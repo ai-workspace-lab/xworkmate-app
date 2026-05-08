@@ -302,13 +302,12 @@ extension AppControllerDesktopThreadBinding on AppController {
       ),
       lifecycleState:
           (snapshot.record?.lifecycleState ??
-                  const ThreadLifecycleState(
-                    archived: false,
-                    status: 'ready',
-                    lastRunAtMs: null,
-                    lastResultCode: null,
-                  ))
-              .copyWith(status: 'ready'),
+          const ThreadLifecycleState(
+            archived: false,
+            status: 'ready',
+            lastRunAtMs: null,
+            lastResultCode: null,
+          )),
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
     );
   }

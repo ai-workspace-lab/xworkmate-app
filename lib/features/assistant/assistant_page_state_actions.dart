@@ -86,6 +86,9 @@ extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
     if (rawPrompt.isEmpty) {
       return;
     }
+    if (controller.hasAssistantPendingRun) {
+      await createNewThreadInternal();
+    }
 
     final autoAgent = pickAutoAgentInternal(controller, rawPrompt);
     if (autoAgent != null) {
@@ -267,15 +270,14 @@ extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
 
   List<String> selectedSkillKeysForInternal(AppController controller) {
     final selected =
-        controller.taskThreadForSessionInternal(controller.currentSessionKey)
+        controller
+            .taskThreadForSessionInternal(controller.currentSessionKey)
             ?.selectedSkillKeys ??
         const <String>[];
-    final availableKeys = availableSkillOptionsInternal(controller)
-        .map((option) => option.key)
-        .toSet();
-    return selected
-        .where(availableKeys.contains)
-        .toList(growable: false);
+    final availableKeys = availableSkillOptionsInternal(
+      controller,
+    ).map((option) => option.key).toSet();
+    return selected.where(availableKeys.contains).toList(growable: false);
   }
 
   List<String> resolveSelectedSkillLabelsInternal(AppController controller) {
@@ -541,6 +543,12 @@ extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
         status: sessionStatusInternal(
           session,
           sessionPending: controller.assistantSessionHasPendingRun(session.key),
+          lifecycleStatus:
+              controller
+                  .taskThreadForSessionInternal(session.key)
+                  ?.lifecycleState
+                  .status ??
+              '',
         ),
         updatedAtMs:
             session.updatedAtMs ??
@@ -846,8 +854,21 @@ extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
     List<GatewayChatMessage> messages,
     AppController controller,
   ) {
+    final thread = controller.taskThreadForSessionInternal(
+      controller.currentSessionKey,
+    );
+    final lifecycleStatus = normalizedTaskStatusInternal(
+      thread?.lifecycleState.status ?? '',
+    );
     if (controller.hasAssistantPendingRun) {
-      return 'running';
+      return switch (lifecycleStatus) {
+        'continuing' => 'continuing',
+        'retrying' => 'retrying',
+        _ => 'running',
+      };
+    }
+    if (lifecycleStatus == 'interrupted') {
+      return 'interrupted';
     }
     if (messages.isEmpty) {
       return null;

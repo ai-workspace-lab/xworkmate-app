@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -790,6 +791,189 @@ void main() {
         );
       },
     );
+
+    test('sendChatMessage runs independent sessions concurrently', () async {
+      final fakeGoTaskService = _BlockingGoTaskServiceClient();
+      final controller = _connectedController(fakeGoTaskService);
+      addTearDown(controller.dispose);
+
+      await controller.sessionsController.switchSession('task-a');
+      final taskAFuture = controller.sendChatMessage('task A');
+      await fakeGoTaskService.waitForRequestCount(1);
+      expect(fakeGoTaskService.requests.single.sessionId, 'task-a');
+      expect(
+        controller
+            .taskThreadForSessionInternal('task-a')
+            ?.lifecycleState
+            .status,
+        'running',
+      );
+
+      await controller.switchSession('task-b');
+      final taskBFuture = controller.sendChatMessage('task B');
+      await fakeGoTaskService.waitForRequestCount(2);
+
+      expect(
+        fakeGoTaskService.requests.map((request) => request.sessionId),
+        <String>['task-a', 'task-b'],
+      );
+      expect(controller.assistantSessionHasPendingRun('task-a'), isTrue);
+      expect(controller.assistantSessionHasPendingRun('task-b'), isTrue);
+
+      fakeGoTaskService.complete(
+        'task-b',
+        const GoTaskServiceResult(
+          success: true,
+          message: 'result B',
+          turnId: 'turn-b',
+          raw: <String, dynamic>{},
+          errorMessage: '',
+          resolvedModel: '',
+          route: GoTaskServiceRoute.externalAcpSingle,
+        ),
+      );
+      await taskBFuture;
+      expect(controller.assistantSessionHasPendingRun('task-a'), isTrue);
+      expect(controller.assistantSessionHasPendingRun('task-b'), isFalse);
+      expect(
+        controller.localSessionMessagesInternal['task-b']!.map(
+          (message) => message.text,
+        ),
+        contains('result B'),
+      );
+      expect(
+        controller.localSessionMessagesInternal['task-a']!.map(
+          (message) => message.text,
+        ),
+        isNot(contains('result B')),
+      );
+
+      fakeGoTaskService.complete(
+        'task-a',
+        const GoTaskServiceResult(
+          success: true,
+          message: 'result A',
+          turnId: 'turn-a',
+          raw: <String, dynamic>{},
+          errorMessage: '',
+          resolvedModel: '',
+          route: GoTaskServiceRoute.externalAcpSingle,
+        ),
+      );
+      await taskAFuture;
+      expect(controller.assistantSessionHasPendingRun('task-a'), isFalse);
+      expect(
+        controller.localSessionMessagesInternal['task-a']!.map(
+          (message) => message.text,
+        ),
+        contains('result A'),
+      );
+    });
+
+    test(
+      'sendChatMessage exposes continuing and retrying lifecycle states',
+      () async {
+        final fakeGoTaskService = _BlockingGoTaskServiceClient();
+        final controller = _connectedController(fakeGoTaskService);
+        addTearDown(controller.dispose);
+
+        await controller.switchSession('interrupted-task');
+        controller.appendLocalSessionMessageInternal(
+          'interrupted-task',
+          GatewayChatMessage(
+            id: 'user-interrupted',
+            role: 'user',
+            text: 'previous turn',
+            timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+            toolCallId: null,
+            toolName: null,
+            stopReason: null,
+            pending: false,
+            error: false,
+          ),
+          persistInThreadContext: true,
+        );
+        controller.upsertTaskThreadInternal(
+          'interrupted-task',
+          lifecycleStatus: 'interrupted',
+          lastResultCode: 'ACP_HTTP_CONNECTION_CLOSED',
+        );
+        expect(
+          controller.hasCommittedUserTurnForGatewaySessionInternal(
+            'interrupted-task',
+          ),
+          isTrue,
+        );
+
+        final continuingFuture = controller.sendChatMessage('continue');
+        await fakeGoTaskService.waitForRequestCount(1);
+        expect(
+          controller
+              .taskThreadForSessionInternal('interrupted-task')
+              ?.lifecycleState
+              .status,
+          'continuing',
+        );
+        fakeGoTaskService.complete(
+          'interrupted-task',
+          const GoTaskServiceResult(
+            success: true,
+            message: 'continued',
+            turnId: 'turn-continued',
+            raw: <String, dynamic>{},
+            errorMessage: '',
+            resolvedModel: '',
+            route: GoTaskServiceRoute.externalAcpSingle,
+          ),
+        );
+        await continuingFuture;
+
+        await controller.switchSession('retry-task');
+        controller.appendLocalSessionMessageInternal(
+          'retry-task',
+          GatewayChatMessage(
+            id: 'user-retry',
+            role: 'user',
+            text: 'previous failed turn',
+            timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+            toolCallId: null,
+            toolName: null,
+            stopReason: null,
+            pending: false,
+            error: false,
+          ),
+          persistInThreadContext: true,
+        );
+        controller.upsertTaskThreadInternal(
+          'retry-task',
+          lifecycleStatus: 'ready',
+          lastResultCode: 'error',
+        );
+
+        final retryFuture = controller.sendChatMessage('retry');
+        await fakeGoTaskService.waitForRequestCount(2);
+        expect(
+          controller
+              .taskThreadForSessionInternal('retry-task')
+              ?.lifecycleState
+              .status,
+          'retrying',
+        );
+        fakeGoTaskService.complete(
+          'retry-task',
+          const GoTaskServiceResult(
+            success: true,
+            message: 'retried',
+            turnId: 'turn-retried',
+            raw: <String, dynamic>{},
+            errorMessage: '',
+            resolvedModel: '',
+            route: GoTaskServiceRoute.externalAcpSingle,
+          ),
+        );
+        await retryFuture;
+      },
+    );
   });
 }
 
@@ -978,6 +1162,74 @@ class _RecordingGoTaskServiceClient implements GoTaskServiceClient {
       resolvedModel: '',
       route: GoTaskServiceRoute.externalAcpSingle,
     );
+  }
+
+  @override
+  Future<void> cancelTask({
+    required GoTaskServiceRoute route,
+    required AssistantExecutionTarget target,
+    required String sessionId,
+    required String threadId,
+  }) async {}
+
+  @override
+  Future<void> closeTask({
+    required GoTaskServiceRoute route,
+    required AssistantExecutionTarget target,
+    required String sessionId,
+    required String threadId,
+  }) async {}
+
+  @override
+  Future<void> dispose() async {}
+}
+
+class _BlockingGoTaskServiceClient implements GoTaskServiceClient {
+  final List<GoTaskServiceRequest> requests = <GoTaskServiceRequest>[];
+  final Map<String, Completer<GoTaskServiceResult>> _pending =
+      <String, Completer<GoTaskServiceResult>>{};
+
+  @override
+  Future<ExternalCodeAgentAcpCapabilities> loadExternalAcpCapabilities({
+    required AssistantExecutionTarget target,
+    bool forceRefresh = false,
+  }) async => const ExternalCodeAgentAcpCapabilities.empty();
+
+  @override
+  Future<ExternalCodeAgentAcpRoutingResolution> resolveExternalAcpRouting({
+    required String taskPrompt,
+    required String workingDirectory,
+    required ExternalCodeAgentAcpRoutingConfig routing,
+  }) async =>
+      const ExternalCodeAgentAcpRoutingResolution(raw: <String, dynamic>{});
+
+  @override
+  Future<GoTaskServiceResult> executeTask(
+    GoTaskServiceRequest request, {
+    required void Function(GoTaskServiceUpdate update) onUpdate,
+  }) {
+    requests.add(request);
+    final completer = Completer<GoTaskServiceResult>();
+    _pending[request.sessionId] = completer;
+    return completer.future;
+  }
+
+  Future<void> waitForRequestCount(int count) async {
+    final deadline = DateTime.now().add(const Duration(seconds: 2));
+    while (requests.length < count && DateTime.now().isBefore(deadline)) {
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+    }
+    if (requests.length < count) {
+      throw StateError('Timed out waiting for $count requests.');
+    }
+  }
+
+  void complete(String sessionId, GoTaskServiceResult result) {
+    final completer = _pending.remove(sessionId);
+    if (completer == null) {
+      throw StateError('No pending task for $sessionId.');
+    }
+    completer.complete(result);
   }
 
   @override

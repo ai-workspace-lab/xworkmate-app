@@ -264,11 +264,19 @@ PillStyleInternal pillStyleForStatusInternal(
       backgroundColor: context.palette.accentMuted,
       foregroundColor: theme.colorScheme.primary,
     ),
+    'continuing' => PillStyleInternal(
+      backgroundColor: context.palette.accentMuted,
+      foregroundColor: theme.colorScheme.primary,
+    ),
+    'retrying' => PillStyleInternal(
+      backgroundColor: context.palette.surfaceSecondary,
+      foregroundColor: theme.colorScheme.tertiary,
+    ),
     'queued' => PillStyleInternal(
       backgroundColor: context.palette.surfaceSecondary,
       foregroundColor: context.palette.textSecondary,
     ),
-    'failed' || 'error' => PillStyleInternal(
+    'interrupted' || 'failed' || 'error' => PillStyleInternal(
       backgroundColor: context.palette.surfacePrimary,
       foregroundColor: theme.colorScheme.error,
     ),
@@ -283,6 +291,9 @@ String normalizedTaskStatusInternal(String status) {
   final value = status.trim().toLowerCase();
   return switch (value) {
     'running' => 'running',
+    'continuing' => 'continuing',
+    'retrying' => 'retrying',
+    'interrupted' => 'interrupted',
     'queued' => 'queued',
     'failed' => 'failed',
     'error' => 'error',
@@ -294,6 +305,9 @@ String normalizedTaskStatusInternal(String status) {
 String toolCallStatusLabelInternal(String status) =>
     switch (normalizedTaskStatusInternal(status)) {
       'running' => appText('运行中', 'Running'),
+      'continuing' => appText('继续中', 'Continuing'),
+      'retrying' => appText('重试中', 'Retrying'),
+      'interrupted' => appText('已中断', 'Interrupted'),
       'failed' || 'error' => appText('错误', 'Error'),
       _ => appText('已完成', 'Completed'),
     };
@@ -347,12 +361,21 @@ String? sessionPreviewInternal(GatewaySessionSummary session) {
 String sessionStatusInternal(
   GatewaySessionSummary session, {
   required bool sessionPending,
+  String lifecycleStatus = '',
 }) {
+  final normalizedLifecycle = normalizedTaskStatusInternal(lifecycleStatus);
   if (session.abortedLastRun == true) {
     return 'failed';
   }
   if (sessionPending) {
-    return 'running';
+    return switch (normalizedLifecycle) {
+      'continuing' => 'continuing',
+      'retrying' => 'retrying',
+      _ => 'running',
+    };
+  }
+  if (normalizedLifecycle == 'interrupted') {
+    return 'interrupted';
   }
   if ((session.lastMessagePreview ?? '').trim().isEmpty) {
     return 'queued';
