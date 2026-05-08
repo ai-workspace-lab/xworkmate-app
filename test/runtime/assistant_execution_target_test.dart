@@ -726,6 +726,99 @@ void main() {
     );
 
     test(
+      'sendChatMessage continues the same session after ACP HTTP handshake interruption',
+      () async {
+        final localWorkspace = await Directory.systemTemp.createTemp(
+          'xworkmate-acp-handshake-interrupt-artifacts-',
+        );
+        addTearDown(() async {
+          if (await localWorkspace.exists()) {
+            await localWorkspace.delete(recursive: true);
+          }
+        });
+        final fakeGoTaskService = _RecordingGoTaskServiceClient()
+          ..updatesBeforeNextOutcome.add(
+            const GoTaskServiceUpdate(
+              sessionId: 'session-1',
+              threadId: 'session-1',
+              turnId: 'turn-1',
+              type: 'delta',
+              text: 'handshake partial output must not persist',
+              message: '',
+              pending: true,
+              error: false,
+              route: GoTaskServiceRoute.externalAcpSingle,
+              payload: <String, dynamic>{},
+            ),
+          )
+          ..outcomes.add(
+            const GatewayAcpException(
+              'ACP HTTP handshake was interrupted before the response started',
+              code: gatewayAcpHttpHandshakeInterruptedCode,
+            ),
+          )
+          ..outcomes.add(
+            GoTaskServiceResult(
+              success: true,
+              message: '全部 6 个文件已生成 ✅',
+              turnId: 'turn-2',
+              raw: <String, dynamic>{'artifacts': _generatedArtifactPayloads()},
+              errorMessage: '',
+              resolvedModel: '',
+              route: GoTaskServiceRoute.externalAcpSingle,
+            ),
+          );
+        final controller = _connectedController(fakeGoTaskService);
+        addTearDown(controller.dispose);
+        controller.resolvedUserHomeDirectoryInternal = localWorkspace.path;
+
+        await controller.sessionsController.switchSession('session-1');
+
+        await controller.sendChatMessage('first turn');
+
+        expect(fakeGoTaskService.requests, hasLength(1));
+        expect(fakeGoTaskService.requests.single.resumeSession, isFalse);
+        final interruptedThread = controller.taskThreadForSessionInternal(
+          'session-1',
+        );
+        expect(interruptedThread?.lifecycleState.status, 'interrupted');
+        expect(
+          interruptedThread?.lifecycleState.lastResultCode,
+          gatewayAcpHttpHandshakeInterruptedCode,
+        );
+        expect(
+          controller.chatMessages.last.text,
+          'Bridge 握手中断；当前对话已保留，下一次发送会继续同一会话。错误码：ACP_HTTP_HANDSHAKE_INTERRUPTED',
+        );
+        expect(
+          controller.chatMessages.map((message) => message.text),
+          isNot(contains('handshake partial output must not persist')),
+        );
+
+        await controller.sendChatMessage('follow up');
+
+        expect(fakeGoTaskService.requests, hasLength(2));
+        expect(fakeGoTaskService.requests.last.resumeSession, isTrue);
+        expect(controller.chatMessages.last.text, '全部 6 个文件已生成 ✅');
+        final thread = controller.taskThreadForSessionInternal('session-1');
+        expect(thread?.lifecycleState.status, 'ready');
+        expect(thread?.lastArtifactSyncStatus, 'synced');
+        expect(thread?.lastArtifactSyncAtMs, greaterThan(0));
+        final workspacePath = controller.assistantWorkspacePathForSession(
+          'session-1',
+        );
+        for (final artifact in _generatedArtifactPayloads()) {
+          final relativePath = artifact['relativePath']! as String;
+          final content = artifact['content']! as String;
+          expect(
+            await File('$workspacePath/$relativePath').readAsString(),
+            content,
+          );
+        }
+      },
+    );
+
+    test(
       'chatMessages does not duplicate persisted local turn messages',
       () async {
         final controller = AppController(
@@ -797,7 +890,7 @@ void main() {
       final controller = _connectedController(fakeGoTaskService);
       addTearDown(controller.dispose);
 
-      await controller.sessionsController.switchSession('task-a');
+      await controller.switchSession('task-a');
       final taskAFuture = controller.sendChatMessage('task A');
       await fakeGoTaskService.waitForRequestCount(1);
       expect(fakeGoTaskService.requests.single.sessionId, 'task-a');

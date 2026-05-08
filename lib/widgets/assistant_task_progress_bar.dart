@@ -125,17 +125,25 @@ AssistantTaskProgressState assistantTaskProgressState({
     );
   }
   final result = lastResultCode.trim().toUpperCase();
-  if (status == 'interrupted' ||
-      syncStatus == 'interrupted' ||
-      result == 'ACP_HTTP_CONNECTION_CLOSED') {
+  if (status == 'interrupted' || syncStatus == 'interrupted') {
     return AssistantTaskProgressState(
       phase: AssistantTaskProgressPhase.interrupted,
-      label: appText(
-        'Bridge 响应中断，等待下一次发送续写同一会话。',
-        'Bridge response interrupted; the next send will continue this session.',
-      ),
+      label: _interruptedTaskProgressLabel(result),
       value: 0.48,
     );
   }
   return const AssistantTaskProgressState.idle();
+}
+
+String _interruptedTaskProgressLabel(String result) {
+  if (result == 'ACP_HTTP_HANDSHAKE_INTERRUPTED') {
+    return appText(
+      'Bridge 握手中断，等待下一次发送续写同一会话。',
+      'Bridge handshake interrupted; the next send will continue this session.',
+    );
+  }
+  return appText(
+    'Bridge 响应中断，等待下一次发送续写同一会话。',
+    'Bridge response interrupted; the next send will continue this session.',
+  );
 }
