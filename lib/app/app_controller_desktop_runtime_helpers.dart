@@ -3,6 +3,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 import 'package:crypto/crypto.dart' as crypto;
 import 'package:flutter/material.dart';
 import 'app_metadata.dart';
@@ -786,7 +787,8 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     String authorization,
   ) async {
     var bytes = <int>[];
-    for (var attempt = 1; attempt <= 3; attempt++) {
+    const maxAttempts = 5;
+    for (var attempt = 1; attempt <= maxAttempts; attempt++) {
       final result = await _downloadBridgeArtifactBytesOnceInternal(
         uri,
         authorization,
@@ -801,8 +803,9 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
       if (result.completed) {
         return bytes;
       }
-      if (attempt < 3) {
-        await Future<void>.delayed(Duration(milliseconds: attempt * 250));
+      if (attempt < maxAttempts) {
+        final delayMs = math.min(2000, 250 * (1 << (attempt - 1)));
+        await Future<void>.delayed(Duration(milliseconds: delayMs));
       }
     }
     return null;
@@ -948,10 +951,7 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     if (bridgeEndpoint == null) {
       return null;
     }
-    if (_usesOpenClawTaskSubmitEndpointInternal(request)) {
-      return bridgeEndpoint.replace(path: '/gateway/openclaw');
-    }
-    return bridgeEndpoint;
+    return resolveAcpHttpRpcEndpoint(bridgeEndpoint);
   }
 
   Uri? gatewayProfileBaseUriInternal(GatewayConnectionProfile profile) {
@@ -1049,22 +1049,6 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
   int gatewayProfileIndexForExecutionTargetInternal(
     AssistantExecutionTarget target,
   ) => kGatewayRemoteProfileIndex;
-}
-
-bool _usesOpenClawTaskSubmitEndpointInternal(GoTaskServiceRequest request) {
-  if (request.isMultiAgentRequest || !request.target.isGateway) {
-    return false;
-  }
-  final providerId = normalizeSingleAgentProviderId(
-    request.provider.providerId,
-  );
-  if (providerId == kCanonicalGatewayProviderId) {
-    return true;
-  }
-  return normalizeSingleAgentProviderId(
-        request.effectiveRouting.preferredGatewayTarget,
-      ) ==
-      kCanonicalGatewayProviderId;
 }
 
 String _normalizeAuthorizationHeaderInternal(String raw) {

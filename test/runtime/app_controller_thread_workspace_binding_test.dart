@@ -539,6 +539,105 @@ void main() {
     },
   );
 
+  test(
+    'retries bridge artifact downloads up to five weak network attempts',
+    () async {
+      const body = 'download after retries';
+      var requestCount = 0;
+      final server = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() => server.close());
+      server.listen((socket) async {
+        requestCount += 1;
+        final requestBytes = <int>[];
+        await for (final chunk in socket) {
+          requestBytes.addAll(chunk);
+          if (String.fromCharCodes(requestBytes).contains('\r\n\r\n')) {
+            break;
+          }
+        }
+        if (requestCount < 5) {
+          socket.destroy();
+          return;
+        }
+        socket.add(
+          'HTTP/1.1 200 OK\r\n'
+                  'Content-Type: text/plain\r\n'
+                  'Content-Length: ${body.length}\r\n'
+                  '\r\n'
+              .codeUnits,
+        );
+        socket.add(body.codeUnits);
+        await socket.flush();
+        await socket.close();
+      });
+
+      final controller = AppController(
+        environmentOverride: const <String, String>{
+          'BRIDGE_AUTH_TOKEN': 'bridge-token',
+        },
+      );
+      addTearDown(controller.dispose);
+
+      final localWorkspace = await Directory.systemTemp.createTemp(
+        'xworkmate-retry-artifact-workspace-',
+      );
+      addTearDown(() async {
+        if (await localWorkspace.exists()) {
+          await localWorkspace.delete(recursive: true);
+        }
+      });
+      controller.upsertTaskThreadInternal(
+        'session-1',
+        workspaceBinding: WorkspaceBinding(
+          workspaceId: 'session-1',
+          workspaceKind: WorkspaceKind.localFs,
+          workspacePath: localWorkspace.path,
+          displayPath: localWorkspace.path,
+          writable: true,
+        ),
+      );
+
+      final result = GoTaskServiceResult(
+        success: true,
+        message: 'hello',
+        turnId: 'turn-1',
+        raw: <String, dynamic>{
+          'artifacts': <Map<String, dynamic>>[
+            <String, dynamic>{
+              'relativePath': 'reports/retry.txt',
+              'downloadUrl':
+                  'http://xworkmate-bridge.svc.plus:${server.port}/retry.txt',
+              'contentType': 'text/plain',
+            },
+          ],
+        },
+        errorMessage: '',
+        resolvedModel: '',
+        route: GoTaskServiceRoute.externalAcpSingle,
+      );
+
+      final clientFactory = _proxiedClientFactory(server.port);
+      await HttpOverrides.runZoned(() async {
+        await controller.persistGoTaskArtifactsForSessionInternal(
+          'session-1',
+          result,
+        );
+      }, createHttpClient: clientFactory);
+
+      expect(requestCount, 5);
+      expect(
+        await File('${localWorkspace.path}/reports/retry.txt').readAsString(),
+        body,
+      );
+      expect(
+        controller
+            .requireTaskThreadForSessionInternal('session-1')
+            .lastArtifactSyncStatus,
+        'synced',
+      );
+    },
+  );
+
   test('keeps syncing later artifacts when one download fails', () async {
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     addTearDown(() => server.close(force: true));
