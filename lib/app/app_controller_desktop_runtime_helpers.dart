@@ -97,6 +97,9 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     if (delta.isEmpty) {
       return;
     }
+    if (isOpenClawNoExportedArtifactsGuardTextInternal(delta)) {
+      return;
+    }
     final key = normalizedAssistantSessionKeyInternal(sessionKey);
     final current = aiGatewayStreamingTextBySessionInternal[key] ?? '';
     aiGatewayStreamingTextBySessionInternal[key] = '$current$delta';
@@ -312,14 +315,19 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
   bool isOpenClawNoExportedArtifactsGuardResultInternal(
     GoTaskServiceResult result,
   ) {
-    if (!result.success || result.artifacts.isNotEmpty) {
+    if (result.artifacts.isNotEmpty) {
       return false;
     }
     final rawText = jsonLikeTextForDiagnosticsInternal(
       result.raw,
     ).toLowerCase();
-    final messageText = '${result.message}\n${result.errorMessage}\n$rawText'
-        .toLowerCase();
+    return isOpenClawNoExportedArtifactsGuardTextInternal(
+      '${result.message}\n${result.errorMessage}\n$rawText',
+    );
+  }
+
+  bool isOpenClawNoExportedArtifactsGuardTextInternal(String text) {
+    final messageText = text.toLowerCase();
     return messageText.contains('未检测到 openclaw 本轮导出的实际文件') ||
         messageText.contains('未检测到openclaw本轮导出的实际文件') ||
         messageText.contains('口头下载声明') ||

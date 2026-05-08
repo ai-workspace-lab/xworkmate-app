@@ -1279,6 +1279,15 @@ Duration gatewayAcpHttpResponseTimeoutFor(
   if (!_isOpenClawTaskSubmitMethod(method)) {
     return const Duration(seconds: 120);
   }
+  if (_isOpenClawTaskSubmitEndpoint(endpoint)) {
+    return Duration(
+      minutes: gatewayAcpTaskRuntimeBudgetMinutesForParams({
+        'requestedExecutionTarget':
+            AssistantExecutionTarget.gateway.promptValue,
+        ...params,
+      }),
+    );
+  }
   return Duration(minutes: gatewayAcpTaskRuntimeBudgetMinutesForParams(params));
 }
 
