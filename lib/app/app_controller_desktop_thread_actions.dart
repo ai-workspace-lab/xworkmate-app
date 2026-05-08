@@ -333,6 +333,17 @@ extension AppControllerDesktopThreadActions on AppController {
         final resumeSession = hasCommittedUserTurnForGatewaySessionInternal(
           sessionKey,
         );
+        final lifecycleStatus = taskThreadForSessionInternal(
+          sessionKey,
+        )?.lifecycleState.status.trim().toLowerCase();
+        final lastResultCode = taskThreadForSessionInternal(
+          sessionKey,
+        )?.lifecycleState.lastResultCode?.trim().toLowerCase();
+        final runStatus = resumeSession && lifecycleStatus == 'interrupted'
+            ? 'continuing'
+            : resumeSession && lastResultCode == 'error'
+            ? 'retrying'
+            : 'running';
         final userText = message.trim().isEmpty
             ? 'See attached.'
             : message.trim();
@@ -354,9 +365,9 @@ extension AppControllerDesktopThreadActions on AppController {
         aiGatewayPendingSessionKeysInternal.add(sessionKey);
         upsertTaskThreadInternal(
           sessionKey,
-          lifecycleStatus: 'running',
+          lifecycleStatus: runStatus,
           lastRunAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-          lastResultCode: 'running',
+          lastResultCode: runStatus,
           updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
         );
         recomputeTasksInternal();

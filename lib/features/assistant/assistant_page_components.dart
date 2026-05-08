@@ -85,9 +85,12 @@ class AssistantTaskRailStateInternal extends State<AssistantTaskRailInternal> {
         AssistantExecutionTarget.values,
       ),
     );
-    final runningCount = tasks
-        .where((task) => normalizedTaskStatusInternal(task.status) == 'running')
-        .length;
+    final activeCount = tasks.where((task) {
+      final status = normalizedTaskStatusInternal(task.status);
+      return status == 'running' ||
+          status == 'continuing' ||
+          status == 'retrying';
+    }).length;
     final openCount = tasks
         .where((task) => normalizedTaskStatusInternal(task.status) == 'open')
         .length;
@@ -162,7 +165,7 @@ class AssistantTaskRailStateInternal extends State<AssistantTaskRailInternal> {
                   runSpacing: 6,
                   children: [
                     MetaPillInternal(
-                      label: '${appText('运行中', 'Running')} $runningCount',
+                      label: '${appText('运行中', 'Running')} $activeCount',
                       icon: Icons.play_circle_outline_rounded,
                     ),
                     MetaPillInternal(
@@ -363,8 +366,11 @@ class AssistantTaskTileInternal extends StatelessWidget {
                 child: Icon(
                   entry.draft
                       ? Icons.edit_note_rounded
-                      : normalizedTaskStatusInternal(entry.status) == 'running'
+                      : _taskIsActiveInternal(entry.status)
                       ? Icons.play_arrow_rounded
+                      : normalizedTaskStatusInternal(entry.status) ==
+                            'interrupted'
+                      ? Icons.pause_circle_outline_rounded
                       : Icons.task_alt_rounded,
                   size: 15,
                   color: statusStyle.foregroundColor,
@@ -385,11 +391,35 @@ class AssistantTaskTileInternal extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              Text(
-                entry.updatedAtLabel,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: palette.textMuted,
-                ),
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    entry.updatedAtLabel,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: palette.textMuted,
+                    ),
+                  ),
+                  if (_taskShowsProgressInternal(entry.status)) ...[
+                    const SizedBox(height: 4),
+                    SizedBox(
+                      key: ValueKey<String>(
+                        'assistant-task-progress-${entry.sessionKey}',
+                      ),
+                      width: 56,
+                      child: LinearProgressIndicator(
+                        value: _taskProgressValueInternal(entry.status),
+                        minHeight: 3,
+                        color: statusStyle.foregroundColor,
+                        backgroundColor: statusStyle.foregroundColor.withValues(
+                          alpha: 0.16,
+                        ),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                  ],
+                ],
               ),
               const SizedBox(width: 2),
               IconButton(
@@ -412,6 +442,30 @@ class AssistantTaskTileInternal extends StatelessWidget {
       ),
     );
   }
+}
+
+bool _taskIsActiveInternal(String status) {
+  final normalized = normalizedTaskStatusInternal(status);
+  return normalized == 'running' ||
+      normalized == 'continuing' ||
+      normalized == 'retrying';
+}
+
+bool _taskShowsProgressInternal(String status) {
+  final normalized = normalizedTaskStatusInternal(status);
+  return normalized == 'running' ||
+      normalized == 'continuing' ||
+      normalized == 'retrying' ||
+      normalized == 'interrupted';
+}
+
+double? _taskProgressValueInternal(String status) {
+  return switch (normalizedTaskStatusInternal(status)) {
+    'continuing' => 0.62,
+    'retrying' => 0.38,
+    'interrupted' => 0.48,
+    _ => null,
+  };
 }
 
 class AssistantTaskGroupHeaderInternal extends StatelessWidget {

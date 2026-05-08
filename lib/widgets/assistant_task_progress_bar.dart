@@ -2,7 +2,14 @@ import 'package:flutter/material.dart';
 
 import '../i18n/app_language.dart';
 
-enum AssistantTaskProgressPhase { idle, running, syncingArtifacts, interrupted }
+enum AssistantTaskProgressPhase {
+  idle,
+  running,
+  retrying,
+  continuing,
+  syncingArtifacts,
+  interrupted,
+}
 
 class AssistantTaskProgressState {
   const AssistantTaskProgressState({
@@ -37,6 +44,8 @@ class AssistantTaskProgressBar extends StatelessWidget {
     final theme = Theme.of(context);
     final color = state.interrupted
         ? theme.colorScheme.error
+        : state.phase == AssistantTaskProgressPhase.retrying
+        ? theme.colorScheme.tertiary
         : theme.colorScheme.primary;
     return Container(
       key: const Key('assistant-task-progress-bar'),
@@ -87,11 +96,26 @@ AssistantTaskProgressState assistantTaskProgressState({
   required String artifactSyncStatus,
 }) {
   final syncStatus = artifactSyncStatus.trim().toLowerCase();
+  final status = lifecycleStatus.trim().toLowerCase();
   if (pending && syncStatus == 'syncing') {
     return AssistantTaskProgressState(
       phase: AssistantTaskProgressPhase.syncingArtifacts,
       label: appText('正在同步生成文件...', 'Syncing generated files...'),
       value: 0.82,
+    );
+  }
+  if (pending && status == 'continuing') {
+    return AssistantTaskProgressState(
+      phase: AssistantTaskProgressPhase.continuing,
+      label: appText('任务继续中...', 'Continuing task...'),
+      value: 0.62,
+    );
+  }
+  if (pending && status == 'retrying') {
+    return AssistantTaskProgressState(
+      phase: AssistantTaskProgressPhase.retrying,
+      label: appText('任务重试中...', 'Retrying task...'),
+      value: 0.38,
     );
   }
   if (pending) {
@@ -100,7 +124,6 @@ AssistantTaskProgressState assistantTaskProgressState({
       label: appText('任务运行中...', 'Task running...'),
     );
   }
-  final status = lifecycleStatus.trim().toLowerCase();
   final result = lastResultCode.trim().toUpperCase();
   if (status == 'interrupted' ||
       syncStatus == 'interrupted' ||
