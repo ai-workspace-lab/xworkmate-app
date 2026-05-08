@@ -727,6 +727,81 @@ void main() {
     );
 
     test(
+      'sendChatMessage hides OpenClaw artifact guard text after an interrupted continuation',
+      () async {
+        final localWorkspace = await Directory.systemTemp.createTemp(
+          'xworkmate-acp-interrupt-guard-',
+        );
+        addTearDown(() async {
+          if (await localWorkspace.exists()) {
+            await localWorkspace.delete(recursive: true);
+          }
+        });
+        const guardMessage =
+            '未检测到 OpenClaw 本轮导出的实际文件。已阻止口头下载声明进入 artifacts 面板；请重新执行并要求 OpenClaw 在 workspace 中真实生成文件。';
+        final fakeGoTaskService = _RecordingGoTaskServiceClient()
+          ..updatesBeforeNextOutcome.add(
+            const GoTaskServiceUpdate(
+              sessionId: 'session-1',
+              threadId: 'session-1',
+              turnId: 'turn-1',
+              type: 'delta',
+              text: 'guard partial output must not persist',
+              message: '',
+              pending: true,
+              error: false,
+              route: GoTaskServiceRoute.externalAcpSingle,
+              payload: <String, dynamic>{},
+            ),
+          )
+          ..outcomes.add(
+            const GatewayAcpException(
+              'ACP HTTP connection closed before the response finished arriving',
+              code: 'ACP_HTTP_CONNECTION_CLOSED',
+            ),
+          )
+          ..outcomes.add(
+            const GoTaskServiceResult(
+              success: true,
+              message: guardMessage,
+              turnId: 'turn-2',
+              raw: <String, dynamic>{'code': 'OPENCLAW_NO_EXPORTED_ARTIFACTS'},
+              errorMessage: '',
+              resolvedModel: '',
+              route: GoTaskServiceRoute.externalAcpSingle,
+            ),
+          );
+        final controller = _connectedController(fakeGoTaskService);
+        addTearDown(controller.dispose);
+        controller.resolvedUserHomeDirectoryInternal = localWorkspace.path;
+
+        await controller.sessionsController.switchSession('session-1');
+
+        await controller.sendChatMessage('first turn');
+        await controller.sendChatMessage('follow up');
+
+        expect(fakeGoTaskService.requests, hasLength(2));
+        expect(fakeGoTaskService.requests.first.resumeSession, isFalse);
+        expect(fakeGoTaskService.requests.last.resumeSession, isTrue);
+
+        final transcript = controller.chatMessages
+            .map((message) => message.text)
+            .join('\n');
+        expect(transcript, isNot(contains('未检测到 OpenClaw 本轮导出的实际文件')));
+        expect(transcript, isNot(contains('口头下载声明')));
+        expect(
+          transcript,
+          isNot(contains('guard partial output must not persist')),
+        );
+
+        final thread = controller.taskThreadForSessionInternal('session-1');
+        expect(thread?.lifecycleState.status, 'ready');
+        expect(thread?.lastArtifactSyncStatus, 'no-exported-artifacts');
+        expect(thread?.lastArtifactSyncAtMs, greaterThan(0));
+      },
+    );
+
+    test(
       'sendChatMessage continues the same session after ACP HTTP handshake interruption',
       () async {
         final localWorkspace = await Directory.systemTemp.createTemp(
@@ -1036,8 +1111,20 @@ void main() {
     test(
       'sendChatMessage exposes continuing and retrying lifecycle states',
       () async {
-        final fakeGoTaskService = _BlockingGoTaskServiceClient();
-        final controller = _connectedController(fakeGoTaskService);
+        late final AppController controller;
+        final observedRequestStatuses = <String>[];
+        final fakeGoTaskService = _BlockingGoTaskServiceClient(
+          onRequest: (request) {
+            observedRequestStatuses.add(
+              controller
+                      .taskThreadForSessionInternal(request.sessionId)
+                      ?.lifecycleState
+                      .status ??
+                  '',
+            );
+          },
+        );
+        controller = _connectedController(fakeGoTaskService);
         addTearDown(controller.dispose);
 
         await controller.switchSession('interrupted-task');
@@ -1070,10 +1157,10 @@ void main() {
 
         final continuingFuture = controller.sendChatMessage('continue');
         await fakeGoTaskService.waitForRequestCount(1);
-        await _waitForThreadLifecycleStatus(
-          controller,
-          'interrupted-task',
-          'continuing',
+        expect(observedRequestStatuses.single, 'continuing');
+        expect(
+          controller.assistantSessionHasPendingRun('interrupted-task'),
+          isTrue,
         );
         fakeGoTaskService.complete(
           'interrupted-task',
@@ -1113,11 +1200,8 @@ void main() {
 
         final retryFuture = controller.sendChatMessage('retry');
         await fakeGoTaskService.waitForRequestCount(2);
-        await _waitForThreadLifecycleStatus(
-          controller,
-          'retry-task',
-          'retrying',
-        );
+        expect(observedRequestStatuses.last, 'retrying');
+        expect(controller.assistantSessionHasPendingRun('retry-task'), isTrue);
         fakeGoTaskService.complete(
           'retry-task',
           const GoTaskServiceResult(
@@ -1178,28 +1262,6 @@ Future<_CapabilityServerCapture> _startCapabilityServer() async {
     await request.response.close();
   });
   return capture;
-}
-
-Future<void> _waitForThreadLifecycleStatus(
-  AppController controller,
-  String sessionKey,
-  String expectedStatus,
-) async {
-  final deadline = DateTime.now().add(const Duration(seconds: 2));
-  while (DateTime.now().isBefore(deadline)) {
-    final status = controller
-        .taskThreadForSessionInternal(sessionKey)
-        ?.lifecycleState
-        .status;
-    if (status == expectedStatus) {
-      return;
-    }
-    await Future<void>.delayed(const Duration(milliseconds: 10));
-  }
-  expect(
-    controller.taskThreadForSessionInternal(sessionKey)?.lifecycleState.status,
-    expectedStatus,
-  );
 }
 
 Future<void> _waitForLastChatMessageText(
@@ -1384,6 +1446,9 @@ class _RecordingGoTaskServiceClient implements GoTaskServiceClient {
 }
 
 class _BlockingGoTaskServiceClient implements GoTaskServiceClient {
+  _BlockingGoTaskServiceClient({this.onRequest});
+
+  final void Function(GoTaskServiceRequest request)? onRequest;
   final List<GoTaskServiceRequest> requests = <GoTaskServiceRequest>[];
   final List<String> cancelledSessionIds = <String>[];
   final Map<String, Completer<GoTaskServiceResult>> _pending =
@@ -1411,6 +1476,7 @@ class _BlockingGoTaskServiceClient implements GoTaskServiceClient {
     required void Function(GoTaskServiceUpdate update) onUpdate,
   }) {
     requests.add(request);
+    onRequest?.call(request);
     _updates[request.sessionId] = onUpdate;
     final completer = Completer<GoTaskServiceResult>();
     _pending[request.sessionId] = completer;
@@ -1418,7 +1484,7 @@ class _BlockingGoTaskServiceClient implements GoTaskServiceClient {
   }
 
   Future<void> waitForRequestCount(int count) async {
-    final deadline = DateTime.now().add(const Duration(seconds: 2));
+    final deadline = DateTime.now().add(const Duration(seconds: 5));
     while (requests.length < count && DateTime.now().isBefore(deadline)) {
       await Future<void>.delayed(const Duration(milliseconds: 10));
     }
