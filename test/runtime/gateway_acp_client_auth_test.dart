@@ -915,6 +915,84 @@ void main() {
     );
 
     test(
+      'desktop task execution keeps OpenClaw SSE alive until final result',
+      () async {
+        final capture = await _startAcpHttpServer(
+          streamResponse: true,
+          streamNotifications: <Map<String, dynamic>>[
+            <String, dynamic>{
+              'jsonrpc': '2.0',
+              'method': 'xworkmate.bridge.accepted',
+              'params': <String, dynamic>{
+                'sessionId': 'session-1',
+                'threadId': 'session-1',
+              },
+            },
+            <String, dynamic>{
+              'jsonrpc': '2.0',
+              'method': 'xworkmate.bridge.keepalive',
+              'params': <String, dynamic>{'intervalMs': 20000},
+            },
+            <String, dynamic>{
+              'jsonrpc': '2.0',
+              'method': 'xworkmate.bridge.keepalive',
+              'params': <String, dynamic>{'intervalMs': 20000},
+            },
+          ],
+          result: <String, dynamic>{
+            'success': true,
+            'status': 'completed',
+            'output': 'done',
+          },
+        );
+        addTearDown(capture.close);
+        final client = GatewayAcpClient(
+          endpointResolver: () => capture.baseEndpoint,
+          authorizationResolver: (_) async => 'bridge-token',
+        );
+        final notifications = <Map<String, dynamic>>[];
+
+        final response = await client.request(
+          method: 'session.start',
+          params: <String, dynamic>{
+            'sessionId': 'session-1',
+            'threadId': 'session-1',
+            'taskPrompt': 'Reply done',
+            'executionTarget': 'gateway',
+            'routing': <String, dynamic>{
+              'routingMode': 'explicit',
+              'explicitExecutionTarget': 'gateway',
+              'preferredGatewayProviderId': 'openclaw',
+            },
+          },
+          endpointOverride: capture.baseEndpoint.replace(
+            path: '/gateway/openclaw',
+          ),
+          onNotification: notifications.add,
+        );
+
+        final diagnostics = (response['_xworkmateDiagnostics'] as Map)
+            .cast<String, dynamic>();
+        expect(capture.requestPath, '/gateway/openclaw');
+        expect((response['result'] as Map)['output'], 'done');
+        expect(diagnostics['transport'], 'http-sse');
+        expect(diagnostics['requestUrl'], contains('/gateway/openclaw'));
+        expect(diagnostics['bodyRead'], isTrue);
+        expect(diagnostics['sseKeepaliveReceived'], isTrue);
+        expect(diagnostics['sseLastEventAtMs'], isPositive);
+        expect(diagnostics['sseEventCount'], 4);
+        expect(
+          notifications.map((item) => item['method']),
+          containsAllInOrder(<String>[
+            'xworkmate.bridge.accepted',
+            'xworkmate.bridge.keepalive',
+            'xworkmate.bridge.keepalive',
+          ]),
+        );
+      },
+    );
+
+    test(
       'desktop OpenClaw follow-up routes through required task endpoint',
       () async {
         final capture = await _startAcpHttpServer();
@@ -1370,6 +1448,8 @@ GoTaskServiceRequest _taskRequest({
 Future<_CapturedAcpHttpServer> _startAcpHttpServer({
   Map<String, dynamic> result = const <String, dynamic>{'ok': true},
   bool streamResponse = false,
+  List<Map<String, dynamic>> streamNotifications =
+      const <Map<String, dynamic>>[],
 }) async {
   final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
   final capture = _CapturedAcpHttpServer._(
@@ -1396,6 +1476,10 @@ Future<_CapturedAcpHttpServer> _startAcpHttpServer({
         HttpHeaders.contentTypeHeader,
         'text/event-stream',
       );
+      for (final notification in streamNotifications) {
+        request.response.write('data: ${jsonEncode(notification)}\n\n');
+        await request.response.flush();
+      }
       request.response.write('data: $envelope\n\n');
       request.response.write('data: [DONE]\n\n');
     } else {

@@ -671,13 +671,16 @@ class GatewayAcpClient {
           onNotification: onNotification,
         );
         return <String, dynamic>{
-          ...decoded,
+          ...decoded.response,
           '_xworkmateDiagnostics': <String, dynamic>{
             'transport': 'http-sse',
             'requestUrl': endpoint.toString(),
             'statusCode': response.statusCode,
             'contentType': contentType,
             'bodyRead': true,
+            'sseKeepaliveReceived': decoded.keepaliveReceived,
+            'sseLastEventAtMs': decoded.lastEventAtMs,
+            'sseEventCount': decoded.eventCount,
           },
         };
       }
@@ -967,26 +970,35 @@ class GatewayAcpClient {
     return RegExp(r"^[A-Za-z][A-Za-z0-9!#$%&'*+.^_`|~-]*$").hasMatch(scheme);
   }
 
-  Future<Map<String, dynamic>> _consumeSseRpcResponse({
+  Future<_GatewayAcpSseRpcResponse> _consumeSseRpcResponse({
     required HttpClientResponse response,
     required String requestId,
     required void Function(Map<String, dynamic>) onNotification,
   }) async {
     Map<String, dynamic>? resolvedResponse;
     final eventLines = <String>[];
+    var eventCount = 0;
+    var keepaliveReceived = false;
+    var lastEventAtMs = 0;
 
     void consumeEventPayload(String payload) {
       final trimmed = payload.trim();
       if (trimmed.isEmpty || trimmed == '[DONE]') {
         return;
       }
+      eventCount += 1;
+      lastEventAtMs = DateTime.now().millisecondsSinceEpoch;
       final json = _decodeMap(trimmed);
       if (stringValue(json['id']) == requestId &&
           (json.containsKey('result') || json.containsKey('error'))) {
         resolvedResponse ??= json;
         return;
       }
-      if ((stringValue(json['method']) ?? '').isNotEmpty) {
+      final method = stringValue(json['method']) ?? '';
+      if (method == 'xworkmate.bridge.keepalive') {
+        keepaliveReceived = true;
+      }
+      if (method.isNotEmpty) {
         onNotification(json);
       }
     }
@@ -1019,7 +1031,12 @@ class GatewayAcpClient {
       );
     }
     _throwIfJsonRpcError(resolved);
-    return resolved;
+    return _GatewayAcpSseRpcResponse(
+      response: resolved,
+      keepaliveReceived: keepaliveReceived,
+      lastEventAtMs: lastEventAtMs,
+      eventCount: eventCount,
+    );
   }
 
   _GatewayAcpSessionUpdate? _sessionUpdateFromNotification(
@@ -1371,4 +1388,18 @@ class _GatewayAcpRpcRequest {
   final String id;
   final String method;
   final Map<String, dynamic> params;
+}
+
+class _GatewayAcpSseRpcResponse {
+  const _GatewayAcpSseRpcResponse({
+    required this.response,
+    required this.keepaliveReceived,
+    required this.lastEventAtMs,
+    required this.eventCount,
+  });
+
+  final Map<String, dynamic> response;
+  final bool keepaliveReceived;
+  final int lastEventAtMs;
+  final int eventCount;
 }
