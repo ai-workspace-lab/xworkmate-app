@@ -470,17 +470,20 @@ extension AppControllerDesktopThreadActions on AppController {
           );
         } catch (error) {
           clearAiGatewayStreamingTextInternal(sessionKey);
-          final connectionClosed = isAcpHttpConnectionClosedErrorInternal(
-            error,
-          );
+          final recoverableTransportCode =
+              recoverableAcpHttpTransportCodeInternal(error);
+          final recoverableTransportInterrupted =
+              recoverableTransportCode != null;
           upsertTaskThreadInternal(
             sessionKey,
-            lifecycleStatus: connectionClosed ? 'interrupted' : 'ready',
+            lifecycleStatus: recoverableTransportInterrupted
+                ? 'interrupted'
+                : 'ready',
             lastRunAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-            lastResultCode: connectionClosed
-                ? 'ACP_HTTP_CONNECTION_CLOSED'
-                : 'error',
-            lastArtifactSyncStatus: connectionClosed ? 'interrupted' : null,
+            lastResultCode: recoverableTransportCode ?? 'error',
+            lastArtifactSyncStatus: recoverableTransportInterrupted
+                ? 'interrupted'
+                : null,
             updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
           );
           appendLocalSessionMessageInternal(

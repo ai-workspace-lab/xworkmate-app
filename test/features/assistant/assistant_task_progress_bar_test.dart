@@ -114,6 +114,27 @@ void main() {
     expect(indicator.value, 0.48);
   });
 
+  testWidgets('shows interrupted state after ACP handshake interruption', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _buildTestApp(
+        assistantTaskProgressState(
+          pending: false,
+          lifecycleStatus: 'interrupted',
+          lastResultCode: 'ACP_HTTP_HANDSHAKE_INTERRUPTED',
+          artifactSyncStatus: 'interrupted',
+        ),
+      ),
+    );
+
+    expect(find.text('Bridge 握手中断，等待下一次发送续写同一会话。'), findsOneWidget);
+    final indicator = tester.widget<LinearProgressIndicator>(
+      find.byKey(const Key('assistant-task-progress-indicator')),
+    );
+    expect(indicator.value, 0.48);
+  });
+
   testWidgets('hides idle progress state', (tester) async {
     await tester.pumpWidget(
       _buildTestApp(const AssistantTaskProgressState.idle()),
