@@ -230,10 +230,19 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     final lowered = raw.toLowerCase();
     final detailCode = gatewayExecutionDetailCodeInternal(error);
     final primaryCode = gatewayExecutionPrimaryCodeInternal(error);
-    if (isAcpHttpConnectionClosedErrorInternal(error)) {
+    final recoverableTransportCode = recoverableAcpHttpTransportCodeInternal(
+      error,
+    );
+    if (recoverableTransportCode == 'ACP_HTTP_CONNECTION_CLOSED') {
       return appText(
         'Bridge 响应读取中断；当前对话已保留，下一次发送会继续同一会话。错误码：ACP_HTTP_CONNECTION_CLOSED',
         'Bridge response was interrupted; this conversation was kept, and the next send will continue the same session. Error code: ACP_HTTP_CONNECTION_CLOSED',
+      );
+    }
+    if (recoverableTransportCode == 'ACP_HTTP_HANDSHAKE_INTERRUPTED') {
+      return appText(
+        'Bridge 握手中断；当前对话已保留，下一次发送会继续同一会话。错误码：ACP_HTTP_HANDSHAKE_INTERRUPTED',
+        'Bridge handshake was interrupted; this conversation was kept, and the next send will continue the same session. Error code: ACP_HTTP_HANDSHAKE_INTERRUPTED',
       );
     }
     final continuationUnavailable =
@@ -295,12 +304,25 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
   }
 
   bool isAcpHttpConnectionClosedErrorInternal(Object error) {
+    return recoverableAcpHttpTransportCodeInternal(error) ==
+        'ACP_HTTP_CONNECTION_CLOSED';
+  }
+
+  String? recoverableAcpHttpTransportCodeInternal(Object error) {
     final raw = error.toString().trim();
     final primaryCode = gatewayExecutionPrimaryCodeInternal(error);
     final detailCode = gatewayExecutionDetailCodeInternal(error);
-    return primaryCode == 'ACP_HTTP_CONNECTION_CLOSED' ||
+    if (primaryCode == 'ACP_HTTP_CONNECTION_CLOSED' ||
         detailCode == 'ACP_HTTP_CONNECTION_CLOSED' ||
-        raw.contains('ACP_HTTP_CONNECTION_CLOSED');
+        raw.contains('ACP_HTTP_CONNECTION_CLOSED')) {
+      return 'ACP_HTTP_CONNECTION_CLOSED';
+    }
+    if (primaryCode == 'ACP_HTTP_HANDSHAKE_INTERRUPTED' ||
+        detailCode == 'ACP_HTTP_HANDSHAKE_INTERRUPTED' ||
+        raw.contains('ACP_HTTP_HANDSHAKE_INTERRUPTED')) {
+      return 'ACP_HTTP_HANDSHAKE_INTERRUPTED';
+    }
+    return null;
   }
 
   String formatAiGatewayHttpErrorInternal(int statusCode, String detail) {

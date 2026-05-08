@@ -476,6 +476,60 @@ void main() {
       },
     );
 
+    test(
+      'retries interrupted TLS handshakes before surfacing ACP diagnostics',
+      () async {
+        final server = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+        var acceptedSockets = 0;
+        addTearDown(() => server.close());
+        server.listen((socket) {
+          acceptedSockets += 1;
+          socket.destroy();
+        });
+        final endpoint = Uri.parse('https://127.0.0.1:${server.port}');
+        final client = GatewayAcpClient(endpointResolver: () => endpoint);
+
+        await expectLater(
+          client.request(
+            method: 'session.start',
+            params: const <String, dynamic>{},
+          ),
+          throwsA(
+            isA<GatewayAcpException>()
+                .having(
+                  (error) => error.code,
+                  'code',
+                  gatewayAcpHttpHandshakeInterruptedCode,
+                )
+                .having(
+                  (error) => error.message,
+                  'message',
+                  contains('handshake was interrupted'),
+                )
+                .having(
+                  (error) => error.details,
+                  'details',
+                  allOf(
+                    containsPair('requestUrl', '$endpoint/acp/rpc'),
+                    containsPair(
+                      'maxRetryAttempts',
+                      gatewayAcpHttpHandshakeInterruptedRetryCount,
+                    ),
+                    containsPair(
+                      'retryAttempt',
+                      gatewayAcpHttpHandshakeInterruptedRetryCount,
+                    ),
+                  ),
+                ),
+          ),
+        );
+        expect(
+          acceptedSockets,
+          gatewayAcpHttpHandshakeInterruptedRetryCount + 1,
+        );
+      },
+    );
+
     test('desktop bridge auth resolver skips unrelated endpoints', () async {
       final storeRoot = await Directory.systemTemp.createTemp(
         'xworkmate-acp-auth-unrelated-',

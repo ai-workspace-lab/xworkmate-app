@@ -5,6 +5,10 @@ import 'dart:io';
 import 'acp_endpoint_paths.dart';
 import 'runtime_models.dart';
 
+const int gatewayAcpHttpHandshakeInterruptedRetryCount = 5;
+const String gatewayAcpHttpHandshakeInterruptedCode =
+    'ACP_HTTP_HANDSHAKE_INTERRUPTED';
+
 class GatewayAcpException implements Exception {
   const GatewayAcpException(
     this.message, {
@@ -560,6 +564,43 @@ class GatewayAcpClient {
       );
     }
 
+    GatewayAcpException? lastHandshakeError;
+    for (
+      var attempt = 0;
+      attempt <= gatewayAcpHttpHandshakeInterruptedRetryCount;
+      attempt += 1
+    ) {
+      try {
+        return await _requestViaHttpAttempt(
+          request,
+          endpoint: endpoint,
+          onNotification: onNotification,
+          authorizationOverride: authorizationOverride,
+          retryAttempt: attempt,
+        );
+      } on GatewayAcpException catch (error) {
+        if (error.code != gatewayAcpHttpHandshakeInterruptedCode ||
+            attempt == gatewayAcpHttpHandshakeInterruptedRetryCount) {
+          rethrow;
+        }
+        lastHandshakeError = error;
+        await Future<void>.delayed(Duration(milliseconds: 50 * (attempt + 1)));
+      }
+    }
+    throw lastHandshakeError ??
+        const GatewayAcpException(
+          'ACP HTTP handshake was interrupted before the response started',
+          code: gatewayAcpHttpHandshakeInterruptedCode,
+        );
+  }
+
+  Future<Map<String, dynamic>> _requestViaHttpAttempt(
+    _GatewayAcpRpcRequest request, {
+    required Uri endpoint,
+    required void Function(Map<String, dynamic>) onNotification,
+    required String authorizationOverride,
+    required int retryAttempt,
+  }) async {
     final client = HttpClient()..connectionTimeout = const Duration(seconds: 8);
     var statusCode = 0;
     var contentType = '';
@@ -652,6 +693,32 @@ class GatewayAcpClient {
       };
     } on GatewayAcpException {
       rethrow;
+    } on HandshakeException catch (error) {
+      throw _handshakeInterruptedException(
+        endpoint: endpoint,
+        statusCode: statusCode,
+        contentType: contentType,
+        bodyRead: bodyRead,
+        retryAttempt: retryAttempt,
+        originalError: error,
+      );
+    } on SocketException catch (error) {
+      if (_looksLikeHandshakeInterruptedSocketError(
+        error.toString(),
+        endpoint: endpoint,
+        statusCode: statusCode,
+        bodyRead: bodyRead,
+      )) {
+        throw _handshakeInterruptedException(
+          endpoint: endpoint,
+          statusCode: statusCode,
+          contentType: contentType,
+          bodyRead: bodyRead,
+          retryAttempt: retryAttempt,
+          originalError: error,
+        );
+      }
+      rethrow;
     } on HttpException catch (error) {
       if (_looksLikeConnectionClosedBeforeResponse(error.toString())) {
         throw GatewayAcpException(
@@ -670,6 +737,44 @@ class GatewayAcpClient {
     } finally {
       client.close(force: true);
     }
+  }
+
+  GatewayAcpException _handshakeInterruptedException({
+    required Uri endpoint,
+    required int statusCode,
+    required String contentType,
+    required bool bodyRead,
+    required int retryAttempt,
+    required Object originalError,
+  }) {
+    return GatewayAcpException(
+      'ACP HTTP handshake was interrupted before the response started',
+      code: gatewayAcpHttpHandshakeInterruptedCode,
+      details: <String, dynamic>{
+        'requestUrl': endpoint.toString(),
+        'statusCode': statusCode,
+        'contentType': contentType,
+        'bodyRead': bodyRead,
+        'retryAttempt': retryAttempt,
+        'maxRetryAttempts': gatewayAcpHttpHandshakeInterruptedRetryCount,
+        'originalError': originalError.toString(),
+      },
+    );
+  }
+
+  bool _looksLikeHandshakeInterruptedSocketError(
+    String raw, {
+    required Uri endpoint,
+    required int statusCode,
+    required bool bodyRead,
+  }) {
+    if (endpoint.scheme != 'https' || statusCode != 0 || bodyRead) {
+      return false;
+    }
+    final lowered = raw.toLowerCase();
+    return lowered.contains('connection reset') ||
+        lowered.contains('read failed') ||
+        lowered.contains('connection terminated during handshake');
   }
 
   bool _looksLikeConnectionClosedBeforeResponse(String raw) {

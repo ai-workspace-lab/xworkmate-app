@@ -183,6 +183,32 @@ void main() {
     );
 
     test(
+      'labels interrupted ACP HTTP handshakes as recoverable conversation state',
+      () async {
+        final controller = await _isolatedController();
+        addTearDown(controller.dispose);
+
+        final label = controller.gatewayExecutionErrorLabelInternal(
+          const GatewayAcpException(
+            'ACP HTTP handshake was interrupted before the response started',
+            code: gatewayAcpHttpHandshakeInterruptedCode,
+          ),
+          target: AssistantExecutionTarget.gateway,
+        );
+
+        expect(
+          label,
+          'Bridge 握手中断；当前对话已保留，下一次发送会继续同一会话。错误码：ACP_HTTP_HANDSHAKE_INTERRUPTED',
+        );
+        expect(
+          label,
+          isNot(contains('Connection terminated during handshake')),
+        );
+        expect(label, isNot(contains('handshake was interrupted')));
+      },
+    );
+
+    test(
       'labels unavailable session continuation without starting a new flow',
       () async {
         final controller = await _isolatedController();
