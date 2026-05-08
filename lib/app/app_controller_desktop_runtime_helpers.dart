@@ -951,6 +951,9 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     if (bridgeEndpoint == null) {
       return null;
     }
+    if (_usesOpenClawTaskSubmitEndpointInternal(request)) {
+      return bridgeEndpoint.replace(path: '/gateway/openclaw');
+    }
     return resolveAcpHttpRpcEndpoint(bridgeEndpoint);
   }
 
@@ -1049,6 +1052,22 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
   int gatewayProfileIndexForExecutionTargetInternal(
     AssistantExecutionTarget target,
   ) => kGatewayRemoteProfileIndex;
+}
+
+bool _usesOpenClawTaskSubmitEndpointInternal(GoTaskServiceRequest request) {
+  if (request.isMultiAgentRequest || !request.target.isGateway) {
+    return false;
+  }
+  final providerId = normalizeSingleAgentProviderId(
+    request.provider.providerId,
+  );
+  if (providerId == kCanonicalGatewayProviderId) {
+    return true;
+  }
+  return normalizeSingleAgentProviderId(
+        request.effectiveRouting.preferredGatewayTarget,
+      ) ==
+      kCanonicalGatewayProviderId;
 }
 
 String _normalizeAuthorizationHeaderInternal(String raw) {
