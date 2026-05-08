@@ -424,6 +424,10 @@ extension AppControllerDesktopThreadActions on AppController {
             lastResultCode: result.success ? 'success' : 'error',
             updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
           );
+          if (isOpenClawNoExportedArtifactsGuardResultInternal(result)) {
+            await persistGoTaskArtifactsForSessionInternal(sessionKey, result);
+            return;
+          }
           if (!result.success) {
             appendLocalSessionMessageInternal(
               sessionKey,
@@ -440,10 +444,6 @@ extension AppControllerDesktopThreadActions on AppController {
               ),
               persistInThreadContext: true,
             );
-            return;
-          }
-          if (isOpenClawNoExportedArtifactsGuardResultInternal(result)) {
-            await persistGoTaskArtifactsForSessionInternal(sessionKey, result);
             return;
           }
           final assistantText = result.message.trim();
