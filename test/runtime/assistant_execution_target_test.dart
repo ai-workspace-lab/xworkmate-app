@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:xworkmate/app/app_controller.dart';
 import 'package:xworkmate/app/app_controller_desktop_external_acp_routing.dart';
 import 'package:xworkmate/features/assistant/assistant_page_composer_skill_models.dart';
+import 'package:xworkmate/runtime/gateway_acp_client.dart';
 import 'package:xworkmate/runtime/go_task_service_client.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
 import 'package:xworkmate/runtime/secure_config_store.dart';
@@ -540,7 +541,7 @@ void main() {
     );
 
     test(
-      'sendChatMessage resumes only when the thread has non-error user or assistant history',
+      'sendChatMessage resumes only when the thread already has a committed user turn',
       () async {
         final controller = AppController(
           environmentOverride: const <String, String>{},
@@ -549,7 +550,7 @@ void main() {
 
         await controller.sessionsController.switchSession('session-1');
         expect(
-          controller.hasResumableGatewaySessionHistoryInternal('session-1'),
+          controller.hasCommittedUserTurnForGatewaySessionInternal('session-1'),
           isFalse,
         );
 
@@ -570,7 +571,28 @@ void main() {
         );
 
         expect(
-          controller.hasResumableGatewaySessionHistoryInternal('session-1'),
+          controller.hasCommittedUserTurnForGatewaySessionInternal('session-1'),
+          isFalse,
+        );
+
+        controller.appendLocalSessionMessageInternal(
+          'session-1',
+          GatewayChatMessage(
+            id: 'assistant-1',
+            role: 'assistant',
+            text: 'assistant-only history',
+            timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+            toolCallId: null,
+            toolName: null,
+            stopReason: null,
+            pending: false,
+            error: false,
+          ),
+          persistInThreadContext: true,
+        );
+
+        expect(
+          controller.hasCommittedUserTurnForGatewaySessionInternal('session-1'),
           isFalse,
         );
 
@@ -591,9 +613,83 @@ void main() {
         );
 
         expect(
-          controller.hasResumableGatewaySessionHistoryInternal('session-1'),
+          controller.hasCommittedUserTurnForGatewaySessionInternal('session-1'),
           isTrue,
         );
+      },
+    );
+
+    test('sendChatMessage starts an empty thread with session.start', () async {
+      final fakeGoTaskService = _RecordingGoTaskServiceClient();
+      final controller = _connectedController(fakeGoTaskService);
+      addTearDown(controller.dispose);
+
+      await controller.sessionsController.switchSession('session-1');
+
+      await controller.sendChatMessage('first turn');
+
+      expect(fakeGoTaskService.requests, hasLength(1));
+      expect(fakeGoTaskService.requests.single.resumeSession, isFalse);
+    });
+
+    test(
+      'sendChatMessage continues the same session after ACP HTTP connection close',
+      () async {
+        final fakeGoTaskService = _RecordingGoTaskServiceClient()
+          ..updatesBeforeNextOutcome.add(
+            const GoTaskServiceUpdate(
+              sessionId: 'session-1',
+              threadId: 'session-1',
+              turnId: 'turn-1',
+              type: 'delta',
+              text: 'partial output that must not persist',
+              message: '',
+              pending: true,
+              error: false,
+              route: GoTaskServiceRoute.externalAcpSingle,
+              payload: <String, dynamic>{},
+            ),
+          )
+          ..outcomes.add(
+            const GatewayAcpException(
+              'ACP HTTP connection closed before the response finished arriving',
+              code: 'ACP_HTTP_CONNECTION_CLOSED',
+            ),
+          )
+          ..outcomes.add(
+            const GoTaskServiceResult(
+              success: true,
+              message: 'continued response',
+              turnId: 'turn-2',
+              raw: <String, dynamic>{},
+              errorMessage: '',
+              resolvedModel: '',
+              route: GoTaskServiceRoute.externalAcpSingle,
+            ),
+          );
+        final controller = _connectedController(fakeGoTaskService);
+        addTearDown(controller.dispose);
+
+        await controller.sessionsController.switchSession('session-1');
+
+        await controller.sendChatMessage('first turn');
+
+        expect(fakeGoTaskService.requests, hasLength(1));
+        expect(fakeGoTaskService.requests.single.resumeSession, isFalse);
+        expect(
+          controller.chatMessages.last.text,
+          'Bridge 响应读取中断；当前对话已保留，下一次发送会继续同一会话。错误码：ACP_HTTP_CONNECTION_CLOSED',
+        );
+        expect(
+          controller.chatMessages.map((message) => message.text),
+          isNot(contains('partial output that must not persist')),
+        );
+
+        await controller.sendChatMessage('follow up');
+
+        expect(fakeGoTaskService.requests, hasLength(2));
+        expect(fakeGoTaskService.requests.last.resumeSession, isTrue);
+        expect(controller.chatMessages.last.text, 'continued response');
       },
     );
 
@@ -751,8 +847,27 @@ class _CapabilityServerCapture {
   Future<void> close() => _server.close(force: true);
 }
 
+AppController _connectedController(GoTaskServiceClient client) {
+  return AppController(
+    goTaskServiceClient: client,
+    environmentOverride: const <String, String>{
+      'BRIDGE_AUTH_TOKEN': 'bridge-token',
+    },
+    initialBridgeProviderCatalog: const <SingleAgentProvider>[
+      SingleAgentProvider.codex,
+    ],
+    initialAvailableExecutionTargets: const <AssistantExecutionTarget>[
+      AssistantExecutionTarget.agent,
+    ],
+  );
+}
+
 class _RecordingGoTaskServiceClient implements GoTaskServiceClient {
   int executeCount = 0;
+  final List<GoTaskServiceRequest> requests = <GoTaskServiceRequest>[];
+  final List<GoTaskServiceUpdate> updatesBeforeNextOutcome =
+      <GoTaskServiceUpdate>[];
+  final List<Object> outcomes = <Object>[];
 
   @override
   Future<ExternalCodeAgentAcpCapabilities> loadExternalAcpCapabilities({
@@ -774,9 +889,23 @@ class _RecordingGoTaskServiceClient implements GoTaskServiceClient {
     required void Function(GoTaskServiceUpdate update) onUpdate,
   }) async {
     executeCount += 1;
+    requests.add(request);
+    for (final update in List<GoTaskServiceUpdate>.from(
+      updatesBeforeNextOutcome,
+    )) {
+      onUpdate(update);
+    }
+    updatesBeforeNextOutcome.clear();
+    if (outcomes.isNotEmpty) {
+      final outcome = outcomes.removeAt(0);
+      if (outcome is GoTaskServiceResult) {
+        return outcome;
+      }
+      throw outcome;
+    }
     return const GoTaskServiceResult(
       success: true,
-      message: 'unexpected executeTask call',
+      message: 'ok',
       turnId: 'turn',
       raw: <String, dynamic>{},
       errorMessage: '',

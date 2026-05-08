@@ -330,7 +330,7 @@ extension AppControllerDesktopThreadActions on AppController {
         final sessionKey = normalizedAssistantSessionKeyInternal(
           currentSessionKey,
         );
-        final resumeSession = hasResumableGatewaySessionHistoryInternal(
+        final resumeSession = hasCommittedUserTurnForGatewaySessionInternal(
           sessionKey,
         );
         final userText = message.trim().isEmpty
@@ -477,7 +477,7 @@ extension AppControllerDesktopThreadActions on AppController {
     recomputeTasksInternal();
   }
 
-  bool hasResumableGatewaySessionHistoryInternal(String sessionKey) {
+  bool hasCommittedUserTurnForGatewaySessionInternal(String sessionKey) {
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey,
     );
@@ -488,10 +488,7 @@ extension AppControllerDesktopThreadActions on AppController {
     ];
     return messages.any((message) {
       final role = message.role.trim().toLowerCase();
-      if (message.error || role.isEmpty) {
-        return false;
-      }
-      return role == 'user' || role == 'assistant';
+      return role == 'user' && !message.pending;
     });
   }
 

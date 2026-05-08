@@ -234,6 +234,26 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     final primaryCode = error is GatewayAcpException
         ? error.code?.trim().toUpperCase()
         : null;
+    final acpHttpConnectionClosed =
+        primaryCode == 'ACP_HTTP_CONNECTION_CLOSED' ||
+        detailCode == 'ACP_HTTP_CONNECTION_CLOSED' ||
+        raw.contains('ACP_HTTP_CONNECTION_CLOSED');
+    if (acpHttpConnectionClosed) {
+      return appText(
+        'Bridge 响应读取中断；当前对话已保留，下一次发送会继续同一会话。错误码：ACP_HTTP_CONNECTION_CLOSED',
+        'Bridge response was interrupted; this conversation was kept, and the next send will continue the same session. Error code: ACP_HTTP_CONNECTION_CLOSED',
+      );
+    }
+    final continuationUnavailable =
+        primaryCode == 'SESSION_CONTINUATION_UNAVAILABLE' ||
+        detailCode == 'SESSION_CONTINUATION_UNAVAILABLE' ||
+        raw.contains('SESSION_CONTINUATION_UNAVAILABLE');
+    if (continuationUnavailable) {
+      return appText(
+        '会话状态不可续写；请检查 xworkmate-bridge/provider 会话状态。错误码：SESSION_CONTINUATION_UNAVAILABLE',
+        'Session state cannot continue; check the xworkmate-bridge/provider session state. Error code: SESSION_CONTINUATION_UNAVAILABLE',
+      );
+    }
     final openClawSocketClosed =
         target.isGateway &&
         (detailCode == 'OPENCLAW_GATEWAY_SOCKET_CLOSED' ||

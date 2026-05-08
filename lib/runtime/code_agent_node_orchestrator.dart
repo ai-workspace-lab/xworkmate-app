@@ -43,29 +43,33 @@ class CodeAgentNodeOrchestrator {
   ) async {
     final resolver = _runtimeCoordinator.dispatchResolver;
     if (resolver != null) {
-      final resolution = await resolver.resolveGatewayDispatch(
-        providers: _runtimeCoordinator.externalCodeAgents,
-        preferredProviderId: state.preferredProviderId,
-        requiredCapabilities: const <String>['gateway-bridge'],
-        nodeState: <String, dynamic>{
-          'selectedAgentId': state.selectedAgentId,
-          'gatewayConnected': state.gatewayConnected,
-          'executionTarget': state.executionTarget.promptValue,
-          'runtimeMode': state.runtimeMode.name,
-          'bridgeEnabled': state.bridgeEnabled,
-          'bridgeState': state.bridgeState,
-        },
-        nodeInfo: const <String, dynamic>{
-          'id': 'xworkmate-app',
-          'name': kSystemAppName,
-          'version': kAppVersion,
-        },
-      );
-      if (resolution.metadata.isNotEmpty) {
-        return CodeAgentGatewayDispatch(
-          agentId: resolution.agentId,
-          metadata: resolution.metadata,
+      try {
+        final resolution = await resolver.resolveGatewayDispatch(
+          providers: _runtimeCoordinator.externalCodeAgents,
+          preferredProviderId: state.preferredProviderId,
+          requiredCapabilities: const <String>['gateway-bridge'],
+          nodeState: <String, dynamic>{
+            'selectedAgentId': state.selectedAgentId,
+            'gatewayConnected': state.gatewayConnected,
+            'executionTarget': state.executionTarget.promptValue,
+            'runtimeMode': state.runtimeMode.name,
+            'bridgeEnabled': state.bridgeEnabled,
+            'bridgeState': state.bridgeState,
+          },
+          nodeInfo: const <String, dynamic>{
+            'id': 'xworkmate-app',
+            'name': kSystemAppName,
+            'version': kAppVersion,
+          },
         );
+        if (resolution.metadata.isNotEmpty) {
+          return CodeAgentGatewayDispatch(
+            agentId: resolution.agentId,
+            metadata: resolution.metadata,
+          );
+        }
+      } catch (_) {
+        // Dispatch metadata is advisory; task execution still carries routing.
       }
     }
 

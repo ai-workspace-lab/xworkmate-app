@@ -160,6 +160,49 @@ void main() {
       },
     );
 
+    test(
+      'labels interrupted ACP HTTP reads as recoverable conversation state',
+      () async {
+        final controller = await _isolatedController();
+        addTearDown(controller.dispose);
+
+        final label = controller.gatewayExecutionErrorLabelInternal(
+          const GatewayAcpException(
+            'ACP HTTP connection closed before the response finished arriving',
+            code: 'ACP_HTTP_CONNECTION_CLOSED',
+          ),
+          target: AssistantExecutionTarget.gateway,
+        );
+
+        expect(
+          label,
+          'Bridge 响应读取中断；当前对话已保留，下一次发送会继续同一会话。错误码：ACP_HTTP_CONNECTION_CLOSED',
+        );
+        expect(label, isNot(contains('closed before the response')));
+      },
+    );
+
+    test(
+      'labels unavailable session continuation without starting a new flow',
+      () async {
+        final controller = await _isolatedController();
+        addTearDown(controller.dispose);
+
+        final label = controller.gatewayExecutionErrorLabelInternal(
+          const GatewayAcpException(
+            'SESSION_CONTINUATION_UNAVAILABLE: provider session state is unavailable',
+            code: '-32002',
+            detailCode: 'SESSION_CONTINUATION_UNAVAILABLE',
+          ),
+          target: AssistantExecutionTarget.agent,
+        );
+
+        expect(label, contains('会话状态不可续写'));
+        expect(label, contains('SESSION_CONTINUATION_UNAVAILABLE'));
+        expect(label, isNot(contains('-32002')));
+      },
+    );
+
     test('keeps signed-out generic runtime failures disconnected', () async {
       final controller = await _isolatedController();
       addTearDown(controller.dispose);
