@@ -829,6 +829,106 @@ void main() {
     );
   });
 
+  test(
+    'records OpenClaw guard status without creating pseudo artifact files',
+    () async {
+      final controller = AppController(
+        environmentOverride: const <String, String>{},
+      );
+      addTearDown(controller.dispose);
+
+      final localWorkspace = await Directory.systemTemp.createTemp(
+        'xworkmate-openclaw-guard-workspace-',
+      );
+      addTearDown(() async {
+        if (await localWorkspace.exists()) {
+          await localWorkspace.delete(recursive: true);
+        }
+      });
+      controller.upsertTaskThreadInternal(
+        'session-1',
+        workspaceBinding: WorkspaceBinding(
+          workspaceId: 'session-1',
+          workspaceKind: WorkspaceKind.localFs,
+          workspacePath: localWorkspace.path,
+          displayPath: localWorkspace.path,
+          writable: true,
+        ),
+      );
+
+      const result = GoTaskServiceResult(
+        success: true,
+        message:
+            '未检测到 OpenClaw 本轮导出的实际文件。已阻止口头下载声明进入 artifacts 面板；请重新执行并要求 OpenClaw 在 workspace 中真实生成文件。',
+        turnId: 'turn-1',
+        raw: <String, dynamic>{'code': 'OPENCLAW_NO_EXPORTED_ARTIFACTS'},
+        errorMessage: '',
+        resolvedModel: '',
+        route: GoTaskServiceRoute.externalAcpSingle,
+      );
+
+      await controller.persistGoTaskArtifactsForSessionInternal(
+        'session-1',
+        result,
+      );
+
+      expect(await localWorkspace.list(recursive: true).toList(), isEmpty);
+      final thread = controller.requireTaskThreadForSessionInternal(
+        'session-1',
+      );
+      expect(thread.lastArtifactSyncStatus, 'no-exported-artifacts');
+      expect(thread.lastArtifactSyncAtMs, greaterThan(0));
+    },
+  );
+
+  test('records ordinary empty artifact results as no artifacts', () async {
+    final controller = AppController(
+      environmentOverride: const <String, String>{},
+    );
+    addTearDown(controller.dispose);
+
+    final localWorkspace = await Directory.systemTemp.createTemp(
+      'xworkmate-empty-artifacts-workspace-',
+    );
+    addTearDown(() async {
+      if (await localWorkspace.exists()) {
+        await localWorkspace.delete(recursive: true);
+      }
+    });
+    controller.upsertTaskThreadInternal(
+      'session-1',
+      workspaceBinding: WorkspaceBinding(
+        workspaceId: 'session-1',
+        workspaceKind: WorkspaceKind.localFs,
+        workspacePath: localWorkspace.path,
+        displayPath: localWorkspace.path,
+        writable: true,
+      ),
+    );
+
+    const result = GoTaskServiceResult(
+      success: true,
+      message: 'no files this time',
+      turnId: 'turn-1',
+      raw: <String, dynamic>{},
+      errorMessage: '',
+      resolvedModel: '',
+      route: GoTaskServiceRoute.externalAcpSingle,
+    );
+
+    await controller.persistGoTaskArtifactsForSessionInternal(
+      'session-1',
+      result,
+    );
+
+    expect(
+      controller
+          .requireTaskThreadForSessionInternal('session-1')
+          .lastArtifactSyncStatus,
+      'no-artifacts',
+    );
+  });
+
   test('skips download URL artifacts outside the bridge host', () async {
     final controller = AppController(
       environmentOverride: const <String, String>{

@@ -46,6 +46,54 @@ void main() {
     expect(find.text('artifact-2.txt'), findsAtLeastNWidgets(1));
   });
 
+  testWidgets('explains OpenClaw runs with no exported artifacts', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _buildTestApp(
+        artifactSyncAtMs: 1,
+        artifactSyncStatus: 'no-exported-artifacts',
+        loadSnapshot: () async => const AssistantArtifactSnapshot(
+          workspacePath: '/tmp/thread',
+          workspaceKind: WorkspaceRefKind.localPath,
+          filesMessage: 'No files found in the recorded working directory.',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('本轮没有检测到实际生成的文件。请重新执行，并要求 OpenClaw 在当前 workspace 中创建文件。'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('口头下载声明'), findsNothing);
+    expect(find.textContaining('已阻止'), findsNothing);
+    expect(find.textContaining('artifacts 面板'), findsNothing);
+  });
+
+  testWidgets('keeps the ordinary empty directory message', (tester) async {
+    await tester.pumpWidget(
+      _buildTestApp(
+        artifactSyncAtMs: 1,
+        loadSnapshot: () async => const AssistantArtifactSnapshot(
+          workspacePath: '/tmp/thread',
+          workspaceKind: WorkspaceRefKind.localPath,
+          filesMessage: 'No files found in the recorded working directory.',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text('No files found in the recorded working directory.'),
+      findsOneWidget,
+    );
+    expect(
+      find.text('本轮没有检测到实际生成的文件。请重新执行，并要求 OpenClaw 在当前 workspace 中创建文件。'),
+      findsNothing,
+    );
+  });
+
   testWidgets('keeps binary artifacts out of preview flow', (tester) async {
     var previewLoadCount = 0;
 
@@ -155,6 +203,7 @@ void main() {
 
 Widget _buildTestApp({
   required double artifactSyncAtMs,
+  String artifactSyncStatus = '',
   required Future<AssistantArtifactSnapshot> Function() loadSnapshot,
   Future<AssistantArtifactPreview> Function(AssistantArtifactEntry entry)?
   loadPreview,
@@ -172,6 +221,7 @@ Widget _buildTestApp({
           workspacePath: '/tmp/thread',
           workspaceKind: WorkspaceRefKind.localPath,
           artifactSyncAtMs: artifactSyncAtMs,
+          artifactSyncStatus: artifactSyncStatus,
           onCollapse: () {},
           loadSnapshot: loadSnapshot,
           loadPreview:

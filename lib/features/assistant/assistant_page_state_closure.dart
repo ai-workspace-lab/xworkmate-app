@@ -342,6 +342,10 @@ extension AssistantPageStateClosureInternal on AssistantPageStateInternal {
                       .assistantArtifactSyncAtMsForSession(
                         controller.currentSessionKey,
                       ),
+                  artifactSyncStatus: controller
+                      .assistantArtifactSyncStatusForSession(
+                        controller.currentSessionKey,
+                      ),
                   onCollapse: () {
                     setState(() {
                       artifactPaneCollapsedInternal = true;
