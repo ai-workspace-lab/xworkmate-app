@@ -4,10 +4,82 @@ import 'package:crypto/crypto.dart' as crypto;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xworkmate/app/app_controller.dart';
 import 'package:xworkmate/app/app_controller_desktop_runtime_coordination_impl.dart';
+import 'package:xworkmate/app/app_controller_desktop_thread_binding.dart';
 import 'package:xworkmate/runtime/go_task_service_client.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
 
 void main() {
+  test(
+    'converges managed local thread workspaces to the user home root',
+    () async {
+      final controller = AppController(
+        environmentOverride: const <String, String>{},
+      );
+      addTearDown(controller.dispose);
+
+      final home = await Directory.systemTemp.createTemp(
+        'xworkmate-home-thread-root-',
+      );
+      final oldWorkspace = await Directory.systemTemp.createTemp(
+        'xworkmate-app-worktree-thread-root-',
+      );
+      addTearDown(() async {
+        if (await home.exists()) {
+          await home.delete(recursive: true);
+        }
+        if (await oldWorkspace.exists()) {
+          await oldWorkspace.delete(recursive: true);
+        }
+      });
+      controller.resolvedUserHomeDirectoryInternal = home.path;
+
+      const sessionKey = 'draft-1778207741322';
+      final oldThreadWorkspace = Directory(
+        '${oldWorkspace.path}/.xworkmate/threads/$sessionKey',
+      );
+      await oldThreadWorkspace.create(recursive: true);
+
+      controller.upsertTaskThreadInternal(
+        sessionKey,
+        workspaceBinding: WorkspaceBinding(
+          workspaceId: sessionKey,
+          workspaceKind: WorkspaceKind.localFs,
+          workspacePath: oldThreadWorkspace.path,
+          displayPath: oldThreadWorkspace.path,
+          writable: true,
+        ),
+        messages: const <GatewayChatMessage>[
+          GatewayChatMessage(
+            id: 'assistant-1',
+            role: 'assistant',
+            text: 'kept message',
+            timestampMs: 1,
+            toolCallId: null,
+            toolName: null,
+            stopReason: null,
+            pending: false,
+            error: false,
+          ),
+        ],
+        lastRemoteWorkingDirectory: '/remote/thread/workspace',
+        lastRemoteWorkspaceRefKind: WorkspaceRefKind.remotePath,
+      );
+
+      await controller.ensureDesktopTaskThreadBindingInternal(sessionKey);
+
+      final expectedWorkspace = '${home.path}/.xworkmate/threads/$sessionKey';
+      final thread = controller.requireTaskThreadForSessionInternal(sessionKey);
+      expect(thread.workspaceBinding.workspacePath, expectedWorkspace);
+      expect(
+        thread.workspaceBinding.displayPath,
+        '\$HOME/.xworkmate/threads/$sessionKey',
+      );
+      expect(Directory(expectedWorkspace).existsSync(), isTrue);
+      expect(thread.lastRemoteWorkingDirectory, '/remote/thread/workspace');
+      expect(thread.messages.single.text, 'kept message');
+    },
+  );
+
   test(
     'keeps local workspace binding separate from remote execution workspace',
     () {
