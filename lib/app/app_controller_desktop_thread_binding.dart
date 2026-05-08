@@ -285,6 +285,27 @@ extension AppControllerDesktopThreadBinding on AppController {
       ownerScope: ownerScope,
       existingBinding: snapshot.record?.workspaceBinding,
     );
+    final currentRecord = assistantThreadRecordsInternal[normalizedSessionKey];
+    final existingLifecycle =
+        currentRecord?.lifecycleState ??
+        snapshot.record?.lifecycleState ??
+        const ThreadLifecycleState(
+          archived: false,
+          status: 'ready',
+          lastRunAtMs: null,
+          lastResultCode: null,
+        );
+    final existingLifecycleStatus = existingLifecycle.status
+        .trim()
+        .toLowerCase();
+    final lifecycleState =
+        existingLifecycleStatus == 'running' ||
+            existingLifecycleStatus == 'continuing' ||
+            existingLifecycleStatus == 'retrying'
+        ? existingLifecycle
+        : assistantSessionHasPendingRun(normalizedSessionKey)
+        ? existingLifecycle.copyWith(status: 'running')
+        : existingLifecycle;
     upsertTaskThreadInternal(
       normalizedSessionKey,
       ownerScope: ownerScope,
@@ -300,14 +321,7 @@ extension AppControllerDesktopThreadBinding on AppController {
         executionTarget: snapshot.executionTarget,
         existingBinding: snapshot.record?.executionBinding,
       ),
-      lifecycleState:
-          (snapshot.record?.lifecycleState ??
-          const ThreadLifecycleState(
-            archived: false,
-            status: 'ready',
-            lastRunAtMs: null,
-            lastResultCode: null,
-          )),
+      lifecycleState: lifecycleState,
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
     );
   }
