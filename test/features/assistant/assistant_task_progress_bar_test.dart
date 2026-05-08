@@ -15,7 +15,9 @@ void main() {
           lifecycleStatus: 'running',
           lastResultCode: 'running',
           artifactSyncStatus: '',
+          runtimeBudgetMinutes: 30,
         ),
+        onStop: () {},
       ),
     );
 
@@ -23,7 +25,11 @@ void main() {
       find.byKey(const Key('assistant-task-progress-bar')),
       findsOneWidget,
     );
-    expect(find.text('任务运行中...'), findsOneWidget);
+    expect(find.text('任务运行中，预计最长 30 分钟...'), findsOneWidget);
+    expect(
+      find.byKey(const Key('assistant-task-progress-stop-button')),
+      findsOneWidget,
+    );
     final indicator = tester.widget<LinearProgressIndicator>(
       find.byKey(const Key('assistant-task-progress-indicator')),
     );
@@ -104,10 +110,15 @@ void main() {
           lastResultCode: 'ACP_HTTP_CONNECTION_CLOSED',
           artifactSyncStatus: 'interrupted',
         ),
+        onContinue: () {},
       ),
     );
 
     expect(find.text('Bridge 响应中断，等待下一次发送续写同一会话。'), findsOneWidget);
+    expect(
+      find.byKey(const Key('assistant-task-progress-continue-button')),
+      findsOneWidget,
+    );
     final indicator = tester.widget<LinearProgressIndicator>(
       find.byKey(const Key('assistant-task-progress-indicator')),
     );
@@ -188,13 +199,21 @@ void main() {
   });
 }
 
-Widget _buildTestApp(AssistantTaskProgressState state) {
+Widget _buildTestApp(
+  AssistantTaskProgressState state, {
+  VoidCallback? onStop,
+  VoidCallback? onContinue,
+}) {
   return MaterialApp(
     theme: AppTheme.light(),
     home: Material(
       child: SizedBox(
         width: 420,
-        child: AssistantTaskProgressBar(state: state),
+        child: AssistantTaskProgressBar(
+          state: state,
+          onStop: onStop,
+          onContinue: onContinue,
+        ),
       ),
     ),
   );

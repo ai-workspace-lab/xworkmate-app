@@ -706,6 +706,7 @@ void main() {
 
         expect(fakeGoTaskService.requests, hasLength(2));
         expect(fakeGoTaskService.requests.last.resumeSession, isTrue);
+        await _waitForLastChatMessageText(controller, '全部 6 个文件已生成 ✅');
         expect(controller.chatMessages.last.text, '全部 6 个文件已生成 ✅');
         final thread = controller.taskThreadForSessionInternal('session-1');
         expect(thread?.lifecycleState.status, 'ready');
@@ -799,6 +800,7 @@ void main() {
 
         expect(fakeGoTaskService.requests, hasLength(2));
         expect(fakeGoTaskService.requests.last.resumeSession, isTrue);
+        await _waitForLastChatMessageText(controller, '全部 6 个文件已生成 ✅');
         expect(controller.chatMessages.last.text, '全部 6 个文件已生成 ✅');
         final thread = controller.taskThreadForSessionInternal('session-1');
         expect(thread?.lifecycleState.status, 'ready');
@@ -949,6 +951,80 @@ void main() {
       );
       await taskAFuture;
       expect(controller.assistantSessionHasPendingRun('task-a'), isFalse);
+      expect(
+        controller.localSessionMessagesInternal['task-a']!.map(
+          (message) => message.text,
+        ),
+        contains('result A'),
+      );
+    });
+
+    test('abortRun cancels only the current pending session', () async {
+      final fakeGoTaskService = _BlockingGoTaskServiceClient();
+      final controller = _connectedController(fakeGoTaskService);
+      addTearDown(controller.dispose);
+
+      await controller.switchSession('task-a');
+      final taskAFuture = controller.sendChatMessage('task A');
+      await fakeGoTaskService.waitForRequestCount(1);
+
+      await controller.switchSession('task-b');
+      final taskBFuture = controller.sendChatMessage('task B');
+      await fakeGoTaskService.waitForRequestCount(2);
+      fakeGoTaskService.emitDelta('task-b', 'streaming text');
+      expect(controller.assistantSessionHasPendingRun('task-a'), isTrue);
+      expect(controller.assistantSessionHasPendingRun('task-b'), isTrue);
+
+      await controller.abortRun();
+
+      expect(fakeGoTaskService.cancelledSessionIds, <String>['task-b']);
+      expect(controller.assistantSessionHasPendingRun('task-a'), isTrue);
+      expect(controller.assistantSessionHasPendingRun('task-b'), isFalse);
+      expect(
+        controller
+            .requireTaskThreadForSessionInternal('task-b')
+            .lifecycleState
+            .lastResultCode,
+        'aborted',
+      );
+      expect(
+        controller.aiGatewayStreamingTextBySessionInternal['task-b'],
+        isNull,
+      );
+
+      fakeGoTaskService.complete(
+        'task-b',
+        const GoTaskServiceResult(
+          success: true,
+          message: 'late result B',
+          turnId: 'turn-b',
+          raw: <String, dynamic>{},
+          errorMessage: '',
+          resolvedModel: '',
+          route: GoTaskServiceRoute.externalAcpSingle,
+        ),
+      );
+      await taskBFuture;
+      expect(
+        controller.localSessionMessagesInternal['task-b']!.map(
+          (message) => message.text,
+        ),
+        isNot(contains('late result B')),
+      );
+
+      fakeGoTaskService.complete(
+        'task-a',
+        const GoTaskServiceResult(
+          success: true,
+          message: 'result A',
+          turnId: 'turn-a',
+          raw: <String, dynamic>{},
+          errorMessage: '',
+          resolvedModel: '',
+          route: GoTaskServiceRoute.externalAcpSingle,
+        ),
+      );
+      await taskAFuture;
       expect(
         controller.localSessionMessagesInternal['task-a']!.map(
           (message) => message.text,
@@ -1126,6 +1202,24 @@ Future<void> _waitForThreadLifecycleStatus(
   );
 }
 
+Future<void> _waitForLastChatMessageText(
+  AppController controller,
+  String expectedText,
+) async {
+  final deadline = DateTime.now().add(const Duration(seconds: 2));
+  while (DateTime.now().isBefore(deadline)) {
+    if (controller.chatMessages.isNotEmpty &&
+        controller.chatMessages.last.text == expectedText) {
+      return;
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+  }
+  expect(
+    controller.chatMessages.isEmpty ? '' : controller.chatMessages.last.text,
+    expectedText,
+  );
+}
+
 Future<_CapabilityServerCapture> _startEmptyCapabilityServer() async {
   final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
   final capture = _CapabilityServerCapture._(
@@ -1291,8 +1385,11 @@ class _RecordingGoTaskServiceClient implements GoTaskServiceClient {
 
 class _BlockingGoTaskServiceClient implements GoTaskServiceClient {
   final List<GoTaskServiceRequest> requests = <GoTaskServiceRequest>[];
+  final List<String> cancelledSessionIds = <String>[];
   final Map<String, Completer<GoTaskServiceResult>> _pending =
       <String, Completer<GoTaskServiceResult>>{};
+  final Map<String, void Function(GoTaskServiceUpdate)> _updates =
+      <String, void Function(GoTaskServiceUpdate)>{};
 
   @override
   Future<ExternalCodeAgentAcpCapabilities> loadExternalAcpCapabilities({
@@ -1314,6 +1411,7 @@ class _BlockingGoTaskServiceClient implements GoTaskServiceClient {
     required void Function(GoTaskServiceUpdate update) onUpdate,
   }) {
     requests.add(request);
+    _updates[request.sessionId] = onUpdate;
     final completer = Completer<GoTaskServiceResult>();
     _pending[request.sessionId] = completer;
     return completer.future;
@@ -1331,10 +1429,32 @@ class _BlockingGoTaskServiceClient implements GoTaskServiceClient {
 
   void complete(String sessionId, GoTaskServiceResult result) {
     final completer = _pending.remove(sessionId);
+    _updates.remove(sessionId);
     if (completer == null) {
       throw StateError('No pending task for $sessionId.');
     }
     completer.complete(result);
+  }
+
+  void emitDelta(String sessionId, String text) {
+    final onUpdate = _updates[sessionId];
+    if (onUpdate == null) {
+      throw StateError('No pending update sink for $sessionId.');
+    }
+    onUpdate(
+      GoTaskServiceUpdate(
+        sessionId: sessionId,
+        threadId: sessionId,
+        turnId: 'turn-$sessionId',
+        type: 'delta',
+        text: text,
+        message: '',
+        pending: true,
+        error: false,
+        route: GoTaskServiceRoute.externalAcpSingle,
+        payload: const <String, dynamic>{},
+      ),
+    );
   }
 
   @override
@@ -1343,7 +1463,9 @@ class _BlockingGoTaskServiceClient implements GoTaskServiceClient {
     required AssistantExecutionTarget target,
     required String sessionId,
     required String threadId,
-  }) async {}
+  }) async {
+    cancelledSessionIds.add(sessionId);
+  }
 
   @override
   Future<void> closeTask({
