@@ -228,17 +228,9 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
   }) {
     final raw = error.toString().trim();
     final lowered = raw.toLowerCase();
-    final detailCode = error is GatewayAcpException
-        ? error.detailCode?.trim().toUpperCase()
-        : null;
-    final primaryCode = error is GatewayAcpException
-        ? error.code?.trim().toUpperCase()
-        : null;
-    final acpHttpConnectionClosed =
-        primaryCode == 'ACP_HTTP_CONNECTION_CLOSED' ||
-        detailCode == 'ACP_HTTP_CONNECTION_CLOSED' ||
-        raw.contains('ACP_HTTP_CONNECTION_CLOSED');
-    if (acpHttpConnectionClosed) {
+    final detailCode = gatewayExecutionDetailCodeInternal(error);
+    final primaryCode = gatewayExecutionPrimaryCodeInternal(error);
+    if (isAcpHttpConnectionClosedErrorInternal(error)) {
       return appText(
         'Bridge 响应读取中断；当前对话已保留，下一次发送会继续同一会话。错误码：ACP_HTTP_CONNECTION_CLOSED',
         'Bridge response was interrupted; this conversation was kept, and the next send will continue the same session. Error code: ACP_HTTP_CONNECTION_CLOSED',
@@ -288,6 +280,27 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
             );
     }
     return raw;
+  }
+
+  String? gatewayExecutionPrimaryCodeInternal(Object error) {
+    return error is GatewayAcpException
+        ? error.code?.trim().toUpperCase()
+        : null;
+  }
+
+  String? gatewayExecutionDetailCodeInternal(Object error) {
+    return error is GatewayAcpException
+        ? error.detailCode?.trim().toUpperCase()
+        : null;
+  }
+
+  bool isAcpHttpConnectionClosedErrorInternal(Object error) {
+    final raw = error.toString().trim();
+    final primaryCode = gatewayExecutionPrimaryCodeInternal(error);
+    final detailCode = gatewayExecutionDetailCodeInternal(error);
+    return primaryCode == 'ACP_HTTP_CONNECTION_CLOSED' ||
+        detailCode == 'ACP_HTTP_CONNECTION_CLOSED' ||
+        raw.contains('ACP_HTTP_CONNECTION_CLOSED');
   }
 
   String formatAiGatewayHttpErrorInternal(int statusCode, String detail) {
@@ -623,6 +636,14 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     final existingThread = requireTaskThreadForSessionInternal(
       normalizedSessionKey,
     );
+    upsertTaskThreadInternal(
+      normalizedSessionKey,
+      lastArtifactSyncAtMs: syncedAtMs,
+      lastArtifactSyncStatus: 'syncing',
+      updatedAtMs: syncedAtMs,
+    );
+    recomputeTasksInternal();
+    notifyIfActiveInternal();
     if (existingThread.workspaceBinding.workspaceKind !=
         WorkspaceKind.localFs) {
       upsertTaskThreadInternal(
