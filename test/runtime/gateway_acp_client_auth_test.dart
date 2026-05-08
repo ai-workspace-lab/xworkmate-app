@@ -250,6 +250,67 @@ void main() {
     });
 
     test(
+      'returns SSE final response before a truncated chunked close is reported',
+      () async {
+        final server = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+        addTearDown(() => server.close());
+        server.listen((socket) async {
+          final requestBytes = <int>[];
+          var headerEnd = -1;
+          await for (final chunk in socket) {
+            requestBytes.addAll(chunk);
+            final raw = utf8.decode(requestBytes, allowMalformed: true);
+            headerEnd = raw.indexOf('\r\n\r\n');
+            if (headerEnd < 0) {
+              continue;
+            }
+            if (raw.contains('"id"') && raw.contains('"method"')) {
+              break;
+            }
+          }
+          final rawRequest = utf8.decode(requestBytes, allowMalformed: true);
+          final id =
+              RegExp(
+                r'"id"\s*:\s*"([^"]+)"',
+              ).firstMatch(rawRequest)?.group(1) ??
+              'request-id';
+          final event = utf8.encode(
+            'data: ${jsonEncode(<String, dynamic>{
+              'jsonrpc': '2.0',
+              'id': id,
+              'result': <String, dynamic>{'ok': true},
+            })}\n\n',
+          );
+          socket
+            ..add(
+              ascii.encode(
+                'HTTP/1.1 200 OK\r\n'
+                'Content-Type: text/event-stream\r\n'
+                'Transfer-Encoding: chunked\r\n'
+                'Connection: keep-alive\r\n'
+                '\r\n'
+                '${event.length.toRadixString(16)}\r\n',
+              ),
+            )
+            ..add(event)
+            ..add(ascii.encode('\r\n'));
+          await socket.flush();
+          socket.destroy();
+        });
+
+        final endpoint = Uri.parse('http://127.0.0.1:${server.port}');
+        final client = GatewayAcpClient(endpointResolver: () => endpoint);
+
+        final response = await client.request(
+          method: 'acp.capabilities',
+          params: const <String, dynamic>{},
+        );
+
+        expect((response['result'] as Map)['ok'], true);
+      },
+    );
+
+    test(
       'normalizes raw authorization override into bearer header for HTTP',
       () async {
         final capture = await _startAcpHttpServer();

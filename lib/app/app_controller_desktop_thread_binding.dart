@@ -95,17 +95,26 @@ extension AppControllerDesktopThreadBinding on AppController {
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey,
     );
-    final baseWorkspace = settings.workspacePath.trim().isNotEmpty
-        ? settings.workspacePath.trim()
-        : resolvedUserHomeDirectoryInternal.trim();
-    if (baseWorkspace.isEmpty) {
+    final homeDirectory = resolvedUserHomeDirectoryInternal.trim();
+    if (homeDirectory.isEmpty) {
       return '';
     }
     final threadWorkspace =
-        '${trimTrailingPathSeparatorInternal(baseWorkspace)}/.xworkmate/threads/${threadWorkspaceDirectoryNameInternal(normalizedSessionKey)}';
+        '${trimTrailingPathSeparatorInternal(homeDirectory)}/.xworkmate/threads/${threadWorkspaceDirectoryNameInternal(normalizedSessionKey)}';
     return ensureLocalWorkspaceDirectoryInternal(threadWorkspace)
         ? threadWorkspace
         : '';
+  }
+
+  String localThreadWorkspaceDisplayPathInternal(String sessionKey) {
+    final homeDirectory = resolvedUserHomeDirectoryInternal.trim();
+    if (homeDirectory.isEmpty) {
+      return '';
+    }
+    final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
+      sessionKey,
+    );
+    return '\$HOME/.xworkmate/threads/${threadWorkspaceDirectoryNameInternal(normalizedSessionKey)}';
   }
 
   String remoteThreadWorkspacePathInternal(
@@ -190,11 +199,14 @@ extension AppControllerDesktopThreadBinding on AppController {
     WorkspaceBinding? existingBinding,
   }) {
     final localPath = localThreadWorkspacePathInternal(sessionKey);
+    final displayPath = localPath.isEmpty
+        ? ''
+        : localThreadWorkspaceDisplayPathInternal(sessionKey);
     return WorkspaceBinding(
       workspaceId: normalizedAssistantSessionKeyInternal(sessionKey),
       workspaceKind: WorkspaceKind.localFs,
       workspacePath: localPath,
-      displayPath: localPath,
+      displayPath: displayPath,
       writable: existingBinding?.writable ?? true,
     );
   }
@@ -277,11 +289,13 @@ extension AppControllerDesktopThreadBinding on AppController {
       normalizedSessionKey,
       ownerScope: ownerScope,
       workspaceBinding: workspaceBinding,
-      lastRemoteWorkingDirectory: remoteThreadWorkspacePathInternal(
-        normalizedSessionKey,
-        ownerScope,
-      ),
-      lastRemoteWorkspaceRefKind: WorkspaceRefKind.remotePath,
+      lastRemoteWorkingDirectory:
+          snapshot.record?.lastRemoteWorkingDirectory?.trim().isNotEmpty == true
+          ? snapshot.record?.lastRemoteWorkingDirectory
+          : remoteThreadWorkspacePathInternal(normalizedSessionKey, ownerScope),
+      lastRemoteWorkspaceRefKind:
+          snapshot.record?.lastRemoteWorkspaceRefKind ??
+          WorkspaceRefKind.remotePath,
       executionBinding: buildDesktopExecutionBindingInternal(
         executionTarget: snapshot.executionTarget,
         existingBinding: snapshot.record?.executionBinding,

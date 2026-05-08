@@ -863,7 +863,7 @@ class GatewayAcpClient {
     required String requestId,
     required void Function(Map<String, dynamic>) onNotification,
   }) async {
-    final completer = Completer<Map<String, dynamic>>();
+    Map<String, dynamic>? resolvedResponse;
     final eventLines = <String>[];
 
     void consumeEventPayload(String payload) {
@@ -874,9 +874,7 @@ class GatewayAcpClient {
       final json = _decodeMap(trimmed);
       if (stringValue(json['id']) == requestId &&
           (json.containsKey('result') || json.containsKey('error'))) {
-        if (!completer.isCompleted) {
-          completer.complete(json);
-        }
+        resolvedResponse ??= json;
         return;
       }
       if ((stringValue(json['method']) ?? '').isNotEmpty) {
@@ -890,6 +888,9 @@ class GatewayAcpClient {
         if (eventLines.isNotEmpty) {
           consumeEventPayload(eventLines.join('\n'));
           eventLines.clear();
+          if (resolvedResponse != null) {
+            break;
+          }
         }
         continue;
       }
@@ -898,16 +899,16 @@ class GatewayAcpClient {
       }
     }
 
-    if (eventLines.isNotEmpty) {
+    if (eventLines.isNotEmpty && resolvedResponse == null) {
       consumeEventPayload(eventLines.join('\n'));
     }
-    if (!completer.isCompleted) {
+    final resolved = resolvedResponse;
+    if (resolved == null) {
       throw GatewayAcpException(
         'ACP SSE ended without JSON-RPC response for request $requestId',
         code: 'ACP_SSE_NO_RESULT',
       );
     }
-    final resolved = await completer.future;
     _throwIfJsonRpcError(resolved);
     return resolved;
   }
