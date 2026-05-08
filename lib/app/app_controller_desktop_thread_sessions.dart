@@ -313,6 +313,14 @@ extension AppControllerDesktopThreadSessions on AppController {
     )?.lastArtifactSyncAtMs;
   }
 
+  String assistantArtifactSyncStatusForSession(String sessionKey) {
+    final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
+      sessionKey,
+    );
+    final thread = taskThreadForSessionInternal(normalizedSessionKey);
+    return thread?.lastArtifactSyncStatus?.trim() ?? '';
+  }
+
   Future<AssistantArtifactSnapshot> loadAssistantArtifactSnapshot({
     String? sessionKey,
   }) {

@@ -309,6 +309,34 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
         'ACP_HTTP_CONNECTION_CLOSED';
   }
 
+  bool isOpenClawNoExportedArtifactsGuardResultInternal(
+    GoTaskServiceResult result,
+  ) {
+    if (!result.success || result.artifacts.isNotEmpty) {
+      return false;
+    }
+    final rawText = jsonLikeTextForDiagnosticsInternal(
+      result.raw,
+    ).toLowerCase();
+    final messageText = '${result.message}\n${result.errorMessage}\n$rawText'
+        .toLowerCase();
+    return messageText.contains('未检测到 openclaw 本轮导出的实际文件') ||
+        messageText.contains('未检测到openclaw本轮导出的实际文件') ||
+        messageText.contains('口头下载声明') ||
+        messageText.contains('no_exported_artifacts') ||
+        messageText.contains('no-exported-artifacts') ||
+        messageText.contains('openclaw_artifact_guard') ||
+        messageText.contains('openclaw_no_exported_artifacts');
+  }
+
+  String jsonLikeTextForDiagnosticsInternal(Object? value) {
+    try {
+      return jsonEncode(value);
+    } catch (_) {
+      return value.toString();
+    }
+  }
+
   String? recoverableAcpHttpTransportCodeInternal(Object error) {
     final raw = error.toString().trim();
     final primaryCode = gatewayExecutionPrimaryCodeInternal(error);
@@ -682,7 +710,10 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
       upsertTaskThreadInternal(
         normalizedSessionKey,
         lastArtifactSyncAtMs: syncedAtMs,
-        lastArtifactSyncStatus: 'no-artifacts',
+        lastArtifactSyncStatus:
+            isOpenClawNoExportedArtifactsGuardResultInternal(result)
+            ? 'no-exported-artifacts'
+            : 'no-artifacts',
         updatedAtMs: syncedAtMs,
       );
       return;
