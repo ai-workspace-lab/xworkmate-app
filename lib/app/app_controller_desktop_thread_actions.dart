@@ -442,6 +442,10 @@ extension AppControllerDesktopThreadActions on AppController {
             );
             return;
           }
+          if (isOpenClawNoExportedArtifactsGuardResultInternal(result)) {
+            await persistGoTaskArtifactsForSessionInternal(sessionKey, result);
+            return;
+          }
           final assistantText = result.message.trim();
           if (assistantText.isEmpty) {
             appendLocalSessionMessageInternal(
