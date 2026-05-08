@@ -22,6 +22,7 @@ import '../../theme/app_palette.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/assistant_focus_panel.dart';
 import '../../widgets/assistant_artifact_sidebar.dart';
+import '../../widgets/assistant_task_progress_bar.dart';
 import '../../widgets/desktop_workspace_scaffold.dart';
 import '../../widgets/pane_resize_handle.dart';
 import '../../widgets/surface_card.dart';
@@ -111,6 +112,17 @@ extension AssistantPageStateClosureInternal on AssistantPageStateInternal {
             (defaultComposerHeight + workspaceLowerPaneHeightAdjustmentInternal)
                 .clamp(composerHeightLowerBound, composerHeightUpperBound)
                 .toDouble();
+        final thread = controller.taskThreadForSessionInternal(
+          controller.currentSessionKey,
+        );
+        final progressState = assistantTaskProgressState(
+          pending: controller.assistantSessionHasPendingRun(
+            controller.currentSessionKey,
+          ),
+          lifecycleStatus: thread?.lifecycleState.status ?? '',
+          lastResultCode: thread?.lifecycleState.lastResultCode ?? '',
+          artifactSyncStatus: thread?.lastArtifactSyncStatus ?? '',
+        );
 
         return SurfaceCard(
           borderRadius: 0,
@@ -149,6 +161,7 @@ extension AssistantPageStateClosureInternal on AssistantPageStateInternal {
                   ),
                 ),
               ),
+              AssistantTaskProgressBar(state: progressState),
               ColoredBox(
                 color: palette.canvas,
                 child: SizedBox(

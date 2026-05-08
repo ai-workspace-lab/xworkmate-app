@@ -352,6 +352,13 @@ extension AppControllerDesktopThreadActions on AppController {
           persistInThreadContext: true,
         );
         aiGatewayPendingSessionKeysInternal.add(sessionKey);
+        upsertTaskThreadInternal(
+          sessionKey,
+          lifecycleStatus: 'running',
+          lastRunAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+          lastResultCode: 'running',
+          updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+        );
         recomputeTasksInternal();
         notifyIfActiveInternal();
         try {
@@ -452,11 +459,17 @@ extension AppControllerDesktopThreadActions on AppController {
           );
         } catch (error) {
           clearAiGatewayStreamingTextInternal(sessionKey);
+          final connectionClosed = isAcpHttpConnectionClosedErrorInternal(
+            error,
+          );
           upsertTaskThreadInternal(
             sessionKey,
-            lifecycleStatus: 'ready',
+            lifecycleStatus: connectionClosed ? 'interrupted' : 'ready',
             lastRunAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-            lastResultCode: 'error',
+            lastResultCode: connectionClosed
+                ? 'ACP_HTTP_CONNECTION_CLOSED'
+                : 'error',
+            lastArtifactSyncStatus: connectionClosed ? 'interrupted' : null,
             updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
           );
           appendLocalSessionMessageInternal(
