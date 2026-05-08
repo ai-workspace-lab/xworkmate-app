@@ -781,6 +781,7 @@ void main() {
       'desktop task execution routes OpenClaw through dedicated bridge gateway path',
       () async {
         final capture = await _startAcpHttpServer(
+          streamResponse: true,
           result: <String, dynamic>{
             'success': true,
             'status': 'completed',
@@ -823,7 +824,7 @@ void main() {
         );
 
         expect(capture.authorizationHeader, 'Bearer bridge-token');
-        expect(capture.acceptHeader, 'application/json');
+        expect(capture.acceptHeader, 'text/event-stream, application/json');
         expect(capture.requestPath, '/gateway/openclaw');
         expect(capture.requestPath, isNot(contains('/acp-server')));
         expect(capture.requestPath, isNot(contains('/acp-server/gateway')));
@@ -885,7 +886,7 @@ void main() {
           onUpdate: (_) {},
         );
 
-        expect(capture.acceptHeader, 'application/json');
+        expect(capture.acceptHeader, 'text/event-stream, application/json');
         expect(capture.requestPath, '/gateway/openclaw');
         expect(capture.requestBody, contains('"method":"session.message"'));
       },
@@ -1303,6 +1304,7 @@ GoTaskServiceRequest _taskRequest({
 
 Future<_CapturedAcpHttpServer> _startAcpHttpServer({
   Map<String, dynamic> result = const <String, dynamic>{'ok': true},
+  bool streamResponse = false,
 }) async {
   final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
   final capture = _CapturedAcpHttpServer._(
@@ -1319,14 +1321,22 @@ Future<_CapturedAcpHttpServer> _startAcpHttpServer({
     capture.requestBody = body;
     capture.requestBodies.add(body);
     final id = _decodeRequestId(body);
-    request.response.headers.contentType = ContentType.json;
-    request.response.write(
-      jsonEncode(<String, dynamic>{
-        'jsonrpc': '2.0',
-        'id': id,
-        'result': result,
-      }),
-    );
+    final envelope = jsonEncode(<String, dynamic>{
+      'jsonrpc': '2.0',
+      'id': id,
+      'result': result,
+    });
+    if (streamResponse) {
+      request.response.headers.set(
+        HttpHeaders.contentTypeHeader,
+        'text/event-stream',
+      );
+      request.response.write('data: $envelope\n\n');
+      request.response.write('data: [DONE]\n\n');
+    } else {
+      request.response.headers.contentType = ContentType.json;
+      request.response.write(envelope);
+    }
     await request.response.close();
   });
   return capture;
