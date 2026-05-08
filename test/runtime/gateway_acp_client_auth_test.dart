@@ -1028,6 +1028,9 @@ void main() {
       final openClawEndpoint = Uri.parse(
         'https://xworkmate-bridge.svc.plus/acp/rpc',
       );
+      final openClawTaskEndpoint = Uri.parse(
+        'https://xworkmate-bridge.svc.plus/gateway/openclaw',
+      );
       final acpEndpoint = Uri.parse(
         'https://xworkmate-bridge.svc.plus/acp/rpc',
       );
@@ -1048,6 +1051,22 @@ void main() {
             'taskPrompt': '输出 完整调研PPT 和 Markdown格式 文件',
             'requestedExecutionTarget': 'gateway',
           },
+        ),
+        const Duration(minutes: 30),
+      );
+      expect(
+        gatewayAcpHttpResponseTimeoutFor(
+          openClawTaskEndpoint,
+          'session.start',
+          const <String, dynamic>{'taskPrompt': 'Reply after a long wait'},
+        ),
+        const Duration(minutes: 10),
+      );
+      expect(
+        gatewayAcpHttpResponseTimeoutFor(
+          openClawTaskEndpoint,
+          'session.message',
+          const <String, dynamic>{'taskPrompt': '输出 PPTX 和 Markdown 文件'},
         ),
         const Duration(minutes: 30),
       );

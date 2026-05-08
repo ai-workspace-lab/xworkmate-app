@@ -802,6 +802,63 @@ void main() {
     );
 
     test(
+      'sendChatMessage hides OpenClaw artifact guard text from failed results and streaming',
+      () async {
+        final localWorkspace = await Directory.systemTemp.createTemp(
+          'xworkmate-acp-guard-failure-',
+        );
+        addTearDown(() async {
+          if (await localWorkspace.exists()) {
+            await localWorkspace.delete(recursive: true);
+          }
+        });
+        const guardMessage =
+            '未检测到 OpenClaw 本轮导出的实际文件。已阻止口头下载声明进入 artifacts 面板；请重新执行并要求 OpenClaw 在 workspace 中真实生成文件。';
+        final fakeGoTaskService = _RecordingGoTaskServiceClient()
+          ..updatesBeforeNextOutcome.add(
+            const GoTaskServiceUpdate(
+              sessionId: 'session-1',
+              threadId: 'session-1',
+              turnId: 'turn-1',
+              type: 'delta',
+              text: guardMessage,
+              message: '',
+              pending: true,
+              error: false,
+              route: GoTaskServiceRoute.externalAcpSingle,
+              payload: <String, dynamic>{},
+            ),
+          )
+          ..outcomes.add(
+            const GoTaskServiceResult(
+              success: false,
+              message: '',
+              turnId: 'turn-1',
+              raw: <String, dynamic>{'code': 'OPENCLAW_ARTIFACT_GUARD'},
+              errorMessage: guardMessage,
+              resolvedModel: '',
+              route: GoTaskServiceRoute.externalAcpSingle,
+            ),
+          );
+        final controller = _connectedController(fakeGoTaskService);
+        addTearDown(controller.dispose);
+        controller.resolvedUserHomeDirectoryInternal = localWorkspace.path;
+
+        await controller.sessionsController.switchSession('session-1');
+        await controller.sendChatMessage('create files');
+
+        final transcript = controller.chatMessages
+            .map((message) => message.text)
+            .join('\n');
+        expect(transcript, isNot(contains('未检测到 OpenClaw 本轮导出的实际文件')));
+        expect(transcript, isNot(contains('口头下载声明')));
+        final thread = controller.taskThreadForSessionInternal('session-1');
+        expect(thread?.lastArtifactSyncStatus, 'no-exported-artifacts');
+        expect(thread?.lastArtifactSyncAtMs, greaterThan(0));
+      },
+    );
+
+    test(
       'sendChatMessage continues the same session after ACP HTTP handshake interruption',
       () async {
         final localWorkspace = await Directory.systemTemp.createTemp(
