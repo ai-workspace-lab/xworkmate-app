@@ -635,6 +635,14 @@ void main() {
     test(
       'sendChatMessage continues the same session after ACP HTTP connection close',
       () async {
+        final localWorkspace = await Directory.systemTemp.createTemp(
+          'xworkmate-acp-interrupt-artifacts-',
+        );
+        addTearDown(() async {
+          if (await localWorkspace.exists()) {
+            await localWorkspace.delete(recursive: true);
+          }
+        });
         final fakeGoTaskService = _RecordingGoTaskServiceClient()
           ..updatesBeforeNextOutcome.add(
             const GoTaskServiceUpdate(
@@ -657,11 +665,11 @@ void main() {
             ),
           )
           ..outcomes.add(
-            const GoTaskServiceResult(
+            GoTaskServiceResult(
               success: true,
-              message: 'continued response',
+              message: '全部 6 个文件已生成 ✅',
               turnId: 'turn-2',
-              raw: <String, dynamic>{},
+              raw: <String, dynamic>{'artifacts': _generatedArtifactPayloads()},
               errorMessage: '',
               resolvedModel: '',
               route: GoTaskServiceRoute.externalAcpSingle,
@@ -669,6 +677,7 @@ void main() {
           );
         final controller = _connectedController(fakeGoTaskService);
         addTearDown(controller.dispose);
+        controller.resolvedUserHomeDirectoryInternal = localWorkspace.path;
 
         await controller.sessionsController.switchSession('session-1');
 
@@ -676,6 +685,13 @@ void main() {
 
         expect(fakeGoTaskService.requests, hasLength(1));
         expect(fakeGoTaskService.requests.single.resumeSession, isFalse);
+        expect(
+          controller
+              .taskThreadForSessionInternal('session-1')
+              ?.lifecycleState
+              .status,
+          'interrupted',
+        );
         expect(
           controller.chatMessages.last.text,
           'Bridge 响应读取中断；当前对话已保留，下一次发送会继续同一会话。错误码：ACP_HTTP_CONNECTION_CLOSED',
@@ -689,7 +705,22 @@ void main() {
 
         expect(fakeGoTaskService.requests, hasLength(2));
         expect(fakeGoTaskService.requests.last.resumeSession, isTrue);
-        expect(controller.chatMessages.last.text, 'continued response');
+        expect(controller.chatMessages.last.text, '全部 6 个文件已生成 ✅');
+        final thread = controller.taskThreadForSessionInternal('session-1');
+        expect(thread?.lifecycleState.status, 'ready');
+        expect(thread?.lastArtifactSyncStatus, 'synced');
+        expect(thread?.lastArtifactSyncAtMs, greaterThan(0));
+        final workspacePath = controller.assistantWorkspacePathForSession(
+          'session-1',
+        );
+        for (final artifact in _generatedArtifactPayloads()) {
+          final relativePath = artifact['relativePath']! as String;
+          final content = artifact['content']! as String;
+          expect(
+            await File('$workspacePath/$relativePath').readAsString(),
+            content,
+          );
+        }
       },
     );
 
@@ -845,6 +876,41 @@ class _CapabilityServerCapture {
   String lastAuthorizationHeader = '';
 
   Future<void> close() => _server.close(force: true);
+}
+
+List<Map<String, dynamic>> _generatedArtifactPayloads() {
+  return <Map<String, dynamic>>[
+    <String, dynamic>{
+      'relativePath': '网络与协议专题-图片生成提示词.md',
+      'content': 'prompt content',
+      'contentType': 'text/markdown',
+    },
+    <String, dynamic>{
+      'relativePath': '小红书风格文案.md',
+      'content': 'xiaohongshu copy',
+      'contentType': 'text/markdown',
+    },
+    <String, dynamic>{
+      'relativePath': 'X文案.md',
+      'content': 'x copy',
+      'contentType': 'text/markdown',
+    },
+    <String, dynamic>{
+      'relativePath': '领英文案.md',
+      'content': 'linkedin copy',
+      'contentType': 'text/markdown',
+    },
+    <String, dynamic>{
+      'relativePath': '云原生网络与协议专题.pptx',
+      'content': 'pptx bytes',
+      'contentType': 'application/octet-stream',
+    },
+    <String, dynamic>{
+      'relativePath': 'PptxGenJS_脚本.js',
+      'content': 'console.log("pptx");',
+      'contentType': 'text/javascript',
+    },
+  ];
 }
 
 AppController _connectedController(GoTaskServiceClient client) {
