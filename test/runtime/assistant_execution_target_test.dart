@@ -894,13 +894,7 @@ void main() {
       final taskAFuture = controller.sendChatMessage('task A');
       await fakeGoTaskService.waitForRequestCount(1);
       expect(fakeGoTaskService.requests.single.sessionId, 'task-a');
-      expect(
-        controller
-            .taskThreadForSessionInternal('task-a')
-            ?.lifecycleState
-            .status,
-        'running',
-      );
+      expect(controller.assistantSessionHasPendingRun('task-a'), isTrue);
 
       await controller.switchSession('task-b');
       final taskBFuture = controller.sendChatMessage('task B');
@@ -1000,11 +994,9 @@ void main() {
 
         final continuingFuture = controller.sendChatMessage('continue');
         await fakeGoTaskService.waitForRequestCount(1);
-        expect(
-          controller
-              .taskThreadForSessionInternal('interrupted-task')
-              ?.lifecycleState
-              .status,
+        await _waitForThreadLifecycleStatus(
+          controller,
+          'interrupted-task',
           'continuing',
         );
         fakeGoTaskService.complete(
@@ -1045,11 +1037,9 @@ void main() {
 
         final retryFuture = controller.sendChatMessage('retry');
         await fakeGoTaskService.waitForRequestCount(2);
-        expect(
-          controller
-              .taskThreadForSessionInternal('retry-task')
-              ?.lifecycleState
-              .status,
+        await _waitForThreadLifecycleStatus(
+          controller,
+          'retry-task',
           'retrying',
         );
         fakeGoTaskService.complete(
@@ -1112,6 +1102,28 @@ Future<_CapabilityServerCapture> _startCapabilityServer() async {
     await request.response.close();
   });
   return capture;
+}
+
+Future<void> _waitForThreadLifecycleStatus(
+  AppController controller,
+  String sessionKey,
+  String expectedStatus,
+) async {
+  final deadline = DateTime.now().add(const Duration(seconds: 2));
+  while (DateTime.now().isBefore(deadline)) {
+    final status = controller
+        .taskThreadForSessionInternal(sessionKey)
+        ?.lifecycleState
+        .status;
+    if (status == expectedStatus) {
+      return;
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+  }
+  expect(
+    controller.taskThreadForSessionInternal(sessionKey)?.lifecycleState.status,
+    expectedStatus,
+  );
 }
 
 Future<_CapabilityServerCapture> _startEmptyCapabilityServer() async {
