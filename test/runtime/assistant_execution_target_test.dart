@@ -1153,6 +1153,265 @@ void main() {
       );
     });
 
+    test(
+      'sendChatMessage keeps same-prompt draft task artifacts isolated',
+      () async {
+        final localHome = await Directory.systemTemp.createTemp(
+          'xworkmate-same-prompt-home-',
+        );
+        addTearDown(() async {
+          if (await localHome.exists()) {
+            await localHome.delete(recursive: true);
+          }
+        });
+        final fakeGoTaskService = _BlockingGoTaskServiceClient();
+        final controller = _connectedController(fakeGoTaskService);
+        addTearDown(controller.dispose);
+        controller.resolvedUserHomeDirectoryInternal = localHome.path;
+
+        const prompt = '用户要求我生成一个关于现代AI基础设施的技术营销内容';
+        final uniqueSuffix = DateTime.now().microsecondsSinceEpoch.toString();
+        final sessionA = 'draft-task-a-$uniqueSuffix';
+        final sessionB = 'draft-task-b-$uniqueSuffix';
+        addTearDown(() async {
+          for (final sessionKey in <String>[sessionA, sessionB]) {
+            final workspace = controller.assistantWorkspacePathForSession(
+              sessionKey,
+            );
+            if (workspace.trim().isEmpty) {
+              continue;
+            }
+            final directory = Directory(workspace);
+            if (await directory.exists()) {
+              await directory.delete(recursive: true);
+            }
+          }
+        });
+
+        await controller.switchSession(sessionA);
+        final taskAFuture = controller.sendChatMessage(prompt);
+        await fakeGoTaskService.waitForRequestCount(1);
+
+        await controller.switchSession(sessionB);
+        final taskBFuture = controller.sendChatMessage(prompt);
+        await fakeGoTaskService.waitForRequestCount(2);
+
+        final taskARequest = fakeGoTaskService.requests[0];
+        final taskBRequest = fakeGoTaskService.requests[1];
+        expect(taskARequest.sessionId, sessionA);
+        expect(taskBRequest.sessionId, sessionB);
+        expect(taskARequest.prompt, taskBRequest.prompt);
+        expect(taskARequest.resumeSession, isFalse);
+        expect(taskBRequest.resumeSession, isFalse);
+        expect(taskARequest.workingDirectory, endsWith('/$sessionA'));
+        expect(taskBRequest.workingDirectory, endsWith('/$sessionB'));
+        expect(
+          taskARequest.workingDirectory,
+          isNot(taskBRequest.workingDirectory),
+        );
+        expect(
+          taskARequest.remoteWorkingDirectoryHint,
+          isNot(taskBRequest.remoteWorkingDirectoryHint),
+        );
+        expect(
+          taskARequest.remoteWorkingDirectoryHint,
+          endsWith('/threads/$sessionA'),
+        );
+        expect(
+          taskBRequest.remoteWorkingDirectoryHint,
+          endsWith('/threads/$sessionB'),
+        );
+
+        fakeGoTaskService.complete(
+          sessionA,
+          GoTaskServiceResult(
+            success: true,
+            message: 'result A',
+            turnId: 'turn-a',
+            raw: <String, dynamic>{
+              'remoteWorkingDirectory':
+                  '/home/ubuntu/.openclaw/workspace/tasks/$sessionA/turn-a',
+              'artifacts': <Map<String, dynamic>>[
+                <String, dynamic>{
+                  'relativePath': 'same-prompt-a.md',
+                  'content': 'artifact A',
+                  'contentType': 'text/markdown',
+                },
+              ],
+            },
+            errorMessage: '',
+            resolvedModel: '',
+            route: GoTaskServiceRoute.externalAcpSingle,
+          ),
+        );
+        await taskAFuture;
+
+        fakeGoTaskService.complete(
+          sessionB,
+          GoTaskServiceResult(
+            success: true,
+            message: 'result B',
+            turnId: 'turn-b',
+            raw: <String, dynamic>{
+              'remoteWorkingDirectory':
+                  '/home/ubuntu/.openclaw/workspace/tasks/$sessionB/turn-b',
+              'artifacts': <Map<String, dynamic>>[
+                <String, dynamic>{
+                  'relativePath': 'same-prompt-b.md',
+                  'content': 'artifact B',
+                  'contentType': 'text/markdown',
+                },
+              ],
+            },
+            errorMessage: '',
+            resolvedModel: '',
+            route: GoTaskServiceRoute.externalAcpSingle,
+          ),
+        );
+        await taskBFuture;
+
+        final taskAWorkspace = controller.assistantWorkspacePathForSession(
+          sessionA,
+        );
+        final taskBWorkspace = controller.assistantWorkspacePathForSession(
+          sessionB,
+        );
+        expect(
+          await File('$taskAWorkspace/same-prompt-a.md').readAsString(),
+          'artifact A',
+        );
+        expect(
+          await File('$taskBWorkspace/same-prompt-b.md').readAsString(),
+          'artifact B',
+        );
+
+        final taskAThread = controller.requireTaskThreadForSessionInternal(
+          sessionA,
+        );
+        final taskBThread = controller.requireTaskThreadForSessionInternal(
+          sessionB,
+        );
+        expect(taskAThread.lastArtifactSyncStatus, 'synced');
+        expect(taskBThread.lastArtifactSyncStatus, 'synced');
+        expect(taskAThread.lastTaskArtifactRelativePaths, <String>[
+          'same-prompt-a.md',
+        ]);
+        expect(taskBThread.lastTaskArtifactRelativePaths, <String>[
+          'same-prompt-b.md',
+        ]);
+        expect(
+          taskAThread.lastRemoteWorkingDirectory,
+          '/home/ubuntu/.openclaw/workspace/tasks/$sessionA/turn-a',
+        );
+        expect(
+          taskBThread.lastRemoteWorkingDirectory,
+          '/home/ubuntu/.openclaw/workspace/tasks/$sessionB/turn-b',
+        );
+
+        final taskBSnapshot = await controller.loadAssistantArtifactSnapshot(
+          sessionKey: sessionB,
+        );
+        expect(
+          taskBSnapshot.fileEntries.map((entry) => entry.relativePath),
+          <String>['same-prompt-b.md'],
+        );
+      },
+    );
+
+    test(
+      'sendChatMessage clears same-prompt draft task artifacts when no files return',
+      () async {
+        final localHome = await Directory.systemTemp.createTemp(
+          'xworkmate-same-prompt-empty-home-',
+        );
+        addTearDown(() async {
+          if (await localHome.exists()) {
+            await localHome.delete(recursive: true);
+          }
+        });
+        final fakeGoTaskService = _BlockingGoTaskServiceClient();
+        final controller = _connectedController(fakeGoTaskService);
+        addTearDown(controller.dispose);
+        controller.resolvedUserHomeDirectoryInternal = localHome.path;
+
+        const prompt = '用户要求我生成一个关于现代AI基础设施的技术营销内容';
+        final uniqueSuffix = DateTime.now().microsecondsSinceEpoch.toString();
+        final sessionA = 'draft-task-a-empty-$uniqueSuffix';
+        final sessionB = 'draft-task-b-empty-$uniqueSuffix';
+        addTearDown(() async {
+          for (final sessionKey in <String>[sessionA, sessionB]) {
+            final workspace = controller.assistantWorkspacePathForSession(
+              sessionKey,
+            );
+            if (workspace.trim().isEmpty) {
+              continue;
+            }
+            final directory = Directory(workspace);
+            if (await directory.exists()) {
+              await directory.delete(recursive: true);
+            }
+          }
+        });
+
+        await controller.switchSession(sessionA);
+        final taskAFuture = controller.sendChatMessage(prompt);
+        await fakeGoTaskService.waitForRequestCount(1);
+        fakeGoTaskService.complete(
+          sessionA,
+          const GoTaskServiceResult(
+            success: true,
+            message: 'result A',
+            turnId: 'turn-a',
+            raw: <String, dynamic>{
+              'artifacts': <Map<String, dynamic>>[
+                <String, dynamic>{
+                  'relativePath': 'same-prompt-a.md',
+                  'content': 'artifact A',
+                  'contentType': 'text/markdown',
+                },
+              ],
+            },
+            errorMessage: '',
+            resolvedModel: '',
+            route: GoTaskServiceRoute.externalAcpSingle,
+          ),
+        );
+        await taskAFuture;
+
+        await controller.switchSession(sessionB);
+        final taskBFuture = controller.sendChatMessage(prompt);
+        await fakeGoTaskService.waitForRequestCount(2);
+        fakeGoTaskService.complete(
+          sessionB,
+          const GoTaskServiceResult(
+            success: true,
+            message: 'result B',
+            turnId: 'turn-b',
+            raw: <String, dynamic>{},
+            errorMessage: '',
+            resolvedModel: '',
+            route: GoTaskServiceRoute.externalAcpSingle,
+          ),
+        );
+        await taskBFuture;
+
+        final taskBThread = controller.requireTaskThreadForSessionInternal(
+          sessionB,
+        );
+        expect(taskBThread.lastArtifactSyncStatus, 'no-artifacts');
+        expect(taskBThread.lastTaskArtifactRelativePaths, isEmpty);
+
+        final taskBSnapshot = await controller.loadAssistantArtifactSnapshot(
+          sessionKey: sessionB,
+        );
+        expect(taskBSnapshot.fileEntries, isEmpty);
+        expect(
+          taskBSnapshot.filesMessage,
+          'No files found in the recorded working directory.',
+        );
+      },
+    );
+
     test('abortRun cancels only the current pending session', () async {
       final fakeGoTaskService = _BlockingGoTaskServiceClient();
       final controller = _connectedController(fakeGoTaskService);
