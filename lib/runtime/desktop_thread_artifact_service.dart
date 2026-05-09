@@ -19,6 +19,7 @@ class DesktopThreadArtifactService {
   Future<AssistantArtifactSnapshot> loadSnapshot({
     required String workspacePath,
     required WorkspaceRefKind workspaceKind,
+    List<String> artifactRelativePaths = const <String>[],
   }) async {
     final normalizedRef = workspacePath.trim();
     if (normalizedRef.isEmpty) {
@@ -56,9 +57,24 @@ class DesktopThreadArtifactService {
       );
     }
 
-    final files = await collectFilesInternal(root);
+    final taskArtifactPaths = normalizeTaskArtifactPathsInternal(
+      artifactRelativePaths,
+    );
+    final files = taskArtifactPaths.isEmpty
+        ? const <File>[]
+        : await collectTaskArtifactFilesInternal(
+            root,
+            normalizedRef,
+            taskArtifactPaths,
+          );
     final fileEntries = await buildEntriesInternal(files, normalizedRef);
-    final changes = await readGitChangesInternal(root, normalizedRef);
+    final changes = taskArtifactPaths.isEmpty
+        ? const <AssistantArtifactChangeEntry>[]
+        : await readGitChangesInternal(
+            root,
+            normalizedRef,
+            artifactRelativePaths: taskArtifactPaths,
+          );
     final results = await buildResultEntriesInternal(
       changes: changes,
       fileEntries: fileEntries,
@@ -93,6 +109,7 @@ class DesktopThreadArtifactService {
     required AssistantArtifactEntry entry,
     required String workspacePath,
     required WorkspaceRefKind workspaceKind,
+    List<String> artifactRelativePaths = const <String>[],
   }) async {
     if (workspaceKind != WorkspaceRefKind.localPath) {
       return const AssistantArtifactPreview.empty(
@@ -106,9 +123,19 @@ class DesktopThreadArtifactService {
             'The recorded working directory is not available on this machine.',
       );
     }
+    final taskArtifactPaths = normalizeTaskArtifactPathsInternal(
+      artifactRelativePaths,
+    );
+    final entryRelativePath = normalizeArtifactPathInternal(entry.relativePath);
+    if (entryRelativePath.isEmpty ||
+        !taskArtifactPaths.contains(entryRelativePath)) {
+      return const AssistantArtifactPreview.empty(
+        message: 'The selected file is not part of the current task artifacts.',
+      );
+    }
     final targetPath = resolveAbsolutePathInternal(
       workspacePath,
-      entry.relativePath,
+      entryRelativePath,
     );
     final file = File(targetPath);
     if (!await file.exists()) {
@@ -117,8 +144,15 @@ class DesktopThreadArtifactService {
             'The selected file is no longer available: ${entry.relativePath}',
       );
     }
+    final resolvedRelativePath = relativePathInternal(workspacePath, file.path);
+    if (resolvedRelativePath == null ||
+        resolvedRelativePath != entryRelativePath) {
+      return const AssistantArtifactPreview.empty(
+        message: 'The selected file is not part of the current task artifacts.',
+      );
+    }
 
-    final extension = fileExtensionInternal(entry.relativePath);
+    final extension = fileExtensionInternal(entryRelativePath);
     final content = await file.readAsString();
     final title = entry.label;
     if (extension == 'md' || extension == 'markdown') {
@@ -167,6 +201,33 @@ class DesktopThreadArtifactService {
       }
     } on FileSystemException {
       // Best effort only. A single unreadable directory should not block the panel.
+    }
+    return files;
+  }
+
+  Future<List<File>> collectTaskArtifactFilesInternal(
+    Directory root,
+    String workspacePath,
+    List<String> artifactRelativePaths,
+  ) async {
+    final files = <File>[];
+    for (final relativePath in artifactRelativePaths) {
+      final target = File(resolveAbsolutePathInternal(root.path, relativePath));
+      try {
+        if (!await target.exists()) {
+          continue;
+        }
+        final resolvedRelativePath = relativePathInternal(
+          workspacePath,
+          target.path,
+        );
+        if (resolvedRelativePath == null || resolvedRelativePath.isEmpty) {
+          continue;
+        }
+        files.add(target);
+      } on FileSystemException {
+        continue;
+      }
     }
     return files;
   }
@@ -232,8 +293,12 @@ class DesktopThreadArtifactService {
 
   Future<List<AssistantArtifactChangeEntry>> readGitChangesInternal(
     Directory workspaceRoot,
-    String workspacePath,
-  ) async {
+    String workspacePath, {
+    List<String> artifactRelativePaths = const <String>[],
+  }) async {
+    final allowedPaths = normalizeTaskArtifactPathsInternal(
+      artifactRelativePaths,
+    ).toSet();
     String? repositoryRoot;
     try {
       final revParse = await Process.run('git', <String>[
@@ -277,6 +342,9 @@ class DesktopThreadArtifactService {
         final absolutePath = joinPathInternal(repositoryRoot, path);
         final relativePath = relativePathInternal(workspacePath, absolutePath);
         if (relativePath == null || relativePath.isEmpty) {
+          continue;
+        }
+        if (allowedPaths.isNotEmpty && !allowedPaths.contains(relativePath)) {
           continue;
         }
         items.add(
@@ -367,6 +435,39 @@ class DesktopThreadArtifactService {
       return null;
     }
     return normalizedPath.substring(prefix.length);
+  }
+
+  static List<String> normalizeTaskArtifactPathsInternal(
+    List<String> relativePaths,
+  ) {
+    final seen = <String>{};
+    final normalized = <String>[];
+    for (final relativePath in relativePaths) {
+      final item = normalizeArtifactPathInternal(relativePath);
+      if (item.isEmpty || !seen.add(item)) {
+        continue;
+      }
+      normalized.add(item);
+    }
+    return normalized;
+  }
+
+  static String normalizeArtifactPathInternal(String relativePath) {
+    final trimmed = relativePath.trim().replaceAll('\\', '/');
+    if (trimmed.isEmpty ||
+        trimmed.startsWith('/') ||
+        trimmed.startsWith('~') ||
+        trimmed.contains(':')) {
+      return '';
+    }
+    final segments = trimmed
+        .split('/')
+        .where((segment) => segment.isNotEmpty && segment != '.')
+        .toList(growable: false);
+    if (segments.isEmpty || segments.any((segment) => segment == '..')) {
+      return '';
+    }
+    return segments.join('/');
   }
 
   static String normalizePathInternal(String path) {
