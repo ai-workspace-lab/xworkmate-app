@@ -603,8 +603,12 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     );
   }
 
-  CodeAgentNodeState buildCodeAgentNodeStateInternal() =>
-      buildCodeAgentNodeStateRuntimeInternal(this);
+  CodeAgentNodeState buildCodeAgentNodeStateInternal({
+    AssistantExecutionTarget? executionTarget,
+  }) => buildCodeAgentNodeStateRuntimeInternal(
+    this,
+    executionTarget: executionTarget,
+  );
 
   GatewayMode bridgeGatewayModeInternal() =>
       bridgeGatewayModeRuntimeInternal(this);
