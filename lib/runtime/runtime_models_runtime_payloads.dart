@@ -741,6 +741,7 @@ class ThreadContextState {
     this.lastRemoteWorkspaceRefKind,
     this.lastArtifactSyncAtMs,
     this.lastArtifactSyncStatus,
+    this.lastTaskArtifactRelativePaths = const <String>[],
   });
 
   final List<GatewayChatMessage> messages;
@@ -758,6 +759,7 @@ class ThreadContextState {
   final WorkspaceRefKind? lastRemoteWorkspaceRefKind;
   final double? lastArtifactSyncAtMs;
   final String? lastArtifactSyncStatus;
+  final List<String> lastTaskArtifactRelativePaths;
 
   ThreadContextState copyWith({
     List<GatewayChatMessage>? messages,
@@ -776,6 +778,7 @@ class ThreadContextState {
     WorkspaceRefKind? lastRemoteWorkspaceRefKind,
     double? lastArtifactSyncAtMs,
     String? lastArtifactSyncStatus,
+    List<String>? lastTaskArtifactRelativePaths,
   }) {
     return ThreadContextState(
       messages: messages ?? this.messages,
@@ -800,6 +803,9 @@ class ThreadContextState {
       lastArtifactSyncAtMs: lastArtifactSyncAtMs ?? this.lastArtifactSyncAtMs,
       lastArtifactSyncStatus:
           lastArtifactSyncStatus ?? this.lastArtifactSyncStatus,
+      lastTaskArtifactRelativePaths: lastTaskArtifactRelativePaths == null
+          ? this.lastTaskArtifactRelativePaths
+          : _stringListFromJson(lastTaskArtifactRelativePaths),
     );
   }
 
@@ -822,6 +828,7 @@ class ThreadContextState {
       'lastRemoteWorkspaceRefKind': lastRemoteWorkspaceRefKind?.name,
       'lastArtifactSyncAtMs': lastArtifactSyncAtMs,
       'lastArtifactSyncStatus': lastArtifactSyncStatus,
+      'lastTaskArtifactRelativePaths': lastTaskArtifactRelativePaths,
     };
   }
 
@@ -897,8 +904,32 @@ class ThreadContextState {
       })(),
       lastArtifactSyncAtMs: asDouble(json['lastArtifactSyncAtMs']),
       lastArtifactSyncStatus: json['lastArtifactSyncStatus']?.toString(),
+      lastTaskArtifactRelativePaths: _stringListFromJson(
+        json['lastTaskArtifactRelativePaths'],
+      ),
     );
   }
+}
+
+List<String> _stringListFromJson(Object? value) {
+  if (value is! List) {
+    return const <String>[];
+  }
+  final seen = <String>{};
+  final items = <String>[];
+  for (final item in value) {
+    final normalized = item?.toString().trim().replaceAll('\\', '/') ?? '';
+    if (normalized.isEmpty || normalized.startsWith('/')) {
+      continue;
+    }
+    if (normalized.split('/').any((segment) => segment == '..')) {
+      continue;
+    }
+    if (seen.add(normalized)) {
+      items.add(normalized);
+    }
+  }
+  return items;
 }
 
 class ThreadLifecycleState {
@@ -984,6 +1015,7 @@ class TaskThread {
     WorkspaceRefKind? lastRemoteWorkspaceRefKind,
     double? lastArtifactSyncAtMs,
     String? lastArtifactSyncStatus,
+    List<String>? lastTaskArtifactRelativePaths,
   }) : threadId = _resolveThreadId(threadId),
        title = title ?? '',
        ownerScope =
@@ -1029,6 +1061,9 @@ class TaskThread {
                  lastArtifactSyncStatus?.trim().isNotEmpty == true
                  ? lastArtifactSyncStatus!.trim()
                  : null,
+             lastTaskArtifactRelativePaths: _stringListFromJson(
+               lastTaskArtifactRelativePaths,
+             ),
            ),
        lifecycleState =
            lifecycleState ??
@@ -1067,6 +1102,8 @@ class TaskThread {
       contextState.lastRemoteWorkspaceRefKind;
   double? get lastArtifactSyncAtMs => contextState.lastArtifactSyncAtMs;
   String? get lastArtifactSyncStatus => contextState.lastArtifactSyncStatus;
+  List<String> get lastTaskArtifactRelativePaths =>
+      contextState.lastTaskArtifactRelativePaths;
   String get latestResolvedRuntimeModel =>
       contextState.latestResolvedRuntimeModel;
   String get latestResolvedProviderId => contextState.latestResolvedProviderId;
@@ -1110,6 +1147,7 @@ class TaskThread {
     WorkspaceRefKind? lastRemoteWorkspaceRefKind,
     double? lastArtifactSyncAtMs,
     String? lastArtifactSyncStatus,
+    List<String>? lastTaskArtifactRelativePaths,
   }) {
     return TaskThread(
       threadId: threadId ?? this.threadId,
@@ -1133,6 +1171,7 @@ class TaskThread {
         lastRemoteWorkspaceRefKind: lastRemoteWorkspaceRefKind,
         lastArtifactSyncAtMs: lastArtifactSyncAtMs,
         lastArtifactSyncStatus: lastArtifactSyncStatus,
+        lastTaskArtifactRelativePaths: lastTaskArtifactRelativePaths,
       ),
       lifecycleState: (lifecycleState ?? this.lifecycleState).copyWith(
         archived: archived,
@@ -1249,6 +1288,7 @@ class TaskThread {
         'lastRemoteWorkspaceRefKind': json['lastRemoteWorkspaceRefKind'],
         'lastArtifactSyncAtMs': json['lastArtifactSyncAtMs'],
         'lastArtifactSyncStatus': json['lastArtifactSyncStatus'],
+        'lastTaskArtifactRelativePaths': json['lastTaskArtifactRelativePaths'],
       };
     }
 

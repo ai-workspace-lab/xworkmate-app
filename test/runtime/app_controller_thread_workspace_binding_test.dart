@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:xworkmate/app/app_controller.dart';
 import 'package:xworkmate/app/app_controller_desktop_runtime_coordination_impl.dart';
 import 'package:xworkmate/app/app_controller_desktop_thread_binding.dart';
+import 'package:xworkmate/runtime/assistant_artifacts.dart';
 import 'package:xworkmate/runtime/go_task_service_client.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
 
@@ -196,14 +197,9 @@ void main() {
     final snapshot = await controller.loadAssistantArtifactSnapshot(
       sessionKey: 'session-1',
     );
-    expect(
-      snapshot.fileEntries.map((entry) => entry.relativePath),
-      contains('notes/hello.txt'),
-    );
-    expect(
-      snapshot.fileEntries.map((entry) => entry.relativePath),
-      contains('notes/hello.v2.txt'),
-    );
+    expect(snapshot.fileEntries.map((entry) => entry.relativePath), <String>[
+      'notes/hello.v2.txt',
+    ]);
     expect(
       controller
           .requireTaskThreadForSessionInternal('session-1')
@@ -211,6 +207,83 @@ void main() {
       'synced',
     );
   });
+
+  test(
+    'limits the artifact panel to files produced by the current task sync',
+    () async {
+      final controller = AppController(
+        environmentOverride: const <String, String>{},
+      );
+      addTearDown(controller.dispose);
+
+      final localWorkspace = await Directory.systemTemp.createTemp(
+        'xworkmate-isolated-artifact-workspace-',
+      );
+      addTearDown(() async {
+        if (await localWorkspace.exists()) {
+          await localWorkspace.delete(recursive: true);
+        }
+      });
+      final staleArtifact = File('${localWorkspace.path}/old-task-report.md');
+      await staleArtifact.writeAsString('stale task output');
+
+      controller.upsertTaskThreadInternal(
+        'session-1',
+        workspaceBinding: WorkspaceBinding(
+          workspaceId: 'session-1',
+          workspaceKind: WorkspaceKind.localFs,
+          workspacePath: localWorkspace.path,
+          displayPath: localWorkspace.path,
+          writable: true,
+        ),
+      );
+
+      final result = GoTaskServiceResult(
+        success: true,
+        message: 'hello',
+        turnId: 'turn-2',
+        raw: <String, dynamic>{
+          'artifacts': <Map<String, dynamic>>[
+            <String, dynamic>{
+              'relativePath': 'current-task-report.md',
+              'content': 'current task output',
+              'contentType': 'text/markdown',
+            },
+          ],
+        },
+        errorMessage: '',
+        resolvedModel: '',
+        route: GoTaskServiceRoute.externalAcpSingle,
+      );
+
+      await controller.persistGoTaskArtifactsForSessionInternal(
+        'session-1',
+        result,
+      );
+
+      final snapshot = await controller.loadAssistantArtifactSnapshot(
+        sessionKey: 'session-1',
+      );
+      final relativePaths = snapshot.fileEntries
+          .map((entry) => entry.relativePath)
+          .toList(growable: false);
+      expect(relativePaths, <String>['current-task-report.md']);
+
+      final stalePreview = await controller.loadAssistantArtifactPreview(
+        AssistantArtifactEntry(
+          id: '${localWorkspace.path}::old-task-report.md',
+          label: 'old-task-report.md',
+          relativePath: 'old-task-report.md',
+          kind: AssistantArtifactEntryKind.file,
+          mimeType: 'text/markdown',
+          previewable: true,
+          workspacePath: localWorkspace.path,
+        ),
+        sessionKey: 'session-1',
+      );
+      expect(stalePreview.kind, AssistantArtifactPreviewKind.empty);
+    },
+  );
 
   test(
     'downloads bridge URL artifacts into the local thread workspace',
@@ -895,6 +968,8 @@ void main() {
         await localWorkspace.delete(recursive: true);
       }
     });
+    final staleArtifact = File('${localWorkspace.path}/old-task-report.md');
+    await staleArtifact.writeAsString('stale task output');
     controller.upsertTaskThreadInternal(
       'session-1',
       workspaceBinding: WorkspaceBinding(
@@ -927,6 +1002,10 @@ void main() {
           .lastArtifactSyncStatus,
       'no-artifacts',
     );
+    final snapshot = await controller.loadAssistantArtifactSnapshot(
+      sessionKey: 'session-1',
+    );
+    expect(snapshot.fileEntries, isEmpty);
   });
 
   test('skips download URL artifacts outside the bridge host', () async {

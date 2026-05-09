@@ -242,6 +242,7 @@ extension AppControllerDesktopSkillPermissions on AppController {
     WorkspaceRefKind? lastRemoteWorkspaceRefKind,
     double? lastArtifactSyncAtMs,
     String? lastArtifactSyncStatus,
+    List<String>? lastTaskArtifactRelativePaths,
   }) {
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey,
@@ -359,6 +360,7 @@ extension AppControllerDesktopSkillPermissions on AppController {
                   lastRemoteWorkspaceRefKind: null,
                   lastArtifactSyncAtMs: null,
                   lastArtifactSyncStatus: null,
+                  lastTaskArtifactRelativePaths: const <String>[],
                 ))
             .copyWith(
               messages: nextMessages,
@@ -382,6 +384,7 @@ extension AppControllerDesktopSkillPermissions on AppController {
               lastRemoteWorkspaceRefKind: lastRemoteWorkspaceRefKind,
               lastArtifactSyncAtMs: lastArtifactSyncAtMs,
               lastArtifactSyncStatus: lastArtifactSyncStatus,
+              lastTaskArtifactRelativePaths: lastTaskArtifactRelativePaths,
             );
     final nextStatus =
         lifecycleStatus ??
