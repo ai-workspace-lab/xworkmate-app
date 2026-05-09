@@ -530,6 +530,91 @@ void main() {
       },
     );
 
+    test(
+      'retries failed connect attempts before surfacing unconfirmed diagnostics',
+      () async {
+        final server = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+        final port = server.port;
+        await server.close();
+        final endpoint = Uri.parse('http://127.0.0.1:$port');
+        final client = GatewayAcpClient(endpointResolver: () => endpoint);
+
+        await expectLater(
+          client.request(
+            method: 'session.start',
+            params: const <String, dynamic>{},
+          ),
+          throwsA(
+            isA<GatewayAcpException>()
+                .having(
+                  (error) => error.code,
+                  'code',
+                  gatewayAcpHttpConnectFailedCode,
+                )
+                .having(
+                  (error) => error.message,
+                  'message',
+                  contains('before the request was confirmed'),
+                )
+                .having(
+                  (error) => error.details,
+                  'details',
+                  allOf(
+                    containsPair('requestUrl', '$endpoint/acp/rpc'),
+                    containsPair(
+                      'maxRetryAttempts',
+                      gatewayAcpHttpConnectFailureRetryCount,
+                    ),
+                    containsPair(
+                      'retryAttempt',
+                      gatewayAcpHttpConnectFailureRetryCount,
+                    ),
+                    containsPair('phase', 'connect'),
+                  ),
+                ),
+          ),
+        );
+      },
+    );
+
+    test(
+      'desktop transport preserves socket timeout as unconfirmed ACP diagnostics',
+      () async {
+        final transport = ExternalCodeAgentAcpDesktopTransport(
+          client: _SocketThrowingGatewayAcpClient(
+            const SocketException(
+              'HTTP connection timed out after 0:00:08.000000, host: xworkmate-bridge.svc.plus, port: 443',
+            ),
+          ),
+          endpointResolver: (_) =>
+              Uri.parse('https://xworkmate-bridge.svc.plus'),
+        );
+
+        await expectLater(
+          transport.executeTask(
+            _taskRequest(
+              target: AssistantExecutionTarget.gateway,
+              provider: SingleAgentProvider.openclaw,
+            ),
+            onUpdate: (_) {},
+          ),
+          throwsA(
+            isA<GatewayAcpException>()
+                .having(
+                  (error) => error.code,
+                  'code',
+                  gatewayAcpHttpConnectTimeoutCode,
+                )
+                .having(
+                  (error) => error.toString(),
+                  'diagnostic',
+                  isNot(contains('EXTERNAL_ACP_GATEWAY_ERROR')),
+                ),
+          ),
+        );
+      },
+    );
+
     test('desktop bridge auth resolver skips unrelated endpoints', () async {
       final storeRoot = await Directory.systemTemp.createTemp(
         'xworkmate-acp-auth-unrelated-',
@@ -1435,6 +1520,26 @@ void main() {
       );
     });
   });
+}
+
+class _SocketThrowingGatewayAcpClient extends GatewayAcpClient {
+  _SocketThrowingGatewayAcpClient(this.error)
+    : super(
+        endpointResolver: () => Uri.parse('https://xworkmate-bridge.svc.plus'),
+      );
+
+  final SocketException error;
+
+  @override
+  Future<Map<String, dynamic>> request({
+    required String method,
+    required Map<String, dynamic> params,
+    void Function(Map<String, dynamic>)? onNotification,
+    Uri? endpointOverride,
+    String authorizationOverride = '',
+  }) async {
+    throw error;
+  }
 }
 
 GoTaskServiceRequest _taskRequest({

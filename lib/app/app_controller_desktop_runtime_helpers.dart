@@ -237,6 +237,19 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     final recoverableTransportCode = recoverableAcpHttpTransportCodeInternal(
       error,
     );
+    final unconfirmedConnectCode = unconfirmedAcpHttpConnectCodeInternal(error);
+    if (unconfirmedConnectCode == gatewayAcpHttpConnectTimeoutCode) {
+      return appText(
+        'Bridge 连接超时，本轮请求未确认，可重试。错误码：ACP_HTTP_CONNECT_TIMEOUT',
+        'Bridge connection timed out; this request was not confirmed and can be retried. Error code: ACP_HTTP_CONNECT_TIMEOUT',
+      );
+    }
+    if (unconfirmedConnectCode == gatewayAcpHttpConnectFailedCode) {
+      return appText(
+        'Bridge 连接失败，本轮请求未确认，可重试。错误码：ACP_HTTP_CONNECT_FAILED',
+        'Bridge connection failed; this request was not confirmed and can be retried. Error code: ACP_HTTP_CONNECT_FAILED',
+      );
+    }
     if (recoverableTransportCode == 'ACP_HTTP_CONNECTION_CLOSED') {
       return appText(
         'Bridge 响应读取中断；当前对话已保留，下一次发送会继续同一会话。错误码：ACP_HTTP_CONNECTION_CLOSED',
@@ -358,6 +371,23 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
         detailCode == 'ACP_HTTP_HANDSHAKE_INTERRUPTED' ||
         raw.contains('ACP_HTTP_HANDSHAKE_INTERRUPTED')) {
       return 'ACP_HTTP_HANDSHAKE_INTERRUPTED';
+    }
+    return null;
+  }
+
+  String? unconfirmedAcpHttpConnectCodeInternal(Object error) {
+    final raw = error.toString().trim();
+    final primaryCode = gatewayExecutionPrimaryCodeInternal(error);
+    final detailCode = gatewayExecutionDetailCodeInternal(error);
+    if (primaryCode == gatewayAcpHttpConnectTimeoutCode ||
+        detailCode == gatewayAcpHttpConnectTimeoutCode ||
+        raw.contains(gatewayAcpHttpConnectTimeoutCode)) {
+      return gatewayAcpHttpConnectTimeoutCode;
+    }
+    if (primaryCode == gatewayAcpHttpConnectFailedCode ||
+        detailCode == gatewayAcpHttpConnectFailedCode ||
+        raw.contains(gatewayAcpHttpConnectFailedCode)) {
+      return gatewayAcpHttpConnectFailedCode;
     }
     return null;
   }

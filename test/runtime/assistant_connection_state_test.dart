@@ -209,6 +209,45 @@ void main() {
     );
 
     test(
+      'labels ACP HTTP connect timeouts as unconfirmed retryable requests',
+      () async {
+        final controller = await _isolatedController();
+        addTearDown(controller.dispose);
+
+        final label = controller.gatewayExecutionErrorLabelInternal(
+          const GatewayAcpException(
+            'SocketException: HTTP connection timed out after 0:00:08.000000, host: xworkmate-bridge.svc.plus, port: 443',
+            code: gatewayAcpHttpConnectTimeoutCode,
+          ),
+          target: AssistantExecutionTarget.gateway,
+        );
+
+        expect(label, 'Bridge 连接超时，本轮请求未确认，可重试。错误码：ACP_HTTP_CONNECT_TIMEOUT');
+        expect(label, isNot(contains('SocketException')));
+        expect(label, isNot(contains('0:00:08')));
+      },
+    );
+
+    test(
+      'labels ACP HTTP connect failures as unconfirmed retryable requests',
+      () async {
+        final controller = await _isolatedController();
+        addTearDown(controller.dispose);
+
+        final label = controller.gatewayExecutionErrorLabelInternal(
+          const GatewayAcpException(
+            'Connection refused',
+            code: gatewayAcpHttpConnectFailedCode,
+          ),
+          target: AssistantExecutionTarget.gateway,
+        );
+
+        expect(label, 'Bridge 连接失败，本轮请求未确认，可重试。错误码：ACP_HTTP_CONNECT_FAILED');
+        expect(label, isNot(contains('Connection refused')));
+      },
+    );
+
+    test(
       'labels unavailable session continuation without starting a new flow',
       () async {
         final controller = await _isolatedController();
