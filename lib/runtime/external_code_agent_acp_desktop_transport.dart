@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
@@ -134,6 +135,17 @@ class ExternalCodeAgentAcpDesktopTransport
       );
     } on GatewayAcpException {
       rethrow;
+    } on SocketException catch (error) {
+      final timeout = _socketExceptionLooksLikeConnectTimeout(error);
+      throw GatewayAcpException(
+        timeout
+            ? 'ACP HTTP connection timed out before the request was confirmed'
+            : 'ACP HTTP connection failed before the request was confirmed',
+        code: timeout
+            ? gatewayAcpHttpConnectTimeoutCode
+            : gatewayAcpHttpConnectFailedCode,
+        details: <String, dynamic>{'originalError': error.toString()},
+      );
     } catch (error) {
       throw GatewayAcpException(
         error.toString(),
@@ -303,5 +315,12 @@ class ExternalCodeAgentAcpDesktopTransport
       return parsed;
     }
     return <AssistantExecutionTarget>[defaultTarget];
+  }
+
+  bool _socketExceptionLooksLikeConnectTimeout(SocketException error) {
+    final lowered = error.toString().toLowerCase();
+    return lowered.contains('connection timed out') ||
+        lowered.contains('timed out') ||
+        lowered.contains('timeout');
   }
 }
