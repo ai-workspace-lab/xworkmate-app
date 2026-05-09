@@ -1107,20 +1107,34 @@ class GatewayAcpClient {
       }
     }
 
-    await for (final line
-        in response.transform(utf8.decoder).transform(const LineSplitter())) {
-      if (line.isEmpty) {
-        if (eventLines.isNotEmpty) {
+    try {
+      await for (final line
+          in response.transform(utf8.decoder).transform(const LineSplitter())) {
+        if (line.isEmpty) {
+          if (eventLines.isNotEmpty) {
+            consumeEventPayload(eventLines.join('\n'));
+            eventLines.clear();
+            if (resolvedResponse != null) {
+              break;
+            }
+          }
+          continue;
+        }
+        if (line.startsWith('data:')) {
+          eventLines.add(line.substring(5).trimLeft());
+        }
+      }
+    } on HttpException catch (error, stackTrace) {
+      if (resolvedResponse == null && eventLines.isNotEmpty) {
+        try {
           consumeEventPayload(eventLines.join('\n'));
           eventLines.clear();
-          if (resolvedResponse != null) {
-            break;
-          }
+        } on FormatException {
+          Error.throwWithStackTrace(error, stackTrace);
         }
-        continue;
       }
-      if (line.startsWith('data:')) {
-        eventLines.add(line.substring(5).trimLeft());
+      if (resolvedResponse == null) {
+        rethrow;
       }
     }
 
