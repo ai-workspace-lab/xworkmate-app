@@ -223,12 +223,14 @@ String? resolveLocalAssistantWorkingDirectoryForSessionRuntimeInternal(
 }
 
 CodeAgentNodeState buildCodeAgentNodeStateRuntimeInternal(
-  AppController controller,
-) {
+  AppController controller, {
+  AssistantExecutionTarget? executionTarget,
+}) {
   return CodeAgentNodeState(
     selectedAgentId: controller.agentsControllerInternal.selectedAgentId,
     gatewayConnected: controller.runtimeInternal.isConnected,
-    executionTarget: controller.currentAssistantExecutionTarget,
+    executionTarget:
+        executionTarget ?? controller.currentAssistantExecutionTarget,
     runtimeMode: controller.effectiveCodeAgentRuntimeMode,
     bridgeEnabled: controller.isCodexBridgeEnabledInternal,
     bridgeState: controller.codexCooperationStateInternal.name,
