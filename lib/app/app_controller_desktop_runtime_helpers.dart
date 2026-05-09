@@ -729,6 +729,7 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
       normalizedSessionKey,
       lastArtifactSyncAtMs: syncedAtMs,
       lastArtifactSyncStatus: 'syncing',
+      lastTaskArtifactRelativePaths: const <String>[],
       updatedAtMs: syncedAtMs,
     );
     recomputeTasksInternal();
@@ -762,6 +763,7 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     var wroteArtifact = false;
     var failedArtifact = false;
     var skippedArtifact = false;
+    final currentTaskArtifactRelativePaths = <String>[];
     for (final artifact in artifacts) {
       final relativePath = _sanitizeArtifactRelativePathInternal(
         artifact.relativePath,
@@ -791,6 +793,14 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
         continue;
       }
       wroteArtifact = true;
+      final writtenRelativePath =
+          DesktopThreadArtifactService.relativePathInternal(
+            root.path,
+            target.path,
+          );
+      if (writtenRelativePath != null && writtenRelativePath.isNotEmpty) {
+        currentTaskArtifactRelativePaths.add(writtenRelativePath);
+      }
     }
 
     final syncStatus = wroteArtifact
@@ -802,6 +812,7 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
       normalizedSessionKey,
       lastArtifactSyncAtMs: syncedAtMs,
       lastArtifactSyncStatus: syncStatus,
+      lastTaskArtifactRelativePaths: currentTaskArtifactRelativePaths,
       updatedAtMs: syncedAtMs,
     );
   }

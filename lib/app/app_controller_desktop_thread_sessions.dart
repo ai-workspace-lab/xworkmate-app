@@ -223,9 +223,7 @@ extension AppControllerDesktopThreadSessions on AppController {
             ?.selectedSkillKeys ??
         const <String>[];
     final availableKeys = skills.map((item) => item.skillKey).toSet();
-    return selected
-        .where(availableKeys.contains)
-        .toList(growable: false);
+    return selected.where(availableKeys.contains).toList(growable: false);
   }
 
   String assistantModelForSession(String sessionKey) {
@@ -327,9 +325,12 @@ extension AppControllerDesktopThreadSessions on AppController {
     final resolvedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey ?? currentSessionKey,
     );
+    final thread = taskThreadForSessionInternal(resolvedSessionKey);
     return threadArtifactServiceInternal.loadSnapshot(
       workspacePath: assistantWorkspacePathForSession(resolvedSessionKey),
       workspaceKind: assistantWorkspaceKindForSession(resolvedSessionKey),
+      artifactRelativePaths:
+          thread?.lastTaskArtifactRelativePaths ?? const <String>[],
     );
   }
 
@@ -340,10 +341,13 @@ extension AppControllerDesktopThreadSessions on AppController {
     final resolvedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey ?? currentSessionKey,
     );
+    final thread = taskThreadForSessionInternal(resolvedSessionKey);
     return threadArtifactServiceInternal.loadPreview(
       entry: entry,
       workspacePath: assistantWorkspacePathForSession(resolvedSessionKey),
       workspaceKind: assistantWorkspaceKindForSession(resolvedSessionKey),
+      artifactRelativePaths:
+          thread?.lastTaskArtifactRelativePaths ?? const <String>[],
     );
   }
 
