@@ -6,8 +6,12 @@ import 'acp_endpoint_paths.dart';
 import 'runtime_models.dart';
 
 const int gatewayAcpHttpHandshakeInterruptedRetryCount = 5;
+const int gatewayAcpHttpConnectFailureRetryCount = 2;
+const Duration gatewayAcpHttpConnectTimeout = Duration(seconds: 12);
 const String gatewayAcpHttpHandshakeInterruptedCode =
     'ACP_HTTP_HANDSHAKE_INTERRUPTED';
+const String gatewayAcpHttpConnectTimeoutCode = 'ACP_HTTP_CONNECT_TIMEOUT';
+const String gatewayAcpHttpConnectFailedCode = 'ACP_HTTP_CONNECT_FAILED';
 
 class GatewayAcpException implements Exception {
   const GatewayAcpException(
@@ -75,6 +79,13 @@ class _GatewayAcpSessionUpdate {
   final String textDelta;
   final int? sequence;
   final Map<String, dynamic> payload;
+}
+
+enum _GatewayAcpHttpRequestPhase {
+  connect,
+  write,
+  waitingForResponse,
+  bodyRead,
 }
 
 class GatewayAcpMultiAgentRequest {
@@ -564,7 +575,7 @@ class GatewayAcpClient {
       );
     }
 
-    GatewayAcpException? lastHandshakeError;
+    GatewayAcpException? lastRetryableError;
     for (
       var attempt = 0;
       attempt <= gatewayAcpHttpHandshakeInterruptedRetryCount;
@@ -579,19 +590,37 @@ class GatewayAcpClient {
           retryAttempt: attempt,
         );
       } on GatewayAcpException catch (error) {
-        if (error.code != gatewayAcpHttpHandshakeInterruptedCode ||
-            attempt == gatewayAcpHttpHandshakeInterruptedRetryCount) {
+        final retryLimit = _httpRetryCountForError(error);
+        if (retryLimit == null || attempt >= retryLimit) {
           rethrow;
         }
-        lastHandshakeError = error;
-        await Future<void>.delayed(Duration(milliseconds: 50 * (attempt + 1)));
+        lastRetryableError = error;
+        await Future<void>.delayed(_httpRetryDelayFor(error, attempt));
       }
     }
-    throw lastHandshakeError ??
+    throw lastRetryableError ??
         const GatewayAcpException(
           'ACP HTTP handshake was interrupted before the response started',
           code: gatewayAcpHttpHandshakeInterruptedCode,
         );
+  }
+
+  int? _httpRetryCountForError(GatewayAcpException error) {
+    return switch (error.code) {
+      gatewayAcpHttpHandshakeInterruptedCode =>
+        gatewayAcpHttpHandshakeInterruptedRetryCount,
+      gatewayAcpHttpConnectTimeoutCode ||
+      gatewayAcpHttpConnectFailedCode => gatewayAcpHttpConnectFailureRetryCount,
+      _ => null,
+    };
+  }
+
+  Duration _httpRetryDelayFor(GatewayAcpException error, int attempt) {
+    if (error.code == gatewayAcpHttpConnectTimeoutCode ||
+        error.code == gatewayAcpHttpConnectFailedCode) {
+      return Duration(milliseconds: 200 * (1 << attempt));
+    }
+    return Duration(milliseconds: 50 * (attempt + 1));
   }
 
   Future<Map<String, dynamic>> _requestViaHttpAttempt(
@@ -601,12 +630,22 @@ class GatewayAcpClient {
     required String authorizationOverride,
     required int retryAttempt,
   }) async {
-    final client = HttpClient()..connectionTimeout = const Duration(seconds: 8);
+    final client = HttpClient()
+      ..connectionTimeout = gatewayAcpHttpConnectTimeout;
     var statusCode = 0;
     var contentType = '';
     var bodyRead = false;
+    var phase = _GatewayAcpHttpRequestPhase.connect;
     try {
-      final httpRequest = await client.postUrl(endpoint);
+      final authorization = await _resolveAuthorizationHeader(
+        endpoint,
+        authorizationOverride: authorizationOverride,
+      );
+      phase = _GatewayAcpHttpRequestPhase.connect;
+      final httpRequest = await client
+          .postUrl(endpoint)
+          .timeout(gatewayAcpHttpConnectTimeout);
+      phase = _GatewayAcpHttpRequestPhase.write;
       httpRequest.headers.set(
         HttpHeaders.contentTypeHeader,
         'application/json; charset=utf-8',
@@ -614,10 +653,6 @@ class GatewayAcpClient {
       httpRequest.headers.set(
         HttpHeaders.acceptHeader,
         'text/event-stream, application/json',
-      );
-      final authorization = await _resolveAuthorizationHeader(
-        endpoint,
-        authorizationOverride: authorizationOverride,
       );
       if (authorization.isNotEmpty) {
         httpRequest.headers.set(HttpHeaders.authorizationHeader, authorization);
@@ -632,6 +667,7 @@ class GatewayAcpClient {
           }),
         ),
       );
+      phase = _GatewayAcpHttpRequestPhase.waitingForResponse;
       final response = await httpRequest.close().timeout(
         gatewayAcpHttpResponseTimeoutFor(
           endpoint,
@@ -646,6 +682,7 @@ class GatewayAcpClient {
               .value(HttpHeaders.contentTypeHeader)
               ?.toLowerCase() ??
           '';
+      phase = _GatewayAcpHttpRequestPhase.bodyRead;
       if (response.statusCode < 200 || response.statusCode >= 300) {
         final body = await response.transform(utf8.decoder).join();
         bodyRead = body.isNotEmpty;
@@ -700,6 +737,20 @@ class GatewayAcpClient {
       };
     } on GatewayAcpException {
       rethrow;
+    } on TimeoutException catch (error) {
+      if (phase == _GatewayAcpHttpRequestPhase.connect) {
+        throw _connectException(
+          endpoint: endpoint,
+          statusCode: statusCode,
+          contentType: contentType,
+          bodyRead: bodyRead,
+          retryAttempt: retryAttempt,
+          phase: phase,
+          originalError: error,
+          timeout: true,
+        );
+      }
+      rethrow;
     } on HandshakeException catch (error) {
       throw _handshakeInterruptedException(
         endpoint: endpoint,
@@ -725,6 +776,20 @@ class GatewayAcpClient {
           originalError: error,
         );
       }
+      if (phase == _GatewayAcpHttpRequestPhase.connect &&
+          statusCode == 0 &&
+          !bodyRead) {
+        throw _connectException(
+          endpoint: endpoint,
+          statusCode: statusCode,
+          contentType: contentType,
+          bodyRead: bodyRead,
+          retryAttempt: retryAttempt,
+          phase: phase,
+          originalError: error,
+          timeout: _looksLikeConnectTimeout(error.toString()),
+        );
+      }
       rethrow;
     } on HttpException catch (error) {
       if (_looksLikeConnectionClosedBeforeResponse(error.toString())) {
@@ -744,6 +809,38 @@ class GatewayAcpClient {
     } finally {
       client.close(force: true);
     }
+  }
+
+  GatewayAcpException _connectException({
+    required Uri endpoint,
+    required int statusCode,
+    required String contentType,
+    required bool bodyRead,
+    required int retryAttempt,
+    required _GatewayAcpHttpRequestPhase phase,
+    required Object originalError,
+    required bool timeout,
+  }) {
+    final code = timeout
+        ? gatewayAcpHttpConnectTimeoutCode
+        : gatewayAcpHttpConnectFailedCode;
+    final message = timeout
+        ? 'ACP HTTP connection timed out before the request was confirmed'
+        : 'ACP HTTP connection failed before the request was confirmed';
+    return GatewayAcpException(
+      message,
+      code: code,
+      details: <String, dynamic>{
+        'requestUrl': endpoint.toString(),
+        'statusCode': statusCode,
+        'contentType': contentType,
+        'bodyRead': bodyRead,
+        'phase': phase.name,
+        'retryAttempt': retryAttempt,
+        'maxRetryAttempts': gatewayAcpHttpConnectFailureRetryCount,
+        'originalError': originalError.toString(),
+      },
+    );
   }
 
   GatewayAcpException _handshakeInterruptedException({
@@ -790,6 +887,13 @@ class GatewayAcpClient {
         lowered.contains('connection closed while receiving data') ||
         lowered.contains('connection terminated during body read') ||
         lowered.contains('stream closed');
+  }
+
+  bool _looksLikeConnectTimeout(String raw) {
+    final lowered = raw.toLowerCase();
+    return lowered.contains('connection timed out') ||
+        lowered.contains('timed out') ||
+        lowered.contains('timeout');
   }
 
   String _describeHttpError({

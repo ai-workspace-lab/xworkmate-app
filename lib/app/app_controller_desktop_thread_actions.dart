@@ -330,7 +330,7 @@ extension AppControllerDesktopThreadActions on AppController {
         final sessionKey = normalizedAssistantSessionKeyInternal(
           currentSessionKey,
         );
-        final resumeSession = hasCommittedUserTurnForGatewaySessionInternal(
+        final resumeSession = shouldResumeGatewaySessionForNextSendInternal(
           sessionKey,
         );
         final lifecycleStatus = taskThreadForSessionInternal(
@@ -339,7 +339,13 @@ extension AppControllerDesktopThreadActions on AppController {
         final lastResultCode = taskThreadForSessionInternal(
           sessionKey,
         )?.lifecycleState.lastResultCode?.trim().toLowerCase();
-        final runStatus = resumeSession && lifecycleStatus == 'interrupted'
+        final continuableTransportResult =
+            lastResultCode == 'acp_http_connection_closed' ||
+            lastResultCode ==
+                gatewayAcpHttpHandshakeInterruptedCode.toLowerCase();
+        final runStatus =
+            resumeSession &&
+                (lifecycleStatus == 'interrupted' || continuableTransportResult)
             ? 'continuing'
             : resumeSession && lastResultCode == 'error'
             ? 'retrying'
@@ -375,6 +381,13 @@ extension AppControllerDesktopThreadActions on AppController {
         try {
           final dispatch = await codeAgentNodeOrchestratorInternal
               .buildGatewayDispatch(buildCodeAgentNodeStateInternal());
+          upsertTaskThreadInternal(
+            sessionKey,
+            lifecycleStatus: runStatus,
+            lastRunAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+            lastResultCode: runStatus,
+            updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+          );
           final result = await goTaskServiceClientInternal.executeTask(
             GoTaskServiceRequest(
               sessionId: sessionKey,
@@ -490,15 +503,20 @@ extension AppControllerDesktopThreadActions on AppController {
           clearAiGatewayStreamingTextInternal(sessionKey);
           final recoverableTransportCode =
               recoverableAcpHttpTransportCodeInternal(error);
+          final unconfirmedConnectCode = unconfirmedAcpHttpConnectCodeInternal(
+            error,
+          );
           final recoverableTransportInterrupted =
               recoverableTransportCode != null;
+          final visibleResultCode =
+              unconfirmedConnectCode ?? recoverableTransportCode;
           upsertTaskThreadInternal(
             sessionKey,
             lifecycleStatus: recoverableTransportInterrupted
                 ? 'interrupted'
                 : 'ready',
             lastRunAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-            lastResultCode: recoverableTransportCode ?? 'error',
+            lastResultCode: visibleResultCode ?? 'error',
             lastArtifactSyncStatus: recoverableTransportInterrupted
                 ? 'interrupted'
                 : null,
@@ -535,6 +553,20 @@ extension AppControllerDesktopThreadActions on AppController {
       final role = message.role.trim().toLowerCase();
       return role == 'user' && !message.pending;
     });
+  }
+
+  bool shouldResumeGatewaySessionForNextSendInternal(String sessionKey) {
+    final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
+      sessionKey,
+    );
+    if (!hasCommittedUserTurnForGatewaySessionInternal(normalizedSessionKey)) {
+      return false;
+    }
+    final lastResultCode = taskThreadForSessionInternal(
+      normalizedSessionKey,
+    )?.lifecycleState.lastResultCode?.trim().toUpperCase();
+    return lastResultCode != gatewayAcpHttpConnectTimeoutCode &&
+        lastResultCode != gatewayAcpHttpConnectFailedCode;
   }
 
   Future<void> abortRun() async {

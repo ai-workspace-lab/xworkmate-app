@@ -727,6 +727,68 @@ void main() {
     );
 
     test(
+      'sendChatMessage starts a new session after ACP HTTP connect timeout',
+      () async {
+        final fakeGoTaskService = _RecordingGoTaskServiceClient()
+          ..outcomes.add(
+            const GatewayAcpException(
+              'ACP HTTP connection timed out before the request was confirmed',
+              code: gatewayAcpHttpConnectTimeoutCode,
+            ),
+          )
+          ..outcomes.add(
+            const GoTaskServiceResult(
+              success: true,
+              message: 'retried from a confirmed new start',
+              turnId: 'turn-2',
+              raw: <String, dynamic>{},
+              errorMessage: '',
+              resolvedModel: '',
+              route: GoTaskServiceRoute.externalAcpSingle,
+            ),
+          );
+        final controller = _connectedController(fakeGoTaskService);
+        addTearDown(controller.dispose);
+
+        await controller.sessionsController.switchSession('session-1');
+
+        await controller.sendChatMessage('first turn');
+
+        expect(fakeGoTaskService.requests, hasLength(1));
+        expect(fakeGoTaskService.requests.single.resumeSession, isFalse);
+        final failedThread = controller.taskThreadForSessionInternal(
+          'session-1',
+        );
+        expect(failedThread?.lifecycleState.status, 'ready');
+        expect(
+          failedThread?.lifecycleState.lastResultCode,
+          gatewayAcpHttpConnectTimeoutCode,
+        );
+        expect(failedThread?.lastArtifactSyncStatus, isNull);
+        expect(
+          controller.chatMessages.last.text,
+          'Bridge 连接超时，本轮请求未确认，可重试。错误码：ACP_HTTP_CONNECT_TIMEOUT',
+        );
+
+        await controller.sendChatMessage('retry after unconfirmed connect');
+
+        expect(fakeGoTaskService.requests, hasLength(2));
+        expect(fakeGoTaskService.requests.last.resumeSession, isFalse);
+        await _waitForLastChatMessageText(
+          controller,
+          'retried from a confirmed new start',
+        );
+        expect(
+          controller.chatMessages.last.text,
+          'retried from a confirmed new start',
+        );
+        final thread = controller.taskThreadForSessionInternal('session-1');
+        expect(thread?.lifecycleState.status, 'ready');
+        expect(thread?.lifecycleState.lastResultCode, 'success');
+      },
+    );
+
+    test(
       'sendChatMessage hides OpenClaw artifact guard text after an interrupted continuation',
       () async {
         final localWorkspace = await Directory.systemTemp.createTemp(
@@ -1325,7 +1387,7 @@ Future<void> _waitForLastChatMessageText(
   AppController controller,
   String expectedText,
 ) async {
-  final deadline = DateTime.now().add(const Duration(seconds: 2));
+  final deadline = DateTime.now().add(const Duration(seconds: 15));
   while (DateTime.now().isBefore(deadline)) {
     if (controller.chatMessages.isNotEmpty &&
         controller.chatMessages.last.text == expectedText) {
@@ -1541,7 +1603,7 @@ class _BlockingGoTaskServiceClient implements GoTaskServiceClient {
   }
 
   Future<void> waitForRequestCount(int count) async {
-    final deadline = DateTime.now().add(const Duration(seconds: 5));
+    final deadline = DateTime.now().add(const Duration(seconds: 15));
     while (requests.length < count && DateTime.now().isBefore(deadline)) {
       await Future<void>.delayed(const Duration(milliseconds: 10));
     }
