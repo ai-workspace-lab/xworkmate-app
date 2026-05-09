@@ -477,6 +477,62 @@ void main() {
     );
 
     test(
+      'uses complete SSE final envelope buffered before abrupt body close',
+      () async {
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        addTearDown(() => server.close(force: true));
+        server.listen((request) async {
+          final body = await utf8.decoder.bind(request).join();
+          final envelope = jsonEncode(<String, dynamic>{
+            'jsonrpc': '2.0',
+            'id': _decodeRequestId(body),
+            'result': <String, dynamic>{
+              'output': 'stable final output',
+              'artifacts': <Map<String, dynamic>>[
+                <String, dynamic>{
+                  'relativePath': 'exports/final.md',
+                  'downloadUrl':
+                      'https://xworkmate-bridge.svc.plus/artifacts/openclaw/download'
+                      '?sessionKey=session-1&runId=run-1&relativePath=exports%2Ffinal.md',
+                  'contentType': 'text/markdown',
+                  'sizeBytes': 42,
+                },
+              ],
+            },
+          });
+          final event = 'data: $envelope\n';
+          final eventBytes = utf8.encode(event);
+          request.response.headers.set(
+            HttpHeaders.contentTypeHeader,
+            'text/event-stream',
+          );
+          request.response.contentLength = eventBytes.length + 128;
+          final socket = await request.response.detachSocket();
+          socket.add(eventBytes);
+          await socket.flush();
+          socket.destroy();
+        });
+        final endpoint = Uri.parse('http://127.0.0.1:${server.port}');
+        final client = GatewayAcpClient(endpointResolver: () => endpoint);
+
+        final response = await client.request(
+          method: 'session.start',
+          params: const <String, dynamic>{},
+        );
+
+        expect((response['result'] as Map)['output'], 'stable final output');
+        expect(
+          ((response['result'] as Map)['artifacts'] as List),
+          hasLength(1),
+        );
+        final diagnostics = (response['_xworkmateDiagnostics'] as Map)
+            .cast<String, dynamic>();
+        expect(diagnostics['transport'], 'http-sse');
+        expect(diagnostics['bodyRead'], isTrue);
+      },
+    );
+
+    test(
       'retries interrupted TLS handshakes before surfacing ACP diagnostics',
       () async {
         final server = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
