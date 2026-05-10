@@ -2,14 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../i18n/app_language.dart';
 
-enum AssistantTaskProgressPhase {
-  idle,
-  running,
-  retrying,
-  continuing,
-  syncingArtifacts,
-  interrupted,
-}
+enum AssistantTaskProgressPhase { idle, running, syncingArtifacts, interrupted }
 
 class AssistantTaskProgressState {
   const AssistantTaskProgressState({
@@ -34,22 +27,14 @@ class AssistantTaskProgressState {
   bool get interrupted => phase == AssistantTaskProgressPhase.interrupted;
   bool get running =>
       phase == AssistantTaskProgressPhase.running ||
-      phase == AssistantTaskProgressPhase.retrying ||
-      phase == AssistantTaskProgressPhase.continuing ||
       phase == AssistantTaskProgressPhase.syncingArtifacts;
 }
 
 class AssistantTaskProgressBar extends StatelessWidget {
-  const AssistantTaskProgressBar({
-    super.key,
-    required this.state,
-    this.onStop,
-    this.onContinue,
-  });
+  const AssistantTaskProgressBar({super.key, required this.state, this.onStop});
 
   final AssistantTaskProgressState state;
   final VoidCallback? onStop;
-  final VoidCallback? onContinue;
 
   @override
   Widget build(BuildContext context) {
@@ -59,8 +44,6 @@ class AssistantTaskProgressBar extends StatelessWidget {
     final theme = Theme.of(context);
     final color = state.interrupted
         ? theme.colorScheme.error
-        : state.phase == AssistantTaskProgressPhase.retrying
-        ? theme.colorScheme.tertiary
         : theme.colorScheme.primary;
     return Container(
       key: const Key('assistant-task-progress-bar'),
@@ -112,15 +95,6 @@ class AssistantTaskProgressBar extends StatelessWidget {
               label: appText('停止', 'Stop'),
               color: color,
               onPressed: onStop,
-            ),
-          ] else if (state.interrupted && onContinue != null) ...[
-            const SizedBox(width: 8),
-            _AssistantTaskProgressActionButton(
-              key: const Key('assistant-task-progress-continue-button'),
-              icon: Icons.play_arrow_rounded,
-              label: appText('继续', 'Continue'),
-              color: color,
-              onPressed: onContinue,
             ),
           ],
         ],
@@ -180,25 +154,6 @@ AssistantTaskProgressState assistantTaskProgressState({
       runtimeBudgetMinutes: budget,
     );
   }
-  if (pending && status == 'continuing') {
-    return AssistantTaskProgressState(
-      phase: AssistantTaskProgressPhase.continuing,
-      label: _budgetedProgressLabel(
-        appText('任务继续中', 'Continuing task'),
-        budget,
-      ),
-      value: 0.62,
-      runtimeBudgetMinutes: budget,
-    );
-  }
-  if (pending && status == 'retrying') {
-    return AssistantTaskProgressState(
-      phase: AssistantTaskProgressPhase.retrying,
-      label: _budgetedProgressLabel(appText('任务重试中', 'Retrying task'), budget),
-      value: 0.38,
-      runtimeBudgetMinutes: budget,
-    );
-  }
   if (pending) {
     return AssistantTaskProgressState(
       phase: AssistantTaskProgressPhase.running,
@@ -227,12 +182,12 @@ String _budgetedProgressLabel(String base, int? minutes) {
 String _interruptedTaskProgressLabel(String result) {
   if (result == 'ACP_HTTP_HANDSHAKE_INTERRUPTED') {
     return appText(
-      'Bridge 握手中断，等待下一次发送续写同一会话。',
-      'Bridge handshake interrupted; the next send will continue this session.',
+      'Bridge 握手中断，本轮请求未完成。',
+      'Bridge handshake interrupted; this request did not complete.',
     );
   }
   return appText(
-    'Bridge 响应中断，等待下一次发送续写同一会话。',
-    'Bridge response interrupted; the next send will continue this session.',
+    'Bridge 响应中断，本轮结果未完成。',
+    'Bridge response interrupted; this result did not complete.',
   );
 }

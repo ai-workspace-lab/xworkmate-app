@@ -160,30 +160,28 @@ void main() {
       },
     );
 
-    test(
-      'labels interrupted ACP HTTP reads as recoverable conversation state',
-      () async {
-        final controller = await _isolatedController();
-        addTearDown(controller.dispose);
+    test('labels interrupted ACP HTTP reads as incomplete results', () async {
+      final controller = await _isolatedController();
+      addTearDown(controller.dispose);
 
-        final label = controller.gatewayExecutionErrorLabelInternal(
-          const GatewayAcpException(
-            'ACP HTTP connection closed before the response finished arriving',
-            code: 'ACP_HTTP_CONNECTION_CLOSED',
-          ),
-          target: AssistantExecutionTarget.gateway,
-        );
+      final label = controller.gatewayExecutionErrorLabelInternal(
+        const GatewayAcpException(
+          'ACP HTTP connection closed before the response finished arriving',
+          code: 'ACP_HTTP_CONNECTION_CLOSED',
+        ),
+        target: AssistantExecutionTarget.gateway,
+      );
 
-        expect(
-          label,
-          'Bridge 响应读取中断；当前对话已保留，下一次发送会继续同一会话。错误码：ACP_HTTP_CONNECTION_CLOSED',
-        );
-        expect(label, isNot(contains('closed before the response')));
-      },
-    );
+      expect(
+        label,
+        'Bridge 响应读取中断，本轮结果未完成。请重新发送请求。错误码：ACP_HTTP_CONNECTION_CLOSED',
+      );
+      expect(label, isNot(contains('下一次发送会继续同一会话')));
+      expect(label, isNot(contains('closed before the response')));
+    });
 
     test(
-      'labels interrupted ACP HTTP handshakes as recoverable conversation state',
+      'labels interrupted ACP HTTP handshakes as incomplete requests',
       () async {
         final controller = await _isolatedController();
         addTearDown(controller.dispose);
@@ -198,8 +196,9 @@ void main() {
 
         expect(
           label,
-          'Bridge 握手中断；当前对话已保留，下一次发送会继续同一会话。错误码：ACP_HTTP_HANDSHAKE_INTERRUPTED',
+          'Bridge 握手中断，本轮请求未完成。请重新发送请求。错误码：ACP_HTTP_HANDSHAKE_INTERRUPTED',
         );
+        expect(label, isNot(contains('下一次发送会继续同一会话')));
         expect(
           label,
           isNot(contains('Connection terminated during handshake')),

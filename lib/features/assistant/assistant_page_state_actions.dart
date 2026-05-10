@@ -861,11 +861,7 @@ extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
       thread?.lifecycleState.status ?? '',
     );
     if (controller.hasAssistantPendingRun) {
-      return switch (lifecycleStatus) {
-        'continuing' => 'continuing',
-        'retrying' => 'retrying',
-        _ => 'running',
-      };
+      return 'running';
     }
     if (lifecycleStatus == 'interrupted') {
       return 'interrupted';
