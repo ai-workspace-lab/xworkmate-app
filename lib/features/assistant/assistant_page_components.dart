@@ -87,9 +87,7 @@ class AssistantTaskRailStateInternal extends State<AssistantTaskRailInternal> {
     );
     final activeCount = tasks.where((task) {
       final status = normalizedTaskStatusInternal(task.status);
-      return status == 'running' ||
-          status == 'continuing' ||
-          status == 'retrying';
+      return status == 'running';
     }).length;
     final openCount = tasks
         .where((task) => normalizedTaskStatusInternal(task.status) == 'open')
@@ -446,23 +444,16 @@ class AssistantTaskTileInternal extends StatelessWidget {
 
 bool _taskIsActiveInternal(String status) {
   final normalized = normalizedTaskStatusInternal(status);
-  return normalized == 'running' ||
-      normalized == 'continuing' ||
-      normalized == 'retrying';
+  return normalized == 'running';
 }
 
 bool _taskShowsProgressInternal(String status) {
   final normalized = normalizedTaskStatusInternal(status);
-  return normalized == 'running' ||
-      normalized == 'continuing' ||
-      normalized == 'retrying' ||
-      normalized == 'interrupted';
+  return normalized == 'running' || normalized == 'interrupted';
 }
 
 double? _taskProgressValueInternal(String status) {
   return switch (normalizedTaskStatusInternal(status)) {
-    'continuing' => 0.62,
-    'retrying' => 0.38,
     'interrupted' => 0.48,
     _ => null,
   };

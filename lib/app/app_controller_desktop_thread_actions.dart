@@ -320,216 +320,258 @@ extension AppControllerDesktopThreadActions on AppController {
         throw error;
       }
     }
-    await enqueueThreadTurnInternal<void>(sessionKey, () async {
-      final resumeSession = shouldResumeGatewaySessionForNextSendInternal(
-        sessionKey,
+    await enqueueThreadTurnInternal<void>(
+      sessionKey,
+      () => runGatewayChatTurnInternal(
+        sessionKey: sessionKey,
+        target: currentTarget,
+        message: message,
+        thinking: thinking,
+        selectedSkillLabels: selectedSkillLabels,
+        attachments: attachments,
+        localAttachments: localAttachments,
+        workingDirectory: workingDirectory,
+        remoteWorkingDirectoryHint: remoteWorkingDirectoryHint,
+      ),
+    );
+    recomputeTasksInternal();
+  }
+
+  Future<void> runGatewayChatTurnInternal({
+    required String sessionKey,
+    required AssistantExecutionTarget target,
+    required String message,
+    required String thinking,
+    required List<String> selectedSkillLabels,
+    required List<GatewayChatAttachmentPayload> attachments,
+    required List<CollaborationAttachment> localAttachments,
+    required String workingDirectory,
+    required String remoteWorkingDirectoryHint,
+  }) async {
+    final resumeSession = shouldResumeGatewaySessionForNextSendInternal(
+      sessionKey,
+    );
+    appendGatewayUserTurnInternal(sessionKey, message);
+    markGatewayChatRunInternal(sessionKey);
+    try {
+      final dispatch = await codeAgentNodeOrchestratorInternal
+          .buildGatewayDispatch(
+            buildCodeAgentNodeStateInternal(executionTarget: target),
+          );
+      markGatewayChatRunInternal(sessionKey);
+      final result = await goTaskServiceClientInternal.executeTask(
+        GoTaskServiceRequest(
+          sessionId: sessionKey,
+          threadId: sessionKey,
+          target: target,
+          provider: assistantProviderForSession(sessionKey),
+          prompt: message,
+          workingDirectory: workingDirectory,
+          remoteWorkingDirectoryHint: remoteWorkingDirectoryHint,
+          model: assistantModelForSession(sessionKey),
+          thinking: thinking,
+          selectedSkills: selectedSkillLabels,
+          inlineAttachments: attachments,
+          localAttachments: localAttachments,
+          agentId: dispatch.agentId ?? '',
+          metadata: dispatch.metadata,
+          routing: buildExternalAcpRoutingForSessionInternal(sessionKey),
+          routingHint: 'gateway',
+          resumeSession: resumeSession,
+        ),
+        onUpdate: (update) {
+          if (update.isDelta) {
+            appendAiGatewayStreamingTextInternal(sessionKey, update.text);
+            notifyIfActiveInternal();
+          }
+        },
       );
-      final lifecycleStatus = taskThreadForSessionInternal(
-        sessionKey,
-      )?.lifecycleState.status.trim().toLowerCase();
-      final lastResultCode = taskThreadForSessionInternal(
-        sessionKey,
-      )?.lifecycleState.lastResultCode?.trim().toLowerCase();
-      final continuableTransportResult =
-          lastResultCode == 'acp_http_connection_closed' ||
-          lastResultCode ==
-              gatewayAcpHttpHandshakeInterruptedCode.toLowerCase();
-      final runStatus =
-          resumeSession &&
-              (lifecycleStatus == 'interrupted' || continuableTransportResult)
-          ? 'continuing'
-          : resumeSession && lastResultCode == 'error'
-          ? 'retrying'
-          : 'running';
-      final userText = message.trim().isEmpty
-          ? 'See attached.'
-          : message.trim();
+      if (!aiGatewayPendingSessionKeysInternal.contains(sessionKey)) {
+        clearAiGatewayStreamingTextInternal(sessionKey);
+        return;
+      }
+      await applyGatewayChatResultInternal(
+        sessionKey: sessionKey,
+        target: target,
+        result: result,
+      );
+    } catch (error) {
+      if (!aiGatewayPendingSessionKeysInternal.contains(sessionKey) &&
+          taskThreadForSessionInternal(
+                sessionKey,
+              )?.lifecycleState.lastResultCode ==
+              'aborted') {
+        clearAiGatewayStreamingTextInternal(sessionKey);
+        return;
+      }
+      applyGatewayChatFailureInternal(
+        sessionKey: sessionKey,
+        target: target,
+        error: error,
+      );
+    } finally {
+      aiGatewayPendingSessionKeysInternal.remove(sessionKey);
+      clearAiGatewayStreamingTextInternal(sessionKey);
+      recomputeTasksInternal();
+      notifyIfActiveInternal();
+    }
+  }
+
+  void appendGatewayUserTurnInternal(String sessionKey, String message) {
+    final userText = message.trim().isEmpty ? 'See attached.' : message.trim();
+    appendLocalSessionMessageInternal(
+      sessionKey,
+      GatewayChatMessage(
+        id: nextLocalMessageIdInternal(),
+        role: 'user',
+        text: userText,
+        timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+        toolCallId: null,
+        toolName: null,
+        stopReason: null,
+        pending: false,
+        error: false,
+      ),
+      persistInThreadContext: true,
+    );
+  }
+
+  void markGatewayChatRunInternal(String sessionKey) {
+    aiGatewayPendingSessionKeysInternal.add(sessionKey);
+    upsertTaskThreadInternal(
+      sessionKey,
+      lifecycleStatus: 'running',
+      lastRunAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+      lastResultCode: 'running',
+      updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+    );
+    recomputeTasksInternal();
+    notifyIfActiveInternal();
+  }
+
+  Future<void> applyGatewayChatResultInternal({
+    required String sessionKey,
+    required AssistantExecutionTarget target,
+    required GoTaskServiceResult result,
+  }) async {
+    clearAiGatewayStreamingTextInternal(sessionKey);
+    upsertTaskThreadInternal(
+      sessionKey,
+      gatewayEntryState: goTaskServiceGatewayEntryState(
+        requestedTarget: target,
+        result: result,
+      ),
+      latestResolvedRuntimeModel: result.resolvedModel.trim(),
+      lastRemoteWorkingDirectory:
+          result.remoteWorkingDirectory.trim().isNotEmpty
+          ? result.remoteWorkingDirectory.trim()
+          : null,
+      lastRemoteWorkspaceRefKind: result.remoteWorkspaceRefKind,
+      lifecycleStatus: 'ready',
+      lastRunAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+      lastResultCode: result.success ? 'success' : 'error',
+      updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+    );
+    if (isOpenClawNoExportedArtifactsGuardResultInternal(result)) {
+      await persistGoTaskArtifactsForSessionInternal(sessionKey, result);
+      return;
+    }
+    if (!result.success) {
       appendLocalSessionMessageInternal(
         sessionKey,
-        GatewayChatMessage(
-          id: nextLocalMessageIdInternal(),
-          role: 'user',
-          text: userText,
-          timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-          toolCallId: null,
-          toolName: null,
-          stopReason: null,
-          pending: false,
-          error: false,
+        assistantErrorMessageInternal(
+          result.errorMessage.trim().isEmpty
+              ? appText(
+                  'GoTaskService 执行失败。',
+                  'GoTaskService execution failed.',
+                )
+              : gatewayExecutionErrorLabelInternal(
+                  result.errorMessage,
+                  target: target,
+                ),
         ),
         persistInThreadContext: true,
       );
-      aiGatewayPendingSessionKeysInternal.add(sessionKey);
+      return;
+    }
+    final assistantText = result.message.trim();
+    if (assistantText.isEmpty) {
+      appendLocalSessionMessageInternal(
+        sessionKey,
+        assistantErrorMessageInternal(
+          appText(
+            'GoTaskService 没有返回可显示的输出。',
+            'GoTaskService returned no displayable output.',
+          ),
+        ),
+        persistInThreadContext: true,
+      );
+      return;
+    }
+    appendLocalSessionMessageInternal(
+      sessionKey,
+      GatewayChatMessage(
+        id: nextLocalMessageIdInternal(),
+        role: 'assistant',
+        text: assistantText,
+        timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+        toolCallId: null,
+        toolName: null,
+        stopReason: null,
+        pending: false,
+        error: false,
+      ),
+      persistInThreadContext: true,
+    );
+    recomputeTasksInternal();
+    notifyIfActiveInternal();
+    await persistGoTaskArtifactsForSessionInternal(sessionKey, result);
+  }
+
+  void applyGatewayChatFailureInternal({
+    required String sessionKey,
+    required AssistantExecutionTarget target,
+    required Object error,
+  }) {
+    clearAiGatewayStreamingTextInternal(sessionKey);
+    final unconfirmedConnectCode = unconfirmedAcpHttpConnectCodeInternal(error);
+    final interruptedTransportCode = interruptedAcpHttpTransportCodeInternal(
+      error,
+    );
+    if (unconfirmedConnectCode != null) {
       upsertTaskThreadInternal(
         sessionKey,
-        lifecycleStatus: runStatus,
+        lifecycleStatus: 'ready',
         lastRunAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-        lastResultCode: runStatus,
+        lastResultCode: unconfirmedConnectCode,
         updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
       );
-      recomputeTasksInternal();
-      notifyIfActiveInternal();
-      try {
-        final dispatch = await codeAgentNodeOrchestratorInternal
-            .buildGatewayDispatch(
-              buildCodeAgentNodeStateInternal(executionTarget: currentTarget),
-            );
-        upsertTaskThreadInternal(
-          sessionKey,
-          lifecycleStatus: runStatus,
-          lastRunAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-          lastResultCode: runStatus,
-          updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-        );
-        final result = await goTaskServiceClientInternal.executeTask(
-          GoTaskServiceRequest(
-            sessionId: sessionKey,
-            threadId: sessionKey,
-            target: currentTarget,
-            provider: assistantProviderForSession(sessionKey),
-            prompt: message,
-            workingDirectory: workingDirectory,
-            remoteWorkingDirectoryHint: remoteWorkingDirectoryHint,
-            model: assistantModelForSession(sessionKey),
-            thinking: thinking,
-            selectedSkills: selectedSkillLabels,
-            inlineAttachments: attachments,
-            localAttachments: localAttachments,
-            agentId: dispatch.agentId ?? '',
-            metadata: dispatch.metadata,
-            routing: buildExternalAcpRoutingForSessionInternal(sessionKey),
-            routingHint: 'gateway',
-            resumeSession: resumeSession,
-          ),
-          onUpdate: (update) {
-            if (update.isDelta) {
-              appendAiGatewayStreamingTextInternal(sessionKey, update.text);
-              notifyIfActiveInternal();
-            }
-          },
-        );
-        if (!aiGatewayPendingSessionKeysInternal.contains(sessionKey)) {
-          clearAiGatewayStreamingTextInternal(sessionKey);
-          return;
-        }
-        clearAiGatewayStreamingTextInternal(sessionKey);
-        upsertTaskThreadInternal(
-          sessionKey,
-          gatewayEntryState: goTaskServiceGatewayEntryState(
-            requestedTarget: currentTarget,
-            result: result,
-          ),
-          latestResolvedRuntimeModel: result.resolvedModel.trim(),
-          lastRemoteWorkingDirectory:
-              result.remoteWorkingDirectory.trim().isNotEmpty
-              ? result.remoteWorkingDirectory.trim()
-              : null,
-          lastRemoteWorkspaceRefKind: result.remoteWorkspaceRefKind,
-          lifecycleStatus: 'ready',
-          lastRunAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-          lastResultCode: result.success ? 'success' : 'error',
-          updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-        );
-        if (isOpenClawNoExportedArtifactsGuardResultInternal(result)) {
-          await persistGoTaskArtifactsForSessionInternal(sessionKey, result);
-          return;
-        }
-        if (!result.success) {
-          appendLocalSessionMessageInternal(
-            sessionKey,
-            assistantErrorMessageInternal(
-              result.errorMessage.trim().isEmpty
-                  ? appText(
-                      'GoTaskService 执行失败。',
-                      'GoTaskService execution failed.',
-                    )
-                  : gatewayExecutionErrorLabelInternal(
-                      result.errorMessage,
-                      target: currentTarget,
-                    ),
-            ),
-            persistInThreadContext: true,
-          );
-          return;
-        }
-        final assistantText = result.message.trim();
-        if (assistantText.isEmpty) {
-          appendLocalSessionMessageInternal(
-            sessionKey,
-            assistantErrorMessageInternal(
-              appText(
-                'GoTaskService 没有返回可显示的输出。',
-                'GoTaskService returned no displayable output.',
-              ),
-            ),
-            persistInThreadContext: true,
-          );
-          return;
-        }
-        appendLocalSessionMessageInternal(
-          sessionKey,
-          GatewayChatMessage(
-            id: nextLocalMessageIdInternal(),
-            role: 'assistant',
-            text: assistantText,
-            timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-            toolCallId: null,
-            toolName: null,
-            stopReason: null,
-            pending: false,
-            error: false,
-          ),
-          persistInThreadContext: true,
-        );
-        recomputeTasksInternal();
-        notifyIfActiveInternal();
-        await persistGoTaskArtifactsForSessionInternal(sessionKey, result);
-      } catch (error) {
-        if (!aiGatewayPendingSessionKeysInternal.contains(sessionKey) &&
-            taskThreadForSessionInternal(
-                  sessionKey,
-                )?.lifecycleState.lastResultCode ==
-                'aborted') {
-          clearAiGatewayStreamingTextInternal(sessionKey);
-          return;
-        }
-        clearAiGatewayStreamingTextInternal(sessionKey);
-        final recoverableTransportCode =
-            recoverableAcpHttpTransportCodeInternal(error);
-        final unconfirmedConnectCode = unconfirmedAcpHttpConnectCodeInternal(
-          error,
-        );
-        final recoverableTransportInterrupted =
-            recoverableTransportCode != null;
-        final visibleResultCode =
-            unconfirmedConnectCode ?? recoverableTransportCode;
-        upsertTaskThreadInternal(
-          sessionKey,
-          lifecycleStatus: recoverableTransportInterrupted
-              ? 'interrupted'
-              : 'ready',
-          lastRunAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-          lastResultCode: visibleResultCode ?? 'error',
-          lastArtifactSyncStatus: recoverableTransportInterrupted
-              ? 'interrupted'
-              : null,
-          updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-        );
-        appendLocalSessionMessageInternal(
-          sessionKey,
-          assistantErrorMessageInternal(
-            gatewayExecutionErrorLabelInternal(error, target: currentTarget),
-          ),
-          persistInThreadContext: true,
-        );
-      } finally {
-        aiGatewayPendingSessionKeysInternal.remove(sessionKey);
-        clearAiGatewayStreamingTextInternal(sessionKey);
-        recomputeTasksInternal();
-        notifyIfActiveInternal();
-      }
-    });
-    recomputeTasksInternal();
+      appendLocalSessionMessageInternal(
+        sessionKey,
+        assistantErrorMessageInternal(
+          gatewayExecutionErrorLabelInternal(error, target: target),
+        ),
+        persistInThreadContext: true,
+      );
+      return;
+    }
+    upsertTaskThreadInternal(
+      sessionKey,
+      lifecycleStatus: 'ready',
+      lastRunAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+      lastResultCode: interruptedTransportCode ?? 'error',
+      lastArtifactSyncAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+      lastArtifactSyncStatus: 'failed',
+      lastTaskArtifactRelativePaths: const <String>[],
+      updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+    );
+    appendLocalSessionMessageInternal(
+      sessionKey,
+      assistantErrorMessageInternal(
+        gatewayExecutionErrorLabelInternal(error, target: target),
+      ),
+      persistInThreadContext: true,
+    );
   }
 
   bool hasCommittedUserTurnForGatewaySessionInternal(String sessionKey) {
@@ -557,8 +599,7 @@ extension AppControllerDesktopThreadActions on AppController {
     final lastResultCode = taskThreadForSessionInternal(
       normalizedSessionKey,
     )?.lifecycleState.lastResultCode?.trim().toUpperCase();
-    return lastResultCode != gatewayAcpHttpConnectTimeoutCode &&
-        lastResultCode != gatewayAcpHttpConnectFailedCode;
+    return lastResultCode == 'SUCCESS';
   }
 
   Future<void> abortRun() async {

@@ -298,10 +298,7 @@ extension AppControllerDesktopThreadBinding on AppController {
     final existingLifecycleStatus = existingLifecycle.status
         .trim()
         .toLowerCase();
-    final lifecycleState =
-        existingLifecycleStatus == 'running' ||
-            existingLifecycleStatus == 'continuing' ||
-            existingLifecycleStatus == 'retrying'
+    final lifecycleState = existingLifecycleStatus == 'running'
         ? existingLifecycle
         : assistantSessionHasPendingRun(normalizedSessionKey)
         ? existingLifecycle.copyWith(status: 'running')

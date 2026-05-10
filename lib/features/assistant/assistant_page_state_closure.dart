@@ -175,13 +175,6 @@ extension AssistantPageStateClosureInternal on AssistantPageStateInternal {
                         unawaited(controller.abortRun());
                       }
                     : null,
-                onContinue: progressState.interrupted
-                    ? () {
-                        unawaited(
-                          controller.sendChatMessage(appText('继续', 'Continue')),
-                        );
-                      }
-                    : null,
               ),
               ColoredBox(
                 color: palette.canvas,

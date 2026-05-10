@@ -234,7 +234,7 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     final lowered = raw.toLowerCase();
     final detailCode = gatewayExecutionDetailCodeInternal(error);
     final primaryCode = gatewayExecutionPrimaryCodeInternal(error);
-    final recoverableTransportCode = recoverableAcpHttpTransportCodeInternal(
+    final interruptedTransportCode = interruptedAcpHttpTransportCodeInternal(
       error,
     );
     final unconfirmedConnectCode = unconfirmedAcpHttpConnectCodeInternal(error);
@@ -250,16 +250,16 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
         'Bridge connection failed; this request was not confirmed and can be retried. Error code: ACP_HTTP_CONNECT_FAILED',
       );
     }
-    if (recoverableTransportCode == 'ACP_HTTP_CONNECTION_CLOSED') {
+    if (interruptedTransportCode == 'ACP_HTTP_CONNECTION_CLOSED') {
       return appText(
-        'Bridge 响应读取中断；当前对话已保留，下一次发送会继续同一会话。错误码：ACP_HTTP_CONNECTION_CLOSED',
-        'Bridge response was interrupted; this conversation was kept, and the next send will continue the same session. Error code: ACP_HTTP_CONNECTION_CLOSED',
+        'Bridge 响应读取中断，本轮结果未完成。请重新发送请求。错误码：ACP_HTTP_CONNECTION_CLOSED',
+        'Bridge response was interrupted and this result did not complete. Send the request again. Error code: ACP_HTTP_CONNECTION_CLOSED',
       );
     }
-    if (recoverableTransportCode == 'ACP_HTTP_HANDSHAKE_INTERRUPTED') {
+    if (interruptedTransportCode == 'ACP_HTTP_HANDSHAKE_INTERRUPTED') {
       return appText(
-        'Bridge 握手中断；当前对话已保留，下一次发送会继续同一会话。错误码：ACP_HTTP_HANDSHAKE_INTERRUPTED',
-        'Bridge handshake was interrupted; this conversation was kept, and the next send will continue the same session. Error code: ACP_HTTP_HANDSHAKE_INTERRUPTED',
+        'Bridge 握手中断，本轮请求未完成。请重新发送请求。错误码：ACP_HTTP_HANDSHAKE_INTERRUPTED',
+        'Bridge handshake was interrupted and this request did not complete. Send the request again. Error code: ACP_HTTP_HANDSHAKE_INTERRUPTED',
       );
     }
     final continuationUnavailable =
@@ -320,11 +320,6 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
         : null;
   }
 
-  bool isAcpHttpConnectionClosedErrorInternal(Object error) {
-    return recoverableAcpHttpTransportCodeInternal(error) ==
-        'ACP_HTTP_CONNECTION_CLOSED';
-  }
-
   bool isOpenClawNoExportedArtifactsGuardResultInternal(
     GoTaskServiceResult result,
   ) {
@@ -358,7 +353,7 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     }
   }
 
-  String? recoverableAcpHttpTransportCodeInternal(Object error) {
+  String? interruptedAcpHttpTransportCodeInternal(Object error) {
     final raw = error.toString().trim();
     final primaryCode = gatewayExecutionPrimaryCodeInternal(error);
     final detailCode = gatewayExecutionDetailCodeInternal(error);
