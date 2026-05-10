@@ -57,48 +57,6 @@ void main() {
     expect(indicator.value, 0.82);
   });
 
-  testWidgets('shows continuing progress when an interrupted task resumes', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      _buildTestApp(
-        assistantTaskProgressState(
-          pending: true,
-          lifecycleStatus: 'continuing',
-          lastResultCode: 'continuing',
-          artifactSyncStatus: '',
-        ),
-      ),
-    );
-
-    expect(find.text('任务继续中...'), findsOneWidget);
-    final indicator = tester.widget<LinearProgressIndicator>(
-      find.byKey(const Key('assistant-task-progress-indicator')),
-    );
-    expect(indicator.value, 0.62);
-  });
-
-  testWidgets('shows retry progress when a failed task is submitted again', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      _buildTestApp(
-        assistantTaskProgressState(
-          pending: true,
-          lifecycleStatus: 'retrying',
-          lastResultCode: 'retrying',
-          artifactSyncStatus: '',
-        ),
-      ),
-    );
-
-    expect(find.text('任务重试中...'), findsOneWidget);
-    final indicator = tester.widget<LinearProgressIndicator>(
-      find.byKey(const Key('assistant-task-progress-indicator')),
-    );
-    expect(indicator.value, 0.38);
-  });
-
   testWidgets('shows interrupted state after ACP connection closes', (
     tester,
   ) async {
@@ -110,14 +68,13 @@ void main() {
           lastResultCode: 'ACP_HTTP_CONNECTION_CLOSED',
           artifactSyncStatus: 'interrupted',
         ),
-        onContinue: () {},
       ),
     );
 
-    expect(find.text('Bridge 响应中断，等待下一次发送续写同一会话。'), findsOneWidget);
+    expect(find.text('Bridge 响应中断，本轮结果未完成。'), findsOneWidget);
     expect(
       find.byKey(const Key('assistant-task-progress-continue-button')),
-      findsOneWidget,
+      findsNothing,
     );
     final indicator = tester.widget<LinearProgressIndicator>(
       find.byKey(const Key('assistant-task-progress-indicator')),
@@ -139,7 +96,7 @@ void main() {
       ),
     );
 
-    expect(find.text('Bridge 握手中断，等待下一次发送续写同一会话。'), findsOneWidget);
+    expect(find.text('Bridge 握手中断，本轮请求未完成。'), findsOneWidget);
     final indicator = tester.widget<LinearProgressIndicator>(
       find.byKey(const Key('assistant-task-progress-indicator')),
     );
@@ -168,7 +125,7 @@ void main() {
                 sessionKey: 'task-a',
                 title: 'Task A',
                 preview: 'preview',
-                status: 'continuing',
+                status: 'running',
                 updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
                 owner: 'XWorkmate',
                 surface: 'Assistant',
@@ -195,25 +152,17 @@ void main() {
         matching: find.byType(LinearProgressIndicator),
       ),
     );
-    expect(indicator.value, 0.62);
+    expect(indicator.value, isNull);
   });
 }
 
-Widget _buildTestApp(
-  AssistantTaskProgressState state, {
-  VoidCallback? onStop,
-  VoidCallback? onContinue,
-}) {
+Widget _buildTestApp(AssistantTaskProgressState state, {VoidCallback? onStop}) {
   return MaterialApp(
     theme: AppTheme.light(),
     home: Material(
       child: SizedBox(
         width: 420,
-        child: AssistantTaskProgressBar(
-          state: state,
-          onStop: onStop,
-          onContinue: onContinue,
-        ),
+        child: AssistantTaskProgressBar(state: state, onStop: onStop),
       ),
     ),
   );

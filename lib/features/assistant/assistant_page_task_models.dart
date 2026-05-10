@@ -264,14 +264,6 @@ PillStyleInternal pillStyleForStatusInternal(
       backgroundColor: context.palette.accentMuted,
       foregroundColor: theme.colorScheme.primary,
     ),
-    'continuing' => PillStyleInternal(
-      backgroundColor: context.palette.accentMuted,
-      foregroundColor: theme.colorScheme.primary,
-    ),
-    'retrying' => PillStyleInternal(
-      backgroundColor: context.palette.surfaceSecondary,
-      foregroundColor: theme.colorScheme.tertiary,
-    ),
     'queued' => PillStyleInternal(
       backgroundColor: context.palette.surfaceSecondary,
       foregroundColor: context.palette.textSecondary,
@@ -291,8 +283,6 @@ String normalizedTaskStatusInternal(String status) {
   final value = status.trim().toLowerCase();
   return switch (value) {
     'running' => 'running',
-    'continuing' => 'continuing',
-    'retrying' => 'retrying',
     'interrupted' => 'interrupted',
     'queued' => 'queued',
     'failed' => 'failed',
@@ -305,8 +295,6 @@ String normalizedTaskStatusInternal(String status) {
 String toolCallStatusLabelInternal(String status) =>
     switch (normalizedTaskStatusInternal(status)) {
       'running' => appText('运行中', 'Running'),
-      'continuing' => appText('继续中', 'Continuing'),
-      'retrying' => appText('重试中', 'Retrying'),
       'interrupted' => appText('已中断', 'Interrupted'),
       'failed' || 'error' => appText('错误', 'Error'),
       _ => appText('已完成', 'Completed'),
@@ -368,11 +356,7 @@ String sessionStatusInternal(
     return 'failed';
   }
   if (sessionPending) {
-    return switch (normalizedLifecycle) {
-      'continuing' => 'continuing',
-      'retrying' => 'retrying',
-      _ => 'running',
-    };
+    return 'running';
   }
   if (normalizedLifecycle == 'interrupted') {
     return 'interrupted';
