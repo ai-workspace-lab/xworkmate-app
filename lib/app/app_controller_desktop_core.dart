@@ -42,6 +42,7 @@ import '../runtime/multi_agent_orchestrator.dart';
 import '../runtime/platform_environment.dart';
 import '../runtime/skill_directory_access.dart';
 import 'task_thread_repositories.dart';
+import 'app_controller_openclaw_task_queue.dart';
 import 'app_controller_desktop_navigation.dart';
 import 'app_controller_desktop_gateway.dart';
 import 'app_controller_desktop_settings.dart';
@@ -254,6 +255,14 @@ class AppController extends ChangeNotifier {
       return;
     }
     disposedInternal = true;
+    for (final turn in openClawGatewayQueuedTurnsInternal) {
+      turn.cancelled = true;
+      if (!turn.completer.isCompleted) {
+        turn.completer.complete();
+      }
+    }
+    openClawGatewayQueuedTurnsInternal.clear();
+    openClawGatewayQueuedTurnsBySessionInternal.clear();
     unawaited(persistSharedSingleAgentLocalSkillsCacheInternal());
     runtimeEventsSubscriptionInternal?.cancel();
     detachChildListenersInternal();
@@ -335,6 +344,12 @@ class AppController extends ChangeNotifier {
   final Set<String> aiGatewayAbortedSessionKeysInternal = <String>{};
   final Map<String, Future<void>> assistantThreadTurnQueuesInternal =
       <String, Future<void>>{};
+  final List<OpenClawGatewayQueuedTurnInternal>
+  openClawGatewayQueuedTurnsInternal = <OpenClawGatewayQueuedTurnInternal>[];
+  final Map<String, List<OpenClawGatewayQueuedTurnInternal>>
+  openClawGatewayQueuedTurnsBySessionInternal =
+      <String, List<OpenClawGatewayQueuedTurnInternal>>{};
+  int openClawGatewayActiveTasksInternal = 0;
   bool multiAgentRunPendingInternal = false;
   int localMessageCounterInternal = 0;
 
