@@ -97,14 +97,8 @@ void main() {
           'session-1',
         );
         expect(
-          controller.assistantExecutionTargetForSession('session-1').isGateway,
-          isTrue,
-        );
-        expect(
-          assistantExecutionTargetFromExecutionMode(
-            record.executionBinding.executionMode,
-          ),
-          AssistantExecutionTarget.gateway,
+          record.executionBinding.executionMode,
+          ThreadExecutionMode.gateway,
         );
         expect(
           controller.assistantProviderForSession('session-1'),
