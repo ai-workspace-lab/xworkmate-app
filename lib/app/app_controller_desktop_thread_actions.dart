@@ -33,6 +33,7 @@ import '../runtime/agent_registry.dart';
 import '../runtime/multi_agent_orchestrator.dart';
 import '../runtime/platform_environment.dart';
 import '../runtime/skill_directory_access.dart';
+import 'app_controller_openclaw_task_queue.dart';
 import 'app_controller_desktop_core.dart';
 import 'app_controller_desktop_navigation.dart';
 import 'app_controller_desktop_gateway.dart';
@@ -320,18 +321,62 @@ extension AppControllerDesktopThreadActions on AppController {
         throw error;
       }
     }
+    final provider = assistantProviderForSession(sessionKey);
+    final model = assistantModelForSession(sessionKey);
+    final routing = buildExternalAcpRoutingForSessionInternal(sessionKey);
+    final dispatch = await codeAgentNodeOrchestratorInternal
+        .buildGatewayDispatch(
+          buildCodeAgentNodeStateInternal(executionTarget: currentTarget),
+        );
+    final capturedSelectedSkillLabels = List<String>.unmodifiable(
+      selectedSkillLabels,
+    );
+    final capturedAttachments = List<GatewayChatAttachmentPayload>.unmodifiable(
+      attachments,
+    );
+    final capturedLocalAttachments = List<CollaborationAttachment>.unmodifiable(
+      localAttachments,
+    );
+    if (usesOpenClawGatewayQueueInternal(currentTarget, provider)) {
+      await enqueueOpenClawGatewayTurnInternal(
+        OpenClawGatewayQueuedTurnInternal(
+          queueId:
+              'openclaw-${DateTime.now().microsecondsSinceEpoch}-$localMessageCounterInternal',
+          sessionKey: sessionKey,
+          target: currentTarget,
+          provider: provider,
+          message: message,
+          thinking: thinking,
+          selectedSkillLabels: capturedSelectedSkillLabels,
+          attachments: capturedAttachments,
+          localAttachments: capturedLocalAttachments,
+          workingDirectory: workingDirectory,
+          remoteWorkingDirectoryHint: remoteWorkingDirectoryHint,
+          model: model,
+          routing: routing,
+          agentId: dispatch.agentId ?? '',
+          metadata: Map<String, dynamic>.unmodifiable(dispatch.metadata),
+        ),
+      );
+      return;
+    }
     await enqueueThreadTurnInternal<void>(
       sessionKey,
       () => runGatewayChatTurnInternal(
         sessionKey: sessionKey,
         target: currentTarget,
+        provider: provider,
         message: message,
         thinking: thinking,
-        selectedSkillLabels: selectedSkillLabels,
-        attachments: attachments,
-        localAttachments: localAttachments,
+        selectedSkillLabels: capturedSelectedSkillLabels,
+        attachments: capturedAttachments,
+        localAttachments: capturedLocalAttachments,
         workingDirectory: workingDirectory,
         remoteWorkingDirectoryHint: remoteWorkingDirectoryHint,
+        model: model,
+        routing: routing,
+        agentId: dispatch.agentId ?? '',
+        metadata: Map<String, dynamic>.unmodifiable(dispatch.metadata),
       ),
     );
     recomputeTasksInternal();
@@ -340,6 +385,7 @@ extension AppControllerDesktopThreadActions on AppController {
   Future<void> runGatewayChatTurnInternal({
     required String sessionKey,
     required AssistantExecutionTarget target,
+    required SingleAgentProvider provider,
     required String message,
     required String thinking,
     required List<String> selectedSkillLabels,
@@ -347,6 +393,10 @@ extension AppControllerDesktopThreadActions on AppController {
     required List<CollaborationAttachment> localAttachments,
     required String workingDirectory,
     required String remoteWorkingDirectoryHint,
+    required String model,
+    required ExternalCodeAgentAcpRoutingConfig routing,
+    required String agentId,
+    required Map<String, dynamic> metadata,
   }) async {
     final resumeSession = shouldResumeGatewaySessionForNextSendInternal(
       sessionKey,
@@ -354,28 +404,23 @@ extension AppControllerDesktopThreadActions on AppController {
     appendGatewayUserTurnInternal(sessionKey, message);
     markGatewayChatRunInternal(sessionKey);
     try {
-      final dispatch = await codeAgentNodeOrchestratorInternal
-          .buildGatewayDispatch(
-            buildCodeAgentNodeStateInternal(executionTarget: target),
-          );
-      markGatewayChatRunInternal(sessionKey);
       final result = await goTaskServiceClientInternal.executeTask(
         GoTaskServiceRequest(
           sessionId: sessionKey,
           threadId: sessionKey,
           target: target,
-          provider: assistantProviderForSession(sessionKey),
+          provider: provider,
           prompt: message,
           workingDirectory: workingDirectory,
           remoteWorkingDirectoryHint: remoteWorkingDirectoryHint,
-          model: assistantModelForSession(sessionKey),
+          model: model,
           thinking: thinking,
           selectedSkills: selectedSkillLabels,
           inlineAttachments: attachments,
           localAttachments: localAttachments,
-          agentId: dispatch.agentId ?? '',
-          metadata: dispatch.metadata,
-          routing: buildExternalAcpRoutingForSessionInternal(sessionKey),
+          agentId: agentId,
+          metadata: metadata,
+          routing: routing,
           routingHint: 'gateway',
           resumeSession: resumeSession,
         ),
@@ -414,6 +459,169 @@ extension AppControllerDesktopThreadActions on AppController {
       clearAiGatewayStreamingTextInternal(sessionKey);
       recomputeTasksInternal();
       notifyIfActiveInternal();
+    }
+  }
+
+  bool usesOpenClawGatewayQueueInternal(
+    AssistantExecutionTarget target,
+    SingleAgentProvider provider,
+  ) {
+    return target.isGateway &&
+        provider.providerId == kCanonicalGatewayProviderId;
+  }
+
+  Future<void> enqueueOpenClawGatewayTurnInternal(
+    OpenClawGatewayQueuedTurnInternal turn,
+  ) async {
+    if (openClawGatewayActiveTasksInternal >=
+            openClawGatewayMaxActiveTasksInternal &&
+        openClawGatewayQueuedTurnsInternal.length >=
+            openClawGatewayMaxQueuedTasksInternal) {
+      final error = StateError(
+        appText(
+          'OpenClaw 任务队列已满，请等待当前任务完成后重试。',
+          'OpenClaw task queue is full. Wait for the current tasks to finish and try again.',
+        ),
+      );
+      await failOpenClawGatewayQueuedTurnInternal(turn.sessionKey, error);
+      throw error;
+    }
+
+    openClawGatewayQueuedTurnsInternal.add(turn);
+    openClawGatewayQueuedTurnsBySessionInternal
+        .putIfAbsent(
+          turn.sessionKey,
+          () => <OpenClawGatewayQueuedTurnInternal>[],
+        )
+        .add(turn);
+    markOpenClawGatewayQueuedTurnInternal(turn.sessionKey);
+    drainOpenClawGatewayQueueInternal();
+    await turn.completer.future;
+  }
+
+  void markOpenClawGatewayQueuedTurnInternal(String sessionKey) {
+    upsertTaskThreadInternal(
+      sessionKey,
+      lifecycleStatus: 'queued',
+      lastResultCode: 'queued',
+      updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+    );
+    recomputeTasksInternal();
+    notifyIfActiveInternal();
+  }
+
+  Future<void> failOpenClawGatewayQueuedTurnInternal(
+    String sessionKey,
+    StateError error,
+  ) async {
+    upsertTaskThreadInternal(
+      sessionKey,
+      lifecycleStatus: 'ready',
+      lastRunAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+      lastResultCode: 'OPENCLAW_GATEWAY_QUEUE_FULL',
+      lastArtifactSyncAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+      lastArtifactSyncStatus: 'failed',
+      lastTaskArtifactRelativePaths: const <String>[],
+      updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+    );
+    appendLocalSessionMessageInternal(
+      sessionKey,
+      assistantErrorMessageInternal(error.message),
+      persistInThreadContext: true,
+    );
+    await flushAssistantThreadPersistenceInternal();
+    recomputeTasksInternal();
+    notifyIfActiveInternal();
+  }
+
+  bool abortQueuedOpenClawGatewayTurnInternal(String sessionKey) {
+    final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
+      sessionKey,
+    );
+    final queuedForSession =
+        openClawGatewayQueuedTurnsBySessionInternal[normalizedSessionKey];
+    if (queuedForSession == null || queuedForSession.isEmpty) {
+      return false;
+    }
+    final turn = queuedForSession.removeAt(0);
+    if (queuedForSession.isEmpty) {
+      openClawGatewayQueuedTurnsBySessionInternal.remove(normalizedSessionKey);
+    }
+    openClawGatewayQueuedTurnsInternal.remove(turn);
+    turn.cancelled = true;
+    clearAiGatewayStreamingTextInternal(normalizedSessionKey);
+    upsertTaskThreadInternal(
+      normalizedSessionKey,
+      lifecycleStatus: 'ready',
+      lastRunAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+      lastResultCode: 'aborted',
+      updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+    );
+    if (!turn.completer.isCompleted) {
+      turn.completer.complete();
+    }
+    recomputeTasksInternal();
+    notifyIfActiveInternal();
+    drainOpenClawGatewayQueueInternal();
+    return true;
+  }
+
+  void drainOpenClawGatewayQueueInternal() {
+    while (openClawGatewayActiveTasksInternal <
+            openClawGatewayMaxActiveTasksInternal &&
+        openClawGatewayQueuedTurnsInternal.isNotEmpty) {
+      final turn = openClawGatewayQueuedTurnsInternal.removeAt(0);
+      final queuedForSession =
+          openClawGatewayQueuedTurnsBySessionInternal[turn.sessionKey];
+      queuedForSession?.remove(turn);
+      if (queuedForSession != null && queuedForSession.isEmpty) {
+        openClawGatewayQueuedTurnsBySessionInternal.remove(turn.sessionKey);
+      }
+      if (turn.cancelled) {
+        if (!turn.completer.isCompleted) {
+          turn.completer.complete();
+        }
+        continue;
+      }
+      turn.started = true;
+      openClawGatewayActiveTasksInternal += 1;
+      unawaited(runOpenClawGatewayQueuedTurnInternal(turn));
+    }
+  }
+
+  Future<void> runOpenClawGatewayQueuedTurnInternal(
+    OpenClawGatewayQueuedTurnInternal turn,
+  ) async {
+    try {
+      await enqueueThreadTurnInternal<void>(
+        turn.sessionKey,
+        () => runGatewayChatTurnInternal(
+          sessionKey: turn.sessionKey,
+          target: turn.target,
+          provider: turn.provider,
+          message: turn.message,
+          thinking: turn.thinking,
+          selectedSkillLabels: turn.selectedSkillLabels,
+          attachments: turn.attachments,
+          localAttachments: turn.localAttachments,
+          workingDirectory: turn.workingDirectory,
+          remoteWorkingDirectoryHint: turn.remoteWorkingDirectoryHint,
+          model: turn.model,
+          routing: turn.routing,
+          agentId: turn.agentId,
+          metadata: turn.metadata,
+        ),
+      );
+      if (!turn.completer.isCompleted) {
+        turn.completer.complete();
+      }
+    } catch (error, stackTrace) {
+      if (!turn.completer.isCompleted) {
+        turn.completer.completeError(error, stackTrace);
+      }
+    } finally {
+      openClawGatewayActiveTasksInternal -= 1;
+      drainOpenClawGatewayQueueInternal();
     }
   }
 
@@ -632,6 +840,9 @@ extension AppControllerDesktopThreadActions on AppController {
     final sessionKey = normalizedAssistantSessionKeyInternal(
       sessionsControllerInternal.currentSessionKey,
     );
+    if (abortQueuedOpenClawGatewayTurnInternal(sessionKey)) {
+      return;
+    }
     if (aiGatewayPendingSessionKeysInternal.contains(sessionKey)) {
       await goTaskServiceClientInternal.cancelTask(
         route: GoTaskServiceRoute.externalAcpSingle,

@@ -1491,6 +1491,229 @@ void main() {
     });
 
     test(
+      'OpenClaw gateway tasks queue globally and keep captured session context',
+      () async {
+        final fakeGoTaskService = _BlockingGoTaskServiceClient();
+        final controller = _connectedGatewayController(fakeGoTaskService);
+        addTearDown(() {
+          fakeGoTaskService.completeAll();
+          controller.dispose();
+        });
+
+        await _selectGatewaySession(controller, 'queue-task-a');
+        final taskAFuture = controller.sendChatMessage('same prompt');
+        await fakeGoTaskService.waitForRequestCount(1);
+
+        await _selectGatewaySession(controller, 'queue-task-b');
+        final taskBFuture = controller.sendChatMessage('same prompt');
+        await _selectGatewaySession(controller, 'queue-task-c');
+        final taskCFuture = controller.sendChatMessage('different prompt');
+        await _waitForThreadLifecycleStatus(
+          controller,
+          'queue-task-b',
+          'queued',
+        );
+        await _waitForThreadLifecycleStatus(
+          controller,
+          'queue-task-c',
+          'queued',
+        );
+
+        expect(fakeGoTaskService.requests, hasLength(1));
+        expect(
+          controller
+              .requireTaskThreadForSessionInternal('queue-task-b')
+              .lifecycleState
+              .status,
+          'queued',
+        );
+        expect(
+          controller
+              .requireTaskThreadForSessionInternal('queue-task-c')
+              .lifecycleState
+              .status,
+          'queued',
+        );
+
+        fakeGoTaskService.complete(
+          'queue-task-a',
+          const GoTaskServiceResult(
+            success: true,
+            message: 'result A',
+            turnId: 'turn-a',
+            raw: <String, dynamic>{},
+            errorMessage: '',
+            resolvedModel: '',
+            route: GoTaskServiceRoute.externalAcpSingle,
+          ),
+        );
+        await taskAFuture;
+        await fakeGoTaskService.waitForRequestCount(2);
+
+        final taskBRequest = fakeGoTaskService.requests[1];
+        expect(taskBRequest.sessionId, 'queue-task-b');
+        expect(taskBRequest.prompt, 'same prompt');
+        expect(taskBRequest.resumeSession, isFalse);
+        expect(taskBRequest.workingDirectory, endsWith('/queue-task-b'));
+        expect(
+          taskBRequest.remoteWorkingDirectoryHint,
+          endsWith('/threads/queue-task-b'),
+        );
+
+        fakeGoTaskService.complete(
+          'queue-task-b',
+          const GoTaskServiceResult(
+            success: true,
+            message: 'result B',
+            turnId: 'turn-b',
+            raw: <String, dynamic>{},
+            errorMessage: '',
+            resolvedModel: '',
+            route: GoTaskServiceRoute.externalAcpSingle,
+          ),
+        );
+        await taskBFuture;
+        await fakeGoTaskService.waitForRequestCount(3);
+
+        final taskCRequest = fakeGoTaskService.requests[2];
+        expect(taskCRequest.sessionId, 'queue-task-c');
+        expect(taskCRequest.prompt, 'different prompt');
+        expect(taskCRequest.workingDirectory, endsWith('/queue-task-c'));
+        fakeGoTaskService.complete(
+          'queue-task-c',
+          const GoTaskServiceResult(
+            success: true,
+            message: 'result C',
+            turnId: 'turn-c',
+            raw: <String, dynamic>{},
+            errorMessage: '',
+            resolvedModel: '',
+            route: GoTaskServiceRoute.externalAcpSingle,
+          ),
+        );
+        await taskCFuture;
+      },
+    );
+
+    test(
+      'abortRun removes a queued OpenClaw task without bridge cancel',
+      () async {
+        final fakeGoTaskService = _BlockingGoTaskServiceClient();
+        final controller = _connectedGatewayController(fakeGoTaskService);
+        addTearDown(() {
+          fakeGoTaskService.completeAll();
+          controller.dispose();
+        });
+
+        await _selectGatewaySession(controller, 'running-openclaw-task');
+        final runningFuture = controller.sendChatMessage('running');
+        await fakeGoTaskService.waitForRequestCount(1);
+
+        await _selectGatewaySession(controller, 'queued-openclaw-task');
+        final queuedFuture = controller.sendChatMessage('queued');
+        await _waitForThreadLifecycleStatus(
+          controller,
+          'queued-openclaw-task',
+          'queued',
+        );
+        expect(fakeGoTaskService.requests, hasLength(1));
+
+        await controller.abortRun();
+
+        expect(fakeGoTaskService.cancelledSessionIds, isEmpty);
+        expect(
+          controller
+              .requireTaskThreadForSessionInternal('queued-openclaw-task')
+              .lifecycleState
+              .lastResultCode,
+          'aborted',
+        );
+        await queuedFuture;
+
+        fakeGoTaskService.complete(
+          'running-openclaw-task',
+          const GoTaskServiceResult(
+            success: true,
+            message: 'running done',
+            turnId: 'turn-running',
+            raw: <String, dynamic>{},
+            errorMessage: '',
+            resolvedModel: '',
+            route: GoTaskServiceRoute.externalAcpSingle,
+          ),
+        );
+        await runningFuture;
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+        expect(fakeGoTaskService.requests, hasLength(1));
+      },
+    );
+
+    test('OpenClaw queue overflow fails without artifact sync', () async {
+      final fakeGoTaskService = _BlockingGoTaskServiceClient();
+      final controller = _connectedGatewayController(fakeGoTaskService);
+      addTearDown(() {
+        fakeGoTaskService.completeAll();
+        controller.dispose();
+      });
+
+      await _selectGatewaySession(controller, 'queue-full-running');
+      final runningFuture = controller.sendChatMessage('running');
+      await fakeGoTaskService.waitForRequestCount(1);
+
+      final queuedFutures = <Future<void>>[];
+      for (var index = 0; index < 20; index += 1) {
+        final sessionKey = 'queue-full-waiting-$index';
+        await _selectGatewaySession(controller, sessionKey);
+        queuedFutures.add(controller.sendChatMessage('queued $index'));
+      }
+      await _waitForOpenClawQueuedTaskCount(controller, 20);
+
+      await _selectGatewaySession(controller, 'queue-full-overflow');
+      await expectLater(
+        controller.sendChatMessage('overflow'),
+        throwsA(isA<StateError>()),
+      );
+
+      expect(fakeGoTaskService.requests, hasLength(1));
+      final overflowThread = controller.requireTaskThreadForSessionInternal(
+        'queue-full-overflow',
+      );
+      expect(overflowThread.lastArtifactSyncStatus, 'failed');
+      expect(overflowThread.lastTaskArtifactRelativePaths, isEmpty);
+
+      fakeGoTaskService.complete(
+        'queue-full-running',
+        const GoTaskServiceResult(
+          success: true,
+          message: 'running done',
+          turnId: 'turn-running',
+          raw: <String, dynamic>{},
+          errorMessage: '',
+          resolvedModel: '',
+          route: GoTaskServiceRoute.externalAcpSingle,
+        ),
+      );
+      await runningFuture;
+      for (var index = 0; index < 20; index += 1) {
+        final sessionKey = 'queue-full-waiting-$index';
+        await fakeGoTaskService.waitForRequestCount(index + 2);
+        fakeGoTaskService.complete(
+          sessionKey,
+          GoTaskServiceResult(
+            success: true,
+            message: 'queued $index done',
+            turnId: 'turn-queued-$index',
+            raw: const <String, dynamic>{},
+            errorMessage: '',
+            resolvedModel: '',
+            route: GoTaskServiceRoute.externalAcpSingle,
+          ),
+        );
+      }
+      await Future.wait(queuedFutures);
+    });
+
+    test(
       'sendChatMessage restarts stale interrupted and error states',
       () async {
         late final AppController controller;
@@ -1794,6 +2017,76 @@ AppController _connectedController(GoTaskServiceClient client) {
   );
 }
 
+AppController _connectedGatewayController(GoTaskServiceClient client) {
+  return AppController(
+    goTaskServiceClient: client,
+    environmentOverride: const <String, String>{
+      'BRIDGE_AUTH_TOKEN': 'bridge-token',
+    },
+    initialBridgeProviderCatalog: const <SingleAgentProvider>[
+      SingleAgentProvider.codex,
+    ],
+    initialGatewayProviderCatalog: const <SingleAgentProvider>[
+      SingleAgentProvider.openclaw,
+    ],
+    initialAvailableExecutionTargets: const <AssistantExecutionTarget>[
+      AssistantExecutionTarget.agent,
+      AssistantExecutionTarget.gateway,
+    ],
+  );
+}
+
+Future<void> _selectGatewaySession(
+  AppController controller,
+  String sessionKey,
+) async {
+  await controller.switchSession(sessionKey);
+  await controller.setAssistantExecutionTarget(
+    AssistantExecutionTarget.gateway,
+  );
+}
+
+Future<void> _waitForThreadLifecycleStatus(
+  AppController controller,
+  String sessionKey,
+  String status,
+) async {
+  final deadline = DateTime.now().add(const Duration(seconds: 15));
+  while (DateTime.now().isBefore(deadline)) {
+    final currentStatus = controller
+        .taskThreadForSessionInternal(sessionKey)
+        ?.lifecycleState
+        .status;
+    if (currentStatus == status) {
+      return;
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+  }
+  final currentStatus = controller
+      .taskThreadForSessionInternal(sessionKey)
+      ?.lifecycleState
+      .status;
+  throw StateError(
+    'Timed out waiting for $sessionKey status $status. Current status: $currentStatus.',
+  );
+}
+
+Future<void> _waitForOpenClawQueuedTaskCount(
+  AppController controller,
+  int count,
+) async {
+  final deadline = DateTime.now().add(const Duration(seconds: 15));
+  while (DateTime.now().isBefore(deadline)) {
+    if (controller.openClawGatewayQueuedTurnsInternal.length >= count) {
+      return;
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+  }
+  throw StateError(
+    'Timed out waiting for $count queued OpenClaw tasks. Current count: ${controller.openClawGatewayQueuedTurnsInternal.length}.',
+  );
+}
+
 class _RecordingGoTaskServiceClient implements GoTaskServiceClient {
   int executeCount = 0;
   final List<GoTaskServiceRequest> requests = <GoTaskServiceRequest>[];
@@ -1921,6 +2214,23 @@ class _BlockingGoTaskServiceClient implements GoTaskServiceClient {
       throw StateError('No pending task for $sessionId.');
     }
     completer.complete(result);
+  }
+
+  void completeAll([
+    GoTaskServiceResult result = const GoTaskServiceResult(
+      success: true,
+      message: 'cleanup',
+      turnId: 'turn-cleanup',
+      raw: <String, dynamic>{},
+      errorMessage: '',
+      resolvedModel: '',
+      route: GoTaskServiceRoute.externalAcpSingle,
+    ),
+  ]) {
+    final pendingSessionIds = List<String>.from(_pending.keys);
+    for (final sessionId in pendingSessionIds) {
+      complete(sessionId, result);
+    }
   }
 
   void emitDelta(String sessionId, String text) {
