@@ -298,6 +298,15 @@ extension AppControllerDesktopSettings on AppController {
     aiGatewayPendingSessionKeysInternal.clear();
     aiGatewayAbortedSessionKeysInternal.clear();
     assistantThreadTurnQueuesInternal.clear();
+    for (final turn in openClawGatewayQueuedTurnsInternal) {
+      turn.cancelled = true;
+      if (!turn.completer.isCompleted) {
+        turn.completer.complete();
+      }
+    }
+    openClawGatewayQueuedTurnsInternal.clear();
+    openClawGatewayQueuedTurnsBySessionInternal.clear();
+    openClawGatewayActiveTasksInternal = 0;
     multiAgentRunPendingInternal = false;
     initializeAssistantThreadContext(
       'main',
