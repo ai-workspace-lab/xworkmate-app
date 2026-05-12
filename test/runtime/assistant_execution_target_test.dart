@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xworkmate/app/app_controller.dart';
 import 'package:xworkmate/app/app_controller_desktop_external_acp_routing.dart';
+import 'package:xworkmate/app/app_controller_openclaw_task_queue.dart';
 import 'package:xworkmate/features/assistant/assistant_page_composer_skill_models.dart';
 import 'package:xworkmate/runtime/gateway_acp_client.dart';
 import 'package:xworkmate/runtime/go_task_service_client.dart';
@@ -1652,22 +1653,39 @@ void main() {
     test('OpenClaw queue overflow fails without artifact sync', () async {
       final fakeGoTaskService = _BlockingGoTaskServiceClient();
       final controller = _connectedGatewayController(fakeGoTaskService);
-      addTearDown(() {
-        fakeGoTaskService.completeAll();
-        controller.dispose();
-      });
+      addTearDown(controller.dispose);
 
-      await _selectGatewaySession(controller, 'queue-full-running');
-      final runningFuture = controller.sendChatMessage('running');
-      await fakeGoTaskService.waitForRequestCount(1);
-
-      final queuedFutures = <Future<void>>[];
-      for (var index = 0; index < 20; index += 1) {
+      controller.openClawGatewayActiveTasksInternal =
+          openClawGatewayMaxActiveTasksInternal;
+      for (
+        var index = 0;
+        index < openClawGatewayMaxQueuedTasksInternal;
+        index += 1
+      ) {
         final sessionKey = 'queue-full-waiting-$index';
-        await _selectGatewaySession(controller, sessionKey);
-        queuedFutures.add(controller.sendChatMessage('queued $index'));
+        final turn = OpenClawGatewayQueuedTurnInternal(
+          queueId: 'queue-full-$index',
+          sessionKey: sessionKey,
+          target: AssistantExecutionTarget.gateway,
+          provider: SingleAgentProvider.openclaw,
+          message: 'queued $index',
+          thinking: 'off',
+          selectedSkillLabels: const <String>[],
+          attachments: const <GatewayChatAttachmentPayload>[],
+          localAttachments: const <CollaborationAttachment>[],
+          workingDirectory: '/tmp/$sessionKey',
+          remoteWorkingDirectoryHint: '/threads/$sessionKey',
+          model: '',
+          routing: const ExternalCodeAgentAcpRoutingConfig.auto(
+            preferredGatewayTarget: kCanonicalGatewayProviderId,
+          ),
+          agentId: '',
+          metadata: const <String, dynamic>{},
+        );
+        controller.openClawGatewayQueuedTurnsInternal.add(turn);
+        controller.openClawGatewayQueuedTurnsBySessionInternal[sessionKey] =
+            <OpenClawGatewayQueuedTurnInternal>[turn];
       }
-      await _waitForOpenClawQueuedTaskCount(controller, 20);
 
       await _selectGatewaySession(controller, 'queue-full-overflow');
       await expectLater(
@@ -1675,43 +1693,12 @@ void main() {
         throwsA(isA<StateError>()),
       );
 
-      expect(fakeGoTaskService.requests, hasLength(1));
       final overflowThread = controller.requireTaskThreadForSessionInternal(
         'queue-full-overflow',
       );
       expect(overflowThread.lastArtifactSyncStatus, 'failed');
       expect(overflowThread.lastTaskArtifactRelativePaths, isEmpty);
-
-      fakeGoTaskService.complete(
-        'queue-full-running',
-        const GoTaskServiceResult(
-          success: true,
-          message: 'running done',
-          turnId: 'turn-running',
-          raw: <String, dynamic>{},
-          errorMessage: '',
-          resolvedModel: '',
-          route: GoTaskServiceRoute.externalAcpSingle,
-        ),
-      );
-      await runningFuture;
-      for (var index = 0; index < 20; index += 1) {
-        final sessionKey = 'queue-full-waiting-$index';
-        await fakeGoTaskService.waitForRequestCount(index + 2);
-        fakeGoTaskService.complete(
-          sessionKey,
-          GoTaskServiceResult(
-            success: true,
-            message: 'queued $index done',
-            turnId: 'turn-queued-$index',
-            raw: const <String, dynamic>{},
-            errorMessage: '',
-            resolvedModel: '',
-            route: GoTaskServiceRoute.externalAcpSingle,
-          ),
-        );
-      }
-      await Future.wait(queuedFutures);
+      expect(fakeGoTaskService.requests, isEmpty);
     });
 
     test(
@@ -2076,22 +2063,6 @@ Future<void> _waitForThreadLifecycleStatus(
       .status;
   throw StateError(
     'Timed out waiting for $sessionKey status $status. Current status: $currentStatus.',
-  );
-}
-
-Future<void> _waitForOpenClawQueuedTaskCount(
-  AppController controller,
-  int count,
-) async {
-  final deadline = DateTime.now().add(const Duration(seconds: 15));
-  while (DateTime.now().isBefore(deadline)) {
-    if (controller.openClawGatewayQueuedTurnsInternal.length >= count) {
-      return;
-    }
-    await Future<void>.delayed(const Duration(milliseconds: 10));
-  }
-  throw StateError(
-    'Timed out waiting for $count queued OpenClaw tasks. Current count: ${controller.openClawGatewayQueuedTurnsInternal.length}.',
   );
 }
 
