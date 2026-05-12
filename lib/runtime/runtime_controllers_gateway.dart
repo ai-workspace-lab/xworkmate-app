@@ -237,6 +237,15 @@ class GatewayChatController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void resetSession(String sessionKey) {
+    sessionKeyInternal = sessionKey.trim().isEmpty ? 'main' : sessionKey.trim();
+    messagesInternal = const <GatewayChatMessage>[];
+    pendingRunsInternal.clear();
+    streamingAssistantTextInternal = null;
+    errorInternal = null;
+    notifyListeners();
+  }
+
   void handleChatRunEventInternal(Map<String, dynamic> payload) {
     final runId = stringValue(payload['runId']);
     final state = stringValue(payload['state']) ?? '';
@@ -249,18 +258,15 @@ class GatewayChatController extends ChangeNotifier {
     }
 
     final assistantText = stringValue(payload['assistantText']) ?? '';
-    if (assistantText.isNotEmpty &&
-        (state == 'delta' || state == 'final')) {
+    if (assistantText.isNotEmpty && (state == 'delta' || state == 'final')) {
       streamingAssistantTextInternal = assistantText;
     }
     if (state == 'error') {
       errorInternal = stringValue(payload['errorMessage']) ?? 'Chat failed';
     }
     final terminal =
-        boolValue(payload['terminal']) ?? false ||
-        state == 'final' ||
-        state == 'aborted' ||
-        state == 'error';
+        boolValue(payload['terminal']) ??
+        false || state == 'final' || state == 'aborted' || state == 'error';
     if (terminal) {
       if (runId != null) {
         pendingRunsInternal.remove(runId);

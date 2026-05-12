@@ -10,6 +10,91 @@ import 'package:xworkmate/runtime/go_task_service_client.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
 
 void main() {
+  test('does not expose gateway chat messages from another session', () async {
+    final controller = AppController(
+      environmentOverride: const <String, String>{},
+    );
+    addTearDown(controller.dispose);
+
+    await controller.sessionsController.switchSession('current-session');
+    controller.localSessionMessagesInternal['current-session'] =
+        const <GatewayChatMessage>[
+          GatewayChatMessage(
+            id: 'current-local',
+            role: 'assistant',
+            text: 'current session message',
+            timestampMs: 1,
+            toolCallId: null,
+            toolName: null,
+            stopReason: null,
+            pending: false,
+            error: false,
+          ),
+        ];
+    controller.chatController
+      ..sessionKeyInternal = 'stale-session'
+      ..messagesInternal = const <GatewayChatMessage>[
+        GatewayChatMessage(
+          id: 'stale-gateway',
+          role: 'assistant',
+          text: 'stale gateway message',
+          timestampMs: 2,
+          toolCallId: null,
+          toolName: null,
+          stopReason: null,
+          pending: false,
+          error: false,
+        ),
+      ]
+      ..streamingAssistantTextInternal = 'stale streaming message';
+
+    expect(
+      controller.chatMessages.map((message) => message.text),
+      contains('current session message'),
+    );
+    expect(
+      controller.chatMessages.map((message) => message.text),
+      isNot(contains('stale gateway message')),
+    );
+    expect(
+      controller.chatMessages.map((message) => message.text),
+      isNot(contains('stale streaming message')),
+    );
+  });
+
+  test('switchSession resets the gateway chat session boundary', () async {
+    final controller = AppController(
+      environmentOverride: const <String, String>{},
+    );
+    addTearDown(controller.dispose);
+
+    await controller.sessionsController.switchSession('stale-session');
+    controller.chatController
+      ..sessionKeyInternal = 'stale-session'
+      ..messagesInternal = const <GatewayChatMessage>[
+        GatewayChatMessage(
+          id: 'stale-gateway',
+          role: 'assistant',
+          text: 'stale gateway message',
+          timestampMs: 1,
+          toolCallId: null,
+          toolName: null,
+          stopReason: null,
+          pending: false,
+          error: false,
+        ),
+      ];
+
+    await controller.switchSession('current-session');
+
+    expect(controller.currentSessionKey, 'current-session');
+    expect(controller.chatController.sessionKey, 'current-session');
+    expect(
+      controller.chatMessages.map((message) => message.text),
+      isNot(contains('stale gateway message')),
+    );
+  });
+
   test(
     'converges managed local thread workspaces to the user home root',
     () async {
