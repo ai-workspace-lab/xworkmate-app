@@ -82,7 +82,7 @@ class _AppShellState extends State<AppShell> {
     AppController controller,
     List<AssistantExecutionTarget> visibleTargets,
   ) async {
-    final sessionKey = 'draft:${DateTime.now().millisecondsSinceEpoch}';
+    final sessionKey = controller.createAssistantDraftSessionKeyInternal();
     final target = pickDraftThreadExecutionTargetInternal(
       currentTarget: controller.currentAssistantExecutionTarget,
       visibleTargets: visibleTargets,
@@ -314,10 +314,9 @@ class _AppShellState extends State<AppShell> {
                                   onExpandFromCollapsed: () =>
                                       _toggleSidebarVisibility(controller),
                                   onOpenHome: controller.navigateHome,
-                                  onOpenAccount: () =>
-                                      controller.openSettings(
-                                        tab: SettingsTab.gateway,
-                                      ),
+                                  onOpenAccount: () => controller.openSettings(
+                                    tab: SettingsTab.gateway,
+                                  ),
                                   onOpenThemeToggle: () =>
                                       controller.setThemeMode(
                                         controller.themeMode == ThemeMode.dark

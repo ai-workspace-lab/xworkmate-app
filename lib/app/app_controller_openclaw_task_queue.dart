@@ -23,6 +23,7 @@ class OpenClawGatewayQueuedTurnInternal {
     required this.routing,
     required this.agentId,
     required this.metadata,
+    required this.resumeSessionHint,
   });
 
   final String queueId;
@@ -40,6 +41,7 @@ class OpenClawGatewayQueuedTurnInternal {
   final ExternalCodeAgentAcpRoutingConfig routing;
   final String agentId;
   final Map<String, dynamic> metadata;
+  final bool resumeSessionHint;
   final Completer<void> completer = Completer<void>();
 
   bool cancelled = false;

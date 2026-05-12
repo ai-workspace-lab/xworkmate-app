@@ -194,9 +194,9 @@ class GatewayChatController extends ChangeNotifier {
   Future<void> loadSession(String sessionKey) async {
     final next = sessionKey.trim().isEmpty ? 'main' : sessionKey.trim();
     sessionKeyInternal = next;
+    messagesInternal = const <GatewayChatMessage>[];
+    streamingAssistantTextInternal = null;
     if (!runtimeInternal.isConnected) {
-      messagesInternal = const <GatewayChatMessage>[];
-      streamingAssistantTextInternal = null;
       errorInternal = null;
       notifyListeners();
       return;
@@ -206,8 +206,8 @@ class GatewayChatController extends ChangeNotifier {
     notifyListeners();
     try {
       messagesInternal = await runtimeInternal.loadHistory(next);
-      streamingAssistantTextInternal = null;
     } catch (error) {
+      messagesInternal = const <GatewayChatMessage>[];
       errorInternal = error.toString();
     } finally {
       loadingInternal = false;

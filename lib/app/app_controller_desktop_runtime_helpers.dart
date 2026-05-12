@@ -124,14 +124,20 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
         assistantThreadTurnQueuesInternal[normalizedThreadId] ??
         Future<void>.value();
     final completer = Completer<T>();
+    T? result;
+    Object? failure;
+    StackTrace? failureStackTrace;
+    var taskCompleted = false;
     late final Future<void> next;
     next = previous
         .catchError((_) {})
         .then((_) async {
           try {
-            completer.complete(await task());
+            result = await task();
+            taskCompleted = true;
           } catch (error, stackTrace) {
-            completer.completeError(error, stackTrace);
+            failure = error;
+            failureStackTrace = stackTrace;
           }
         })
         .whenComplete(() {
@@ -141,6 +147,25 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
           )) {
             assistantThreadTurnQueuesInternal.remove(normalizedThreadId);
           }
+          if (completer.isCompleted) {
+            return;
+          }
+          final error = failure;
+          if (error != null) {
+            completer.completeError(
+              error,
+              failureStackTrace ?? StackTrace.current,
+            );
+            return;
+          }
+          if (taskCompleted) {
+            completer.complete(result);
+            return;
+          }
+          completer.completeError(
+            StateError('Thread turn did not complete.'),
+            StackTrace.current,
+          );
         });
     assistantThreadTurnQueuesInternal[normalizedThreadId] = next;
     return completer.future;
