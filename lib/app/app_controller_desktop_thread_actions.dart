@@ -194,14 +194,9 @@ extension AppControllerDesktopThreadActions on AppController {
   }
 
   Future<void> switchSession(String sessionKey) async {
-    final previousSessionKey = normalizedAssistantSessionKeyInternal(
-      sessionsControllerInternal.currentSessionKey,
-    );
     final nextSessionKey = normalizedAssistantSessionKeyInternal(sessionKey);
     final nextTarget = assistantExecutionTargetForSession(nextSessionKey);
     final nextViewMode = assistantMessageViewModeForSession(nextSessionKey);
-
-    preserveGatewayHistoryForSessionInternal(previousSessionKey);
 
     await setCurrentAssistantSessionKeyInternal(nextSessionKey);
     upsertTaskThreadInternal(
@@ -220,6 +215,11 @@ extension AppControllerDesktopThreadActions on AppController {
       persistDefaultSelection: false,
       preserveGatewayHistoryForSelectedThread: false,
     );
+    if (runtimeInternal.isConnected) {
+      await chatControllerInternal.loadSession(nextSessionKey);
+    } else {
+      chatControllerInternal.resetSession(nextSessionKey);
+    }
     recomputeTasksInternal();
   }
 
@@ -730,6 +730,13 @@ extension AppControllerDesktopThreadActions on AppController {
         error: false,
       ),
       persistInThreadContext: true,
+    );
+    upsertTaskThreadInternal(
+      sessionKey,
+      lifecycleStatus: 'ready',
+      lastRunAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+      lastResultCode: gatewayTerminalResultCodeInternal(result),
+      updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
     );
     recomputeTasksInternal();
     notifyIfActiveInternal();

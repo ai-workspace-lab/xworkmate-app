@@ -113,13 +113,14 @@ extension AssistantPageStateClosureInternal on AssistantPageStateInternal {
             (defaultComposerHeight + workspaceLowerPaneHeightAdjustmentInternal)
                 .clamp(composerHeightLowerBound, composerHeightUpperBound)
                 .toDouble();
+        final activeSessionKey = currentTask.sessionKey.trim().isEmpty
+            ? controller.currentSessionKey
+            : currentTask.sessionKey.trim();
         final thread = controller.taskThreadForSessionInternal(
-          controller.currentSessionKey,
+          activeSessionKey,
         );
         final progressState = assistantTaskProgressState(
-          pending: controller.assistantSessionHasPendingRun(
-            controller.currentSessionKey,
-          ),
+          pending: controller.assistantSessionHasPendingRun(activeSessionKey),
           lifecycleStatus: thread?.lifecycleState.status ?? '',
           lastResultCode: thread?.lifecycleState.lastResultCode ?? '',
           artifactSyncStatus: thread?.lastArtifactSyncStatus ?? '',
@@ -144,7 +145,8 @@ extension AssistantPageStateClosureInternal on AssistantPageStateInternal {
                     controller: controller,
                     currentTask: currentTask,
                     items: timelineItems,
-                    messageViewMode: controller.currentAssistantMessageViewMode,
+                    messageViewMode: controller
+                        .assistantMessageViewModeForSession(activeSessionKey),
                     bottomContentInset: composerBottomSpacing,
                     topTrailingInset: artifactPaneCollapsedInternal
                         ? assistantCollapsedArtifactToggleClearanceInternal
@@ -208,7 +210,7 @@ extension AssistantPageStateClosureInternal on AssistantPageStateInternal {
                   thinkingLabel: thinkingLabelInternal,
                   showModelControl: true,
                   modelLabel: controller.assistantDisplayModelForSession(
-                    controller.currentSessionKey,
+                    activeSessionKey,
                   ),
                   modelOptions: controller.assistantModelChoices,
                   attachments: attachmentsInternal,
@@ -229,7 +231,7 @@ extension AssistantPageStateClosureInternal on AssistantPageStateInternal {
                   onToggleSkill: (key) {
                     unawaited(
                       controller.toggleAssistantSkillForSession(
-                        controller.currentSessionKey,
+                        activeSessionKey,
                         key,
                       ),
                     );
@@ -242,7 +244,7 @@ extension AssistantPageStateClosureInternal on AssistantPageStateInternal {
                   },
                   onModelChanged: (modelId) =>
                       controller.selectAssistantModelForSession(
-                        controller.currentSessionKey,
+                        activeSessionKey,
                         modelId,
                       ),
                   onPickAttachments: AssistantPageStateActionsInternal(
@@ -293,6 +295,9 @@ extension AssistantPageStateClosureInternal on AssistantPageStateInternal {
         final paneWidth = artifactPaneWidthInternal
             .clamp(assistantArtifactPaneMinWidthInternal, maxPaneWidth)
             .toDouble();
+        final activeSessionKey = currentTask.sessionKey.trim().isEmpty
+            ? controller.currentSessionKey
+            : currentTask.sessionKey.trim();
         final panel = Row(
           children: [
             Expanded(child: child),
@@ -322,23 +327,19 @@ extension AssistantPageStateClosureInternal on AssistantPageStateInternal {
               SizedBox(
                 width: paneWidth,
                 child: AssistantArtifactSidebar(
-                  sessionKey: controller.currentSessionKey,
+                  sessionKey: activeSessionKey,
                   threadTitle: currentTask.title,
                   workspacePath: controller
                       .assistantWorkspaceDisplayPathForSession(
-                        controller.currentSessionKey,
+                        activeSessionKey,
                       ),
                   workspaceKind: controller.assistantWorkspaceKindForSession(
-                    controller.currentSessionKey,
+                    activeSessionKey,
                   ),
                   artifactSyncAtMs: controller
-                      .assistantArtifactSyncAtMsForSession(
-                        controller.currentSessionKey,
-                      ),
+                      .assistantArtifactSyncAtMsForSession(activeSessionKey),
                   artifactSyncStatus: controller
-                      .assistantArtifactSyncStatusForSession(
-                        controller.currentSessionKey,
-                      ),
+                      .assistantArtifactSyncStatusForSession(activeSessionKey),
                   onCollapse: () {
                     setState(() {
                       artifactPaneCollapsedInternal = true;
@@ -346,9 +347,7 @@ extension AssistantPageStateClosureInternal on AssistantPageStateInternal {
                   },
                   onOpenWorkspace: () async {
                     final workspacePath = controller
-                        .assistantWorkspacePathForSession(
-                          controller.currentSessionKey,
-                        )
+                        .assistantWorkspacePathForSession(activeSessionKey)
                         .trim();
                     if (workspacePath.isEmpty) {
                       return;
@@ -369,9 +368,7 @@ extension AssistantPageStateClosureInternal on AssistantPageStateInternal {
                   },
                   onOpenEntryLocation: (entry) async {
                     final workspacePath = controller
-                        .assistantWorkspacePathForSession(
-                          controller.currentSessionKey,
-                        )
+                        .assistantWorkspacePathForSession(activeSessionKey)
                         .trim();
                     if (workspacePath.isEmpty) {
                       return;
@@ -398,10 +395,14 @@ extension AssistantPageStateClosureInternal on AssistantPageStateInternal {
                       ]);
                     }
                   },
-                  loadSnapshot: () =>
-                      controller.loadAssistantArtifactSnapshot(),
+                  loadSnapshot: () => controller.loadAssistantArtifactSnapshot(
+                    sessionKey: activeSessionKey,
+                  ),
                   loadPreview: (entry) =>
-                      controller.loadAssistantArtifactPreview(entry),
+                      controller.loadAssistantArtifactPreview(
+                        entry,
+                        sessionKey: activeSessionKey,
+                      ),
                 ),
               ),
             ],

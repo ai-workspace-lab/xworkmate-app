@@ -328,8 +328,6 @@ class AppController extends ChangeNotifier {
       DesktopTaskThreadRepository(saveRecords: storeInternal.saveTaskThreads);
   final Map<String, List<GatewayChatMessage>> localSessionMessagesInternal =
       <String, List<GatewayChatMessage>>{};
-  final Map<String, List<GatewayChatMessage>> gatewayHistoryCacheInternal =
-      <String, List<GatewayChatMessage>>{};
   final Map<String, String> aiGatewayStreamingTextBySessionInternal =
       <String, String>{};
   final DesktopThreadArtifactService threadArtifactServiceInternal =
