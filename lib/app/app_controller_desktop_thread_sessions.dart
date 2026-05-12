@@ -473,9 +473,12 @@ extension AppControllerDesktopThreadSessions on AppController {
     final sessionKey = normalizedAssistantSessionKeyInternal(
       sessionsControllerInternal.currentSessionKey,
     );
-    final items = List<GatewayChatMessage>.from(
-      chatControllerInternal.messages,
+    final chatSessionKey = normalizedAssistantSessionKeyInternal(
+      chatControllerInternal.sessionKey,
     );
+    final items = matchesSessionKey(chatSessionKey, sessionKey)
+        ? List<GatewayChatMessage>.from(chatControllerInternal.messages)
+        : <GatewayChatMessage>[];
     final threadItems = assistantThreadMessagesInternal[sessionKey];
     if (threadItems != null && threadItems.isNotEmpty) {
       items.addAll(threadItems);
@@ -484,8 +487,9 @@ extension AppControllerDesktopThreadSessions on AppController {
     if (localItems != null && localItems.isNotEmpty) {
       items.addAll(localItems);
     }
-    final streaming =
-        chatControllerInternal.streamingAssistantText?.trim() ?? '';
+    final streaming = matchesSessionKey(chatSessionKey, sessionKey)
+        ? chatControllerInternal.streamingAssistantText?.trim() ?? ''
+        : '';
     if (streaming.isNotEmpty) {
       items.add(
         GatewayChatMessage(

@@ -318,16 +318,6 @@ extension AppControllerDesktopThreadStorage on AppController {
     notifyIfActiveInternal();
   }
 
-  void preserveGatewayHistoryForSessionInternal(String sessionKey) {
-    final key = normalizedAssistantSessionKeyInternal(sessionKey);
-    if (chatControllerInternal.messages.isEmpty) {
-      return;
-    }
-    gatewayHistoryCacheInternal[key] = List<GatewayChatMessage>.from(
-      chatControllerInternal.messages,
-    );
-  }
-
   List<GatewaySessionSummary> assistantSessionSummariesInternal() {
     final items = <GatewaySessionSummary>[];
 

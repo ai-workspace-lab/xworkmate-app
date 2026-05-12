@@ -292,7 +292,6 @@ extension AppControllerDesktopSettings on AppController {
     taskThreadRepositoryInternal.clear();
     assistantThreadMessagesInternal.clear();
     localSessionMessagesInternal.clear();
-    gatewayHistoryCacheInternal.clear();
     aiGatewayStreamingTextBySessionInternal.clear();
     aiGatewayStreamingClientsInternal.clear();
     aiGatewayPendingSessionKeysInternal.clear();
