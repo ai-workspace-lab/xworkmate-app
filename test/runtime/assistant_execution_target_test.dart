@@ -2045,6 +2045,13 @@ Future<void> _selectGatewaySession(
   await controller.setAssistantExecutionTarget(
     AssistantExecutionTarget.gateway,
   );
+  await controller.setAssistantProvider(SingleAgentProvider.openclaw);
+  controller.upsertTaskThreadInternal(
+    sessionKey,
+    executionTarget: AssistantExecutionTarget.gateway,
+    selectedProvider: SingleAgentProvider.openclaw,
+    selectedProviderSource: ThreadSelectionSource.explicit,
+  );
 }
 
 Future<void> _waitForThreadLifecycleStatus(
