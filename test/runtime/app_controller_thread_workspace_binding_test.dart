@@ -197,9 +197,13 @@ void main() {
     final snapshot = await controller.loadAssistantArtifactSnapshot(
       sessionKey: 'session-1',
     );
-    expect(snapshot.fileEntries.map((entry) => entry.relativePath), <String>[
+    expect(snapshot.resultEntries.map((entry) => entry.relativePath), <String>[
       'notes/hello.v2.txt',
     ]);
+    expect(
+      snapshot.fileEntries.map((entry) => entry.relativePath),
+      containsAll(<String>['notes/hello.v2.txt', 'notes/hello.txt']),
+    );
     expect(
       controller
           .requireTaskThreadForSessionInternal('session-1')
@@ -209,7 +213,7 @@ void main() {
   });
 
   test(
-    'limits the artifact panel to files produced by the current task sync',
+    'keeps current task artifacts primary while exposing older workspace files',
     () async {
       final controller = AppController(
         environmentOverride: const <String, String>{},
@@ -264,10 +268,14 @@ void main() {
       final snapshot = await controller.loadAssistantArtifactSnapshot(
         sessionKey: 'session-1',
       );
-      final relativePaths = snapshot.fileEntries
+      final currentRelativePaths = snapshot.resultEntries
           .map((entry) => entry.relativePath)
           .toList(growable: false);
-      expect(relativePaths, <String>['current-task-report.md']);
+      expect(currentRelativePaths, <String>['current-task-report.md']);
+      expect(
+        snapshot.fileEntries.map((entry) => entry.relativePath),
+        containsAll(<String>['current-task-report.md', 'old-task-report.md']),
+      );
 
       final stalePreview = await controller.loadAssistantArtifactPreview(
         AssistantArtifactEntry(
@@ -281,7 +289,8 @@ void main() {
         ),
         sessionKey: 'session-1',
       );
-      expect(stalePreview.kind, AssistantArtifactPreviewKind.empty);
+      expect(stalePreview.kind, AssistantArtifactPreviewKind.markdown);
+      expect(stalePreview.content, 'stale task output');
     },
   );
 
@@ -1005,7 +1014,11 @@ void main() {
     final snapshot = await controller.loadAssistantArtifactSnapshot(
       sessionKey: 'session-1',
     );
-    expect(snapshot.fileEntries, isEmpty);
+    expect(snapshot.resultEntries, isEmpty);
+    expect(
+      snapshot.fileEntries.map((entry) => entry.relativePath),
+      contains('old-task-report.md'),
+    );
   });
 
   test('skips download URL artifacts outside the bridge host', () async {

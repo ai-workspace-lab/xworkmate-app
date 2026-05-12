@@ -677,7 +677,7 @@ extension AppControllerDesktopThreadActions on AppController {
       lastRemoteWorkspaceRefKind: result.remoteWorkspaceRefKind,
       lifecycleStatus: 'ready',
       lastRunAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-      lastResultCode: result.success ? 'success' : 'error',
+      lastResultCode: gatewayTerminalResultCodeInternal(result),
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
     );
     if (isOpenClawNoExportedArtifactsGuardResultInternal(result)) {
@@ -808,6 +808,21 @@ extension AppControllerDesktopThreadActions on AppController {
       normalizedSessionKey,
     )?.lifecycleState.lastResultCode?.trim().toUpperCase();
     return lastResultCode == 'SUCCESS';
+  }
+
+  String gatewayTerminalResultCodeInternal(GoTaskServiceResult result) {
+    if (result.success) {
+      return 'success';
+    }
+    final status = result.status.trim();
+    if (status.isNotEmpty) {
+      return status;
+    }
+    final code = result.code.trim();
+    if (code.isNotEmpty) {
+      return code;
+    }
+    return 'error';
   }
 
   Future<void> abortRun() async {
