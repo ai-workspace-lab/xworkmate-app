@@ -273,7 +273,9 @@ extension AppControllerDesktopThreadBinding on AppController {
     final ownerScope = await ensureDesktopThreadOwnerScopeInternal(
       normalizedSessionKey,
     );
-    final latestRecord = assistantThreadRecordsInternal[normalizedSessionKey];
+    final latestRecord =
+        taskThreadForSessionInternal(normalizedSessionKey) ??
+        assistantThreadRecordsInternal[normalizedSessionKey];
     final snapshot = resolveDesktopThreadBindingSnapshotInternal(
       defaultExecutionTarget: settings.assistantExecutionTarget,
       executionTargetOverride: executionTarget,
@@ -285,7 +287,9 @@ extension AppControllerDesktopThreadBinding on AppController {
       ownerScope: ownerScope,
       existingBinding: snapshot.record?.workspaceBinding,
     );
-    final currentRecord = assistantThreadRecordsInternal[normalizedSessionKey];
+    final currentRecord =
+        taskThreadForSessionInternal(normalizedSessionKey) ??
+        assistantThreadRecordsInternal[normalizedSessionKey];
     final existingLifecycle =
         currentRecord?.lifecycleState ??
         snapshot.record?.lifecycleState ??
