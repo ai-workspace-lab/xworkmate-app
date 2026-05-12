@@ -470,6 +470,10 @@ class GoTaskServiceResult {
       ? raw['resultSummary'].toString().trim()
       : raw['summary']?.toString().trim() ?? '';
 
+  String get status => raw['status']?.toString().trim() ?? '';
+
+  String get code => raw['code']?.toString().trim() ?? '';
+
   String get resolvedExecutionTarget =>
       raw['resolvedExecutionTarget']?.toString().trim() ?? '';
 

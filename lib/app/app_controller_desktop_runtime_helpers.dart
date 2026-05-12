@@ -97,9 +97,6 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     if (delta.isEmpty) {
       return;
     }
-    if (isOpenClawNoExportedArtifactsGuardTextInternal(delta)) {
-      return;
-    }
     final key = normalizedAssistantSessionKeyInternal(sessionKey);
     final current = aiGatewayStreamingTextBySessionInternal[key] ?? '';
     aiGatewayStreamingTextBySessionInternal[key] = '$current$delta';
@@ -326,23 +323,24 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     if (result.artifacts.isNotEmpty) {
       return false;
     }
-    final rawText = jsonLikeTextForDiagnosticsInternal(
-      result.raw,
-    ).toLowerCase();
-    return isOpenClawNoExportedArtifactsGuardTextInternal(
-      '${result.message}\n${result.errorMessage}\n$rawText',
-    );
-  }
-
-  bool isOpenClawNoExportedArtifactsGuardTextInternal(String text) {
-    final messageText = text.toLowerCase();
-    return messageText.contains('未检测到 openclaw 本轮导出的实际文件') ||
-        messageText.contains('未检测到openclaw本轮导出的实际文件') ||
-        messageText.contains('口头下载声明') ||
-        messageText.contains('no_exported_artifacts') ||
-        messageText.contains('no-exported-artifacts') ||
-        messageText.contains('openclaw_artifact_guard') ||
-        messageText.contains('openclaw_no_exported_artifacts');
+    final status = result.status.trim().toLowerCase();
+    if (status == 'artifact_missing') {
+      return true;
+    }
+    final code = result.code.trim().toUpperCase();
+    if (code == 'OPENCLAW_ARTIFACT_MISSING' ||
+        code == 'OPENCLAW_NO_EXPORTED_ARTIFACTS') {
+      return true;
+    }
+    final warnings = result.raw['artifactWarnings'];
+    if (warnings is List) {
+      return warnings.any((item) {
+        final text = item?.toString().toLowerCase() ?? '';
+        return text.contains('openclaw artifact export returned no files') ||
+            text.contains('no files for a file-delivery request');
+      });
+    }
+    return false;
   }
 
   String jsonLikeTextForDiagnosticsInternal(Object? value) {

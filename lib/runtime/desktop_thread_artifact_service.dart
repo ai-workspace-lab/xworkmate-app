@@ -60,14 +60,19 @@ class DesktopThreadArtifactService {
     final taskArtifactPaths = normalizeTaskArtifactPathsInternal(
       artifactRelativePaths,
     );
-    final files = taskArtifactPaths.isEmpty
+    final allFiles = await collectFilesInternal(root);
+    final fileEntries = await buildEntriesInternal(allFiles, normalizedRef);
+    final taskFiles = taskArtifactPaths.isEmpty
         ? const <File>[]
         : await collectTaskArtifactFilesInternal(
             root,
             normalizedRef,
             taskArtifactPaths,
           );
-    final fileEntries = await buildEntriesInternal(files, normalizedRef);
+    final taskFileEntries = await buildEntriesInternal(
+      taskFiles,
+      normalizedRef,
+    );
     final changes = taskArtifactPaths.isEmpty
         ? const <AssistantArtifactChangeEntry>[]
         : await readGitChangesInternal(
@@ -77,14 +82,14 @@ class DesktopThreadArtifactService {
           );
     final results = await buildResultEntriesInternal(
       changes: changes,
-      fileEntries: fileEntries,
+      fileEntries: taskFileEntries,
       workspacePath: normalizedRef,
     );
 
     final resultMessage = results.isEmpty
-        ? fileEntries.isEmpty
-              ? 'No files found in the recorded working directory.'
-              : 'No changed artifacts detected. Showing the latest files instead.'
+        ? taskArtifactPaths.isEmpty
+              ? 'No task artifacts recorded for this run.'
+              : 'No current task artifacts found. Showing all files for this thread.'
         : '';
     final filesMessage = fileEntries.isEmpty
         ? 'No files found in the recorded working directory.'
@@ -123,14 +128,11 @@ class DesktopThreadArtifactService {
             'The recorded working directory is not available on this machine.',
       );
     }
-    final taskArtifactPaths = normalizeTaskArtifactPathsInternal(
-      artifactRelativePaths,
-    );
     final entryRelativePath = normalizeArtifactPathInternal(entry.relativePath);
-    if (entryRelativePath.isEmpty ||
-        !taskArtifactPaths.contains(entryRelativePath)) {
+    if (entryRelativePath.isEmpty) {
       return const AssistantArtifactPreview.empty(
-        message: 'The selected file is not part of the current task artifacts.',
+        message:
+            'The selected file is not part of the current thread workspace.',
       );
     }
     final targetPath = resolveAbsolutePathInternal(
@@ -148,7 +150,8 @@ class DesktopThreadArtifactService {
     if (resolvedRelativePath == null ||
         resolvedRelativePath != entryRelativePath) {
       return const AssistantArtifactPreview.empty(
-        message: 'The selected file is not part of the current task artifacts.',
+        message:
+            'The selected file is not part of the current thread workspace.',
       );
     }
 
