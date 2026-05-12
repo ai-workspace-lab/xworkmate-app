@@ -181,12 +181,25 @@ extension AppControllerDesktopThreadActions on AppController {
   }
 
   Future<void> refreshSessions() async {
+    final selectedSessionKey = normalizedAssistantSessionKeyInternal(
+      sessionsControllerInternal.currentSessionKey,
+    );
+    final preserveSelectedLocalTask =
+        !isAssistantTaskArchived(selectedSessionKey) &&
+        hasAssistantTaskStateInternal(selectedSessionKey);
     sessionsControllerInternal.configure(
       mainSessionKey: runtimeInternal.snapshot.mainSessionKey ?? 'main',
       selectedAgentId: agentsControllerInternal.selectedAgentId,
       defaultAgentId: '',
     );
     await sessionsControllerInternal.refresh();
+    if (preserveSelectedLocalTask &&
+        !matchesSessionKey(
+          selectedSessionKey,
+          sessionsControllerInternal.currentSessionKey,
+        )) {
+      await sessionsControllerInternal.switchSession(selectedSessionKey);
+    }
     await chatControllerInternal.loadSession(
       sessionsControllerInternal.currentSessionKey,
     );
@@ -236,6 +249,9 @@ extension AppControllerDesktopThreadActions on AppController {
       sessionsControllerInternal.currentSessionKey,
     );
     final currentTarget = assistantExecutionTargetForSession(sessionKey);
+    final resumeSessionHint = shouldResumeGatewaySessionForNextSendInternal(
+      sessionKey,
+    );
     var connectionState = assistantConnectionStateForSession(sessionKey);
     if (!connectionState.connected &&
         isBridgeAcpRuntimeConfiguredInternal() &&
@@ -356,6 +372,7 @@ extension AppControllerDesktopThreadActions on AppController {
           routing: routing,
           agentId: dispatch.agentId ?? '',
           metadata: Map<String, dynamic>.unmodifiable(dispatch.metadata),
+          resumeSessionHint: resumeSessionHint,
         ),
       );
       return;
@@ -377,6 +394,7 @@ extension AppControllerDesktopThreadActions on AppController {
         routing: routing,
         agentId: dispatch.agentId ?? '',
         metadata: Map<String, dynamic>.unmodifiable(dispatch.metadata),
+        resumeSessionHint: resumeSessionHint,
       ),
     );
     recomputeTasksInternal();
@@ -397,10 +415,11 @@ extension AppControllerDesktopThreadActions on AppController {
     required ExternalCodeAgentAcpRoutingConfig routing,
     required String agentId,
     required Map<String, dynamic> metadata,
+    required bool resumeSessionHint,
   }) async {
-    final resumeSession = shouldResumeGatewaySessionForNextSendInternal(
-      sessionKey,
-    );
+    final resumeSession =
+        resumeSessionHint ||
+        shouldResumeGatewaySessionForNextSendInternal(sessionKey);
     appendGatewayUserTurnInternal(sessionKey, message);
     markGatewayChatRunInternal(sessionKey);
     try {
@@ -500,11 +519,15 @@ extension AppControllerDesktopThreadActions on AppController {
   }
 
   void markOpenClawGatewayQueuedTurnInternal(String sessionKey) {
+    final queuedAtMs = DateTime.now().millisecondsSinceEpoch.toDouble();
     upsertTaskThreadInternal(
       sessionKey,
       lifecycleStatus: 'queued',
       lastResultCode: 'queued',
-      updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+      lastArtifactSyncAtMs: queuedAtMs,
+      lastArtifactSyncStatus: 'queued',
+      lastTaskArtifactRelativePaths: const <String>[],
+      updatedAtMs: queuedAtMs,
     );
     recomputeTasksInternal();
     notifyIfActiveInternal();
@@ -519,6 +542,7 @@ extension AppControllerDesktopThreadActions on AppController {
       lifecycleStatus: 'ready',
       lastRunAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
       lastResultCode: 'OPENCLAW_GATEWAY_QUEUE_FULL',
+      lastRemoteWorkingDirectory: '',
       lastArtifactSyncAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
       lastArtifactSyncStatus: 'failed',
       lastTaskArtifactRelativePaths: const <String>[],
@@ -555,6 +579,10 @@ extension AppControllerDesktopThreadActions on AppController {
       lifecycleStatus: 'ready',
       lastRunAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
       lastResultCode: 'aborted',
+      lastRemoteWorkingDirectory: '',
+      lastArtifactSyncAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+      lastArtifactSyncStatus: 'failed',
+      lastTaskArtifactRelativePaths: const <String>[],
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
     );
     if (!turn.completer.isCompleted) {
@@ -610,6 +638,7 @@ extension AppControllerDesktopThreadActions on AppController {
           routing: turn.routing,
           agentId: turn.agentId,
           metadata: turn.metadata,
+          resumeSessionHint: turn.resumeSessionHint,
         ),
       );
       if (!turn.completer.isCompleted) {
@@ -645,16 +674,34 @@ extension AppControllerDesktopThreadActions on AppController {
   }
 
   void markGatewayChatRunInternal(String sessionKey) {
+    final startedAtMs = DateTime.now().millisecondsSinceEpoch.toDouble();
     aiGatewayPendingSessionKeysInternal.add(sessionKey);
     upsertTaskThreadInternal(
       sessionKey,
       lifecycleStatus: 'running',
-      lastRunAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+      lastRunAtMs: startedAtMs,
       lastResultCode: 'running',
-      updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+      lastArtifactSyncAtMs: startedAtMs,
+      lastArtifactSyncStatus: 'running',
+      lastTaskArtifactRelativePaths: const <String>[],
+      updatedAtMs: startedAtMs,
     );
     recomputeTasksInternal();
     notifyIfActiveInternal();
+  }
+
+  void clearGatewayTaskArtifactStateInternal(
+    String sessionKey, {
+    required double completedAtMs,
+    required String syncStatus,
+  }) {
+    upsertTaskThreadInternal(
+      sessionKey,
+      lastArtifactSyncAtMs: completedAtMs,
+      lastArtifactSyncStatus: syncStatus,
+      lastTaskArtifactRelativePaths: const <String>[],
+      updatedAtMs: completedAtMs,
+    );
   }
 
   Future<void> applyGatewayChatResultInternal({
@@ -662,6 +709,15 @@ extension AppControllerDesktopThreadActions on AppController {
     required AssistantExecutionTarget target,
     required GoTaskServiceResult result,
   }) async {
+    final completedAtMs = DateTime.now().millisecondsSinceEpoch.toDouble();
+    final assistantText = result.message.trim();
+    final hasCurrentRunArtifacts = result.artifacts.isNotEmpty;
+    final noDisplayableOutput =
+        result.success && assistantText.isEmpty && !hasCurrentRunArtifacts;
+    final terminalResultCode = noDisplayableOutput
+        ? 'failed'
+        : gatewayTerminalResultCodeInternal(result);
+    final remoteWorkingDirectory = result.remoteWorkingDirectory.trim();
     clearAiGatewayStreamingTextInternal(sessionKey);
     upsertTaskThreadInternal(
       sessionKey,
@@ -670,21 +726,25 @@ extension AppControllerDesktopThreadActions on AppController {
         result: result,
       ),
       latestResolvedRuntimeModel: result.resolvedModel.trim(),
-      lastRemoteWorkingDirectory:
-          result.remoteWorkingDirectory.trim().isNotEmpty
-          ? result.remoteWorkingDirectory.trim()
-          : null,
+      lastRemoteWorkingDirectory: remoteWorkingDirectory.isNotEmpty
+          ? remoteWorkingDirectory
+          : '',
       lastRemoteWorkspaceRefKind: result.remoteWorkspaceRefKind,
       lifecycleStatus: 'ready',
-      lastRunAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-      lastResultCode: gatewayTerminalResultCodeInternal(result),
-      updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+      lastRunAtMs: completedAtMs,
+      lastResultCode: terminalResultCode,
+      updatedAtMs: completedAtMs,
     );
     if (isOpenClawNoExportedArtifactsGuardResultInternal(result)) {
       await persistGoTaskArtifactsForSessionInternal(sessionKey, result);
       return;
     }
     if (!result.success) {
+      clearGatewayTaskArtifactStateInternal(
+        sessionKey,
+        completedAtMs: completedAtMs,
+        syncStatus: 'failed',
+      );
       appendLocalSessionMessageInternal(
         sessionKey,
         assistantErrorMessageInternal(
@@ -702,8 +762,12 @@ extension AppControllerDesktopThreadActions on AppController {
       );
       return;
     }
-    final assistantText = result.message.trim();
-    if (assistantText.isEmpty) {
+    if (noDisplayableOutput) {
+      clearGatewayTaskArtifactStateInternal(
+        sessionKey,
+        completedAtMs: completedAtMs,
+        syncStatus: 'failed',
+      );
       appendLocalSessionMessageInternal(
         sessionKey,
         assistantErrorMessageInternal(
@@ -716,28 +780,23 @@ extension AppControllerDesktopThreadActions on AppController {
       );
       return;
     }
-    appendLocalSessionMessageInternal(
-      sessionKey,
-      GatewayChatMessage(
-        id: nextLocalMessageIdInternal(),
-        role: 'assistant',
-        text: assistantText,
-        timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-        toolCallId: null,
-        toolName: null,
-        stopReason: null,
-        pending: false,
-        error: false,
-      ),
-      persistInThreadContext: true,
-    );
-    upsertTaskThreadInternal(
-      sessionKey,
-      lifecycleStatus: 'ready',
-      lastRunAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-      lastResultCode: gatewayTerminalResultCodeInternal(result),
-      updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-    );
+    if (assistantText.isNotEmpty) {
+      appendLocalSessionMessageInternal(
+        sessionKey,
+        GatewayChatMessage(
+          id: nextLocalMessageIdInternal(),
+          role: 'assistant',
+          text: assistantText,
+          timestampMs: completedAtMs,
+          toolCallId: null,
+          toolName: null,
+          stopReason: null,
+          pending: false,
+          error: false,
+        ),
+        persistInThreadContext: true,
+      );
+    }
     recomputeTasksInternal();
     notifyIfActiveInternal();
     await persistGoTaskArtifactsForSessionInternal(sessionKey, result);
@@ -759,6 +818,10 @@ extension AppControllerDesktopThreadActions on AppController {
         lifecycleStatus: 'ready',
         lastRunAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
         lastResultCode: unconfirmedConnectCode,
+        lastRemoteWorkingDirectory: '',
+        lastArtifactSyncAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+        lastArtifactSyncStatus: 'failed',
+        lastTaskArtifactRelativePaths: const <String>[],
         updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
       );
       appendLocalSessionMessageInternal(
@@ -775,6 +838,7 @@ extension AppControllerDesktopThreadActions on AppController {
       lifecycleStatus: 'ready',
       lastRunAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
       lastResultCode: interruptedTransportCode ?? 'error',
+      lastRemoteWorkingDirectory: '',
       lastArtifactSyncAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
       lastArtifactSyncStatus: 'failed',
       lastTaskArtifactRelativePaths: const <String>[],
@@ -853,6 +917,10 @@ extension AppControllerDesktopThreadActions on AppController {
         lifecycleStatus: 'ready',
         lastRunAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
         lastResultCode: 'aborted',
+        lastRemoteWorkingDirectory: '',
+        lastArtifactSyncAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+        lastArtifactSyncStatus: 'failed',
+        lastTaskArtifactRelativePaths: const <String>[],
         updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
       );
       recomputeTasksInternal();
@@ -879,6 +947,10 @@ extension AppControllerDesktopThreadActions on AppController {
         lifecycleStatus: 'ready',
         lastRunAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
         lastResultCode: 'aborted',
+        lastRemoteWorkingDirectory: '',
+        lastArtifactSyncAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+        lastArtifactSyncStatus: 'failed',
+        lastTaskArtifactRelativePaths: const <String>[],
         updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
       );
       recomputeTasksInternal();

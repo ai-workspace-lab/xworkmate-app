@@ -407,7 +407,8 @@ extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
   }
 
   Future<void> createNewThreadInternal() async {
-    final sessionKey = buildDraftSessionKeyInternal(widget.controller);
+    final sessionKey = widget.controller
+        .createAssistantDraftSessionKeyInternal();
     final inheritedTarget = pickDraftThreadExecutionTargetInternal(
       currentTarget: widget.controller.currentAssistantExecutionTarget,
       visibleTargets: widget.controller.visibleAssistantExecutionTargets(
@@ -796,15 +797,6 @@ extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
         );
       }
     });
-  }
-
-  String buildDraftSessionKeyInternal(AppController controller) {
-    final stamp = DateTime.now().millisecondsSinceEpoch;
-    final selectedAgentId = controller.selectedAgentId.trim();
-    if (selectedAgentId.isEmpty) {
-      return 'draft:$stamp';
-    }
-    return 'draft:$selectedAgentId:$stamp';
   }
 
   AssistantFocusEntry? resolveFocusedDestinationInternal(

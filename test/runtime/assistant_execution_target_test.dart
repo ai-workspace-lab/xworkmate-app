@@ -109,6 +109,80 @@ void main() {
     );
 
     test(
+      'new task sessions do not inherit execution target from main',
+      () async {
+        final localHome = await Directory.systemTemp.createTemp(
+          'xworkmate-no-main-target-inheritance-',
+        );
+        addTearDown(() async {
+          if (await localHome.exists()) {
+            await localHome.delete(recursive: true);
+          }
+        });
+        final controller = AppController(
+          environmentOverride: const <String, String>{},
+          initialBridgeProviderCatalog: const <SingleAgentProvider>[
+            SingleAgentProvider.codex,
+          ],
+          initialGatewayProviderCatalog: const <SingleAgentProvider>[
+            SingleAgentProvider.openclaw,
+          ],
+          initialAvailableExecutionTargets: const <AssistantExecutionTarget>[
+            AssistantExecutionTarget.agent,
+            AssistantExecutionTarget.gateway,
+          ],
+        );
+        addTearDown(controller.dispose);
+        controller.resolvedUserHomeDirectoryInternal = localHome.path;
+
+        controller.upsertTaskThreadInternal(
+          'main',
+          executionTarget: AssistantExecutionTarget.gateway,
+          selectedProvider: SingleAgentProvider.openclaw,
+          selectedProviderSource: ThreadSelectionSource.explicit,
+        );
+
+        expect(
+          controller.assistantExecutionTargetForSession('fresh-task'),
+          AssistantExecutionTarget.agent,
+        );
+
+        await controller.switchSession('fresh-task');
+
+        final freshThread = controller.requireTaskThreadForSessionInternal(
+          'fresh-task',
+        );
+        expect(
+          freshThread.executionBinding.executionMode,
+          ThreadExecutionMode.agent,
+        );
+        expect(
+          freshThread.workspaceBinding.workspacePath,
+          endsWith('/.xworkmate/threads/fresh-task'),
+        );
+      },
+    );
+
+    test('allocates unique draft session keys for repeated task creation', () {
+      final controller = AppController(
+        environmentOverride: const <String, String>{},
+      );
+      addTearDown(controller.dispose);
+
+      final first = controller.createAssistantDraftSessionKeyInternal();
+      controller.initializeAssistantThreadContext(
+        first,
+        executionTarget: AssistantExecutionTarget.agent,
+        messageViewMode: AssistantMessageViewMode.rendered,
+      );
+      final second = controller.createAssistantDraftSessionKeyInternal();
+
+      expect(first, startsWith('draft:'));
+      expect(second, startsWith('draft:'));
+      expect(second, isNot(first));
+    });
+
+    test(
       'returns unspecified when a saved provider is no longer in the current catalog',
       () {
         final controller = AppController(
@@ -762,7 +836,8 @@ void main() {
           failedThread?.lifecycleState.lastResultCode,
           gatewayAcpHttpConnectTimeoutCode,
         );
-        expect(failedThread?.lastArtifactSyncStatus, isNull);
+        expect(failedThread?.lastArtifactSyncStatus, 'failed');
+        expect(failedThread?.lastTaskArtifactRelativePaths, isEmpty);
         expect(
           controller.chatMessages.last.text,
           'Bridge 连接超时，本轮请求未确认，可重试。错误码：ACP_HTTP_CONNECT_TIMEOUT',
@@ -1418,6 +1493,224 @@ void main() {
       },
     );
 
+    test(
+      'sendChatMessage accepts artifact-only task success as terminal output',
+      () async {
+        final localHome = await Directory.systemTemp.createTemp(
+          'xworkmate-artifact-only-home-',
+        );
+        addTearDown(() async {
+          if (await localHome.exists()) {
+            await localHome.delete(recursive: true);
+          }
+        });
+        final fakeGoTaskService = _BlockingGoTaskServiceClient();
+        final controller = _connectedController(fakeGoTaskService);
+        addTearDown(controller.dispose);
+        controller.resolvedUserHomeDirectoryInternal = localHome.path;
+
+        await controller.switchSession('artifact-only-task');
+        final taskFuture = controller.sendChatMessage('create only a file');
+        await fakeGoTaskService.waitForRequestCount(1);
+        fakeGoTaskService.complete(
+          'artifact-only-task',
+          const GoTaskServiceResult(
+            success: true,
+            message: '',
+            turnId: 'turn-artifact-only',
+            raw: <String, dynamic>{
+              'artifacts': <Map<String, dynamic>>[
+                <String, dynamic>{
+                  'relativePath': 'artifact-only.md',
+                  'content': 'artifact-only body',
+                  'contentType': 'text/markdown',
+                },
+              ],
+            },
+            errorMessage: '',
+            resolvedModel: '',
+            route: GoTaskServiceRoute.externalAcpSingle,
+          ),
+        );
+        await taskFuture;
+
+        final workspacePath = controller.assistantWorkspacePathForSession(
+          'artifact-only-task',
+        );
+        final thread = controller.requireTaskThreadForSessionInternal(
+          'artifact-only-task',
+        );
+        expect(thread.lifecycleState.lastResultCode, 'success');
+        expect(thread.lastArtifactSyncStatus, 'synced');
+        expect(thread.lastTaskArtifactRelativePaths, hasLength(1));
+        final recordedPath = thread.lastTaskArtifactRelativePaths.single;
+        expect(recordedPath, matches(RegExp(r'^artifact-only(\.v\d+)?\.md$')));
+        expect(
+          await File('$workspacePath/$recordedPath').readAsString(),
+          'artifact-only body',
+        );
+        expect(
+          controller.localSessionMessagesInternal['artifact-only-task']!.where(
+            (message) => message.error,
+          ),
+          isEmpty,
+        );
+      },
+    );
+
+    test(
+      'sendChatMessage clears stale current artifacts on terminal task failure',
+      () async {
+        final localHome = await Directory.systemTemp.createTemp(
+          'xworkmate-terminal-failure-home-',
+        );
+        addTearDown(() async {
+          if (await localHome.exists()) {
+            await localHome.delete(recursive: true);
+          }
+        });
+        final fakeGoTaskService = _BlockingGoTaskServiceClient();
+        final controller = _connectedController(fakeGoTaskService);
+        addTearDown(controller.dispose);
+        controller.resolvedUserHomeDirectoryInternal = localHome.path;
+
+        await controller.switchSession('terminal-failure-task');
+        final firstFuture = controller.sendChatMessage('create first file');
+        await fakeGoTaskService.waitForRequestCount(1);
+        fakeGoTaskService.complete(
+          'terminal-failure-task',
+          const GoTaskServiceResult(
+            success: true,
+            message: 'first result',
+            turnId: 'turn-first',
+            raw: <String, dynamic>{
+              'artifacts': <Map<String, dynamic>>[
+                <String, dynamic>{
+                  'relativePath': 'first.md',
+                  'content': 'first body',
+                  'contentType': 'text/markdown',
+                },
+              ],
+              'remoteWorkingDirectory': '/remote/first-run',
+            },
+            errorMessage: '',
+            resolvedModel: '',
+            route: GoTaskServiceRoute.externalAcpSingle,
+          ),
+        );
+        await firstFuture;
+
+        final secondFuture = controller.sendChatMessage('second run fails');
+        await fakeGoTaskService.waitForRequestCount(2);
+        fakeGoTaskService.complete(
+          'terminal-failure-task',
+          const GoTaskServiceResult(
+            success: false,
+            message: '',
+            turnId: 'turn-second',
+            raw: <String, dynamic>{'status': 'failed'},
+            errorMessage: 'second run failed',
+            resolvedModel: '',
+            route: GoTaskServiceRoute.externalAcpSingle,
+          ),
+        );
+        await secondFuture;
+
+        final thread = controller.requireTaskThreadForSessionInternal(
+          'terminal-failure-task',
+        );
+        expect(thread.lifecycleState.lastResultCode, 'failed');
+        expect(thread.lastArtifactSyncStatus, 'failed');
+        expect(thread.lastTaskArtifactRelativePaths, isEmpty);
+        expect(thread.lastRemoteWorkingDirectory?.trim(), isEmpty);
+
+        final snapshot = await controller.loadAssistantArtifactSnapshot(
+          sessionKey: 'terminal-failure-task',
+        );
+        expect(snapshot.resultEntries, isEmpty);
+        expect(
+          snapshot.fileEntries.map((entry) => entry.relativePath),
+          contains('first.md'),
+        );
+      },
+    );
+
+    test(
+      'sendChatMessage clears stale current artifacts when output is empty',
+      () async {
+        final localHome = await Directory.systemTemp.createTemp(
+          'xworkmate-empty-output-home-',
+        );
+        addTearDown(() async {
+          if (await localHome.exists()) {
+            await localHome.delete(recursive: true);
+          }
+        });
+        final fakeGoTaskService = _BlockingGoTaskServiceClient();
+        final controller = _connectedController(fakeGoTaskService);
+        addTearDown(controller.dispose);
+        controller.resolvedUserHomeDirectoryInternal = localHome.path;
+
+        await controller.switchSession('empty-output-task');
+        final firstFuture = controller.sendChatMessage('create first file');
+        await fakeGoTaskService.waitForRequestCount(1);
+        fakeGoTaskService.complete(
+          'empty-output-task',
+          const GoTaskServiceResult(
+            success: true,
+            message: 'first result',
+            turnId: 'turn-first',
+            raw: <String, dynamic>{
+              'artifacts': <Map<String, dynamic>>[
+                <String, dynamic>{
+                  'relativePath': 'first.md',
+                  'content': 'first body',
+                  'contentType': 'text/markdown',
+                },
+              ],
+            },
+            errorMessage: '',
+            resolvedModel: '',
+            route: GoTaskServiceRoute.externalAcpSingle,
+          ),
+        );
+        await firstFuture;
+
+        final secondFuture = controller.sendChatMessage('empty run');
+        await fakeGoTaskService.waitForRequestCount(2);
+        fakeGoTaskService.complete(
+          'empty-output-task',
+          const GoTaskServiceResult(
+            success: true,
+            message: '',
+            turnId: 'turn-second',
+            raw: <String, dynamic>{},
+            errorMessage: '',
+            resolvedModel: '',
+            route: GoTaskServiceRoute.externalAcpSingle,
+          ),
+        );
+        await secondFuture;
+
+        final thread = controller.requireTaskThreadForSessionInternal(
+          'empty-output-task',
+        );
+        expect(thread.lifecycleState.lastResultCode, 'failed');
+        expect(thread.lastArtifactSyncStatus, 'failed');
+        expect(thread.lastTaskArtifactRelativePaths, isEmpty);
+        final snapshot = await controller.loadAssistantArtifactSnapshot(
+          sessionKey: 'empty-output-task',
+        );
+        expect(snapshot.resultEntries, isEmpty);
+        expect(
+          controller.localSessionMessagesInternal['empty-output-task']!.any(
+            (message) => message.error && message.text.contains('没有返回可显示的输出'),
+          ),
+          isTrue,
+        );
+      },
+    );
+
     test('abortRun cancels only the current pending session', () async {
       final fakeGoTaskService = _BlockingGoTaskServiceClient();
       final controller = _connectedController(fakeGoTaskService);
@@ -1681,6 +1974,7 @@ void main() {
           ),
           agentId: '',
           metadata: const <String, dynamic>{},
+          resumeSessionHint: false,
         );
         controller.openClawGatewayQueuedTurnsInternal.add(turn);
         controller.openClawGatewayQueuedTurnsBySessionInternal[sessionKey] =
