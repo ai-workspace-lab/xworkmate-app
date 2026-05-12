@@ -893,7 +893,13 @@ void main() {
               success: false,
               message: '',
               turnId: 'turn-1',
-              raw: <String, dynamic>{'code': 'OPENCLAW_ARTIFACT_GUARD'},
+              raw: <String, dynamic>{
+                'status': 'artifact_missing',
+                'code': 'OPENCLAW_ARTIFACT_MISSING',
+                'artifactWarnings': <String>[
+                  'OpenClaw artifact export returned no files for a file-delivery request.',
+                ],
+              },
               errorMessage: guardMessage,
               resolvedModel: '',
               route: GoTaskServiceRoute.externalAcpSingle,
@@ -912,6 +918,7 @@ void main() {
         expect(transcript, isNot(contains('未检测到 OpenClaw 本轮导出的实际文件')));
         expect(transcript, isNot(contains('口头下载声明')));
         final thread = controller.taskThreadForSessionInternal('session-1');
+        expect(thread?.lifecycleState.lastResultCode, 'artifact_missing');
         expect(thread?.lastArtifactSyncStatus, 'no-exported-artifacts');
         expect(thread?.lastArtifactSyncAtMs, greaterThan(0));
       },
