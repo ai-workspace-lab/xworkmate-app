@@ -1,0 +1,69 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:xworkmate/app/app_controller.dart';
+import 'package:xworkmate/features/assistant/assistant_page_main.dart';
+import 'package:xworkmate/runtime/runtime_models.dart';
+import 'package:xworkmate/theme/app_theme.dart';
+
+void main() {
+  testWidgets('does not render conversation messages from another session', (
+    tester,
+  ) async {
+    final controller = AppController(
+      environmentOverride: const <String, String>{},
+    );
+    addTearDown(controller.dispose);
+
+    await controller.sessionsController.switchSession('current-session');
+    controller.localSessionMessagesInternal['current-session'] =
+        const <GatewayChatMessage>[
+          GatewayChatMessage(
+            id: 'current-local',
+            role: 'assistant',
+            text: 'current session message',
+            timestampMs: 1,
+            toolCallId: null,
+            toolName: null,
+            stopReason: null,
+            pending: false,
+            error: false,
+          ),
+        ];
+    controller.chatController
+      ..sessionKeyInternal = 'stale-session'
+      ..messagesInternal = const <GatewayChatMessage>[
+        GatewayChatMessage(
+          id: 'stale-gateway',
+          role: 'assistant',
+          text: 'stale gateway message',
+          timestampMs: 2,
+          toolCallId: null,
+          toolName: null,
+          stopReason: null,
+          pending: false,
+          error: false,
+        ),
+      ];
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(),
+        home: Material(
+          child: SizedBox(
+            width: 1280,
+            height: 760,
+            child: AssistantPage(
+              controller: controller,
+              showStandaloneTaskRail: false,
+              onOpenDetail: (_) {},
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('current session message'), findsAtLeastNWidgets(1));
+    expect(find.text('stale gateway message'), findsNothing);
+  });
+}
