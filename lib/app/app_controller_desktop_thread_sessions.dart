@@ -187,12 +187,18 @@ bool bridgeCapabilityReadyForExecutionTargetInternal({
 
 extension AppControllerDesktopThreadSessions on AppController {
   AssistantExecutionTarget resolveAssistantExecutionTargetFromRecordsInternal(
-    TaskThread? primaryRecord, {
-    TaskThread? fallbackRecord,
-  }) {
-    return resolveAssistantExecutionTargetFromRecordsForTest(
-      primaryRecord,
-      fallbackRecord: fallbackRecord,
+    TaskThread? record,
+  ) {
+    return resolveAssistantExecutionTargetFromRecordForTest(
+      record,
+      defaultExecutionTarget: pickDraftThreadExecutionTargetInternal(
+        currentTarget: sanitizePersistedExecutionTargetInternal(
+          settings.assistantExecutionTarget,
+        ),
+        visibleTargets: visibleAssistantExecutionTargets(
+          AssistantExecutionTarget.values,
+        ),
+      ),
     );
   }
 
@@ -212,6 +218,31 @@ extension AppControllerDesktopThreadSessions on AppController {
     return taskThreadRepositoryInternal.requireTaskThreadForSession(
       normalizedSessionKey,
     );
+  }
+
+  bool hasAssistantTaskStateInternal(String sessionKey) {
+    final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
+      sessionKey,
+    );
+    return taskThreadRepositoryInternal.containsKey(normalizedSessionKey) ||
+        assistantThreadMessagesInternal.containsKey(normalizedSessionKey) ||
+        localSessionMessagesInternal.containsKey(normalizedSessionKey);
+  }
+
+  String createAssistantDraftSessionKeyInternal() {
+    final selectedAgentId = agentsControllerInternal.selectedAgentId.trim();
+    for (var attempt = 0; attempt < 32; attempt += 1) {
+      assistantDraftSessionCounterInternal += 1;
+      final stamp = DateTime.now().microsecondsSinceEpoch;
+      final suffix = '$stamp-$assistantDraftSessionCounterInternal';
+      final candidate = selectedAgentId.isEmpty
+          ? 'draft:$suffix'
+          : 'draft:$selectedAgentId:$suffix';
+      if (!hasAssistantTaskStateInternal(candidate)) {
+        return candidate;
+      }
+    }
+    throw StateError('Unable to allocate a unique draft task session key.');
   }
 
   List<String> assistantSelectedSkillKeysForSession(String sessionKey) {
@@ -535,13 +566,7 @@ extension AppControllerDesktopThreadSessions on AppController {
       sessionKey,
     );
     final record = taskThreadForSessionInternal(normalizedSessionKey);
-    final mainRecord = matchesSessionKey(normalizedSessionKey, 'main')
-        ? null
-        : taskThreadForSessionInternal('main');
-    return resolveAssistantExecutionTargetFromRecordsInternal(
-      record,
-      fallbackRecord: mainRecord,
-    );
+    return resolveAssistantExecutionTargetFromRecordsInternal(record);
   }
 
   AssistantMessageViewMode assistantMessageViewModeForSession(
@@ -605,13 +630,12 @@ extension AppControllerDesktopThreadSessions on AppController {
   }
 }
 
-AssistantExecutionTarget resolveAssistantExecutionTargetFromRecordsForTest(
-  TaskThread? primaryRecord, {
-  TaskThread? fallbackRecord,
+AssistantExecutionTarget resolveAssistantExecutionTargetFromRecordForTest(
+  TaskThread? record, {
+  required AssistantExecutionTarget defaultExecutionTarget,
 }) {
-  final record = primaryRecord ?? fallbackRecord;
   return record == null
-      ? AssistantExecutionTarget.agent
+      ? defaultExecutionTarget
       : assistantExecutionTargetFromExecutionMode(
           record.executionBinding.executionMode,
         );

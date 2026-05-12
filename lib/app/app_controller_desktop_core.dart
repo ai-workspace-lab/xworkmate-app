@@ -350,6 +350,7 @@ class AppController extends ChangeNotifier {
   int openClawGatewayActiveTasksInternal = 0;
   bool multiAgentRunPendingInternal = false;
   int localMessageCounterInternal = 0;
+  int assistantDraftSessionCounterInternal = 0;
 
   WorkspaceDestination destinationInternal = WorkspaceDestination.assistant;
   ThemeMode themeModeInternal = ThemeMode.light;
