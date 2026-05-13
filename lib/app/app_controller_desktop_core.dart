@@ -356,8 +356,6 @@ class AppController extends ChangeNotifier {
   ThemeMode themeModeInternal = ThemeMode.light;
   AppSidebarState sidebarStateInternal = AppSidebarState.expanded;
   SettingsTab settingsTabInternal = SettingsTab.gateway;
-  SettingsDetailPage? settingsDetailInternal;
-  SettingsNavigationContext? settingsNavigationContextInternal;
   DetailPanelData? detailPanelInternal;
   AppUiState appUiStateInternal = AppUiState.defaults();
   SettingsSnapshot settingsDraftInternal = SettingsSnapshot.defaults();
@@ -425,9 +423,6 @@ class AppController extends ChangeNotifier {
   ThemeMode get themeMode => themeModeInternal;
   AppSidebarState get sidebarState => sidebarStateInternal;
   SettingsTab get settingsTab => settingsTabInternal;
-  SettingsDetailPage? get settingsDetail => settingsDetailInternal;
-  SettingsNavigationContext? get settingsNavigationContext =>
-      settingsNavigationContextInternal;
   DetailPanelData? get detailPanel => detailPanelInternal;
   bool get initializing => initializingInternal;
   String? get bootstrapError => bootstrapErrorInternal;
@@ -576,13 +571,42 @@ class AppController extends ChangeNotifier {
       ]);
 
   List<SingleAgentProvider> get assistantProviderCatalog =>
-      normalizeSingleAgentProviderList(bridgeAgentProviderCatalogInternal);
+      normalizeSingleAgentProviderList(
+        bridgeAgentProviderCatalogInternal.where(
+          (provider) =>
+              provider.providerId != kCanonicalGatewayProviderId &&
+              !provider.supportedTargets.contains(
+                AssistantExecutionTarget.gateway,
+              ),
+        ),
+      );
 
   List<SingleAgentProvider> get gatewayProviderCatalog =>
-      normalizeSingleAgentProviderList(bridgeGatewayProviderCatalogInternal);
+      normalizeSingleAgentProviderList(<SingleAgentProvider>[
+        ...bridgeGatewayProviderCatalogInternal,
+        ...bridgeAgentProviderCatalogInternal.where(
+          (provider) =>
+              provider.providerId == kCanonicalGatewayProviderId ||
+              provider.supportedTargets.contains(
+                AssistantExecutionTarget.gateway,
+              ),
+        ),
+      ]);
 
-  List<AssistantExecutionTarget> get bridgeAvailableExecutionTargets =>
-      compactAssistantExecutionTargets(bridgeAvailableExecutionTargetsInternal);
+  List<AssistantExecutionTarget> get bridgeAvailableExecutionTargets {
+    final targets = <AssistantExecutionTarget>[
+      ...bridgeAvailableExecutionTargetsInternal,
+    ];
+    if (assistantProviderCatalog.isNotEmpty &&
+        !targets.contains(AssistantExecutionTarget.agent)) {
+      targets.add(AssistantExecutionTarget.agent);
+    }
+    if (gatewayProviderCatalog.isNotEmpty &&
+        !targets.contains(AssistantExecutionTarget.gateway)) {
+      targets.add(AssistantExecutionTarget.gateway);
+    }
+    return compactAssistantExecutionTargets(targets);
+  }
 
   List<SingleAgentProvider> providerCatalogForExecutionTarget(
     AssistantExecutionTarget executionTarget,
@@ -665,15 +689,8 @@ class AppController extends ChangeNotifier {
 
   void navigateHome() => AppControllerDesktopNavigation(this).navigateHome();
 
-  void openSettings({
-    SettingsTab tab = SettingsTab.gateway,
-    SettingsDetailPage? detail,
-    SettingsNavigationContext? navigationContext,
-  }) => AppControllerDesktopNavigation(this).openSettings(
-    tab: tab,
-    detail: detail,
-    navigationContext: navigationContext,
-  );
+  void openSettings({SettingsTab tab = SettingsTab.gateway}) =>
+      AppControllerDesktopNavigation(this).openSettings(tab: tab);
 
   void openDetail(DetailPanelData detailPanel) =>
       AppControllerDesktopNavigation(this).openDetail(detailPanel);

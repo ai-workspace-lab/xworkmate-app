@@ -2,7 +2,6 @@ export 'app_controller_desktop_core.dart';
 export 'app_controller_desktop_navigation.dart';
 export 'app_controller_desktop_gateway.dart';
 export 'app_controller_desktop_settings.dart';
-export 'app_controller_desktop_single_agent.dart';
 export 'app_controller_desktop_thread_sessions.dart';
 export 'app_controller_desktop_thread_actions.dart';
 export 'app_controller_desktop_workspace_execution.dart';

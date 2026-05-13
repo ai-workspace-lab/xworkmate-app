@@ -5,9 +5,9 @@
 > Scope: `lib/app`, `lib/runtime`, `lib/models`, `lib/features/**`, `lib/theme`, `rust/src`.
 > Excludes private `_` symbols and non-top-level Dart members.
 
-- Generated at: `2026-04-14T08:20:04.438927+00:00`
-- Files scanned: `130`
-- Public symbols extracted: `614`
+- Generated at: `2026-05-13T08:37:25.180831+00:00`
+- Files scanned: `129`
+- Public symbols extracted: `603`
 
 ## Group Summary
 
@@ -15,23 +15,23 @@
 | --- | ---: | ---: |
 | `lib/app` | 30 | 68 |
 | `lib/features` | 26 | 103 |
-| `lib/models` | 1 | 34 |
-| `lib/runtime` | 67 | 377 |
+| `lib/models` | 1 | 31 |
+| `lib/runtime` | 66 | 372 |
 | `lib/theme` | 2 | 13 |
-| `rust/src` | 4 | 19 |
+| `rust/src` | 4 | 16 |
 
 ## Coverage Scope Summary
 
 | Scope | Files | Public Symbols |
 | --- | ---: | ---: |
 | `lib/app` | 30 | 68 |
-| `lib/runtime` | 67 | 377 |
-| `lib/models` | 1 | 34 |
-| `lib/features/assistant` | 16 | 80 |
-| `lib/features/settings` | 4 | 4 |
+| `lib/runtime` | 66 | 372 |
+| `lib/models` | 1 | 31 |
+| `lib/features/assistant` | 16 | 79 |
+| `lib/features/settings` | 4 | 5 |
 | `lib/features/mobile` | 6 | 19 |
 | `lib/theme` | 2 | 13 |
-| `rust/src` | 4 | 19 |
+| `rust/src` | 4 | 16 |
 
 ## lib/app
 
@@ -77,9 +77,9 @@ _No extracted public top-level symbols._
 
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
-| 54 | `enum` | `CodexCooperationState` | `enum CodexCooperationState { notStarted, bridgeOnly, registered }` |
-| 56 | `class` | `SingleAgentSkillScanRootInternal` | `class SingleAgentSkillScanRootInternal {` |
-| 88 | `class` | `AppController` | `class AppController extends ChangeNotifier {` |
+| 57 | `enum` | `CodexCooperationState` | `enum CodexCooperationState { notStarted, bridgeOnly, registered }` |
+| 59 | `class` | `SingleAgentSkillScanRootInternal` | `class SingleAgentSkillScanRootInternal {` |
+| 91 | `class` | `AppController` | `class AppController extends ChangeNotifier {` |
 
 ### `lib/app/app_controller_desktop_external_acp_routing.dart`
 
@@ -97,7 +97,7 @@ _No extracted public top-level symbols._
 
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
-| 49 | `extension` | `AppControllerDesktopGateway` | `extension AppControllerDesktopGateway on AppController {` |
+| 48 | `extension` | `AppControllerDesktopGateway` | `extension AppControllerDesktopGateway on AppController {` |
 
 ### `lib/app/app_controller_desktop_navigation.dart`
 
@@ -106,24 +106,25 @@ _No extracted public top-level symbols._
 
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
-| 48 | `extension` | `AppControllerDesktopNavigation` | `extension AppControllerDesktopNavigation on AppController {` |
+| 47 | `extension` | `AppControllerDesktopNavigation` | `extension AppControllerDesktopNavigation on AppController {` |
 
 ### `lib/app/app_controller_desktop_runtime_coordination_impl.dart`
 
 - Language: `dart`
-- Public symbols: `9`
+- Public symbols: `10`
 
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
 | 48 | `top-level function` | `refreshAcpCapabilitiesRuntimeInternal` | `Future<void> refreshAcpCapabilitiesRuntimeInternal( AppController controller, { bool forceRefresh = false, bool persistMountTargets = false, }) async {` |
-| 90 | `top-level function` | `refreshSingleAgentCapabilitiesRuntimeInternal` | `Future<void> refreshSingleAgentCapabilitiesRuntimeInternal( AppController controller, { bool forceRefresh = false, }) async {` |
-| 158 | `top-level function` | `assistantWorkingDirectoryForSessionRuntimeInternal` | `String? assistantWorkingDirectoryForSessionRuntimeInternal( AppController controller, String sessionKey, ) {` |
-| 178 | `top-level function` | `resolveLocalAssistantWorkingDirectoryForSessionRuntimeInternal` | `String? resolveLocalAssistantWorkingDirectoryForSessionRuntimeInternal( AppController controller, String sessionKey, { bool requireLocalExistence = true, }) {` |
-| 206 | `top-level function` | `buildCodeAgentNodeStateRuntimeInternal` | `CodeAgentNodeState buildCodeAgentNodeStateRuntimeInternal( AppController controller, ) {` |
-| 220 | `top-level function` | `bridgeGatewayModeRuntimeInternal` | `GatewayMode bridgeGatewayModeRuntimeInternal(AppController controller) {` |
-| 230 | `top-level function` | `ensureCodexGatewayRegistrationRuntimeInternal` | `Future<void> ensureCodexGatewayRegistrationRuntimeInternal( AppController controller, ) async {` |
-| 298 | `top-level function` | `clearCodexGatewayRegistrationRuntimeInternal` | `void clearCodexGatewayRegistrationRuntimeInternal(AppController controller) {` |
-| 308 | `top-level function` | `recomputeTasksRuntimeInternal` | `void recomputeTasksRuntimeInternal(AppController controller) {` |
+| 98 | `top-level function` | `refreshSingleAgentCapabilitiesRuntimeInternal` | `Future<void> refreshSingleAgentCapabilitiesRuntimeInternal( AppController controller, { bool forceRefresh = false, }) async {` |
+| 170 | `top-level function` | `assistantWorkingDirectoryForSessionRuntimeInternal` | `String? assistantWorkingDirectoryForSessionRuntimeInternal( AppController controller, String sessionKey, ) {` |
+| 181 | `top-level function` | `assistantRemoteWorkingDirectoryHintForSessionRuntimeInternal` | `String? assistantRemoteWorkingDirectoryHintForSessionRuntimeInternal( AppController controller, String sessionKey, ) {` |
+| 200 | `top-level function` | `resolveLocalAssistantWorkingDirectoryForSessionRuntimeInternal` | `String? resolveLocalAssistantWorkingDirectoryForSessionRuntimeInternal( AppController controller, String sessionKey, { bool requireLocalExistence = true, }) {` |
+| 223 | `top-level function` | `buildCodeAgentNodeStateRuntimeInternal` | `CodeAgentNodeState buildCodeAgentNodeStateRuntimeInternal( AppController controller, { AssistantExecutionTarget? executionTarget, }) {` |
+| 239 | `top-level function` | `bridgeGatewayModeRuntimeInternal` | `GatewayMode bridgeGatewayModeRuntimeInternal(AppController controller) {` |
+| 249 | `top-level function` | `ensureCodexGatewayRegistrationRuntimeInternal` | `Future<void> ensureCodexGatewayRegistrationRuntimeInternal( AppController controller, ) async {` |
+| 317 | `top-level function` | `clearCodexGatewayRegistrationRuntimeInternal` | `void clearCodexGatewayRegistrationRuntimeInternal(AppController controller) {` |
+| 327 | `top-level function` | `recomputeTasksRuntimeInternal` | `void recomputeTasksRuntimeInternal(AppController controller) {` |
 
 ### `lib/app/app_controller_desktop_runtime_exceptions.dart`
 
@@ -142,7 +143,7 @@ _No extracted public top-level symbols._
 
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
-| 51 | `extension` | `AppControllerDesktopRuntimeHelpers` | `extension AppControllerDesktopRuntimeHelpers on AppController {` |
+| 53 | `extension` | `AppControllerDesktopRuntimeHelpers` | `extension AppControllerDesktopRuntimeHelpers on AppController {` |
 
 ### `lib/app/app_controller_desktop_settings.dart`
 
@@ -160,16 +161,7 @@ _No extracted public top-level symbols._
 
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
-| 49 | `extension` | `AppControllerDesktopSettingsRuntime` | `extension AppControllerDesktopSettingsRuntime on AppController {` |
-
-### `lib/app/app_controller_desktop_single_agent.dart`
-
-- Language: `dart`
-- Public symbols: `1`
-
-| Line | Kind | Name | Signature |
-| ---: | --- | --- | --- |
-| 3 | `extension` | `AppControllerDesktopSingleAgent` | `extension AppControllerDesktopSingleAgent on AppController {}` |
+| 50 | `extension` | `AppControllerDesktopSettingsRuntime` | `extension AppControllerDesktopSettingsRuntime on AppController {` |
 
 ### `lib/app/app_controller_desktop_skill_permissions.dart`
 
@@ -178,7 +170,7 @@ _No extracted public top-level symbols._
 
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
-| 49 | `extension` | `AppControllerDesktopSkillPermissions` | `extension AppControllerDesktopSkillPermissions on AppController {` |
+| 48 | `extension` | `AppControllerDesktopSkillPermissions` | `extension AppControllerDesktopSkillPermissions on AppController {` |
 
 ### `lib/app/app_controller_desktop_thread_actions.dart`
 
@@ -187,7 +179,7 @@ _No extracted public top-level symbols._
 
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
-| 50 | `extension` | `AppControllerDesktopThreadActions` | `extension AppControllerDesktopThreadActions on AppController {` |
+| 51 | `extension` | `AppControllerDesktopThreadActions` | `extension AppControllerDesktopThreadActions on AppController {` |
 
 ### `lib/app/app_controller_desktop_thread_binding.dart`
 
@@ -198,40 +190,40 @@ _No extracted public top-level symbols._
 | ---: | --- | --- | --- |
 | 47 | `class` | `DesktopThreadBindingSnapshotInternal` | `class DesktopThreadBindingSnapshotInternal {` |
 | 76 | `extension` | `AppControllerDesktopThreadBinding` | `extension AppControllerDesktopThreadBinding on AppController {` |
-| 294 | `top-level function` | `pickDraftThreadExecutionTargetInternal` | `AssistantExecutionTarget pickDraftThreadExecutionTargetInternal({ required AssistantExecutionTarget currentTarget, required Iterable<AssistantExecutionTarget> visibleTargets, bool? localWorkspaceAvailable, }) {` |
+| 337 | `top-level function` | `pickDraftThreadExecutionTargetInternal` | `AssistantExecutionTarget pickDraftThreadExecutionTargetInternal({ required AssistantExecutionTarget currentTarget, required Iterable<AssistantExecutionTarget> visibleTargets, bool? localWorkspaceAvailable, }) {` |
 
 ### `lib/app/app_controller_desktop_thread_sessions.dart`
 
 - Language: `dart`
-- Public symbols: `3`
+- Public symbols: `4`
 
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
-| 51 | `top-level function` | `resolveGatewayThreadConnectionStateInternal` | `AssistantThreadConnectionState resolveGatewayThreadConnectionStateInternal({ required AssistantExecutionTarget target, required bool bridgeReady, required String bridgeLabel, required AccountSyncState? accountSyncState, }) {` |
-| 99 | `extension` | `AppControllerDesktopThreadSessions` | `extension AppControllerDesktopThreadSessions on AppController {` |
-| 470 | `top-level function` | `resolveAssistantExecutionTargetFromRecordsForTest` | `AssistantExecutionTarget resolveAssistantExecutionTargetFromRecordsForTest( TaskThread? primaryRecord, { TaskThread? fallbackRecord, }) {` |
+| 55 | `top-level function` | `resolveGatewayThreadConnectionStateInternal` | `AssistantThreadConnectionState resolveGatewayThreadConnectionStateInternal({ required AssistantExecutionTarget target, required bool bridgeReady, required String bridgeLabel, required AccountSyncState? accountSyncState, required bool accountSignedIn, required bool bridgeConfigured, bool bridgeDiscoveryAttempted = false, String bridgeDiscoveryError = '', bool providerCatalogEmpty = false, }) {` |
+| 180 | `top-level function` | `bridgeCapabilityReadyForExecutionTargetInternal` | `bool bridgeCapabilityReadyForExecutionTargetInternal({ required AssistantExecutionTarget target, required bool bridgeConfigured, required List<SingleAgentProvider> providers, required List<AssistantExecutionTarget> availableTargets, }) {` |
+| 192 | `extension` | `AppControllerDesktopThreadSessions` | `extension AppControllerDesktopThreadSessions on AppController {` |
+| 655 | `top-level function` | `resolveAssistantExecutionTargetFromRecordForTest` | `AssistantExecutionTarget resolveAssistantExecutionTargetFromRecordForTest( TaskThread? record, { required AssistantExecutionTarget defaultExecutionTarget, }) {` |
 
 ### `lib/app/app_controller_desktop_thread_sessions_collaboration_impl.dart`
 
 - Language: `dart`
-- Public symbols: `14`
+- Public symbols: `13`
 
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
-| 50 | `top-level function` | `loadAiGatewayApiKeyThreadSessionInternal` | `Future<String> loadAiGatewayApiKeyThreadSessionInternal( AppController controller, ) async {` |
-| 56 | `top-level function` | `saveMultiAgentConfigThreadSessionInternal` | `Future<void> saveMultiAgentConfigThreadSessionInternal( AppController controller, MultiAgentConfig config, ) async {` |
-| 73 | `top-level function` | `refreshMultiAgentMountsThreadSessionInternal` | `Future<void> refreshMultiAgentMountsThreadSessionInternal( AppController controller, { bool sync = false, }) async {` |
-| 98 | `top-level function` | `runMultiAgentCollaborationThreadSessionInternal` | `Future<void> runMultiAgentCollaborationThreadSessionInternal( AppController controller, { required String rawPrompt, required String composedPrompt, required List<CollaborationAttachment> attachments, required List<String> selectedSkillLabels, }) async {` |
-| 269 | `top-level function` | `openOnlineWorkspaceThreadSessionInternal` | `Future<void> openOnlineWorkspaceThreadSessionInternal( AppController controller, ) async {` |
-| 290 | `top-level function` | `aiGatewayModelChoicesThreadSessionInternal` | `List<String> aiGatewayModelChoicesThreadSessionInternal( AppController controller, ) {` |
-| 296 | `top-level function` | `connectedGatewayModelChoicesThreadSessionInternal` | `List<String> connectedGatewayModelChoicesThreadSessionInternal( AppController controller, ) {` |
-| 308 | `top-level function` | `assistantModelChoicesThreadSessionInternal` | `List<String> assistantModelChoicesThreadSessionInternal( AppController controller, ) {` |
-| 317 | `top-level function` | `assistantModelChoicesForSessionThreadSessionInternal` | `List<String> assistantModelChoicesForSessionThreadSessionInternal( AppController controller, String sessionKey, ) {` |
-| 332 | `top-level function` | `resolvedDefaultModelThreadSessionInternal` | `String resolvedDefaultModelThreadSessionInternal(AppController controller) {` |
-| 354 | `top-level function` | `canQuickConnectGatewayThreadSessionInternal` | `bool canQuickConnectGatewayThreadSessionInternal(AppController controller) {` |
-| 374 | `top-level function` | `normalizeAssistantSessionKeyThreadInternal` | `String normalizeAssistantSessionKeyThreadInternal(String sessionKey) {` |
-| 379 | `top-level function` | `joinConnectionPartsThreadSessionInternal` | `String joinConnectionPartsThreadSessionInternal(List<String> parts) {` |
-| 387 | `top-level function` | `gatewayAddressLabelThreadSessionInternal` | `String gatewayAddressLabelThreadSessionInternal( GatewayConnectionProfile profile, ) {` |
+| 49 | `top-level function` | `loadAiGatewayApiKeyThreadSessionInternal` | `Future<String> loadAiGatewayApiKeyThreadSessionInternal( AppController controller, ) async {` |
+| 55 | `top-level function` | `saveMultiAgentConfigThreadSessionInternal` | `Future<void> saveMultiAgentConfigThreadSessionInternal( AppController controller, MultiAgentConfig config, ) async {` |
+| 72 | `top-level function` | `refreshMultiAgentMountsThreadSessionInternal` | `Future<void> refreshMultiAgentMountsThreadSessionInternal( AppController controller, { bool sync = false, }) async {` |
+| 97 | `top-level function` | `runMultiAgentCollaborationThreadSessionInternal` | `Future<void> runMultiAgentCollaborationThreadSessionInternal( AppController controller, { required String rawPrompt, required String composedPrompt, required List<CollaborationAttachment> attachments, required List<String> selectedSkillLabels, }) async {` |
+| 283 | `top-level function` | `openOnlineWorkspaceThreadSessionInternal` | `Future<void> openOnlineWorkspaceThreadSessionInternal( AppController controller, ) async {` |
+| 304 | `top-level function` | `aiGatewayModelChoicesThreadSessionInternal` | `List<String> aiGatewayModelChoicesThreadSessionInternal( AppController controller, ) {` |
+| 310 | `top-level function` | `connectedGatewayModelChoicesThreadSessionInternal` | `List<String> connectedGatewayModelChoicesThreadSessionInternal( AppController controller, ) {` |
+| 322 | `top-level function` | `assistantModelChoicesThreadSessionInternal` | `List<String> assistantModelChoicesThreadSessionInternal( AppController controller, ) {` |
+| 331 | `top-level function` | `assistantModelChoicesForSessionThreadSessionInternal` | `List<String> assistantModelChoicesForSessionThreadSessionInternal( AppController controller, String sessionKey, ) {` |
+| 346 | `top-level function` | `resolvedDefaultModelThreadSessionInternal` | `String resolvedDefaultModelThreadSessionInternal(AppController controller) {` |
+| 368 | `top-level function` | `canQuickConnectGatewayThreadSessionInternal` | `bool canQuickConnectGatewayThreadSessionInternal(AppController controller) {` |
+| 388 | `top-level function` | `joinConnectionPartsThreadSessionInternal` | `String joinConnectionPartsThreadSessionInternal(List<String> parts) {` |
+| 396 | `top-level function` | `gatewayAddressLabelThreadSessionInternal` | `String gatewayAddressLabelThreadSessionInternal( GatewayConnectionProfile profile, ) {` |
 
 ### `lib/app/app_controller_desktop_thread_storage.dart`
 
@@ -240,7 +232,7 @@ _No extracted public top-level symbols._
 
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
-| 48 | `extension` | `AppControllerDesktopThreadStorage` | `extension AppControllerDesktopThreadStorage on AppController {` |
+| 47 | `extension` | `AppControllerDesktopThreadStorage` | `extension AppControllerDesktopThreadStorage on AppController {` |
 
 ### `lib/app/app_controller_desktop_workspace_execution.dart`
 
@@ -250,6 +242,15 @@ _No extracted public top-level symbols._
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
 | 48 | `extension` | `AppControllerDesktopWorkspaceExecution` | `extension AppControllerDesktopWorkspaceExecution on AppController {` |
+
+### `lib/app/app_controller_openclaw_task_queue.dart`
+
+- Language: `dart`
+- Public symbols: `1`
+
+| Line | Kind | Name | Signature |
+| ---: | --- | --- | --- |
+| 9 | `class` | `OpenClawGatewayQueuedTurnInternal` | `class OpenClawGatewayQueuedTurnInternal {` |
 
 ### `lib/app/app_metadata.dart`
 
@@ -313,21 +314,20 @@ _No extracted public top-level symbols._
 | 14 | `enum` | `UiFeatureBuildMode` | `enum UiFeatureBuildMode { debug, profile, release }` |
 | 16 | `top-level function` | `currentUiFeatureBuildMode` | `UiFeatureBuildMode currentUiFeatureBuildMode() {` |
 | 26 | `top-level function` | `resolveUiFeaturePlatformFromContext` | `UiFeaturePlatform resolveUiFeaturePlatformFromContext(BuildContext context) {` |
-| 62 | `class` | `UiFeatureFlag` | `class UiFeatureFlag {` |
-| 94 | `class` | `UiFeatureManifest` | `class UiFeatureManifest {` |
-| 341 | `class` | `UiFeatureAccess` | `class UiFeatureAccess {` |
-| 480 | `class` | `UiFeatureManifestLoader` | `class UiFeatureManifestLoader {` |
+| 57 | `class` | `UiFeatureFlag` | `class UiFeatureFlag {` |
+| 89 | `class` | `UiFeatureManifest` | `class UiFeatureManifest {` |
+| 336 | `class` | `UiFeatureAccess` | `class UiFeatureAccess {` |
+| 466 | `class` | `UiFeatureManifestLoader` | `class UiFeatureManifestLoader {` |
 
 ### `lib/app/workspace_navigation.dart`
 
 - Language: `dart`
-- Public symbols: `3`
+- Public symbols: `2`
 
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
 | 8 | `top-level function` | `buildWorkspaceBreadcrumbs` | `List<AppBreadcrumbItem> buildWorkspaceBreadcrumbs({ required AppController controller, required String rootLabel, String? sectionLabel, String? detailLabel, VoidCallback? onRootTap, }) {` |
-| 32 | `top-level function` | `buildSettingsBreadcrumbs` | `List<AppBreadcrumbItem> buildSettingsBreadcrumbs( AppController controller, { required SettingsTab tab, SettingsDetailPage? detail, SettingsNavigationContext? navigationContext, }) {` |
-| 57 | `top-level function` | `openSettingsNavigationContext` | `void openSettingsNavigationContext( AppController controller, SettingsNavigationContext context, ) {` |
+| 32 | `top-level function` | `buildSettingsBreadcrumbs` | `List<AppBreadcrumbItem> buildSettingsBreadcrumbs( AppController controller, { required SettingsTab tab, }) {` |
 
 ### `lib/app/workspace_page_registry.dart`
 
@@ -339,7 +339,7 @@ _No extracted public top-level symbols._
 | 8 | `enum` | `WorkspacePageSurface` | `enum WorkspacePageSurface { desktop, mobile }` |
 | 10 | `typedef` | `WorkspacePageBuilder` | `typedef WorkspacePageBuilder = Widget Function( AppController controller, ValueChanged<DetailPanelData> onOpenDetail, );` |
 | 16 | `class` | `WorkspacePageSpec` | `class WorkspacePageSpec {` |
-| 60 | `top-level function` | `buildWorkspacePage` | `Widget buildWorkspacePage({ required WorkspaceDestination destination, required AppController controller, required ValueChanged<DetailPanelData> onOpenDetail, required WorkspacePageSurface surface, }) {` |
+| 56 | `top-level function` | `buildWorkspacePage` | `Widget buildWorkspacePage({ required WorkspaceDestination destination, required AppController controller, required ValueChanged<DetailPanelData> onOpenDetail, required WorkspacePageSurface surface, }) {` |
 
 ## lib/features
 
@@ -362,10 +362,10 @@ _No extracted public top-level symbols._
 | ---: | --- | --- | --- |
 | 40 | `class` | `AssistantTaskRailInternal` | `class AssistantTaskRailInternal extends StatefulWidget {` |
 | 73 | `class` | `AssistantTaskRailStateInternal` | `class AssistantTaskRailStateInternal extends State<AssistantTaskRailInternal> {` |
-| 282 | `top-level function` | `groupTasksForRailInternal` | `List<AssistantTaskGroupInternal> groupTasksForRailInternal( List<AssistantTaskEntryInternal> tasks, List<AssistantExecutionTarget> visibleExecutionTargets, ) {` |
-| 312 | `class` | `AssistantTaskTileInternal` | `class AssistantTaskTileInternal extends StatelessWidget {` |
-| 417 | `class` | `AssistantTaskGroupHeaderInternal` | `class AssistantTaskGroupHeaderInternal extends StatelessWidget {` |
-| 481 | `class` | `AssistantEmptyStateInternal` | `class AssistantEmptyStateInternal extends StatelessWidget {` |
+| 283 | `top-level function` | `groupTasksForRailInternal` | `List<AssistantTaskGroupInternal> groupTasksForRailInternal( List<AssistantTaskEntryInternal> tasks, List<AssistantExecutionTarget> visibleExecutionTargets, ) {` |
+| 313 | `class` | `AssistantTaskTileInternal` | `class AssistantTaskTileInternal extends StatelessWidget {` |
+| 462 | `class` | `AssistantTaskGroupHeaderInternal` | `class AssistantTaskGroupHeaderInternal extends StatelessWidget {` |
+| 526 | `class` | `AssistantEmptyStateInternal` | `class AssistantEmptyStateInternal extends StatelessWidget {` |
 
 ### `lib/features/assistant/assistant_page_components_core.dart`
 
@@ -400,13 +400,12 @@ _No extracted public top-level symbols._
 ### `lib/features/assistant/assistant_page_composer_skill_models.dart`
 
 - Language: `dart`
-- Public symbols: `3`
+- Public symbols: `2`
 
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
-| 79 | `top-level function` | `skillOptionFromGatewayInternal` | `ComposerSkillOptionInternal skillOptionFromGatewayInternal( GatewaySkillSummary skill, ) {` |
-| 106 | `top-level function` | `skillOptionFromThreadSkillInternal` | `ComposerSkillOptionInternal skillOptionFromThreadSkillInternal( AssistantThreadSkillEntry skill, ) {` |
-| 122 | `class` | `ComposerSkillOptionInternal` | `class ComposerSkillOptionInternal {` |
+| 40 | `top-level function` | `skillOptionFromGatewayInternal` | `ComposerSkillOptionInternal skillOptionFromGatewayInternal( GatewaySkillSummary skill, ) {` |
+| 61 | `class` | `ComposerSkillOptionInternal` | `class ComposerSkillOptionInternal {` |
 
 ### `lib/features/assistant/assistant_page_composer_skill_picker.dart`
 
@@ -455,13 +454,13 @@ _No extracted public top-level symbols._
 | 56 | `typedef` | `AssistantClipboardImageReader` | `typedef AssistantClipboardImageReader = Future<XFile?> Function();` |
 | 58 | `class` | `AssistantPage` | `class AssistantPage extends StatefulWidget {` |
 | 80 | `class` | `AssistantPageStateInternal` | `class AssistantPageStateInternal extends State<AssistantPage> {` |
-| 270 | `enum` | `AssistantSidePaneInternal` | `enum AssistantSidePaneInternal { tasks, navigation, focused }` |
-| 272 | `class` | `AssistantUnifiedSidePaneInternal` | `class AssistantUnifiedSidePaneInternal extends StatelessWidget {` |
-| 344 | `class` | `AssistantSideTabRailInternal` | `class AssistantSideTabRailInternal extends StatelessWidget {` |
-| 444 | `class` | `AssistantSideTabButtonInternal` | `class AssistantSideTabButtonInternal extends StatefulWidget {` |
-| 463 | `class` | `AssistantSideTabButtonStateInternal` | `class AssistantSideTabButtonStateInternal extends State<AssistantSideTabButtonInternal> {` |
-| 512 | `class` | `AssistantLowerPaneInternal` | `class AssistantLowerPaneInternal extends StatelessWidget {` |
-| 596 | `class` | `ConversationAreaInternal` | `class ConversationAreaInternal extends StatelessWidget {` |
+| 278 | `enum` | `AssistantSidePaneInternal` | `enum AssistantSidePaneInternal { tasks, navigation, focused }` |
+| 280 | `class` | `AssistantUnifiedSidePaneInternal` | `class AssistantUnifiedSidePaneInternal extends StatelessWidget {` |
+| 352 | `class` | `AssistantSideTabRailInternal` | `class AssistantSideTabRailInternal extends StatelessWidget {` |
+| 452 | `class` | `AssistantSideTabButtonInternal` | `class AssistantSideTabButtonInternal extends StatefulWidget {` |
+| 471 | `class` | `AssistantSideTabButtonStateInternal` | `class AssistantSideTabButtonStateInternal extends State<AssistantSideTabButtonInternal> {` |
+| 520 | `class` | `AssistantLowerPaneInternal` | `class AssistantLowerPaneInternal extends StatelessWidget {` |
+| 604 | `class` | `ConversationAreaInternal` | `class ConversationAreaInternal extends StatelessWidget {` |
 
 ### `lib/features/assistant/assistant_page_message_widgets.dart`
 
@@ -499,7 +498,7 @@ _No extracted public top-level symbols._
 
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
-| 42 | `extension` | `AssistantPageStateClosureInternal` | `extension AssistantPageStateClosureInternal on AssistantPageStateInternal {` |
+| 44 | `extension` | `AssistantPageStateClosureInternal` | `extension AssistantPageStateClosureInternal on AssistantPageStateInternal {` |
 
 ### `lib/features/assistant/assistant_page_task_dialog_controls.dart`
 
@@ -527,15 +526,15 @@ _No extracted public top-level symbols._
 | 202 | `class` | `MetaPillInternal` | `class MetaPillInternal extends StatelessWidget {` |
 | 256 | `top-level function` | `pillStyleForStatusInternal` | `PillStyleInternal pillStyleForStatusInternal( BuildContext context, String label, ) {` |
 | 282 | `top-level function` | `normalizedTaskStatusInternal` | `String normalizedTaskStatusInternal(String status) {` |
-| 294 | `top-level function` | `toolCallStatusLabelInternal` | `String toolCallStatusLabelInternal(String status) =>` |
-| 301 | `top-level function` | `assistantThinkingLabelInternal` | `String assistantThinkingLabelInternal(String level) => switch (level) {` |
-| 308 | `top-level function` | `sessionDisplayTitleInternal` | `String sessionDisplayTitleInternal(GatewaySessionSummary session) {` |
-| 320 | `top-level function` | `fallbackSessionTitleInternal` | `String fallbackSessionTitleInternal(String sessionKey) {` |
-| 335 | `top-level function` | `sessionPreviewInternal` | `String? sessionPreviewInternal(GatewaySessionSummary session) {` |
-| 347 | `top-level function` | `sessionStatusInternal` | `String sessionStatusInternal( GatewaySessionSummary session, { required bool sessionPending, }) {` |
-| 363 | `top-level function` | `sessionUpdatedAtLabelInternal` | `String sessionUpdatedAtLabelInternal(double? updatedAtMs) {` |
-| 382 | `top-level function` | `estimatedComposerWrapSectionHeightInternal` | `double estimatedComposerWrapSectionHeightInternal({ required int itemCount, required double availableWidth, required double averageChipWidth, }) {` |
-| 398 | `top-level function` | `sessionKeysMatchInternal` | `bool sessionKeysMatchInternal(String incoming, String current) {` |
+| 295 | `top-level function` | `toolCallStatusLabelInternal` | `String toolCallStatusLabelInternal(String status) =>` |
+| 303 | `top-level function` | `assistantThinkingLabelInternal` | `String assistantThinkingLabelInternal(String level) => switch (level) {` |
+| 310 | `top-level function` | `sessionDisplayTitleInternal` | `String sessionDisplayTitleInternal(GatewaySessionSummary session) {` |
+| 318 | `top-level function` | `fallbackSessionTitleInternal` | `String fallbackSessionTitleInternal(String sessionKey) {` |
+| 326 | `top-level function` | `sessionPreviewInternal` | `String? sessionPreviewInternal(GatewaySessionSummary session) {` |
+| 338 | `top-level function` | `sessionStatusInternal` | `String sessionStatusInternal( GatewaySessionSummary session, { required bool sessionPending, String lifecycleStatus = '', }) {` |
+| 359 | `top-level function` | `sessionUpdatedAtLabelInternal` | `String sessionUpdatedAtLabelInternal(double? updatedAtMs) {` |
+| 378 | `top-level function` | `estimatedComposerWrapSectionHeightInternal` | `double estimatedComposerWrapSectionHeightInternal({ required int itemCount, required double availableWidth, required double averageChipWidth, }) {` |
+| 394 | `top-level function` | `sessionKeysMatchInternal` | `bool sessionKeysMatchInternal(String incoming, String current) {` |
 
 ### `lib/features/assistant/assistant_page_tooltip_labels.dart`
 
@@ -647,63 +646,61 @@ _No extracted public top-level symbols._
 ### `lib/features/settings/settings_page_core.dart`
 
 - Language: `dart`
-- Public symbols: `1`
+- Public symbols: `2`
 
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
-| 19 | `class` | `SettingsPage` | `class SettingsPage extends StatefulWidget {` |
+| 19 | `top-level function` | `loadBridgeMetadataForSettingsAbout` | `Future<Map<String, dynamic>> loadBridgeMetadataForSettingsAbout({ required Uri bridgeEndpoint, required Future<String?> Function(Uri endpoint) authorizationResolver, HttpClient Function()? clientFactory, }) async {` |
+| 109 | `class` | `SettingsPage` | `class SettingsPage extends StatefulWidget {` |
 
 ## lib/models
 
 - Files: `1`
-- Public symbols: `34`
+- Public symbols: `31`
 
 ### `lib/models/app_models.dart`
 
 - Language: `dart`
-- Public symbols: `34`
+- Public symbols: `31`
 
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
-| 5 | `enum` | `WorkspaceDestination` | `enum WorkspaceDestination {` |
-| 10 | `extension` | `WorkspaceDestinationCopy` | `extension WorkspaceDestinationCopy on WorkspaceDestination {` |
-| 45 | `enum` | `AssistantFocusEntry` | `enum AssistantFocusEntry {` |
-| 51 | `extension` | `AssistantFocusEntryCopy` | `extension AssistantFocusEntryCopy on AssistantFocusEntry {` |
-| 124 | `top-level function` | `normalizeAssistantNavigationDestinations` | `List<AssistantFocusEntry> normalizeAssistantNavigationDestinations( Iterable<AssistantFocusEntry> destinations, ) {` |
-| 139 | `enum` | `StatusTone` | `enum StatusTone { neutral, accent, success, warning, danger }` |
-| 141 | `class` | `StatusInfo` | `class StatusInfo {` |
-| 148 | `enum` | `AppSidebarState` | `enum AppSidebarState { expanded, collapsed, hidden }` |
-| 150 | `enum` | `AssistantMode` | `enum AssistantMode { code, office }` |
-| 152 | `extension` | `AssistantModeCopy` | `extension AssistantModeCopy on AssistantMode {` |
-| 159 | `enum` | `SettingsTab` | `enum SettingsTab { gateway }` |
-| 161 | `extension` | `SettingsTabCopy` | `extension SettingsTabCopy on SettingsTab {` |
-| 167 | `enum` | `SettingsDetailPage` | `enum SettingsDetailPage { gatewayConnection }` |
-| 169 | `extension` | `SettingsDetailPageCopy` | `extension SettingsDetailPageCopy on SettingsDetailPage {` |
-| 183 | `class` | `SettingsNavigationContext` | `class SettingsNavigationContext {` |
-| 201 | `class` | `QuickAction` | `class QuickAction {` |
-| 213 | `class` | `RecentSession` | `class RecentSession {` |
-| 225 | `class` | `MetricSummary` | `class MetricSummary {` |
-| 241 | `class` | `TaskSummary` | `class TaskSummary {` |
-| 259 | `class` | `ModuleSummary` | `class ModuleSummary {` |
-| 275 | `class` | `NodeSummary` | `class NodeSummary {` |
-| 293 | `class` | `AgentSummary` | `class AgentSummary {` |
-| 309 | `class` | `SkillSummary` | `class SkillSummary {` |
-| 327 | `class` | `ConnectorSummary` | `class ConnectorSummary {` |
-| 343 | `class` | `SecretSummary` | `class SecretSummary {` |
-| 359 | `class` | `SecretReference` | `class SecretReference {` |
-| 375 | `class` | `ProviderSummary` | `class ProviderSummary {` |
-| 389 | `class` | `AuditSummary` | `class AuditSummary {` |
-| 407 | `class` | `SettingSummary` | `class SettingSummary {` |
-| 419 | `class` | `WorkspaceProfile` | `class WorkspaceProfile {` |
-| 433 | `class` | `DetailPanelData` | `class DetailPanelData {` |
-| 455 | `class` | `DetailSection` | `class DetailSection {` |
-| 462 | `class` | `DetailItem` | `class DetailItem {` |
-| 469 | `class` | `CommandEntry` | `class CommandEntry {` |
+| 5 | `enum` | `WorkspaceDestination` | `enum WorkspaceDestination { assistant, settings }` |
+| 7 | `extension` | `WorkspaceDestinationCopy` | `extension WorkspaceDestinationCopy on WorkspaceDestination {` |
+| 42 | `enum` | `AssistantFocusEntry` | `enum AssistantFocusEntry { settings, language, theme }` |
+| 44 | `extension` | `AssistantFocusEntryCopy` | `extension AssistantFocusEntryCopy on AssistantFocusEntry {` |
+| 117 | `top-level function` | `normalizeAssistantNavigationDestinations` | `List<AssistantFocusEntry> normalizeAssistantNavigationDestinations( Iterable<AssistantFocusEntry> destinations, ) {` |
+| 132 | `enum` | `StatusTone` | `enum StatusTone { neutral, accent, success, warning, danger }` |
+| 134 | `class` | `StatusInfo` | `class StatusInfo {` |
+| 141 | `enum` | `AppSidebarState` | `enum AppSidebarState { expanded, collapsed, hidden }` |
+| 143 | `enum` | `AssistantMode` | `enum AssistantMode { code, office }` |
+| 145 | `extension` | `AssistantModeCopy` | `extension AssistantModeCopy on AssistantMode {` |
+| 152 | `enum` | `SettingsTab` | `enum SettingsTab { gateway }` |
+| 154 | `extension` | `SettingsTabCopy` | `extension SettingsTabCopy on SettingsTab {` |
+| 160 | `class` | `QuickAction` | `class QuickAction {` |
+| 172 | `class` | `RecentSession` | `class RecentSession {` |
+| 184 | `class` | `MetricSummary` | `class MetricSummary {` |
+| 200 | `class` | `TaskSummary` | `class TaskSummary {` |
+| 218 | `class` | `ModuleSummary` | `class ModuleSummary {` |
+| 234 | `class` | `NodeSummary` | `class NodeSummary {` |
+| 252 | `class` | `AgentSummary` | `class AgentSummary {` |
+| 268 | `class` | `SkillSummary` | `class SkillSummary {` |
+| 286 | `class` | `ConnectorSummary` | `class ConnectorSummary {` |
+| 302 | `class` | `SecretSummary` | `class SecretSummary {` |
+| 318 | `class` | `SecretReference` | `class SecretReference {` |
+| 334 | `class` | `ProviderSummary` | `class ProviderSummary {` |
+| 348 | `class` | `AuditSummary` | `class AuditSummary {` |
+| 366 | `class` | `SettingSummary` | `class SettingSummary {` |
+| 378 | `class` | `WorkspaceProfile` | `class WorkspaceProfile {` |
+| 392 | `class` | `DetailPanelData` | `class DetailPanelData {` |
+| 414 | `class` | `DetailSection` | `class DetailSection {` |
+| 421 | `class` | `DetailItem` | `class DetailItem {` |
+| 428 | `class` | `CommandEntry` | `class CommandEntry {` |
 
 ## lib/runtime
 
-- Files: `67`
-- Public symbols: `377`
+- Files: `66`
+- Public symbols: `372`
 
 ### `lib/runtime/account_runtime_client.dart`
 
@@ -723,8 +720,8 @@ _No extracted public top-level symbols._
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
 | 1 | `class` | `AcpEndpointPaths` | `class AcpEndpointPaths {` |
-| 51 | `top-level function` | `resolveAcpWebSocketEndpoint` | `Uri? resolveAcpWebSocketEndpoint(Uri? endpoint) {` |
-| 69 | `top-level function` | `resolveAcpHttpRpcEndpoint` | `Uri? resolveAcpHttpRpcEndpoint(Uri? endpoint) {` |
+| 72 | `top-level function` | `resolveAcpWebSocketEndpoint` | `Uri? resolveAcpWebSocketEndpoint(Uri? endpoint) {` |
+| 93 | `top-level function` | `resolveAcpHttpRpcEndpoint` | `Uri? resolveAcpHttpRpcEndpoint(Uri? endpoint) {` |
 
 ### `lib/runtime/agent_registry.dart`
 
@@ -740,26 +737,14 @@ _No extracted public top-level symbols._
 | 153 | `class` | `AgentException` | `class AgentException implements Exception {` |
 | 165 | `class` | `AgentRegistry` | `class AgentRegistry with ChangeNotifier {` |
 
-### `lib/runtime/aris_bundle.dart`
-
-- Language: `dart`
-- Public symbols: `3`
-
-| Line | Kind | Name | Signature |
-| ---: | --- | --- | --- |
-| 9 | `class` | `ArisBundleManifest` | `class ArisBundleManifest {` |
-| 69 | `class` | `ResolvedArisBundle` | `class ResolvedArisBundle {` |
-| 98 | `class` | `ArisBundleRepository` | `class ArisBundleRepository {` |
-
 ### `lib/runtime/aris_llm_chat_client.dart`
 
 - Language: `dart`
-- Public symbols: `2`
+- Public symbols: `1`
 
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
-| 8 | `typedef` | `ArisProcessStarter` | `typedef ArisProcessStarter = Future<Process> Function( String executable, List<String> arguments, { Map<String, String>? environment, String? workingDirectory, });` |
-| 16 | `class` | `ArisLlmChatClient` | `class ArisLlmChatClient {` |
+| 3 | `class` | `ArisLlmChatClient` | `class ArisLlmChatClient {` |
 
 ### `lib/runtime/assistant_artifacts.dart`
 
@@ -807,22 +792,22 @@ _No extracted public top-level symbols._
 
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
-| 12 | `enum` | `CodexSandboxMode` | `enum CodexSandboxMode {` |
-| 22 | `enum` | `CodexApprovalPolicy` | `enum CodexApprovalPolicy {` |
-| 32 | `enum` | `CodexAuthMode` | `enum CodexAuthMode {` |
-| 42 | `class` | `CodexThread` | `class CodexThread {` |
-| 75 | `class` | `CodexTurn` | `class CodexTurn {` |
-| 106 | `class` | `CodexAccount` | `class CodexAccount {` |
-| 137 | `class` | `CodexRateLimit` | `class CodexRateLimit {` |
-| 160 | `class` | `CodexUserInput` | `class CodexUserInput {` |
-| 180 | `class` | `CodexAttachment` | `class CodexAttachment {` |
-| 198 | `class` | `CodexLogEvent` | `class CodexLogEvent extends CodexEvent {` |
-| 211 | `class` | `CodexNotificationEvent` | `class CodexNotificationEvent extends CodexEvent {` |
-| 219 | `class` | `CodexTurnEvent` | `class CodexTurnEvent extends CodexEvent {` |
-| 253 | `class` | `CodexRpcError` | `class CodexRpcError implements Exception {` |
-| 273 | `enum` | `CodexConnectionState` | `enum CodexConnectionState {` |
-| 283 | `class` | `CodexRuntime` | `class CodexRuntime extends ChangeNotifier {` |
-| 901 | `class` | `CodexLaunchConfiguration` | `class CodexLaunchConfiguration {` |
+| 10 | `enum` | `CodexSandboxMode` | `enum CodexSandboxMode {` |
+| 20 | `enum` | `CodexApprovalPolicy` | `enum CodexApprovalPolicy {` |
+| 30 | `enum` | `CodexAuthMode` | `enum CodexAuthMode {` |
+| 40 | `class` | `CodexThread` | `class CodexThread {` |
+| 73 | `class` | `CodexTurn` | `class CodexTurn {` |
+| 104 | `class` | `CodexAccount` | `class CodexAccount {` |
+| 135 | `class` | `CodexRateLimit` | `class CodexRateLimit {` |
+| 158 | `class` | `CodexUserInput` | `class CodexUserInput {` |
+| 178 | `class` | `CodexAttachment` | `class CodexAttachment {` |
+| 196 | `class` | `CodexLogEvent` | `class CodexLogEvent extends CodexEvent {` |
+| 209 | `class` | `CodexNotificationEvent` | `class CodexNotificationEvent extends CodexEvent {` |
+| 217 | `class` | `CodexTurnEvent` | `class CodexTurnEvent extends CodexEvent {` |
+| 251 | `class` | `CodexRpcError` | `class CodexRpcError implements Exception {` |
+| 271 | `enum` | `CodexConnectionState` | `enum CodexConnectionState {` |
+| 281 | `class` | `CodexRuntime` | `class CodexRuntime extends ChangeNotifier {` |
+| 629 | `class` | `CodexLaunchConfiguration` | `class CodexLaunchConfiguration {` |
 
 ### `lib/runtime/desktop_platform_service.dart`
 
@@ -861,8 +846,8 @@ _No extracted public top-level symbols._
 
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
-| 4 | `top-level function` | `shouldBlockEmbeddedAgentLaunch` | `bool shouldBlockEmbeddedAgentLaunch({ required bool isAppleHost, bool? enabled, }) {` |
-| 14 | `top-level function` | `shouldBlockGoCoreLaunch` | `bool shouldBlockGoCoreLaunch( GoCoreLaunch _, { required bool isAppleHost, bool? enabled, }) {` |
+| 6 | `top-level function` | `shouldBlockEmbeddedAgentLaunch` | `bool shouldBlockEmbeddedAgentLaunch({ required bool isAppleHost, bool? enabled, }) {` |
+| 19 | `top-level function` | `shouldBlockGoCoreLaunch` | `bool shouldBlockGoCoreLaunch({ required bool isAppleHost, bool? enabled, }) {` |
 
 ### `lib/runtime/external_code_agent_acp_desktop_transport.dart`
 
@@ -871,7 +856,7 @@ _No extracted public top-level symbols._
 
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
-| 9 | `class` | `ExternalCodeAgentAcpDesktopTransport` | `class ExternalCodeAgentAcpDesktopTransport implements ExternalCodeAgentAcpTransport {` |
+| 10 | `class` | `ExternalCodeAgentAcpDesktopTransport` | `class ExternalCodeAgentAcpDesktopTransport implements ExternalCodeAgentAcpTransport {` |
 
 ### `lib/runtime/file_store_support.dart`
 
@@ -888,27 +873,29 @@ _No extracted public top-level symbols._
 | 75 | `class` | `PersistentWriteFailures` | `class PersistentWriteFailures {` |
 | 92 | `class` | `StoreLayout` | `class StoreLayout {` |
 | 122 | `class` | `StoreLayoutResolver` | `class StoreLayoutResolver {` |
-| 210 | `top-level function` | `normalizeStoreDirectoryPath` | `String normalizeStoreDirectoryPath(String path) {` |
-| 227 | `top-level function` | `ensureDirectory` | `Future<Directory> ensureDirectory(String path) async {` |
-| 235 | `top-level function` | `ensureOwnerOnlyDirectory` | `Future<void> ensureOwnerOnlyDirectory(Directory directory) async {` |
-| 242 | `top-level function` | `ensureOwnerOnlyFile` | `Future<void> ensureOwnerOnlyFile(File file) async {` |
-| 249 | `top-level function` | `encodeStableFileKey` | `String encodeStableFileKey(String key) {` |
-| 253 | `top-level function` | `atomicWriteString` | `Future<void> atomicWriteString( File file, String contents, { bool ownerOnly = false, }) async {` |
-| 275 | `top-level function` | `deleteIfExists` | `Future<void> deleteIfExists(File file) async {` |
-| 281 | `top-level function` | `decodeYamlDocument` | `Object? decodeYamlDocument(String raw) {` |
-| 306 | `top-level function` | `encodeYamlDocument` | `String encodeYamlDocument(Object? value) {` |
+| 220 | `top-level function` | `normalizeStoreDirectoryPath` | `String normalizeStoreDirectoryPath(String path) {` |
+| 237 | `top-level function` | `ensureDirectory` | `Future<Directory> ensureDirectory(String path) async {` |
+| 245 | `top-level function` | `ensureOwnerOnlyDirectory` | `Future<void> ensureOwnerOnlyDirectory(Directory directory) async {` |
+| 252 | `top-level function` | `ensureOwnerOnlyFile` | `Future<void> ensureOwnerOnlyFile(File file) async {` |
+| 259 | `top-level function` | `encodeStableFileKey` | `String encodeStableFileKey(String key) {` |
+| 263 | `top-level function` | `atomicWriteString` | `Future<void> atomicWriteString( File file, String contents, { bool ownerOnly = false, }) async {` |
+| 285 | `top-level function` | `deleteIfExists` | `Future<void> deleteIfExists(File file) async {` |
+| 291 | `top-level function` | `decodeYamlDocument` | `Object? decodeYamlDocument(String raw) {` |
+| 316 | `top-level function` | `encodeYamlDocument` | `String encodeYamlDocument(Object? value) {` |
 
 ### `lib/runtime/gateway_acp_client.dart`
 
 - Language: `dart`
-- Public symbols: `4`
+- Public symbols: `6`
 
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
-| 8 | `class` | `GatewayAcpException` | `class GatewayAcpException implements Exception {` |
-| 19 | `class` | `GatewayAcpCapabilities` | `class GatewayAcpCapabilities {` |
-| 70 | `class` | `GatewayAcpMultiAgentRequest` | `class GatewayAcpMultiAgentRequest {` |
-| 90 | `class` | `GatewayAcpClient` | `class GatewayAcpClient {` |
+| 16 | `class` | `GatewayAcpException` | `class GatewayAcpException implements Exception {` |
+| 33 | `class` | `GatewayAcpCapabilities` | `class GatewayAcpCapabilities {` |
+| 91 | `class` | `GatewayAcpMultiAgentRequest` | `class GatewayAcpMultiAgentRequest {` |
+| 111 | `class` | `GatewayAcpClient` | `class GatewayAcpClient {` |
+| 1392 | `top-level function` | `gatewayAcpHttpResponseTimeoutFor` | `Duration gatewayAcpHttpResponseTimeoutFor( Uri endpoint, String method, [ Map<String, dynamic> params = const <String, dynamic>{}, ]) {` |
+| 1412 | `top-level function` | `gatewayAcpTaskRuntimeBudgetMinutesForParams` | `int gatewayAcpTaskRuntimeBudgetMinutesForParams(Map<String, dynamic> params) {` |
 
 ### `lib/runtime/gateway_runtime.dart`
 
@@ -933,7 +920,7 @@ _No extracted public top-level symbols._
 
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
-| 24 | `class` | `GatewayRuntime` | `class GatewayRuntime extends ChangeNotifier with GatewayRuntimeHelpersInternal {` |
+| 25 | `class` | `GatewayRuntime` | `class GatewayRuntime extends ChangeNotifier with GatewayRuntimeHelpersInternal {` |
 
 ### `lib/runtime/gateway_runtime_errors.dart`
 
@@ -962,21 +949,21 @@ _No extracted public top-level symbols._
 | ---: | --- | --- | --- |
 | 21 | `top-level function` | `formatGatewayConnectAuthSummary` | `String formatGatewayConnectAuthSummary({ required String mode, required List<String> fields, required List<String> sources, }) {` |
 | 31 | `mixin` | `GatewayRuntimeHelpersInternal` | `mixin GatewayRuntimeHelpersInternal on ChangeNotifier {` |
-| 554 | `class` | `GatewaySetupPayload` | `class GatewaySetupPayload {` |
-| 570 | `top-level function` | `decodeGatewaySetupCode` | `GatewaySetupPayload? decodeGatewaySetupCode(String rawInput) {` |
-| 590 | `top-level function` | `decodeSetupPayloadJsonInternal` | `GatewaySetupPayload? decodeSetupPayloadJsonInternal(String raw) {` |
-| 615 | `top-level function` | `resolveSetupCodeCandidateInternal` | `String resolveSetupCodeCandidateInternal(String raw) {` |
-| 650 | `top-level function` | `composeManualUrlInternal` | `String? composeManualUrlInternal(String? host, int? port, bool? tls) {` |
-| 660 | `top-level function` | `asMap` | `Map<String, dynamic> asMap(Object? value) {` |
-| 670 | `top-level function` | `asList` | `List<dynamic> asList(Object? value) {` |
-| 680 | `top-level function` | `stringValue` | `String? stringValue(Object? value) {` |
-| 688 | `top-level function` | `boolValue` | `bool? boolValue(Object? value) {` |
-| 703 | `top-level function` | `intValue` | `int? intValue(Object? value) {` |
-| 716 | `top-level function` | `doubleValue` | `double? doubleValue(Object? value) {` |
-| 729 | `top-level function` | `stringList` | `List<String> stringList(Object? value) {` |
-| 735 | `top-level function` | `extractMessageText` | `String extractMessageText(Map<String, dynamic> message) {` |
-| 756 | `top-level function` | `randomIdInternal` | `String randomIdInternal() {` |
-| 766 | `class` | `RpcResponseInternal` | `class RpcResponseInternal {` |
+| 561 | `class` | `GatewaySetupPayload` | `class GatewaySetupPayload {` |
+| 577 | `top-level function` | `decodeGatewaySetupCode` | `GatewaySetupPayload? decodeGatewaySetupCode(String rawInput) {` |
+| 597 | `top-level function` | `decodeSetupPayloadJsonInternal` | `GatewaySetupPayload? decodeSetupPayloadJsonInternal(String raw) {` |
+| 622 | `top-level function` | `resolveSetupCodeCandidateInternal` | `String resolveSetupCodeCandidateInternal(String raw) {` |
+| 657 | `top-level function` | `composeManualUrlInternal` | `String? composeManualUrlInternal(String? host, int? port, bool? tls) {` |
+| 667 | `top-level function` | `asMap` | `Map<String, dynamic> asMap(Object? value) {` |
+| 677 | `top-level function` | `asList` | `List<dynamic> asList(Object? value) {` |
+| 687 | `top-level function` | `stringValue` | `String? stringValue(Object? value) {` |
+| 695 | `top-level function` | `boolValue` | `bool? boolValue(Object? value) {` |
+| 710 | `top-level function` | `intValue` | `int? intValue(Object? value) {` |
+| 723 | `top-level function` | `doubleValue` | `double? doubleValue(Object? value) {` |
+| 736 | `top-level function` | `stringList` | `List<String> stringList(Object? value) {` |
+| 742 | `top-level function` | `extractMessageText` | `String extractMessageText(Map<String, dynamic> message) {` |
+| 763 | `top-level function` | `randomIdInternal` | `String randomIdInternal() {` |
+| 773 | `class` | `RpcResponseInternal` | `class RpcResponseInternal {` |
 
 ### `lib/runtime/gateway_runtime_protocol.dart`
 
@@ -1007,10 +994,10 @@ _No extracted public top-level symbols._
 
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
-| 3 | `enum` | `GoCoreLaunchSource` | `enum GoCoreLaunchSource { buildArtifact }` |
-| 5 | `class` | `GoCoreLaunch` | `class GoCoreLaunch {` |
-| 19 | `typedef` | `GoCoreBinaryExistsResolver` | `typedef GoCoreBinaryExistsResolver = Future<bool> Function(String command);` |
-| 21 | `class` | `GoCoreLocator` | `class GoCoreLocator {` |
+| 4 | `enum` | `GoCoreLaunchSource` | `enum GoCoreLaunchSource { buildArtifact }` |
+| 7 | `class` | `GoCoreLaunch` | `class GoCoreLaunch {` |
+| 21 | `typedef` | `GoCoreBinaryExistsResolver` | `typedef GoCoreBinaryExistsResolver = Future<bool> Function(String command);` |
+| 24 | `class` | `GoCoreLocator` | `class GoCoreLocator {` |
 
 ### `lib/runtime/go_multi_agent_mount_desktop_client.dart`
 
@@ -1046,16 +1033,16 @@ _No extracted public top-level symbols._
 | 107 | `class` | `ExternalCodeAgentAcpRoutingConfig` | `class ExternalCodeAgentAcpRoutingConfig {` |
 | 167 | `class` | `ExternalCodeAgentAcpSkillInstallApproval` | `class ExternalCodeAgentAcpSkillInstallApproval {` |
 | 187 | `class` | `GoTaskServiceRequest` | `class GoTaskServiceRequest {` |
-| 357 | `class` | `GoTaskServiceUpdate` | `class GoTaskServiceUpdate {` |
-| 386 | `class` | `GoTaskServiceArtifact` | `class GoTaskServiceArtifact {` |
-| 433 | `class` | `GoTaskServiceResult` | `class GoTaskServiceResult {` |
-| 540 | `top-level function` | `goTaskServiceGatewayEntryState` | `String? goTaskServiceGatewayEntryState({ required AssistantExecutionTarget requestedTarget, required GoTaskServiceResult result, }) {` |
-| 575 | `abstract interface` | `ExternalCodeAgentAcpTransport` | `abstract class ExternalCodeAgentAcpTransport {` |
-| 607 | `abstract interface` | `GoTaskServiceClient` | `abstract class GoTaskServiceClient {` |
-| 641 | `top-level function` | `goTaskServiceUpdateFromAcpNotification` | `GoTaskServiceUpdate? goTaskServiceUpdateFromAcpNotification( Map<String, dynamic> notification, ) {` |
-| 682 | `top-level function` | `goTaskServiceResultFromAcpResponse` | `GoTaskServiceResult goTaskServiceResultFromAcpResponse( Map<String, dynamic> response, { required GoTaskServiceRoute route, String streamedText = '', String? completedMessage, }) {` |
-| 743 | `top-level function` | `mergeGoTaskServiceResponseResult` | `Map<String, dynamic> mergeGoTaskServiceResponseResult( Map<String, dynamic> response, Map<String, dynamic> overlay, ) {` |
-| 767 | `top-level function` | `goTaskServiceBase64Size` | `int goTaskServiceBase64Size(String base64) {` |
+| 359 | `class` | `GoTaskServiceUpdate` | `class GoTaskServiceUpdate {` |
+| 388 | `class` | `GoTaskServiceArtifact` | `class GoTaskServiceArtifact {` |
+| 443 | `class` | `GoTaskServiceResult` | `class GoTaskServiceResult {` |
+| 577 | `top-level function` | `goTaskServiceGatewayEntryState` | `String? goTaskServiceGatewayEntryState({ required AssistantExecutionTarget requestedTarget, required GoTaskServiceResult result, }) {` |
+| 612 | `abstract interface` | `ExternalCodeAgentAcpTransport` | `abstract class ExternalCodeAgentAcpTransport {` |
+| 644 | `abstract interface` | `GoTaskServiceClient` | `abstract class GoTaskServiceClient {` |
+| 678 | `top-level function` | `goTaskServiceUpdateFromAcpNotification` | `GoTaskServiceUpdate? goTaskServiceUpdateFromAcpNotification( Map<String, dynamic> notification, ) {` |
+| 719 | `top-level function` | `goTaskServiceResultFromAcpResponse` | `GoTaskServiceResult goTaskServiceResultFromAcpResponse( Map<String, dynamic> response, { required GoTaskServiceRoute route, String streamedText = '', String? completedMessage, }) {` |
+| 913 | `top-level function` | `mergeGoTaskServiceResponseResult` | `Map<String, dynamic> mergeGoTaskServiceResponseResult( Map<String, dynamic> response, Map<String, dynamic> overlay, ) {` |
+| 937 | `top-level function` | `goTaskServiceBase64Size` | `int goTaskServiceBase64Size(String base64) {` |
 
 ### `lib/runtime/go_task_service_desktop_service.dart`
 
@@ -1086,9 +1073,9 @@ _No extracted public top-level symbols._
 
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
-| 6 | `abstract interface` | `FrameworkPreset` | `abstract class FrameworkPreset {` |
-| 19 | `class` | `NativeFrameworkPreset` | `class NativeFrameworkPreset extends FrameworkPreset {` |
-| 48 | `class` | `ArisFrameworkPreset` | `class ArisFrameworkPreset extends FrameworkPreset {` |
+| 3 | `abstract interface` | `FrameworkPreset` | `abstract class FrameworkPreset {` |
+| 16 | `class` | `NativeFrameworkPreset` | `class NativeFrameworkPreset extends FrameworkPreset {` |
+| 45 | `class` | `ArisFrameworkPreset` | `class ArisFrameworkPreset extends FrameworkPreset {` |
 
 ### `lib/runtime/multi_agent_mount_resolver.dart`
 
@@ -1103,18 +1090,17 @@ _No extracted public top-level symbols._
 ### `lib/runtime/multi_agent_mounts.dart`
 
 - Language: `dart`
-- Public symbols: `8`
+- Public symbols: `7`
 
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
-| 11 | `class` | `MultiAgentMountManager` | `class MultiAgentMountManager {` |
-| 139 | `abstract interface` | `CliMountAdapter` | `abstract class CliMountAdapter {` |
-| 191 | `class` | `ArisMountAdapter` | `class ArisMountAdapter extends CliMountAdapter {` |
-| 277 | `class` | `CodexMountAdapter` | `class CodexMountAdapter extends CliMountAdapter {` |
-| 350 | `class` | `ClaudeMountAdapter` | `class ClaudeMountAdapter extends CliMountAdapter {` |
-| 398 | `class` | `GeminiMountAdapter` | `class GeminiMountAdapter extends CliMountAdapter {` |
-| 446 | `class` | `OpencodeMountAdapter` | `class OpencodeMountAdapter extends CliMountAdapter {` |
-| 515 | `class` | `OpenClawMountAdapter` | `class OpenClawMountAdapter extends CliMountAdapter {` |
+| 9 | `class` | `MultiAgentMountManager` | `class MultiAgentMountManager {` |
+| 90 | `abstract interface` | `CliMountAdapter` | `abstract class CliMountAdapter {` |
+| 112 | `class` | `CodexMountAdapter` | `class CodexMountAdapter extends CliMountAdapter {` |
+| 154 | `class` | `ClaudeMountAdapter` | `class ClaudeMountAdapter extends CliMountAdapter {` |
+| 193 | `class` | `GeminiMountAdapter` | `class GeminiMountAdapter extends CliMountAdapter {` |
+| 232 | `class` | `OpencodeMountAdapter` | `class OpencodeMountAdapter extends CliMountAdapter {` |
+| 273 | `class` | `OpenClawMountAdapter` | `class OpenClawMountAdapter extends CliMountAdapter {` |
 
 ### `lib/runtime/multi_agent_orchestrator.dart`
 
@@ -1130,7 +1116,7 @@ _No extracted public top-level symbols._
 
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
-| 24 | `class` | `MultiAgentOrchestrator` | `class MultiAgentOrchestrator extends ChangeNotifier {` |
+| 20 | `class` | `MultiAgentOrchestrator` | `class MultiAgentOrchestrator extends ChangeNotifier {` |
 
 ### `lib/runtime/multi_agent_orchestrator_protocol.dart`
 
@@ -1216,16 +1202,14 @@ _No extracted public top-level symbols._
 ### `lib/runtime/runtime_controllers_derived_tasks.dart`
 
 - Language: `dart`
-- Public symbols: `6`
+- Public symbols: `4`
 
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
-| 14 | `class` | `DerivedTasksController` | `class DerivedTasksController extends ChangeNotifier {` |
-| 150 | `top-level function` | `normalizeMainSessionKey` | `String normalizeMainSessionKey(String? value) {` |
-| 155 | `top-level function` | `makeAgentSessionKey` | `String makeAgentSessionKey({required String agentId, required String baseKey}) {` |
-| 164 | `top-level function` | `matchesSessionKey` | `bool matchesSessionKey(String incoming, String current) {` |
-| 174 | `top-level function` | `encodePrettyJson` | `String encodePrettyJson(Object value) {` |
-| 179 | `top-level function` | `ephemeralIdInternal` | `String ephemeralIdInternal() =>` |
+| 6 | `class` | `DerivedTasksController` | `class DerivedTasksController extends ChangeNotifier {` |
+| 142 | `top-level function` | `matchesSessionKey` | `bool matchesSessionKey(String incoming, String current) {` |
+| 148 | `top-level function` | `encodePrettyJson` | `String encodePrettyJson(Object value) {` |
+| 153 | `top-level function` | `ephemeralIdInternal` | `String ephemeralIdInternal() =>` |
 
 ### `lib/runtime/runtime_controllers_entities.dart`
 
@@ -1249,7 +1233,7 @@ _No extracted public top-level symbols._
 | 14 | `class` | `AiGatewayResponseExceptionInternal` | `class AiGatewayResponseExceptionInternal implements Exception {` |
 | 24 | `class` | `GatewayAgentsController` | `class GatewayAgentsController extends ChangeNotifier {` |
 | 89 | `class` | `GatewaySessionsController` | `class GatewaySessionsController extends ChangeNotifier {` |
-| 173 | `class` | `GatewayChatController` | `class GatewayChatController extends ChangeNotifier {` |
+| 146 | `class` | `GatewayChatController` | `class GatewayChatController extends ChangeNotifier {` |
 
 ### `lib/runtime/runtime_controllers_settings.dart`
 
@@ -1258,7 +1242,7 @@ _No extracted public top-level symbols._
 
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
-| 20 | `class` | `SettingsController` | `class SettingsController extends ChangeNotifier {` |
+| 21 | `class` | `SettingsController` | `class SettingsController extends ChangeNotifier {` |
 
 ### `lib/runtime/runtime_controllers_settings_account.dart`
 
@@ -1272,7 +1256,7 @@ _No extracted public top-level symbols._
 ### `lib/runtime/runtime_controllers_settings_account_impl.dart`
 
 - Language: `dart`
-- Public symbols: `8`
+- Public symbols: `9`
 
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
@@ -1282,8 +1266,9 @@ _No extracted public top-level symbols._
 | 158 | `top-level function` | `restoreAccountSessionSettingsInternal` | `Future<void> restoreAccountSessionSettingsInternal( SettingsController controller, { String baseUrl = '', bool quiet = false, }) async {` |
 | 225 | `top-level function` | `syncAccountSettingsInternal` | `Future<AccountSyncResult> syncAccountSettingsInternal( SettingsController controller, { String baseUrl = '', bool quiet = false, Map<String, dynamic> profilePayloadOverride = const <String, dynamic>{}, }) async {` |
 | 371 | `top-level function` | `logoutAccountSettingsInternal` | `Future<void> logoutAccountSettingsInternal( SettingsController controller, { String statusMessage = 'Signed out', bool quiet = false, }) async {` |
-| 414 | `top-level function` | `cancelAccountMfaChallengeSettingsInternal` | `Future<void> cancelAccountMfaChallengeSettingsInternal( SettingsController controller, ) async {` |
-| 444 | `top-level function` | `normalizeAccountBaseUrlSettingsInternal` | `String normalizeAccountBaseUrlSettingsInternal( String raw, { String fallback = '', }) {` |
+| 424 | `top-level function` | `cancelAccountMfaChallengeSettingsInternal` | `Future<void> cancelAccountMfaChallengeSettingsInternal( SettingsController controller, ) async {` |
+| 454 | `top-level function` | `normalizeAccountBaseUrlSettingsInternal` | `String normalizeAccountBaseUrlSettingsInternal( String raw, { String fallback = '', }) {` |
+| 574 | `top-level function` | `resolveAcpBridgeServerEffectiveConfigInternal` | `AcpBridgeServerEffectiveConfig resolveAcpBridgeServerEffectiveConfigInternal( SettingsController controller, { required AcpBridgeServerModeConfig config, }) {` |
 
 ### `lib/runtime/runtime_controllers_settings_connectivity_impl.dart`
 
@@ -1310,28 +1295,28 @@ _No extracted public top-level symbols._
 | 3 | `top-level function` | `saveGatewaySecretsSettingsInternal` | `Future<void> saveGatewaySecretsSettingsInternal( SettingsController controller, { int? profileIndex, required String token, required String password, }) async {` |
 | 61 | `top-level function` | `clearGatewaySecretsSettingsInternal` | `Future<void> clearGatewaySecretsSettingsInternal( SettingsController controller, { int? profileIndex, bool token = false, bool password = false, }) async {` |
 | 115 | `top-level function` | `loadGatewayTokenSettingsInternal` | `Future<String> loadGatewayTokenSettingsInternal( SettingsController controller, { int? profileIndex, }) async {` |
-| 141 | `top-level function` | `loadGatewayPasswordSettingsInternal` | `Future<String> loadGatewayPasswordSettingsInternal( SettingsController controller, { int? profileIndex, }) async {` |
-| 167 | `top-level function` | `hasStoredGatewayTokenForProfileSettingsInternal` | `bool hasStoredGatewayTokenForProfileSettingsInternal( SettingsController controller, int profileIndex, ) =>` |
-| 179 | `top-level function` | `hasStoredGatewayPasswordForProfileSettingsInternal` | `bool hasStoredGatewayPasswordForProfileSettingsInternal( SettingsController controller, int profileIndex, ) => controller.secureRefsInternal.containsKey( gatewayPasswordRefForProfileSettingsInternal(controller, profileIndex), );` |
-| 186 | `top-level function` | `storedGatewayTokenMaskForProfileSettingsInternal` | `String? storedGatewayTokenMaskForProfileSettingsInternal( SettingsController controller, int profileIndex, ) =>` |
-| 199 | `top-level function` | `storedGatewayPasswordMaskForProfileSettingsInternal` | `String? storedGatewayPasswordMaskForProfileSettingsInternal( SettingsController controller, int profileIndex, ) =>` |
-| 208 | `top-level function` | `gatewayTokenRefForProfileSettingsInternal` | `String gatewayTokenRefForProfileSettingsInternal( SettingsController controller, int profileIndex, ) {` |
-| 221 | `top-level function` | `gatewayPasswordRefForProfileSettingsInternal` | `String gatewayPasswordRefForProfileSettingsInternal( SettingsController controller, int profileIndex, ) {` |
-| 234 | `top-level function` | `aiGatewayApiKeyRefSettingsInternal` | `String aiGatewayApiKeyRefSettingsInternal( SettingsController controller, [ AiGatewayProfile? profile, ]) {` |
-| 243 | `top-level function` | `vaultTokenRefSettingsInternal` | `String vaultTokenRefSettingsInternal( SettingsController controller, [ VaultConfig? profile, ]) {` |
-| 252 | `top-level function` | `ollamaCloudApiKeyRefSettingsInternal` | `String ollamaCloudApiKeyRefSettingsInternal( SettingsController controller, [ OllamaCloudConfig? profile, ]) {` |
-| 261 | `top-level function` | `saveOllamaCloudApiKeySettingsInternal` | `Future<void> saveOllamaCloudApiKeySettingsInternal( SettingsController controller, String value, ) async {` |
-| 287 | `top-level function` | `loadOllamaCloudApiKeySettingsInternal` | `Future<String> loadOllamaCloudApiKeySettingsInternal( SettingsController controller, ) async {` |
-| 304 | `top-level function` | `saveVaultTokenSettingsInternal` | `Future<void> saveVaultTokenSettingsInternal( SettingsController controller, String value, ) async {` |
-| 330 | `top-level function` | `loadVaultTokenSettingsInternal` | `Future<String> loadVaultTokenSettingsInternal( SettingsController controller, ) async {` |
-| 346 | `top-level function` | `saveAiGatewayApiKeySettingsInternal` | `Future<void> saveAiGatewayApiKeySettingsInternal( SettingsController controller, String value, ) async {` |
-| 372 | `top-level function` | `loadAiGatewayApiKeySettingsInternal` | `Future<String> loadAiGatewayApiKeySettingsInternal( SettingsController controller, ) async {` |
-| 388 | `top-level function` | `clearAiGatewayApiKeySettingsInternal` | `Future<void> clearAiGatewayApiKeySettingsInternal( SettingsController controller, ) async {` |
-| 398 | `top-level function` | `saveSecretValueByRefSettingsInternal` | `Future<void> saveSecretValueByRefSettingsInternal( SettingsController controller, String refName, String value, { required String provider, required String module, }) async {` |
-| 425 | `top-level function` | `loadSecretValueByRefSettingsInternal` | `Future<String> loadSecretValueByRefSettingsInternal( SettingsController controller, String refName, ) async {` |
-| 435 | `top-level function` | `loadVaultTokenForSecretReadsSettingsInternal` | `Future<String> loadVaultTokenForSecretReadsSettingsInternal( SettingsController controller, { String tokenOverride = '', }) async {` |
-| 454 | `top-level function` | `readVaultSecretByRefSettingsInternal` | `Future<String> readVaultSecretByRefSettingsInternal( SettingsController controller, String refName, ) async {` |
-| 484 | `top-level function` | `resolveSecretValueSettingsInternal` | `Future<String> resolveSecretValueSettingsInternal( SettingsController controller, { String explicitValue = '', String refName = '', String fallbackRefName = '', String accountTarget = '', bool allowVaultLookup = true, bool persistExplicitValue = true, }) async {` |
+| 127 | `top-level function` | `loadGatewayPasswordSettingsInternal` | `Future<String> loadGatewayPasswordSettingsInternal( SettingsController controller, { int? profileIndex, }) async {` |
+| 139 | `top-level function` | `hasStoredGatewayTokenForProfileSettingsInternal` | `bool hasStoredGatewayTokenForProfileSettingsInternal( SettingsController controller, int profileIndex, ) =>` |
+| 151 | `top-level function` | `hasStoredGatewayPasswordForProfileSettingsInternal` | `bool hasStoredGatewayPasswordForProfileSettingsInternal( SettingsController controller, int profileIndex, ) => controller.secureRefsInternal.containsKey( gatewayPasswordRefForProfileSettingsInternal(controller, profileIndex), );` |
+| 158 | `top-level function` | `storedGatewayTokenMaskForProfileSettingsInternal` | `String? storedGatewayTokenMaskForProfileSettingsInternal( SettingsController controller, int profileIndex, ) =>` |
+| 171 | `top-level function` | `storedGatewayPasswordMaskForProfileSettingsInternal` | `String? storedGatewayPasswordMaskForProfileSettingsInternal( SettingsController controller, int profileIndex, ) =>` |
+| 180 | `top-level function` | `gatewayTokenRefForProfileSettingsInternal` | `String gatewayTokenRefForProfileSettingsInternal( SettingsController controller, int profileIndex, ) {` |
+| 193 | `top-level function` | `gatewayPasswordRefForProfileSettingsInternal` | `String gatewayPasswordRefForProfileSettingsInternal( SettingsController controller, int profileIndex, ) {` |
+| 206 | `top-level function` | `aiGatewayApiKeyRefSettingsInternal` | `String aiGatewayApiKeyRefSettingsInternal( SettingsController controller, [ AiGatewayProfile? profile, ]) {` |
+| 215 | `top-level function` | `vaultTokenRefSettingsInternal` | `String vaultTokenRefSettingsInternal( SettingsController controller, [ VaultConfig? profile, ]) {` |
+| 224 | `top-level function` | `ollamaCloudApiKeyRefSettingsInternal` | `String ollamaCloudApiKeyRefSettingsInternal( SettingsController controller, [ OllamaCloudConfig? profile, ]) {` |
+| 233 | `top-level function` | `saveOllamaCloudApiKeySettingsInternal` | `Future<void> saveOllamaCloudApiKeySettingsInternal( SettingsController controller, String value, ) async {` |
+| 259 | `top-level function` | `loadOllamaCloudApiKeySettingsInternal` | `Future<String> loadOllamaCloudApiKeySettingsInternal( SettingsController controller, ) async {` |
+| 267 | `top-level function` | `saveVaultTokenSettingsInternal` | `Future<void> saveVaultTokenSettingsInternal( SettingsController controller, String value, ) async {` |
+| 293 | `top-level function` | `loadVaultTokenSettingsInternal` | `Future<String> loadVaultTokenSettingsInternal( SettingsController controller, ) async {` |
+| 301 | `top-level function` | `saveAiGatewayApiKeySettingsInternal` | `Future<void> saveAiGatewayApiKeySettingsInternal( SettingsController controller, String value, ) async {` |
+| 327 | `top-level function` | `loadAiGatewayApiKeySettingsInternal` | `Future<String> loadAiGatewayApiKeySettingsInternal( SettingsController controller, ) async {` |
+| 335 | `top-level function` | `clearAiGatewayApiKeySettingsInternal` | `Future<void> clearAiGatewayApiKeySettingsInternal( SettingsController controller, ) async {` |
+| 345 | `top-level function` | `saveSecretValueByRefSettingsInternal` | `Future<void> saveSecretValueByRefSettingsInternal( SettingsController controller, String refName, String value, { required String provider, required String module, }) async {` |
+| 372 | `top-level function` | `loadSecretValueByRefSettingsInternal` | `Future<String> loadSecretValueByRefSettingsInternal( SettingsController controller, String refName, ) async {` |
+| 382 | `top-level function` | `loadVaultTokenForSecretReadsSettingsInternal` | `Future<String> loadVaultTokenForSecretReadsSettingsInternal( SettingsController controller, { String tokenOverride = '', }) async {` |
+| 393 | `top-level function` | `readVaultSecretByRefSettingsInternal` | `Future<String> readVaultSecretByRefSettingsInternal( SettingsController controller, String refName, ) async {` |
+| 423 | `top-level function` | `resolveSecretValueSettingsInternal` | `Future<String> resolveSecretValueSettingsInternal( SettingsController controller, { String explicitValue = '', String refName = '', String fallbackRefName = '', String accountTarget = '', bool allowVaultLookup = true, bool persistExplicitValue = true, }) async {` |
 
 ### `lib/runtime/runtime_coordinator.dart`
 
@@ -1341,7 +1326,7 @@ _No extracted public top-level symbols._
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
 | 17 | `enum` | `CoordinatorState` | `enum CoordinatorState { disconnected, connecting, connected, ready, error }` |
-| 26 | `class` | `RuntimeCoordinator` | `class RuntimeCoordinator extends ChangeNotifier {` |
+| 20 | `class` | `RuntimeCoordinator` | `class RuntimeCoordinator extends ChangeNotifier {` |
 
 ### `lib/runtime/runtime_dispatch_resolver.dart`
 
@@ -1374,22 +1359,22 @@ _No extracted public top-level symbols._
 ### `lib/runtime/runtime_models_account.dart`
 
 - Language: `dart`
-- Public symbols: `13`
+- Public symbols: `12`
 
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
-| 4 | `class` | `AccountSessionSummary` | `class AccountSessionSummary {` |
-| 68 | `class` | `AccountTokenConfigured` | `class AccountTokenConfigured {` |
-| 108 | `class` | `AccountSecretLocator` | `class AccountSecretLocator {` |
-| 166 | `class` | `AccountRemoteProfile` | `class AccountRemoteProfile {` |
-| 269 | `class` | `AcpBridgeServerRemoteServerSummary` | `class AcpBridgeServerRemoteServerSummary {` |
-| 312 | `class` | `AcpBridgeServerCloudSyncConfig` | `class AcpBridgeServerCloudSyncConfig {` |
-| 370 | `class` | `AcpBridgeServerSelfHostedConfig` | `class AcpBridgeServerSelfHostedConfig {` |
-| 423 | `class` | `AcpBridgeServerAdvancedOverrides` | `class AcpBridgeServerAdvancedOverrides {` |
-| 509 | `class` | `AcpBridgeServerModeConfig` | `class AcpBridgeServerModeConfig {` |
-| 577 | `class` | `AccountSyncState` | `class AccountSyncState {` |
-| 667 | `class` | `AccountSyncResult` | `class AccountSyncResult {` |
-| 686 | `top-level function` | `isSupportedAccountManagedSecretTarget` | `bool isSupportedAccountManagedSecretTarget(String target) {` |
+| 3 | `class` | `AccountSessionSummary` | `class AccountSessionSummary {` |
+| 67 | `class` | `AccountTokenConfigured` | `class AccountTokenConfigured {` |
+| 96 | `class` | `AccountSecretLocator` | `class AccountSecretLocator {` |
+| 154 | `class` | `AccountRemoteProfile` | `class AccountRemoteProfile {` |
+| 248 | `class` | `AcpBridgeServerRemoteServerSummary` | `class AcpBridgeServerRemoteServerSummary {` |
+| 276 | `class` | `AcpBridgeServerCloudSyncConfig` | `class AcpBridgeServerCloudSyncConfig {` |
+| 334 | `class` | `AcpBridgeServerSelfHostedConfig` | `class AcpBridgeServerSelfHostedConfig {` |
+| 387 | `class` | `AcpBridgeServerEffectiveConfig` | `class AcpBridgeServerEffectiveConfig {` |
+| 442 | `class` | `AcpBridgeServerModeConfig` | `class AcpBridgeServerModeConfig {` |
+| 498 | `class` | `AccountSyncState` | `class AccountSyncState {` |
+| 588 | `class` | `AccountSyncResult` | `class AccountSyncResult {` |
+| 607 | `top-level function` | `isSupportedAccountManagedSecretTarget` | `bool isSupportedAccountManagedSecretTarget(String target) {` |
 
 ### `lib/runtime/runtime_models_configs.dart`
 
@@ -1399,16 +1384,16 @@ _No extracted public top-level symbols._
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
 | 13 | `class` | `GatewayConnectionProfile` | `class GatewayConnectionProfile {` |
-| 136 | `top-level function` | `normalizeGatewayProfiles` | `List<GatewayConnectionProfile> normalizeGatewayProfiles({ Iterable<GatewayConnectionProfile>? profiles, }) {` |
-| 214 | `top-level function` | `replaceGatewayProfileAt` | `List<GatewayConnectionProfile> replaceGatewayProfileAt( List<GatewayConnectionProfile> profiles, int index, GatewayConnectionProfile profile, ) {` |
-| 260 | `class` | `OllamaLocalConfig` | `class OllamaLocalConfig {` |
-| 311 | `class` | `OllamaCloudConfig` | `class OllamaCloudConfig {` |
-| 378 | `class` | `VaultConfig` | `class VaultConfig {` |
-| 434 | `class` | `AiGatewayProfile` | `class AiGatewayProfile {` |
-| 532 | `class` | `AiGatewayConnectionCheck` | `class AiGatewayConnectionCheck {` |
-| 548 | `enum` | `WebSessionPersistenceMode` | `enum WebSessionPersistenceMode { browser, remote }` |
-| 550 | `extension` | `WebSessionPersistenceModeCopy` | `extension WebSessionPersistenceModeCopy on WebSessionPersistenceMode {` |
-| 567 | `class` | `WebSessionPersistenceConfig` | `class WebSessionPersistenceConfig {` |
+| 121 | `top-level function` | `normalizeGatewayProfiles` | `List<GatewayConnectionProfile> normalizeGatewayProfiles({ Iterable<GatewayConnectionProfile>? profiles, }) {` |
+| 162 | `top-level function` | `replaceGatewayProfileAt` | `List<GatewayConnectionProfile> replaceGatewayProfileAt( List<GatewayConnectionProfile> profiles, int _, GatewayConnectionProfile profile, ) {` |
+| 206 | `class` | `OllamaLocalConfig` | `class OllamaLocalConfig {` |
+| 257 | `class` | `OllamaCloudConfig` | `class OllamaCloudConfig {` |
+| 324 | `class` | `VaultConfig` | `class VaultConfig {` |
+| 380 | `class` | `AiGatewayProfile` | `class AiGatewayProfile {` |
+| 473 | `class` | `AiGatewayConnectionCheck` | `class AiGatewayConnectionCheck {` |
+| 489 | `enum` | `WebSessionPersistenceMode` | `enum WebSessionPersistenceMode { browser, remote }` |
+| 491 | `extension` | `WebSessionPersistenceModeCopy` | `extension WebSessionPersistenceModeCopy on WebSessionPersistenceMode {` |
+| 508 | `class` | `WebSessionPersistenceConfig` | `class WebSessionPersistenceConfig {` |
 
 ### `lib/runtime/runtime_models_connection.dart`
 
@@ -1540,11 +1525,11 @@ _No extracted public top-level symbols._
 | 711 | `top-level function` | `assistantExecutionTargetFromExecutionMode` | `AssistantExecutionTarget assistantExecutionTargetFromExecutionMode( ThreadExecutionMode mode, ) {` |
 | 720 | `top-level function` | `workspaceRefKindFromWorkspaceKind` | `WorkspaceRefKind workspaceRefKindFromWorkspaceKind(WorkspaceKind kind) {` |
 | 727 | `class` | `ThreadContextState` | `class ThreadContextState {` |
-| 904 | `class` | `ThreadLifecycleState` | `class ThreadLifecycleState {` |
-| 960 | `class` | `TaskThread` | `class TaskThread {` |
-| 1291 | `top-level function` | `isNewConversationTaskTitle` | `bool isNewConversationTaskTitle(String title) {` |
-| 1296 | `top-level function` | `firstUserMessageTaskTitle` | `String firstUserMessageTaskTitle( Iterable<GatewayChatMessage> messages, { String fallback = '', }) {` |
-| 1318 | `top-level function` | `derivePersistedTaskTitle` | `String derivePersistedTaskTitle( String currentTitle, Iterable<GatewayChatMessage> messages, { String fallback = '', bool hasCustomTitle = false, }) {` |
+| 935 | `class` | `ThreadLifecycleState` | `class ThreadLifecycleState {` |
+| 991 | `class` | `TaskThread` | `class TaskThread {` |
+| 1332 | `top-level function` | `isNewConversationTaskTitle` | `bool isNewConversationTaskTitle(String title) {` |
+| 1337 | `top-level function` | `firstUserMessageTaskTitle` | `String firstUserMessageTaskTitle( Iterable<GatewayChatMessage> messages, { String fallback = '', }) {` |
+| 1359 | `top-level function` | `derivePersistedTaskTitle` | `String derivePersistedTaskTitle( String currentTitle, Iterable<GatewayChatMessage> messages, { String fallback = '', bool hasCustomTitle = false, }) {` |
 
 ### `lib/runtime/runtime_models_settings_snapshot.dart`
 
@@ -1553,7 +1538,7 @@ _No extracted public top-level symbols._
 
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
-| 16 | `class` | `SettingsSnapshot` | `class SettingsSnapshot {` |
+| 17 | `class` | `SettingsSnapshot` | `class SettingsSnapshot {` |
 
 ### `lib/runtime/runtime_models_ui_state.dart`
 
@@ -1583,7 +1568,7 @@ _No extracted public top-level symbols._
 
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
-| 13 | `class` | `SecureConfigStore` | `class SecureConfigStore {` |
+| 9 | `class` | `SecureConfigStore` | `class SecureConfigStore {` |
 
 ### `lib/runtime/settings_store.dart`
 
@@ -1594,9 +1579,9 @@ _No extracted public top-level symbols._
 | ---: | --- | --- | --- |
 | 8 | `enum` | `SettingsSnapshotReloadStatus` | `enum SettingsSnapshotReloadStatus { applied, invalid }` |
 | 10 | `class` | `SettingsSnapshotReloadResult` | `class SettingsSnapshotReloadResult {` |
-| 22 | `enum` | `SkippedTaskThreadReason` | `enum SkippedTaskThreadReason {` |
-| 28 | `class` | `SkippedTaskThreadRecord` | `class SkippedTaskThreadRecord {` |
-| 35 | `class` | `SettingsStore` | `class SettingsStore {` |
+| 20 | `enum` | `SkippedTaskThreadReason` | `enum SkippedTaskThreadReason {` |
+| 26 | `class` | `SkippedTaskThreadRecord` | `class SkippedTaskThreadRecord {` |
+| 36 | `class` | `SettingsStore` | `class SettingsStore {` |
 
 ### `lib/runtime/skill_directory_access.dart`
 
@@ -1649,7 +1634,7 @@ _No extracted public top-level symbols._
 ## rust/src
 
 - Files: `4`
-- Public symbols: `19`
+- Public symbols: `16`
 
 ### `rust/src/error.rs`
 
@@ -1692,12 +1677,9 @@ _No extracted public top-level symbols._
 ### `rust/src/types.rs`
 
 - Language: `rust`
-- Public symbols: `5`
+- Public symbols: `2`
 
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
 | 8 | `struct` | `CodexResult` | `pub struct CodexResult {` |
-| 38 | `struct` | `CodexMessage` | `pub struct CodexMessage {` |
-| 51 | `struct` | `CodexEvent` | `pub struct CodexEvent {` |
-| 66 | `struct` | `CodexModelInfo` | `pub struct CodexModelInfo {` |
-| 79 | `struct` | `CodexAccountInfo` | `pub struct CodexAccountInfo {` |
+| 38 | `struct` | `CodexEvent` | `pub struct CodexEvent {` |

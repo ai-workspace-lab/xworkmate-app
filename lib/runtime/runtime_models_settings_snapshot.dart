@@ -301,9 +301,7 @@ class SettingsSnapshot {
         (json['vault'] as Map?)?.cast<String, dynamic>() ?? const {},
       ),
       aiGateway: AiGatewayProfile.fromJson(
-        (json['aiGateway'] as Map?)?.cast<String, dynamic>() ??
-            (json['apisix'] as Map?)?.cast<String, dynamic>() ??
-            const {},
+        (json['aiGateway'] as Map?)?.cast<String, dynamic>() ?? const {},
       ),
       webSessionPersistence: WebSessionPersistenceConfig.fromJson(
         (json['webSessionPersistence'] as Map?)?.cast<String, dynamic>() ??

@@ -53,7 +53,8 @@ class SettingsAccountPanel extends StatelessWidget {
     if (!accountSignedIn && !accountMfaRequired) {
       return DefaultTabController(
         length: 2,
-        initialIndex: settings.acpBridgeServerModeConfig.effective.source == 'bridge'
+        initialIndex:
+            settings.acpBridgeServerModeConfig.effective.source == 'bridge'
             ? 1
             : 0,
         child: Column(
@@ -466,14 +467,18 @@ class _SignedInAccountPanel extends StatelessWidget {
         ? accountState!.syncMessage.trim()
         : appText('尚未同步远端配置', 'Remote config not synced yet');
     final modeStateLabel = accountBusy
-        ? (isAccountSyncMode ? appText('同步中', 'Syncing') : appText('保存中', 'Saving'))
+        ? (isAccountSyncMode
+              ? appText('同步中', 'Syncing')
+              : appText('保存中', 'Saving'))
         : (isAccountSyncMode
               ? _describeAccountSyncState(syncState)
               : _describeBridgeSaveState(settings));
     final modeStatusLabel = accountBusy && accountStatus.trim().isNotEmpty
         ? accountStatus.trim()
         : syncMessage;
-    final modeIcon = isAccountSyncMode ? Icons.cloud_outlined : Icons.link_outlined;
+    final modeIcon = isAccountSyncMode
+        ? Icons.cloud_outlined
+        : Icons.link_outlined;
     final modeTitle = isAccountSyncMode
         ? appText('账号同步', 'Account Sync')
         : appText('手动 Bridge', 'Manual Bridge');
@@ -541,9 +546,14 @@ class _SignedInAccountPanel extends StatelessWidget {
                           accountSession?.email.trim().isNotEmpty == true
                               ? accountSession!.email.trim()
                               : appText('当前账号', 'Current account'),
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Theme.of(context).textTheme.bodySmall?.color?.withValues(alpha: 0.78),
-                          ),
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.color
+                                    ?.withValues(alpha: 0.78),
+                              ),
                         ),
                       ],
                     ),
@@ -596,7 +606,9 @@ class _SignedInAccountPanel extends StatelessWidget {
                     ? '${appText('同步说明', 'Sync Summary')}: $modeStatusLabel'
                     : '${appText('保存说明', 'Save Summary')}: $modeStatusLabel',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).textTheme.bodySmall?.color?.withValues(alpha: 0.78),
+                  color: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.color?.withValues(alpha: 0.78),
                 ),
               ),
               const SizedBox(height: 8),
@@ -610,7 +622,10 @@ class _SignedInAccountPanel extends StatelessWidget {
                   style: Theme.of(context).textTheme.titleSmall,
                 ),
                 subtitle: Text(
-                  appText('查看服务地址、令牌与远端摘要', 'View service URL, tokens, and remote summary'),
+                  appText(
+                    '查看服务地址、令牌与远端摘要',
+                    'View service URL, tokens, and remote summary',
+                  ),
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
                 children: [
@@ -760,8 +775,6 @@ class _TokenConfiguredSummary extends StatelessWidget {
     final configured = <String>[
       if (accountState?.tokenConfigured.bridge == true)
         appText('Bridge Token', 'Bridge Token'),
-      if (accountState?.tokenConfigured.apisix == true)
-        appText('AI Gateway Token', 'AI Gateway Token'),
       if (accountState?.tokenConfigured.vault == true) 'Vault Token',
     ];
     final summary = configured.isEmpty

@@ -51,20 +51,6 @@ class GatewayConnectionProfile {
     );
   }
 
-  factory GatewayConnectionProfile.emptySlot({required int index}) {
-    return GatewayConnectionProfile(
-      mode: RuntimeConnectionMode.unconfigured,
-      useSetupCode: false,
-      setupCode: '',
-      host: '',
-      port: 443,
-      tls: true,
-      tokenRef: 'gateway_token_$index',
-      passwordRef: 'gateway_password_$index',
-      selectedAgentId: '',
-    );
-  }
-
   GatewayConnectionProfile copyWith({
     RuntimeConnectionMode? mode,
     bool? useSetupCode,
@@ -129,81 +115,43 @@ class GatewayConnectionProfile {
   }
 }
 
-const int kGatewayProfileListLength = 4;
+const int kGatewayProfileListLength = 1;
 const int kGatewayRemoteProfileIndex = 0;
-const int kGatewayCustomProfileStartIndex = 1;
 
 List<GatewayConnectionProfile> normalizeGatewayProfiles({
   Iterable<GatewayConnectionProfile>? profiles,
 }) {
-  final defaults = List<GatewayConnectionProfile>.generate(
-    kGatewayProfileListLength,
-    (index) => switch (index) {
-      kGatewayRemoteProfileIndex => GatewayConnectionProfile.defaultsGateway(),
-      _ => GatewayConnectionProfile.emptySlot(index: index),
-    },
-    growable: false,
-  );
+  final fallback = GatewayConnectionProfile.defaultsGateway();
   final incoming =
       profiles?.toList(growable: false) ?? const <GatewayConnectionProfile>[];
-  final normalized = <GatewayConnectionProfile>[];
-  for (var index = 0; index < kGatewayProfileListLength; index += 1) {
-    final fallback = defaults[index];
-    final current = index < incoming.length ? incoming[index] : fallback;
-    if (index == kGatewayRemoteProfileIndex) {
-      final hasEndpoint =
-          current.host.trim().isNotEmpty &&
-          current.port > 0 &&
-          !_isGatewayLoopbackHost(current.host);
-      final slotMode = switch (current.mode) {
-        RuntimeConnectionMode.remote => RuntimeConnectionMode.remote,
-        RuntimeConnectionMode.unconfigured =>
-          hasEndpoint
-              ? RuntimeConnectionMode.remote
-              : RuntimeConnectionMode.unconfigured,
-      };
-      normalized.add(
-        current.copyWith(
-          mode: slotMode,
-          useSetupCode: current.useSetupCode,
-          setupCode: current.setupCode,
-          host: hasEndpoint ? current.host : fallback.host,
-          port: current.port > 0 ? current.port : fallback.port,
-          tls: hasEndpoint ? current.tls : fallback.tls,
-          tokenRef: current.tokenRef.trim().isEmpty
-              ? fallback.tokenRef
-              : current.tokenRef,
-          passwordRef: current.passwordRef.trim().isEmpty
-              ? fallback.passwordRef
-              : current.passwordRef,
-        ),
-      );
-      continue;
-    }
-    final slotMode = switch (current.mode) {
-      RuntimeConnectionMode.remote => RuntimeConnectionMode.remote,
-      RuntimeConnectionMode.unconfigured =>
-        current.host.trim().isNotEmpty && !_isGatewayLoopbackHost(current.host)
-            ? RuntimeConnectionMode.remote
-            : RuntimeConnectionMode.unconfigured,
-    };
-    normalized.add(
-      current.copyWith(
-        mode: slotMode,
-        useSetupCode: current.useSetupCode,
-        setupCode: current.setupCode,
-        port: current.port > 0 ? current.port : 443,
-        tls: current.tls,
-        tokenRef: current.tokenRef.trim().isEmpty
-            ? fallback.tokenRef
-            : current.tokenRef,
-        passwordRef: current.passwordRef.trim().isEmpty
-            ? fallback.passwordRef
-            : current.passwordRef,
-      ),
-    );
-  }
-  return List<GatewayConnectionProfile>.unmodifiable(normalized);
+  final current = incoming.isNotEmpty ? incoming.first : fallback;
+  final hasEndpoint =
+      current.host.trim().isNotEmpty &&
+      current.port > 0 &&
+      !_isGatewayLoopbackHost(current.host);
+  final slotMode = switch (current.mode) {
+    RuntimeConnectionMode.remote => RuntimeConnectionMode.remote,
+    RuntimeConnectionMode.unconfigured =>
+      hasEndpoint
+          ? RuntimeConnectionMode.remote
+          : RuntimeConnectionMode.unconfigured,
+  };
+  return List<GatewayConnectionProfile>.unmodifiable(<GatewayConnectionProfile>[
+    current.copyWith(
+      mode: slotMode,
+      useSetupCode: current.useSetupCode,
+      setupCode: current.setupCode,
+      host: hasEndpoint ? current.host : fallback.host,
+      port: current.port > 0 ? current.port : fallback.port,
+      tls: hasEndpoint ? current.tls : fallback.tls,
+      tokenRef: current.tokenRef.trim().isEmpty
+          ? fallback.tokenRef
+          : current.tokenRef,
+      passwordRef: current.passwordRef.trim().isEmpty
+          ? fallback.passwordRef
+          : current.passwordRef,
+    ),
+  ]);
 }
 
 bool _isGatewayLoopbackHost(String host) {
@@ -213,14 +161,12 @@ bool _isGatewayLoopbackHost(String host) {
 
 List<GatewayConnectionProfile> replaceGatewayProfileAt(
   List<GatewayConnectionProfile> profiles,
-  int index,
+  int _,
   GatewayConnectionProfile profile,
 ) {
-  final normalizedProfiles = normalizeGatewayProfiles(profiles: profiles);
-  final next = List<GatewayConnectionProfile>.from(normalizedProfiles);
-  final clampedIndex = index.clamp(0, kGatewayProfileListLength - 1);
-  next[clampedIndex] = profile;
-  return normalizeGatewayProfiles(profiles: next);
+  return normalizeGatewayProfiles(
+    profiles: <GatewayConnectionProfile>[profile],
+  );
 }
 
 ({String host, int port, bool tls}) normalizeGatewayManualEndpointInternal({
@@ -512,14 +458,9 @@ class AiGatewayProfile {
           (item) => availableModels.isEmpty || availableModels.contains(item),
         )
         .toList(growable: false);
-    final legacyFilePath = json['filePath'] as String?;
-    final legacyBaseUrl =
-        legacyFilePath != null && legacyFilePath.trim().startsWith('http')
-        ? legacyFilePath.trim()
-        : null;
     return AiGatewayProfile(
       name: json['name'] as String? ?? defaults.name,
-      baseUrl: json['baseUrl'] as String? ?? legacyBaseUrl ?? defaults.baseUrl,
+      baseUrl: json['baseUrl'] as String? ?? defaults.baseUrl,
       apiKeyRef: json['apiKeyRef'] as String? ?? defaults.apiKeyRef,
       availableModels: availableModels,
       selectedModels: selectedModels,

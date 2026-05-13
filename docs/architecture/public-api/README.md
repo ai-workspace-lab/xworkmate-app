@@ -58,18 +58,18 @@ Last Updated: 2026-04-14
 
 ## Coverage Summary
 
-当前生成清单覆盖 `130` 个源码文件、`614` 个公开符号。
+当前生成清单覆盖 `129` 个源码文件、`603` 个公开符号。
 
 | Scope | Files | Public Symbols | Detailed Design Entries | Notes |
 | --- | ---: | ---: | ---: | --- |
 | `lib/app` | 30 | 68 | 10 | 主写桌面编排入口、扩展、registry 与 shell |
-| `lib/runtime` | 67 | 377 | 18 | 主写 bridge contract、runtime client、controller、bootstrap |
-| `lib/models` | 1 | 34 | 13 | 主写 settings / execution / provider / snapshot 主模型 |
-| `lib/features/assistant` | 16 | 80 | 1 | 只展开页面入口与业务挂点 |
-| `lib/features/settings` | 4 | 4 | 1 | 只展开设置主入口 |
+| `lib/runtime` | 66 | 372 | 18 | 主写 bridge contract、runtime client、controller、bootstrap |
+| `lib/models` | 1 | 31 | 13 | 主写 settings / execution / provider / snapshot 主模型 |
+| `lib/features/assistant` | 16 | 79 | 1 | 只展开页面入口与业务挂点 |
+| `lib/features/settings` | 4 | 5 | 1 | 只展开设置主入口 |
 | `lib/features/mobile` | 6 | 19 | 1 | 只展开移动端 shell 主入口 |
 | `lib/theme` | 2 | 13 | 2 | 只展开工程上影响 API 的 theme/palette 入口 |
-| `rust/src` | 4 | 19 | 17 | 结构体与 FFI 函数全部展开 |
+| `rust/src` | 4 | 16 | 17 | 结构体与 FFI 函数全部展开 |
 
 说明：
 

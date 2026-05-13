@@ -25,37 +25,33 @@ class WorkspacePageSpec {
   final WorkspacePageBuilder mobileBuilder;
 }
 
-final Map<WorkspaceDestination, WorkspacePageSpec>
-workspacePageSpecsInternal = <WorkspaceDestination, WorkspacePageSpec>{
-  WorkspaceDestination.assistant: WorkspacePageSpec(
-    destination: WorkspaceDestination.assistant,
-    desktopBuilder: (controller, onOpenDetail) => AssistantPage(
-      controller: controller,
-      onOpenDetail: onOpenDetail,
-      showStandaloneTaskRail: false,
-    ),
-    mobileBuilder: (controller, onOpenDetail) => AssistantPage(
-      controller: controller,
-      onOpenDetail: onOpenDetail,
-      showStandaloneTaskRail: false,
-    ),
-  ),
-  WorkspaceDestination.settings: WorkspacePageSpec(
-    destination: WorkspaceDestination.settings,
-    desktopBuilder: (controller, onOpenDetail) => SettingsPage(
-      controller: controller,
-      initialTab: controller.settingsTab,
-      initialDetail: controller.settingsDetail,
-      navigationContext: controller.settingsNavigationContext,
-    ),
-    mobileBuilder: (controller, onOpenDetail) => SettingsPage(
-      controller: controller,
-      initialTab: controller.settingsTab,
-      initialDetail: controller.settingsDetail,
-      navigationContext: controller.settingsNavigationContext,
-    ),
-  ),
-};
+final Map<WorkspaceDestination, WorkspacePageSpec> workspacePageSpecsInternal =
+    <WorkspaceDestination, WorkspacePageSpec>{
+      WorkspaceDestination.assistant: WorkspacePageSpec(
+        destination: WorkspaceDestination.assistant,
+        desktopBuilder: (controller, onOpenDetail) => AssistantPage(
+          controller: controller,
+          onOpenDetail: onOpenDetail,
+          showStandaloneTaskRail: false,
+        ),
+        mobileBuilder: (controller, onOpenDetail) => AssistantPage(
+          controller: controller,
+          onOpenDetail: onOpenDetail,
+          showStandaloneTaskRail: false,
+        ),
+      ),
+      WorkspaceDestination.settings: WorkspacePageSpec(
+        destination: WorkspaceDestination.settings,
+        desktopBuilder: (controller, onOpenDetail) => SettingsPage(
+          controller: controller,
+          initialTab: controller.settingsTab,
+        ),
+        mobileBuilder: (controller, onOpenDetail) => SettingsPage(
+          controller: controller,
+          initialTab: controller.settingsTab,
+        ),
+      ),
+    };
 
 Widget buildWorkspacePage({
   required WorkspaceDestination destination,
