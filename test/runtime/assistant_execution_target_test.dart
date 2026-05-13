@@ -82,7 +82,7 @@ void main() {
         );
         addTearDown(controller.dispose);
 
-        await controller.sessionsController.switchSession('session-1');
+        await controller.sessionsController.switchSession('draft:test-task-a');
 
         expect(controller.currentAssistantExecutionTarget.isAgent, isTrue);
         expect(
@@ -95,14 +95,14 @@ void main() {
         );
 
         final record = controller.requireTaskThreadForSessionInternal(
-          'session-1',
+          'draft:test-task-a',
         );
         expect(
           record.executionBinding.executionMode,
           ThreadExecutionMode.gateway,
         );
         expect(
-          controller.assistantProviderForSession('session-1'),
+          controller.assistantProviderForSession('draft:test-task-a'),
           SingleAgentProvider.openclaw,
         );
       },
@@ -135,22 +135,25 @@ void main() {
         addTearDown(controller.dispose);
         controller.resolvedUserHomeDirectoryInternal = localHome.path;
 
-        controller.upsertTaskThreadInternal(
-          'main',
-          executionTarget: AssistantExecutionTarget.gateway,
-          selectedProvider: SingleAgentProvider.openclaw,
-          selectedProviderSource: ThreadSelectionSource.explicit,
+        expect(
+          () => controller.upsertTaskThreadInternal(
+            'main',
+            executionTarget: AssistantExecutionTarget.gateway,
+            selectedProvider: SingleAgentProvider.openclaw,
+            selectedProviderSource: ThreadSelectionSource.explicit,
+          ),
+          throwsStateError,
         );
 
         expect(
-          controller.assistantExecutionTargetForSession('fresh-task'),
+          controller.assistantExecutionTargetForSession('draft:fresh-task'),
           AssistantExecutionTarget.agent,
         );
 
-        await controller.switchSession('fresh-task');
+        await controller.switchSession('draft:fresh-task');
 
         final freshThread = controller.requireTaskThreadForSessionInternal(
-          'fresh-task',
+          'draft:fresh-task',
         );
         expect(
           freshThread.executionBinding.executionMode,
@@ -158,7 +161,7 @@ void main() {
         );
         expect(
           freshThread.workspaceBinding.workspacePath,
-          endsWith('/.xworkmate/threads/fresh-task'),
+          endsWith('/.xworkmate/threads/draft-fresh-task'),
         );
       },
     );
@@ -180,6 +183,121 @@ void main() {
       expect(first, startsWith('draft:'));
       expect(second, startsWith('draft:'));
       expect(second, isNot(first));
+    });
+
+    test('navigateHome does not select the runtime main session key', () async {
+      final localHome = await Directory.systemTemp.createTemp(
+        'xworkmate-no-runtime-main-home-',
+      );
+      addTearDown(() async {
+        if (await localHome.exists()) {
+          await localHome.delete(recursive: true);
+        }
+      });
+      final controller = AppController(
+        environmentOverride: const <String, String>{},
+      );
+      addTearDown(controller.dispose);
+      controller.resolvedUserHomeDirectoryInternal = localHome.path;
+      controller.runtimeInternal.snapshotInternal = controller
+          .runtimeInternal
+          .snapshot
+          .copyWith(mainSessionKey: 'session-1');
+
+      const taskKey = 'draft:test-home-task';
+      await controller.switchSession(taskKey);
+
+      controller.navigateHome();
+      await Future<void>.delayed(Duration.zero);
+
+      expect(controller.currentSessionKey, taskKey);
+      expect(
+        controller.assistantWorkspacePathForSession(taskKey),
+        endsWith('/.xworkmate/threads/draft-test-home-task'),
+      );
+      expect(controller.assistantWorkspacePathForSession('session-1'), isEmpty);
+      expect(controller.taskThreadForSessionInternal('session-1'), isNull);
+    });
+
+    test(
+      'refreshSessions allocates an app task instead of runtime main when current is stale',
+      () async {
+        final localHome = await Directory.systemTemp.createTemp(
+          'xworkmate-refresh-no-session-one-',
+        );
+        addTearDown(() async {
+          if (await localHome.exists()) {
+            await localHome.delete(recursive: true);
+          }
+        });
+        final controller = AppController(
+          environmentOverride: const <String, String>{},
+        );
+        addTearDown(controller.dispose);
+        controller.resolvedUserHomeDirectoryInternal = localHome.path;
+        controller.runtimeInternal.snapshotInternal = controller
+            .runtimeInternal
+            .snapshot
+            .copyWith(mainSessionKey: 'session-1');
+
+        await controller.refreshSessions();
+
+        expect(controller.currentSessionKey, startsWith('draft:'));
+        expect(controller.currentSessionKey, isNot('session-1'));
+        expect(controller.currentSessionKey, isNot('main'));
+        expect(
+          controller.assistantWorkspacePathForSession(
+            controller.currentSessionKey,
+          ),
+          contains('/.xworkmate/threads/draft-'),
+        );
+        expect(
+          controller.assistantWorkspacePathForSession('session-1'),
+          isEmpty,
+        );
+      },
+    );
+
+    test('assistant task list ignores runtime sessions from the gateway', () {
+      final controller = AppController(
+        environmentOverride: const <String, String>{},
+      );
+      addTearDown(controller.dispose);
+      controller.sessionsControllerInternal.sessionsInternal =
+          const <GatewaySessionSummary>[
+            GatewaySessionSummary(
+              key: 'session-1',
+              kind: 'assistant',
+              displayName: 'runtime session',
+              surface: 'Assistant',
+              subject: null,
+              room: null,
+              space: null,
+              updatedAtMs: 1,
+              sessionId: 'session-1',
+              systemSent: false,
+              abortedLastRun: false,
+              thinkingLevel: null,
+              verboseLevel: null,
+              inputTokens: null,
+              outputTokens: null,
+              totalTokens: null,
+              model: null,
+              contextTokens: null,
+              derivedTitle: null,
+              lastMessagePreview: null,
+            ),
+          ];
+      controller.initializeAssistantThreadContext(
+        'draft:test-visible-task',
+        executionTarget: AssistantExecutionTarget.agent,
+        messageViewMode: AssistantMessageViewMode.rendered,
+      );
+
+      final keys = controller.assistantSessions.map((item) => item.key);
+
+      expect(keys, contains('draft:test-visible-task'));
+      expect(keys, isNot(contains('session-1')));
     });
 
     test(
@@ -235,17 +353,17 @@ void main() {
         );
         addTearDown(controller.dispose);
 
-        await controller.sessionsController.switchSession('session-1');
+        await controller.sessionsController.switchSession('draft:test-task-a');
         await controller.setAssistantExecutionTarget(
           AssistantExecutionTarget.gateway,
         );
 
         final record = controller.requireTaskThreadForSessionInternal(
-          'session-1',
+          'draft:test-task-a',
         );
 
         expect(
-          controller.assistantExecutionTargetForSession('session-1'),
+          controller.assistantExecutionTargetForSession('draft:test-task-a'),
           AssistantExecutionTarget.gateway,
         );
         expect(record.executionBinding.providerId, isEmpty);
@@ -269,13 +387,13 @@ void main() {
         );
         addTearDown(controller.dispose);
 
-        await controller.sessionsController.switchSession('session-1');
+        await controller.sessionsController.switchSession('draft:test-task-a');
         await controller.setAssistantExecutionTarget(
           AssistantExecutionTarget.gateway,
         );
 
         final routing = controller.buildExternalAcpRoutingForSessionInternal(
-          'session-1',
+          'draft:test-task-a',
         );
 
         expect(routing.mode, ExternalCodeAgentAcpRoutingMode.explicit);
@@ -405,7 +523,7 @@ void main() {
         );
         addTearDown(controller.dispose);
 
-        await controller.sessionsController.switchSession('session-1');
+        await controller.sessionsController.switchSession('draft:test-task-a');
         await Future<void>.delayed(const Duration(milliseconds: 200));
 
         expect(controller.assistantProviderCatalog, isEmpty);
@@ -467,7 +585,7 @@ void main() {
         );
         addTearDown(controller.dispose);
 
-        await controller.sessionsController.switchSession('session-1');
+        await controller.sessionsController.switchSession('draft:test-task-a');
         await controller.setAssistantExecutionTarget(
           AssistantExecutionTarget.gateway,
         );
@@ -580,7 +698,7 @@ void main() {
               ),
             );
 
-        await controller.sessionsController.switchSession('session-1');
+        await controller.sessionsController.switchSession('draft:test-task-a');
         await controller.setAssistantExecutionTarget(
           AssistantExecutionTarget.agent,
         );
@@ -618,14 +736,16 @@ void main() {
         );
         addTearDown(controller.dispose);
 
-        await controller.sessionsController.switchSession('session-1');
+        await controller.sessionsController.switchSession('draft:test-task-a');
         expect(
-          controller.hasCommittedUserTurnForGatewaySessionInternal('session-1'),
+          controller.hasCommittedUserTurnForGatewaySessionInternal(
+            'draft:test-task-a',
+          ),
           isFalse,
         );
 
         controller.appendLocalSessionMessageInternal(
-          'session-1',
+          'draft:test-task-a',
           GatewayChatMessage(
             id: 'error-1',
             role: 'assistant',
@@ -641,12 +761,14 @@ void main() {
         );
 
         expect(
-          controller.hasCommittedUserTurnForGatewaySessionInternal('session-1'),
+          controller.hasCommittedUserTurnForGatewaySessionInternal(
+            'draft:test-task-a',
+          ),
           isFalse,
         );
 
         controller.appendLocalSessionMessageInternal(
-          'session-1',
+          'draft:test-task-a',
           GatewayChatMessage(
             id: 'assistant-1',
             role: 'assistant',
@@ -662,12 +784,14 @@ void main() {
         );
 
         expect(
-          controller.hasCommittedUserTurnForGatewaySessionInternal('session-1'),
+          controller.hasCommittedUserTurnForGatewaySessionInternal(
+            'draft:test-task-a',
+          ),
           isFalse,
         );
 
         controller.appendLocalSessionMessageInternal(
-          'session-1',
+          'draft:test-task-a',
           GatewayChatMessage(
             id: 'user-1',
             role: 'user',
@@ -683,7 +807,9 @@ void main() {
         );
 
         expect(
-          controller.hasCommittedUserTurnForGatewaySessionInternal('session-1'),
+          controller.hasCommittedUserTurnForGatewaySessionInternal(
+            'draft:test-task-a',
+          ),
           isTrue,
         );
       },
@@ -694,7 +820,7 @@ void main() {
       final controller = _connectedController(fakeGoTaskService);
       addTearDown(controller.dispose);
 
-      await controller.sessionsController.switchSession('session-1');
+      await controller.sessionsController.switchSession('draft:test-task-a');
 
       await controller.sendChatMessage('first turn');
 
@@ -714,8 +840,8 @@ void main() {
       final fakeGoTaskService = _RecordingGoTaskServiceClient()
         ..updatesBeforeNextOutcome.add(
           const GoTaskServiceUpdate(
-            sessionId: 'session-1',
-            threadId: 'session-1',
+            sessionId: 'draft:test-task-a',
+            threadId: 'draft:test-task-a',
             turnId: 'turn-1',
             type: 'delta',
             text: 'partial output that must not persist',
@@ -747,7 +873,7 @@ void main() {
       addTearDown(controller.dispose);
       controller.resolvedUserHomeDirectoryInternal = localWorkspace.path;
 
-      await controller.sessionsController.switchSession('session-1');
+      await controller.sessionsController.switchSession('draft:test-task-a');
 
       await controller.sendChatMessage('first turn');
 
@@ -755,7 +881,7 @@ void main() {
       expect(fakeGoTaskService.requests.single.resumeSession, isFalse);
       expect(
         controller
-            .taskThreadForSessionInternal('session-1')
+            .taskThreadForSessionInternal('draft:test-task-a')
             ?.lifecycleState
             .status,
         'ready',
@@ -770,7 +896,7 @@ void main() {
       );
       expect(
         controller
-            .taskThreadForSessionInternal('session-1')
+            .taskThreadForSessionInternal('draft:test-task-a')
             ?.lastArtifactSyncStatus,
         'failed',
       );
@@ -781,12 +907,14 @@ void main() {
       expect(fakeGoTaskService.requests.last.resumeSession, isFalse);
       await _waitForLastChatMessageText(controller, '全部 6 个文件已生成 ✅');
       expect(controller.chatMessages.last.text, '全部 6 个文件已生成 ✅');
-      final thread = controller.taskThreadForSessionInternal('session-1');
+      final thread = controller.taskThreadForSessionInternal(
+        'draft:test-task-a',
+      );
       expect(thread?.lifecycleState.status, 'ready');
       expect(thread?.lastArtifactSyncStatus, 'synced');
       expect(thread?.lastArtifactSyncAtMs, greaterThan(0));
       final workspacePath = controller.assistantWorkspacePathForSession(
-        'session-1',
+        'draft:test-task-a',
       );
       for (final artifact in _generatedArtifactPayloads()) {
         final relativePath = artifact['relativePath']! as String;
@@ -822,14 +950,14 @@ void main() {
         final controller = _connectedController(fakeGoTaskService);
         addTearDown(controller.dispose);
 
-        await controller.sessionsController.switchSession('session-1');
+        await controller.sessionsController.switchSession('draft:test-task-a');
 
         await controller.sendChatMessage('first turn');
 
         expect(fakeGoTaskService.requests, hasLength(1));
         expect(fakeGoTaskService.requests.single.resumeSession, isFalse);
         final failedThread = controller.taskThreadForSessionInternal(
-          'session-1',
+          'draft:test-task-a',
         );
         expect(failedThread?.lifecycleState.status, 'ready');
         expect(
@@ -855,7 +983,9 @@ void main() {
           controller.chatMessages.last.text,
           'retried from a confirmed new start',
         );
-        final thread = controller.taskThreadForSessionInternal('session-1');
+        final thread = controller.taskThreadForSessionInternal(
+          'draft:test-task-a',
+        );
         expect(thread?.lifecycleState.status, 'ready');
         expect(thread?.lifecycleState.lastResultCode, 'success');
       },
@@ -877,8 +1007,8 @@ void main() {
         final fakeGoTaskService = _RecordingGoTaskServiceClient()
           ..updatesBeforeNextOutcome.add(
             const GoTaskServiceUpdate(
-              sessionId: 'session-1',
-              threadId: 'session-1',
+              sessionId: 'draft:test-task-a',
+              threadId: 'draft:test-task-a',
               turnId: 'turn-1',
               type: 'delta',
               text: 'guard partial output must not persist',
@@ -910,7 +1040,7 @@ void main() {
         addTearDown(controller.dispose);
         controller.resolvedUserHomeDirectoryInternal = localWorkspace.path;
 
-        await controller.sessionsController.switchSession('session-1');
+        await controller.sessionsController.switchSession('draft:test-task-a');
 
         await controller.sendChatMessage('first turn');
         await controller.sendChatMessage('follow up');
@@ -929,7 +1059,9 @@ void main() {
           isNot(contains('guard partial output must not persist')),
         );
 
-        final thread = controller.taskThreadForSessionInternal('session-1');
+        final thread = controller.taskThreadForSessionInternal(
+          'draft:test-task-a',
+        );
         expect(thread?.lifecycleState.status, 'ready');
         expect(thread?.lastArtifactSyncStatus, 'no-exported-artifacts');
         expect(thread?.lastArtifactSyncAtMs, greaterThan(0));
@@ -952,8 +1084,8 @@ void main() {
         final fakeGoTaskService = _RecordingGoTaskServiceClient()
           ..updatesBeforeNextOutcome.add(
             const GoTaskServiceUpdate(
-              sessionId: 'session-1',
-              threadId: 'session-1',
+              sessionId: 'draft:test-task-a',
+              threadId: 'draft:test-task-a',
               turnId: 'turn-1',
               type: 'delta',
               text: guardMessage,
@@ -985,7 +1117,7 @@ void main() {
         addTearDown(controller.dispose);
         controller.resolvedUserHomeDirectoryInternal = localWorkspace.path;
 
-        await controller.sessionsController.switchSession('session-1');
+        await controller.sessionsController.switchSession('draft:test-task-a');
         await controller.sendChatMessage('create files');
 
         final transcript = controller.chatMessages
@@ -993,7 +1125,9 @@ void main() {
             .join('\n');
         expect(transcript, isNot(contains('未检测到 OpenClaw 本轮导出的实际文件')));
         expect(transcript, isNot(contains('口头下载声明')));
-        final thread = controller.taskThreadForSessionInternal('session-1');
+        final thread = controller.taskThreadForSessionInternal(
+          'draft:test-task-a',
+        );
         expect(thread?.lifecycleState.lastResultCode, 'artifact_missing');
         expect(thread?.lastArtifactSyncStatus, 'no-exported-artifacts');
         expect(thread?.lastArtifactSyncAtMs, greaterThan(0));
@@ -1014,8 +1148,8 @@ void main() {
         final fakeGoTaskService = _RecordingGoTaskServiceClient()
           ..updatesBeforeNextOutcome.add(
             const GoTaskServiceUpdate(
-              sessionId: 'session-1',
-              threadId: 'session-1',
+              sessionId: 'draft:test-task-a',
+              threadId: 'draft:test-task-a',
               turnId: 'turn-1',
               type: 'delta',
               text: 'handshake partial output must not persist',
@@ -1047,14 +1181,14 @@ void main() {
         addTearDown(controller.dispose);
         controller.resolvedUserHomeDirectoryInternal = localWorkspace.path;
 
-        await controller.sessionsController.switchSession('session-1');
+        await controller.sessionsController.switchSession('draft:test-task-a');
 
         await controller.sendChatMessage('first turn');
 
         expect(fakeGoTaskService.requests, hasLength(1));
         expect(fakeGoTaskService.requests.single.resumeSession, isFalse);
         final failedThread = controller.taskThreadForSessionInternal(
-          'session-1',
+          'draft:test-task-a',
         );
         expect(failedThread?.lifecycleState.status, 'ready');
         expect(
@@ -1077,12 +1211,14 @@ void main() {
         expect(fakeGoTaskService.requests.last.resumeSession, isFalse);
         await _waitForLastChatMessageText(controller, '全部 6 个文件已生成 ✅');
         expect(controller.chatMessages.last.text, '全部 6 个文件已生成 ✅');
-        final thread = controller.taskThreadForSessionInternal('session-1');
+        final thread = controller.taskThreadForSessionInternal(
+          'draft:test-task-a',
+        );
         expect(thread?.lifecycleState.status, 'ready');
         expect(thread?.lastArtifactSyncStatus, 'synced');
         expect(thread?.lastArtifactSyncAtMs, greaterThan(0));
         final workspacePath = controller.assistantWorkspacePathForSession(
-          'session-1',
+          'draft:test-task-a',
         );
         for (final artifact in _generatedArtifactPayloads()) {
           final relativePath = artifact['relativePath']! as String;
@@ -1103,7 +1239,7 @@ void main() {
         );
         addTearDown(controller.dispose);
 
-        await controller.sessionsController.switchSession('session-1');
+        await controller.sessionsController.switchSession('draft:test-task-a');
 
         final userMessage = GatewayChatMessage(
           id: 'local-user-1',
@@ -1129,19 +1265,19 @@ void main() {
         );
 
         controller.appendLocalSessionMessageInternal(
-          'session-1',
+          'draft:test-task-a',
           userMessage,
           persistInThreadContext: true,
         );
         controller.appendLocalSessionMessageInternal(
-          'session-1',
+          'draft:test-task-a',
           assistantMessage,
           persistInThreadContext: true,
         );
-        controller.assistantThreadMessagesInternal['session-1'] =
+        controller.assistantThreadMessagesInternal['draft:test-task-a'] =
             List<GatewayChatMessage>.from(
               controller
-                  .requireTaskThreadForSessionInternal('session-1')
+                  .requireTaskThreadForSessionInternal('draft:test-task-a')
                   .messages,
             );
 

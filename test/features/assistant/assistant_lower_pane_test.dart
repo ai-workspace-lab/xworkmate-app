@@ -13,10 +13,12 @@ void main() {
     testWidgets(
       'does not fabricate providers when live capabilities are unavailable',
       (tester) async {
-        final controller = AppController(environmentOverride: const <String, String>{});
+        final controller = AppController(
+          environmentOverride: const <String, String>{},
+        );
         addTearDown(controller.dispose);
 
-        await controller.sessionsController.switchSession('session-1');
+        await controller.sessionsController.switchSession('draft:test-task-a');
 
         await tester.pumpWidget(
           _buildTestApp(child: _buildLowerPane(controller: controller)),
@@ -29,9 +31,10 @@ void main() {
         );
         expect(find.text('未提供'), findsNothing);
 
-        final providerButton = tester.widget<PopupMenuButton<SingleAgentProvider>>(
-          find.byKey(const Key('assistant-provider-button')),
-        );
+        final providerButton = tester
+            .widget<PopupMenuButton<SingleAgentProvider>>(
+              find.byKey(const Key('assistant-provider-button')),
+            );
         expect(providerButton.enabled, isFalse);
 
         expect(
@@ -55,7 +58,7 @@ void main() {
 
     testWidgets('shows mode-specific provider catalogs', (tester) async {
       final controller = AppController(
-          environmentOverride: const <String, String>{},
+        environmentOverride: const <String, String>{},
         initialBridgeProviderCatalog: const <SingleAgentProvider>[
           SingleAgentProvider.codex,
           SingleAgentProvider.opencode,
@@ -76,7 +79,7 @@ void main() {
       );
       addTearDown(controller.dispose);
 
-      await controller.sessionsController.switchSession('session-1');
+      await controller.sessionsController.switchSession('draft:test-task-a');
 
       await tester.pumpWidget(
         _buildTestApp(child: _buildLowerPane(controller: controller)),
@@ -110,7 +113,7 @@ void main() {
       );
 
       final gatewayThread = controller
-          .requireTaskThreadForSessionInternal('session-1')
+          .requireTaskThreadForSessionInternal('draft:test-task-a')
           .copyWith(
             executionBinding: ExecutionBinding(
               executionMode: threadExecutionModeFromAssistantExecutionTarget(
@@ -151,7 +154,7 @@ void main() {
       await tester.pumpAndSettle();
 
       final agentThread = controller
-          .requireTaskThreadForSessionInternal('session-1')
+          .requireTaskThreadForSessionInternal('draft:test-task-a')
           .copyWith(
             executionBinding: ExecutionBinding(
               executionMode: threadExecutionModeFromAssistantExecutionTarget(
@@ -204,7 +207,7 @@ void main() {
       tester,
     ) async {
       final controller = AppController(
-          environmentOverride: const <String, String>{},
+        environmentOverride: const <String, String>{},
         initialBridgeProviderCatalog: const <SingleAgentProvider>[
           SingleAgentProvider.codex,
           SingleAgentProvider.opencode,
@@ -213,7 +216,7 @@ void main() {
       );
       addTearDown(controller.dispose);
 
-      await controller.sessionsController.switchSession('session-1');
+      await controller.sessionsController.switchSession('draft:test-task-a');
 
       await tester.pumpWidget(
         _buildTestApp(child: _buildLowerPane(controller: controller)),
@@ -253,7 +256,7 @@ void main() {
       tester,
     ) async {
       final controller = AppController(
-          environmentOverride: const <String, String>{},
+        environmentOverride: const <String, String>{},
         initialBridgeProviderCatalog: const <SingleAgentProvider>[
           SingleAgentProvider.codex,
           SingleAgentProvider.opencode,
@@ -274,12 +277,12 @@ void main() {
       );
       addTearDown(controller.dispose);
 
-      await controller.sessionsController.switchSession('session-1');
+      await controller.sessionsController.switchSession('draft:test-task-a');
       controller.initializeAssistantThreadContext(
-        'session-1',
+        'draft:test-task-a',
         executionTarget: AssistantExecutionTarget.gateway,
         messageViewMode: controller.assistantMessageViewModeForSession(
-          'session-1',
+          'draft:test-task-a',
         ),
       );
       controller.notifyListeners();
@@ -315,10 +318,12 @@ void main() {
     });
 
     testWidgets('uses submit button instead of connect action', (tester) async {
-      final controller = AppController(environmentOverride: const <String, String>{});
+      final controller = AppController(
+        environmentOverride: const <String, String>{},
+      );
       addTearDown(controller.dispose);
 
-      await controller.sessionsController.switchSession('session-1');
+      await controller.sessionsController.switchSession('draft:test-task-a');
 
       var sendCount = 0;
 

@@ -93,8 +93,7 @@ class GatewaySessionsController extends ChangeNotifier {
 
   List<GatewaySessionSummary> sessionsInternal =
       const <GatewaySessionSummary>[];
-  String currentSessionKeyInternal = 'main';
-  String mainSessionBaseKeyInternal = 'main';
+  String currentSessionKeyInternal = '';
   String selectedAgentIdInternal = '';
   String defaultAgentIdInternal = '';
   bool loadingInternal = false;
@@ -104,35 +103,14 @@ class GatewaySessionsController extends ChangeNotifier {
   String get currentSessionKey => currentSessionKeyInternal;
   bool get loading => loadingInternal;
   String? get error => errorInternal;
-  String get mainSessionBaseKey => mainSessionBaseKeyInternal;
 
   void configure({
-    required String mainSessionKey,
     required String selectedAgentId,
     required String defaultAgentId,
   }) {
-    mainSessionBaseKeyInternal = normalizeMainSessionKey(mainSessionKey);
     selectedAgentIdInternal = selectedAgentId.trim();
     defaultAgentIdInternal = defaultAgentId.trim();
-    final preferred = preferredSessionKey;
-    if (currentSessionKeyInternal.trim().isEmpty ||
-        currentSessionKeyInternal == 'main' ||
-        currentSessionKeyInternal == mainSessionBaseKeyInternal ||
-        currentSessionKeyInternal.startsWith('agent:')) {
-      currentSessionKeyInternal = preferred;
-    }
     notifyListeners();
-  }
-
-  String get preferredSessionKey {
-    final selected = selectedAgentIdInternal.trim();
-    final defaultAgent = defaultAgentIdInternal.trim();
-    final base = normalizeMainSessionKey(mainSessionBaseKeyInternal);
-    if (selected.isEmpty ||
-        (defaultAgent.isNotEmpty && selected == defaultAgent)) {
-      return base;
-    }
-    return makeAgentSessionKey(agentId: selected, baseKey: base);
   }
 
   Future<void> refresh() async {
@@ -147,11 +125,6 @@ class GatewaySessionsController extends ChangeNotifier {
     notifyListeners();
     try {
       sessionsInternal = await runtimeInternal.listSessions(limit: 50);
-      if (!sessionsInternal.any(
-        (item) => matchesSessionKey(item.key, currentSessionKeyInternal),
-      )) {
-        currentSessionKeyInternal = preferredSessionKey;
-      }
     } catch (error) {
       errorInternal = error.toString();
     } finally {

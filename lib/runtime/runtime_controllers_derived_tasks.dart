@@ -147,20 +147,6 @@ class DerivedTasksController extends ChangeNotifier {
   }
 }
 
-String normalizeMainSessionKey(String? value) {
-  final trimmed = value?.trim() ?? '';
-  return trimmed.isEmpty ? 'main' : trimmed;
-}
-
-String makeAgentSessionKey({required String agentId, required String baseKey}) {
-  final trimmedAgent = agentId.trim();
-  final trimmedBase = baseKey.trim();
-  if (trimmedAgent.isEmpty) {
-    return normalizeMainSessionKey(trimmedBase);
-  }
-  return 'agent:$trimmedAgent:${normalizeMainSessionKey(trimmedBase)}';
-}
-
 bool matchesSessionKey(String incoming, String current) {
   final left = incoming.trim().toLowerCase();
   final right = current.trim().toLowerCase();

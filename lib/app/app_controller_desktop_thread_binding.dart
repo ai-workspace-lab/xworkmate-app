@@ -95,6 +95,9 @@ extension AppControllerDesktopThreadBinding on AppController {
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey,
     );
+    if (!isAppOwnedAssistantSessionKeyInternal(normalizedSessionKey)) {
+      return '';
+    }
     final homeDirectory = resolvedUserHomeDirectoryInternal.trim();
     if (homeDirectory.isEmpty) {
       return '';
@@ -114,6 +117,9 @@ extension AppControllerDesktopThreadBinding on AppController {
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey,
     );
+    if (!isAppOwnedAssistantSessionKeyInternal(normalizedSessionKey)) {
+      return '';
+    }
     return '\$HOME/.xworkmate/threads/${threadWorkspaceDirectoryNameInternal(normalizedSessionKey)}';
   }
 

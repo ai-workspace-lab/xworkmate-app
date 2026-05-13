@@ -48,6 +48,11 @@ import 'app_controller_desktop_thread_sessions_collaboration_impl.dart';
 
 // ignore_for_file: invalid_use_of_visible_for_testing_member, invalid_use_of_protected_member
 
+final RegExp _runtimeSessionKeyPatternInternal = RegExp(
+  r'^session-\d+$',
+  caseSensitive: false,
+);
+
 AssistantThreadConnectionState resolveGatewayThreadConnectionStateInternal({
   required AssistantExecutionTarget target,
   required bool bridgeReady,
@@ -186,6 +191,26 @@ bool bridgeCapabilityReadyForExecutionTargetInternal({
 }
 
 extension AppControllerDesktopThreadSessions on AppController {
+  bool isRuntimeOwnedAssistantSessionKeyInternal(String sessionKey) {
+    final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
+      sessionKey,
+    ).toLowerCase();
+    if (normalizedSessionKey.isEmpty) {
+      return true;
+    }
+    if (normalizedSessionKey == 'main') {
+      return true;
+    }
+    if (normalizedSessionKey.startsWith('agent:')) {
+      return true;
+    }
+    return _runtimeSessionKeyPatternInternal.hasMatch(normalizedSessionKey);
+  }
+
+  bool isAppOwnedAssistantSessionKeyInternal(String sessionKey) {
+    return !isRuntimeOwnedAssistantSessionKeyInternal(sessionKey);
+  }
+
   AssistantExecutionTarget resolveAssistantExecutionTargetFromRecordsInternal(
     TaskThread? record,
   ) {
@@ -206,6 +231,9 @@ extension AppControllerDesktopThreadSessions on AppController {
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey,
     );
+    if (!isAppOwnedAssistantSessionKeyInternal(normalizedSessionKey)) {
+      return null;
+    }
     return taskThreadRepositoryInternal.taskThreadForSession(
       normalizedSessionKey,
     );
@@ -224,6 +252,9 @@ extension AppControllerDesktopThreadSessions on AppController {
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey,
     );
+    if (!isAppOwnedAssistantSessionKeyInternal(normalizedSessionKey)) {
+      return false;
+    }
     return taskThreadRepositoryInternal.containsKey(normalizedSessionKey) ||
         assistantThreadMessagesInternal.containsKey(normalizedSessionKey) ||
         localSessionMessagesInternal.containsKey(normalizedSessionKey);
@@ -587,21 +618,12 @@ extension AppControllerDesktopThreadSessions on AppController {
   List<GatewaySessionSummary> assistantSessionsInternal() {
     final byKey = <String, GatewaySessionSummary>{};
 
-    for (final session in sessionsControllerInternal.sessions) {
-      final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
-        session.key,
-      );
-      if (isAssistantTaskArchived(normalizedSessionKey)) {
-        continue;
-      }
-      byKey[normalizedSessionKey] = session;
-    }
-
     for (final record in assistantThreadRecordsInternal.values) {
       final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
         record.sessionKey,
       );
       if (normalizedSessionKey.isEmpty ||
+          !isAppOwnedAssistantSessionKeyInternal(normalizedSessionKey) ||
           isAssistantTaskArchived(normalizedSessionKey) ||
           record.archived) {
         continue;
@@ -616,7 +638,8 @@ extension AppControllerDesktopThreadSessions on AppController {
     }
 
     final currentKey = normalizedAssistantSessionKeyInternal(currentSessionKey);
-    if (!isAssistantTaskArchived(currentKey) &&
+    if (isAppOwnedAssistantSessionKeyInternal(currentKey) &&
+        !isAssistantTaskArchived(currentKey) &&
         !byKey.containsKey(currentKey)) {
       byKey[currentKey] = assistantSessionSummaryForInternal(currentKey);
     }

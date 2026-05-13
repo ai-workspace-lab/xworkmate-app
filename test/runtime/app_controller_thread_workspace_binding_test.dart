@@ -186,9 +186,9 @@ void main() {
       });
 
       controller.upsertTaskThreadInternal(
-        'session-1',
+        'draft:test-task-a',
         workspaceBinding: WorkspaceBinding(
-          workspaceId: 'session-1',
+          workspaceId: 'draft:test-task-a',
           workspaceKind: WorkspaceKind.localFs,
           workspacePath: localWorkspace.path,
           displayPath: localWorkspace.path,
@@ -201,26 +201,60 @@ void main() {
       expect(
         assistantWorkingDirectoryForSessionRuntimeInternal(
           controller,
-          'session-1',
+          'draft:test-task-a',
         ),
         localWorkspace.path,
       );
       expect(
         resolveLocalAssistantWorkingDirectoryForSessionRuntimeInternal(
           controller,
-          'session-1',
+          'draft:test-task-a',
         ),
         localWorkspace.path,
       );
       expect(
         assistantRemoteWorkingDirectoryHintForSessionRuntimeInternal(
           controller,
-          'session-1',
+          'draft:test-task-a',
         ),
         remoteWorkspace.path,
       );
     },
   );
+
+  test('runtime session keys do not resolve to app task workspaces', () async {
+    final controller = AppController(
+      environmentOverride: const <String, String>{},
+    );
+    addTearDown(controller.dispose);
+
+    final home = await Directory.systemTemp.createTemp(
+      'xworkmate-runtime-key-workspace-',
+    );
+    addTearDown(() async {
+      if (await home.exists()) {
+        await home.delete(recursive: true);
+      }
+    });
+    controller.resolvedUserHomeDirectoryInternal = home.path;
+
+    controller.initializeAssistantThreadContext(
+      'draft:test-workspace-task',
+      executionTarget: AssistantExecutionTarget.gateway,
+      messageViewMode: AssistantMessageViewMode.rendered,
+    );
+
+    expect(controller.localThreadWorkspacePathInternal('session-1'), isEmpty);
+    expect(
+      controller.localThreadWorkspaceDisplayPathInternal('session-1'),
+      isEmpty,
+    );
+    expect(controller.assistantWorkspacePathForSession('session-1'), isEmpty);
+    expect(
+      controller.assistantWorkspacePathForSession('draft:test-workspace-task'),
+      endsWith('/.xworkmate/threads/draft-test-workspace-task'),
+    );
+  });
 
   test('writes inline ACP artifacts into the local thread workspace', () async {
     final controller = AppController(
@@ -238,9 +272,9 @@ void main() {
     });
 
     controller.upsertTaskThreadInternal(
-      'session-1',
+      'draft:test-task-a',
       workspaceBinding: WorkspaceBinding(
-        workspaceId: 'session-1',
+        workspaceId: 'draft:test-task-a',
         workspaceKind: WorkspaceKind.localFs,
         workspacePath: localWorkspace.path,
         displayPath: localWorkspace.path,
@@ -267,20 +301,20 @@ void main() {
     );
 
     await controller.persistGoTaskArtifactsForSessionInternal(
-      'session-1',
+      'draft:test-task-a',
       result,
     );
 
     final artifact = File('${localWorkspace.path}/notes/hello.txt');
     expect(await artifact.readAsString(), 'artifact body');
     await controller.persistGoTaskArtifactsForSessionInternal(
-      'session-1',
+      'draft:test-task-a',
       result,
     );
     final versionedArtifact = File('${localWorkspace.path}/notes/hello.v2.txt');
     expect(await versionedArtifact.readAsString(), 'artifact body');
     final snapshot = await controller.loadAssistantArtifactSnapshot(
-      sessionKey: 'session-1',
+      sessionKey: 'draft:test-task-a',
     );
     expect(snapshot.resultEntries.map((entry) => entry.relativePath), <String>[
       'notes/hello.v2.txt',
@@ -291,7 +325,7 @@ void main() {
     );
     expect(
       controller
-          .requireTaskThreadForSessionInternal('session-1')
+          .requireTaskThreadForSessionInternal('draft:test-task-a')
           .lastArtifactSyncStatus,
       'synced',
     );
@@ -317,9 +351,9 @@ void main() {
       await staleArtifact.writeAsString('stale task output');
 
       controller.upsertTaskThreadInternal(
-        'session-1',
+        'draft:test-task-a',
         workspaceBinding: WorkspaceBinding(
-          workspaceId: 'session-1',
+          workspaceId: 'draft:test-task-a',
           workspaceKind: WorkspaceKind.localFs,
           workspacePath: localWorkspace.path,
           displayPath: localWorkspace.path,
@@ -346,12 +380,12 @@ void main() {
       );
 
       await controller.persistGoTaskArtifactsForSessionInternal(
-        'session-1',
+        'draft:test-task-a',
         result,
       );
 
       final snapshot = await controller.loadAssistantArtifactSnapshot(
-        sessionKey: 'session-1',
+        sessionKey: 'draft:test-task-a',
       );
       final currentRelativePaths = snapshot.resultEntries
           .map((entry) => entry.relativePath)
@@ -372,7 +406,7 @@ void main() {
           previewable: true,
           workspacePath: localWorkspace.path,
         ),
-        sessionKey: 'session-1',
+        sessionKey: 'draft:test-task-a',
       );
       expect(stalePreview.kind, AssistantArtifactPreviewKind.markdown);
       expect(stalePreview.content, 'stale task output');
@@ -412,9 +446,9 @@ void main() {
       });
 
       controller.upsertTaskThreadInternal(
-        'session-1',
+        'draft:test-task-a',
         workspaceBinding: WorkspaceBinding(
-          workspaceId: 'session-1',
+          workspaceId: 'draft:test-task-a',
           workspaceKind: WorkspaceKind.localFs,
           workspacePath: localWorkspace.path,
           displayPath: localWorkspace.path,
@@ -444,7 +478,7 @@ void main() {
       final clientFactory = _proxiedClientFactory(server.port);
       await HttpOverrides.runZoned(() async {
         await controller.persistGoTaskArtifactsForSessionInternal(
-          'session-1',
+          'draft:test-task-a',
           result,
         );
       }, createHttpClient: clientFactory);
@@ -453,7 +487,7 @@ void main() {
       expect(await artifact.readAsString(), 'downloaded artifact body');
       expect(observedAuthorization, 'Bearer bridge-token');
       final snapshot = await controller.loadAssistantArtifactSnapshot(
-        sessionKey: 'session-1',
+        sessionKey: 'draft:test-task-a',
       );
       expect(
         snapshot.fileEntries.map((entry) => entry.relativePath),
@@ -461,7 +495,7 @@ void main() {
       );
       expect(
         controller
-            .requireTaskThreadForSessionInternal('session-1')
+            .requireTaskThreadForSessionInternal('draft:test-task-a')
             .lastArtifactSyncStatus,
         'synced',
       );
@@ -650,9 +684,9 @@ void main() {
         }
       });
       controller.upsertTaskThreadInternal(
-        'session-1',
+        'draft:test-task-a',
         workspaceBinding: WorkspaceBinding(
-          workspaceId: 'session-1',
+          workspaceId: 'draft:test-task-a',
           workspaceKind: WorkspaceKind.localFs,
           workspacePath: localWorkspace.path,
           displayPath: localWorkspace.path,
@@ -670,7 +704,7 @@ void main() {
               'relativePath': 'reports/resume.bin',
               'downloadUrl':
                   'http://xworkmate-bridge.svc.plus:${server.port}/artifacts/openclaw/download'
-                  '?sessionKey=session-1&runId=run-1&relativePath=reports%2Fresume.bin'
+                  '?sessionKey=draft:test-task-a&runId=run-1&relativePath=reports%2Fresume.bin'
                   '&expires=9999999999&sig=test-signature',
               'contentType': 'application/octet-stream',
               'sizeBytes': body.length,
@@ -686,7 +720,7 @@ void main() {
       final clientFactory = _proxiedClientFactory(server.port);
       await HttpOverrides.runZoned(() async {
         await controller.persistGoTaskArtifactsForSessionInternal(
-          'session-1',
+          'draft:test-task-a',
           result,
         );
       }, createHttpClient: clientFactory);
@@ -699,7 +733,7 @@ void main() {
       );
       expect(
         controller
-            .requireTaskThreadForSessionInternal('session-1')
+            .requireTaskThreadForSessionInternal('draft:test-task-a')
             .lastArtifactSyncStatus,
         'synced',
       );
@@ -754,9 +788,9 @@ void main() {
         }
       });
       controller.upsertTaskThreadInternal(
-        'session-1',
+        'draft:test-task-a',
         workspaceBinding: WorkspaceBinding(
-          workspaceId: 'session-1',
+          workspaceId: 'draft:test-task-a',
           workspaceKind: WorkspaceKind.localFs,
           workspacePath: localWorkspace.path,
           displayPath: localWorkspace.path,
@@ -786,7 +820,7 @@ void main() {
       final clientFactory = _proxiedClientFactory(server.port);
       await HttpOverrides.runZoned(() async {
         await controller.persistGoTaskArtifactsForSessionInternal(
-          'session-1',
+          'draft:test-task-a',
           result,
         );
       }, createHttpClient: clientFactory);
@@ -798,7 +832,7 @@ void main() {
       );
       expect(
         controller
-            .requireTaskThreadForSessionInternal('session-1')
+            .requireTaskThreadForSessionInternal('draft:test-task-a')
             .lastArtifactSyncStatus,
         'synced',
       );
@@ -837,9 +871,9 @@ void main() {
       }
     });
     controller.upsertTaskThreadInternal(
-      'session-1',
+      'draft:test-task-a',
       workspaceBinding: WorkspaceBinding(
-        workspaceId: 'session-1',
+        workspaceId: 'draft:test-task-a',
         workspaceKind: WorkspaceKind.localFs,
         workspacePath: localWorkspace.path,
         displayPath: localWorkspace.path,
@@ -880,7 +914,7 @@ void main() {
     final clientFactory = _proxiedClientFactory(server.port);
     await HttpOverrides.runZoned(() async {
       await controller.persistGoTaskArtifactsForSessionInternal(
-        'session-1',
+        'draft:test-task-a',
         result,
       );
     }, createHttpClient: clientFactory);
@@ -898,7 +932,7 @@ void main() {
       isFalse,
     );
     final snapshot = await controller.loadAssistantArtifactSnapshot(
-      sessionKey: 'session-1',
+      sessionKey: 'draft:test-task-a',
     );
     expect(
       snapshot.fileEntries.map((entry) => entry.relativePath),
@@ -906,7 +940,7 @@ void main() {
     );
     expect(
       controller
-          .requireTaskThreadForSessionInternal('session-1')
+          .requireTaskThreadForSessionInternal('draft:test-task-a')
           .lastArtifactSyncStatus,
       'partial',
     );
@@ -939,9 +973,9 @@ void main() {
       }
     });
     controller.upsertTaskThreadInternal(
-      'session-1',
+      'draft:test-task-a',
       workspaceBinding: WorkspaceBinding(
-        workspaceId: 'session-1',
+        workspaceId: 'draft:test-task-a',
         workspaceKind: WorkspaceKind.localFs,
         workspacePath: localWorkspace.path,
         displayPath: localWorkspace.path,
@@ -974,7 +1008,7 @@ void main() {
     final clientFactory = _proxiedClientFactory(server.port);
     await HttpOverrides.runZoned(() async {
       await controller.persistGoTaskArtifactsForSessionInternal(
-        'session-1',
+        'draft:test-task-a',
         result,
       );
     }, createHttpClient: clientFactory);
@@ -990,7 +1024,7 @@ void main() {
     expect(leftovers, isEmpty);
     expect(
       controller
-          .requireTaskThreadForSessionInternal('session-1')
+          .requireTaskThreadForSessionInternal('draft:test-task-a')
           .lastArtifactSyncStatus,
       'download-failed',
     );
@@ -1013,9 +1047,9 @@ void main() {
         }
       });
       controller.upsertTaskThreadInternal(
-        'session-1',
+        'draft:test-task-a',
         workspaceBinding: WorkspaceBinding(
-          workspaceId: 'session-1',
+          workspaceId: 'draft:test-task-a',
           workspaceKind: WorkspaceKind.localFs,
           workspacePath: localWorkspace.path,
           displayPath: localWorkspace.path,
@@ -1035,13 +1069,13 @@ void main() {
       );
 
       await controller.persistGoTaskArtifactsForSessionInternal(
-        'session-1',
+        'draft:test-task-a',
         result,
       );
 
       expect(await localWorkspace.list(recursive: true).toList(), isEmpty);
       final thread = controller.requireTaskThreadForSessionInternal(
-        'session-1',
+        'draft:test-task-a',
       );
       expect(thread.lastArtifactSyncStatus, 'no-exported-artifacts');
       expect(thread.lastArtifactSyncAtMs, greaterThan(0));
@@ -1065,9 +1099,9 @@ void main() {
     final staleArtifact = File('${localWorkspace.path}/old-task-report.md');
     await staleArtifact.writeAsString('stale task output');
     controller.upsertTaskThreadInternal(
-      'session-1',
+      'draft:test-task-a',
       workspaceBinding: WorkspaceBinding(
-        workspaceId: 'session-1',
+        workspaceId: 'draft:test-task-a',
         workspaceKind: WorkspaceKind.localFs,
         workspacePath: localWorkspace.path,
         displayPath: localWorkspace.path,
@@ -1086,18 +1120,18 @@ void main() {
     );
 
     await controller.persistGoTaskArtifactsForSessionInternal(
-      'session-1',
+      'draft:test-task-a',
       result,
     );
 
     expect(
       controller
-          .requireTaskThreadForSessionInternal('session-1')
+          .requireTaskThreadForSessionInternal('draft:test-task-a')
           .lastArtifactSyncStatus,
       'no-artifacts',
     );
     final snapshot = await controller.loadAssistantArtifactSnapshot(
-      sessionKey: 'session-1',
+      sessionKey: 'draft:test-task-a',
     );
     expect(snapshot.resultEntries, isEmpty);
     expect(
@@ -1124,9 +1158,9 @@ void main() {
     });
 
     controller.upsertTaskThreadInternal(
-      'session-1',
+      'draft:test-task-a',
       workspaceBinding: WorkspaceBinding(
-        workspaceId: 'session-1',
+        workspaceId: 'draft:test-task-a',
         workspaceKind: WorkspaceKind.localFs,
         workspacePath: localWorkspace.path,
         displayPath: localWorkspace.path,
@@ -1153,7 +1187,7 @@ void main() {
     );
 
     await controller.persistGoTaskArtifactsForSessionInternal(
-      'session-1',
+      'draft:test-task-a',
       result,
     );
 
@@ -1163,7 +1197,7 @@ void main() {
     );
     expect(
       controller
-          .requireTaskThreadForSessionInternal('session-1')
+          .requireTaskThreadForSessionInternal('draft:test-task-a')
           .lastArtifactSyncStatus,
       'no-artifacts',
     );

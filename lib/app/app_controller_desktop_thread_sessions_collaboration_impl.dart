@@ -102,9 +102,12 @@ Future<void> runMultiAgentCollaborationThreadSessionInternal(
   required List<CollaborationAttachment> attachments,
   required List<String> selectedSkillLabels,
 }) async {
-  final sessionKey = controller.currentSessionKey.trim().isEmpty
-      ? 'main'
-      : controller.currentSessionKey;
+  if (!controller.isAppOwnedAssistantSessionKeyInternal(
+    controller.currentSessionKey,
+  )) {
+    await controller.ensureActiveAssistantThreadInternal();
+  }
+  final sessionKey = controller.currentSessionKey.trim();
   await controller.enqueueThreadTurnInternal<void>(sessionKey, () async {
     await controller.ensureDesktopTaskThreadBindingInternal(
       sessionKey,
@@ -381,11 +384,6 @@ bool canQuickConnectGatewayThreadSessionInternal(AppController controller) {
       profile.port != defaults.port ||
       profile.tls != defaults.tls ||
       profile.mode != defaults.mode;
-}
-
-String normalizeAssistantSessionKeyThreadInternal(String sessionKey) {
-  final trimmed = sessionKey.trim();
-  return trimmed.isEmpty ? 'main' : trimmed;
 }
 
 String joinConnectionPartsThreadSessionInternal(List<String> parts) {
