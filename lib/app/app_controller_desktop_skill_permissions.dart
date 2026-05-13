@@ -247,6 +247,11 @@ extension AppControllerDesktopSkillPermissions on AppController {
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey,
     );
+    if (!isAppOwnedAssistantSessionKeyInternal(normalizedSessionKey)) {
+      throw StateError(
+        'Runtime session key "$normalizedSessionKey" cannot be used as an app task.',
+      );
+    }
     final existing = taskThreadForSessionInternal(normalizedSessionKey);
     final nextExecutionTarget =
         executionTarget ??
@@ -439,11 +444,17 @@ extension AppControllerDesktopSkillPermissions on AppController {
     String sessionKey, {
     bool persistSelection = true,
   }) async {
-    final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
+    var normalizedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey,
     );
-    if (normalizedSessionKey.isEmpty) {
-      return;
+    if (!isAppOwnedAssistantSessionKeyInternal(normalizedSessionKey)) {
+      normalizedSessionKey = createAssistantDraftSessionKeyInternal();
+      initializeAssistantThreadContext(
+        normalizedSessionKey,
+        title: appText('新对话', 'New conversation'),
+        executionTarget: currentAssistantExecutionTarget,
+        messageViewMode: currentAssistantMessageViewMode,
+      );
     }
     await sessionsControllerInternal.switchSession(normalizedSessionKey);
     if (persistSelection) {

@@ -62,15 +62,19 @@ extension AppControllerDesktopThreadStorage on AppController {
   }
 
   Future<void> ensureActiveAssistantThreadInternal() async {
-    if (!isAssistantTaskArchived(
+    final currentKey = normalizedAssistantSessionKeyInternal(
       sessionsControllerInternal.currentSessionKey,
-    )) {
+    );
+    if (isAppOwnedAssistantSessionKeyInternal(currentKey) &&
+        !isAssistantTaskArchived(currentKey)) {
       return;
     }
     final fallback = assistantSessionSummariesInternal().firstWhere(
-      (item) => !isAssistantTaskArchived(item.key),
+      (item) =>
+          isAppOwnedAssistantSessionKeyInternal(item.key) &&
+          !isAssistantTaskArchived(item.key),
       orElse: () => GatewaySessionSummary(
-        key: 'draft:${DateTime.now().millisecondsSinceEpoch}',
+        key: createAssistantDraftSessionKeyInternal(),
         kind: 'assistant',
         displayName: appText('新对话', 'New conversation'),
         surface: 'Assistant',
@@ -92,6 +96,14 @@ extension AppControllerDesktopThreadStorage on AppController {
         lastMessagePreview: null,
       ),
     );
+    if (!hasAssistantTaskStateInternal(fallback.key)) {
+      initializeAssistantThreadContext(
+        fallback.key,
+        title: appText('新对话', 'New conversation'),
+        executionTarget: currentAssistantExecutionTarget,
+        messageViewMode: currentAssistantMessageViewMode,
+      );
+    }
     await setCurrentAssistantSessionKeyInternal(fallback.key);
   }
 
@@ -100,9 +112,9 @@ extension AppControllerDesktopThreadStorage on AppController {
       appUiState.assistantLastSessionKey,
     );
     final known =
-        normalized == 'main' ||
-        assistantThreadRecordsInternal.containsKey(normalized) ||
-        assistantThreadMessagesInternal.containsKey(normalized);
+        isAppOwnedAssistantSessionKeyInternal(normalized) &&
+        (assistantThreadRecordsInternal.containsKey(normalized) ||
+            assistantThreadMessagesInternal.containsKey(normalized));
     if (normalized.isEmpty || !known || isAssistantTaskArchived(normalized)) {
       return;
     }
@@ -325,7 +337,8 @@ extension AppControllerDesktopThreadStorage on AppController {
       final sessionKey = normalizedAssistantSessionKeyInternal(
         record.sessionKey,
       );
-      if (record.archived) {
+      if (!isAppOwnedAssistantSessionKeyInternal(sessionKey) ||
+          record.archived) {
         continue;
       }
       items.add(assistantSessionSummaryForInternal(sessionKey, record: record));
@@ -337,7 +350,9 @@ extension AppControllerDesktopThreadStorage on AppController {
     final hasCurrent = items.any(
       (item) => matchesSessionKey(item.key, currentSessionKey),
     );
-    if (!hasCurrent && !isAssistantTaskArchived(currentSessionKey)) {
+    if (isAppOwnedAssistantSessionKeyInternal(currentSessionKey) &&
+        !hasCurrent &&
+        !isAssistantTaskArchived(currentSessionKey)) {
       items.add(assistantSessionSummaryForInternal(currentSessionKey));
     }
 

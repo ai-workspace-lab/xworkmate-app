@@ -144,7 +144,6 @@ extension AppControllerDesktopThreadActions on AppController {
   Future<void> refreshAgents() async {
     await agentsControllerInternal.refresh();
     sessionsControllerInternal.configure(
-      mainSessionKey: runtimeInternal.snapshot.mainSessionKey ?? 'main',
       selectedAgentId: agentsControllerInternal.selectedAgentId,
       defaultAgentId: '',
     );
@@ -165,13 +164,13 @@ extension AppControllerDesktopThreadActions on AppController {
       refreshAfterSave: false,
     );
     sessionsControllerInternal.configure(
-      mainSessionKey: runtimeInternal.snapshot.mainSessionKey ?? 'main',
       selectedAgentId: agentsControllerInternal.selectedAgentId,
       defaultAgentId: '',
     );
-    await chatControllerInternal.loadSession(
-      sessionsControllerInternal.currentSessionKey,
-    );
+    final sessionKey = normalizedAssistantSessionKeyInternal(currentSessionKey);
+    if (isAppOwnedAssistantSessionKeyInternal(sessionKey)) {
+      await chatControllerInternal.loadSession(sessionKey);
+    }
     await skillsControllerInternal.refresh(
       agentId: agentsControllerInternal.selectedAgentId.isEmpty
           ? null
@@ -181,33 +180,26 @@ extension AppControllerDesktopThreadActions on AppController {
   }
 
   Future<void> refreshSessions() async {
-    final selectedSessionKey = normalizedAssistantSessionKeyInternal(
-      sessionsControllerInternal.currentSessionKey,
-    );
-    final preserveSelectedLocalTask =
-        !isAssistantTaskArchived(selectedSessionKey) &&
-        hasAssistantTaskStateInternal(selectedSessionKey);
     sessionsControllerInternal.configure(
-      mainSessionKey: runtimeInternal.snapshot.mainSessionKey ?? 'main',
       selectedAgentId: agentsControllerInternal.selectedAgentId,
       defaultAgentId: '',
     );
     await sessionsControllerInternal.refresh();
-    if (preserveSelectedLocalTask &&
-        !matchesSessionKey(
-          selectedSessionKey,
-          sessionsControllerInternal.currentSessionKey,
-        )) {
-      await sessionsControllerInternal.switchSession(selectedSessionKey);
-    }
-    await chatControllerInternal.loadSession(
+    await ensureActiveAssistantThreadInternal();
+    final selectedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionsControllerInternal.currentSessionKey,
     );
+    if (isAppOwnedAssistantSessionKeyInternal(selectedSessionKey)) {
+      await chatControllerInternal.loadSession(selectedSessionKey);
+    }
     recomputeTasksInternal();
   }
 
   Future<void> switchSession(String sessionKey) async {
-    final nextSessionKey = normalizedAssistantSessionKeyInternal(sessionKey);
+    var nextSessionKey = normalizedAssistantSessionKeyInternal(sessionKey);
+    if (!isAppOwnedAssistantSessionKeyInternal(nextSessionKey)) {
+      nextSessionKey = createAssistantDraftSessionKeyInternal();
+    }
     final nextTarget = assistantExecutionTargetForSession(nextSessionKey);
     final nextViewMode = assistantMessageViewModeForSession(nextSessionKey);
 
@@ -245,9 +237,15 @@ extension AppControllerDesktopThreadActions on AppController {
         const <CollaborationAttachment>[],
     List<String> selectedSkillLabels = const <String>[],
   }) async {
-    final sessionKey = normalizedAssistantSessionKeyInternal(
+    var sessionKey = normalizedAssistantSessionKeyInternal(
       sessionsControllerInternal.currentSessionKey,
     );
+    if (!isAppOwnedAssistantSessionKeyInternal(sessionKey)) {
+      await ensureActiveAssistantThreadInternal();
+      sessionKey = normalizedAssistantSessionKeyInternal(
+        sessionsControllerInternal.currentSessionKey,
+      );
+    }
     final currentTarget = assistantExecutionTargetForSession(sessionKey);
     final resumeSessionHint = shouldResumeGatewaySessionForNextSendInternal(
       sessionKey,

@@ -307,22 +307,18 @@ extension AppControllerDesktopSettings on AppController {
     openClawGatewayQueuedTurnsBySessionInternal.clear();
     openClawGatewayActiveTasksInternal = 0;
     multiAgentRunPendingInternal = false;
+    final sessionKey = createAssistantDraftSessionKeyInternal();
     initializeAssistantThreadContext(
-      'main',
+      sessionKey,
       executionTarget: sanitizePersistedExecutionTargetInternal(
         currentSettings.assistantExecutionTarget,
       ),
       messageViewMode: AssistantMessageViewMode.rendered,
     );
     await setCurrentAssistantSessionKeyInternal(
-      'main',
+      sessionKey,
       persistSelection: false,
     );
-    taskThreadRepositoryInternal.removeWhere(
-      (key, _) => key != 'main',
-      persist: false,
-    );
-    assistantThreadMessagesInternal.removeWhere((key, _) => key != 'main');
     await flushAssistantThreadPersistenceInternal();
     await storeInternal.saveTaskThreads(
       taskThreadRepositoryInternal.snapshot(),

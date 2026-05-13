@@ -540,7 +540,6 @@ extension AppControllerDesktopSettingsRuntime on AppController {
             '',
       );
       sessionsControllerInternal.configure(
-        mainSessionKey: runtimeInternal.snapshot.mainSessionKey ?? 'main',
         selectedAgentId: agentsControllerInternal.selectedAgentId,
         defaultAgentId: '',
       );

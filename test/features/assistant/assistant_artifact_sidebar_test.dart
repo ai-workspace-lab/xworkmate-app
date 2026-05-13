@@ -216,7 +216,7 @@ Widget _buildTestApp({
         width: 460,
         height: 640,
         child: AssistantArtifactSidebar(
-          sessionKey: 'session-1',
+          sessionKey: 'draft:test-task-a',
           threadTitle: 'Thread',
           workspacePath: '/tmp/thread',
           workspaceKind: WorkspaceRefKind.localPath,

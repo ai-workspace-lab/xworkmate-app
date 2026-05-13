@@ -187,7 +187,7 @@ String? assistantRemoteWorkingDirectoryHintForSessionRuntimeInternal(
   );
   final candidate =
       controller
-          .assistantThreadRecordsInternal[normalizedSessionKey]
+          .taskThreadForSessionInternal(normalizedSessionKey)
           ?.lastRemoteWorkingDirectory
           ?.trim() ??
       '';
@@ -202,9 +202,7 @@ String? resolveLocalAssistantWorkingDirectoryForSessionRuntimeInternal(
   String sessionKey, {
   bool requireLocalExistence = true,
 }) {
-  final record =
-      controller.assistantThreadRecordsInternal[controller
-          .normalizedAssistantSessionKeyInternal(sessionKey)];
+  final record = controller.taskThreadForSessionInternal(sessionKey);
   if (record?.workspaceKind != WorkspaceKind.localFs) {
     return null;
   }
@@ -328,7 +326,7 @@ void clearCodexGatewayRegistrationRuntimeInternal(AppController controller) {
 
 void recomputeTasksRuntimeInternal(AppController controller) {
   controller.tasksControllerInternal.recompute(
-    sessions: controller.sessions,
+    sessions: controller.assistantSessions,
     cronJobs: controller.cronJobsControllerInternal.items,
     currentSessionKey: controller.sessionsControllerInternal.currentSessionKey,
     hasPendingRun: controller.hasAssistantPendingRun,
