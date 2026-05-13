@@ -43,7 +43,7 @@ void main() {
         );
         addTearDown(controller.dispose);
 
-        await controller.sessionsController.switchSession('session-1');
+        await controller.sessionsController.switchSession('draft:test-task-a');
         await controller.setAssistantExecutionTarget(
           AssistantExecutionTarget.gateway,
         );
@@ -75,7 +75,7 @@ void main() {
         );
         addTearDown(controller.dispose);
 
-        await controller.sessionsController.switchSession('session-1');
+        await controller.sessionsController.switchSession('draft:test-task-a');
         await controller.setAssistantExecutionTarget(
           AssistantExecutionTarget.gateway,
         );
@@ -108,7 +108,7 @@ void main() {
         );
         addTearDown(controller.dispose);
 
-        await controller.sessionsController.switchSession('session-1');
+        await controller.sessionsController.switchSession('draft:test-task-a');
         await controller.setAssistantExecutionTarget(
           AssistantExecutionTarget.gateway,
         );
@@ -271,7 +271,7 @@ void main() {
       final controller = await _isolatedController();
       addTearDown(controller.dispose);
 
-      await controller.sessionsController.switchSession('session-1');
+      await controller.sessionsController.switchSession('draft:test-task-a');
       await controller.setAssistantExecutionTarget(
         AssistantExecutionTarget.gateway,
       );
@@ -298,7 +298,7 @@ void main() {
       final controller = await _isolatedController();
       addTearDown(controller.dispose);
 
-      await controller.sessionsController.switchSession('session-1');
+      await controller.sessionsController.switchSession('draft:test-task-a');
       await controller.setAssistantExecutionTarget(
         AssistantExecutionTarget.gateway,
       );
@@ -320,7 +320,7 @@ void main() {
         final controller = await _isolatedController();
         addTearDown(controller.dispose);
 
-        await controller.sessionsController.switchSession('session-1');
+        await controller.sessionsController.switchSession('draft:test-task-a');
         await controller.setAssistantExecutionTarget(
           AssistantExecutionTarget.gateway,
         );
@@ -350,7 +350,7 @@ void main() {
         final controller = await _isolatedController();
         addTearDown(controller.dispose);
 
-        await controller.sessionsController.switchSession('session-1');
+        await controller.sessionsController.switchSession('draft:test-task-a');
         await controller.setAssistantExecutionTarget(
           AssistantExecutionTarget.gateway,
         );
@@ -380,7 +380,7 @@ void main() {
         final controller = await _isolatedController();
         addTearDown(controller.dispose);
 
-        await controller.sessionsController.switchSession('session-1');
+        await controller.sessionsController.switchSession('draft:test-task-a');
         await controller.setAssistantExecutionTarget(
           AssistantExecutionTarget.gateway,
         );
@@ -407,7 +407,7 @@ void main() {
       final controller = await _isolatedController();
       addTearDown(controller.dispose);
 
-      await controller.sessionsController.switchSession('session-1');
+      await controller.sessionsController.switchSession('draft:test-task-a');
       await controller.setAssistantExecutionTarget(
         AssistantExecutionTarget.gateway,
       );
