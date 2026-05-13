@@ -317,6 +317,50 @@ void main() {
       );
     });
 
+    testWidgets(
+      'keeps task dialog modes selectable when only OpenClaw is live',
+      (tester) async {
+        final controller = AppController(
+          environmentOverride: const <String, String>{},
+          initialGatewayProviderCatalog: const <SingleAgentProvider>[
+            SingleAgentProvider.openclaw,
+          ],
+          initialAvailableExecutionTargets: const <AssistantExecutionTarget>[
+            AssistantExecutionTarget.gateway,
+          ],
+        );
+        addTearDown(controller.dispose);
+
+        await controller.sessionsController.switchSession('draft:test-task-a');
+        controller.initializeAssistantThreadContext(
+          'draft:test-task-a',
+          executionTarget: AssistantExecutionTarget.gateway,
+          messageViewMode: controller.assistantMessageViewModeForSession(
+            'draft:test-task-a',
+          ),
+        );
+        controller.notifyListeners();
+
+        await tester.pumpWidget(
+          _buildTestApp(child: _buildLowerPane(controller: controller)),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(
+          find.byKey(const Key('assistant-execution-target-button')),
+        );
+        await tester.pumpAndSettle();
+
+        final agentItem = tester
+            .widget<PopupMenuItem<AssistantExecutionTarget>>(
+              find.byKey(
+                const Key('assistant-execution-target-menu-item-agent'),
+              ),
+            );
+        expect(agentItem.enabled, isTrue);
+      },
+    );
+
     testWidgets('uses submit button instead of connect action', (tester) async {
       final controller = AppController(
         environmentOverride: const <String, String>{},

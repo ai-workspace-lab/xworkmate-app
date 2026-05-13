@@ -73,7 +73,8 @@ extension AppControllerDesktopExternalAcpRouting on AppController {
             !resolvedProvider.isUnspecified
         ? resolvedProvider.providerId
         : '';
-    final resolvedExplicitModel = thread?.hasExplicitModelSelection ?? false
+    final resolvedExplicitModel =
+        !currentTarget.isGateway && (thread?.hasExplicitModelSelection ?? false)
         ? assistantModelForSession(normalizedSessionKey)
         : '';
     final resolvedExplicitSkills = thread?.hasExplicitSkillSelection ?? false
