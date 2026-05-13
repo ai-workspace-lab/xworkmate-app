@@ -108,7 +108,8 @@ class SecretStore {
   bool _initialized = false;
   PersistentWriteFailure? _secretsWriteFailure;
 
-  Map<String, String> get secureRefs => Map<String, String>.unmodifiable(_memorySecure);
+  Map<String, String> get secureRefs =>
+      Map<String, String>.unmodifiable(_memorySecure);
 
   PersistentWriteFailure? get secretsWriteFailure => _secretsWriteFailure;
 
@@ -133,16 +134,9 @@ class SecretStore {
   }
 
   Future<String?> loadGatewayToken({int? profileIndex}) async {
-    if (profileIndex != null) {
-      return _readSecure(_gatewayTokenKeyForProfile(profileIndex));
-    }
-    for (final index in _gatewayProfileFallbackOrder) {
-      final scopedValue = await _readSecure(_gatewayTokenKeyForProfile(index));
-      if ((scopedValue ?? '').trim().isNotEmpty) {
-        return scopedValue;
-      }
-    }
-    return null;
+    return _readSecure(
+      _gatewayTokenKeyForProfile(profileIndex ?? kGatewayRemoteProfileIndex),
+    );
   }
 
   Future<void> saveGatewayToken(String value, {int? profileIndex}) =>
@@ -156,18 +150,9 @@ class SecretStore {
   );
 
   Future<String?> loadGatewayPassword({int? profileIndex}) async {
-    if (profileIndex != null) {
-      return _readSecure(_gatewayPasswordKeyForProfile(profileIndex));
-    }
-    for (final index in _gatewayProfileFallbackOrder) {
-      final scopedValue = await _readSecure(
-        _gatewayPasswordKeyForProfile(index),
-      );
-      if ((scopedValue ?? '').trim().isNotEmpty) {
-        return scopedValue;
-      }
-    }
-    return null;
+    return _readSecure(
+      _gatewayPasswordKeyForProfile(profileIndex ?? kGatewayRemoteProfileIndex),
+    );
   }
 
   Future<void> saveGatewayPassword(String value, {int? profileIndex}) =>
@@ -470,13 +455,6 @@ class SecretStore {
 
   static String _gatewayPasswordRefKey(int profileIndex) =>
       'gateway_password_$profileIndex';
-
-  static const List<int> _gatewayProfileFallbackOrder = <int>[
-    kGatewayRemoteProfileIndex,
-    1,
-    2,
-    3,
-  ];
 
   static String _accountManagedSecretKey(String target) =>
       'xworkmate.account.managed.${target.trim()}';

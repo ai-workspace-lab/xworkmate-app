@@ -206,9 +206,9 @@ flowchart LR
 
 - `Directory.current.path`
 
-关键位置：
+历史关键位置：
 
-- [app_controller_desktop_single_agent.dart](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate/lib/app/app_controller_desktop_single_agent.dart:140)
+- 历史 Single Agent 桥接文件，已在 2026-05 清理中移除
 
 这就是“任务线程没有有效目录时，命令最后跑到全局/容器 cwd”的直接原因。
 
@@ -219,9 +219,9 @@ Single Agent 运行后可能返回：
 - `result.resolvedWorkingDirectory`
 - `result.resolvedWorkspaceRefKind`
 
-关键位置：
+历史关键位置：
 
-- [app_controller_desktop_single_agent.dart](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate/lib/app/app_controller_desktop_single_agent.dart:155)
+- 历史 Single Agent 桥接文件，已在 2026-05 清理中移除
 
 当前逻辑中：
 

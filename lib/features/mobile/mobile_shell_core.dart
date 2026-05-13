@@ -73,46 +73,18 @@ class MobileShellStateInternal extends State<MobileShell> {
   }
 
   void showConnectSheetInternal() {
-    widget.controller.openSettings(
-      detail: SettingsDetailPage.gatewayConnection,
-      navigationContext: SettingsNavigationContext(
-        rootLabel: appText('移动端', 'Mobile'),
-        destination: WorkspaceDestination.settings,
-        sectionLabel: appText('集成', 'Integrations'),
-        settingsTab: SettingsTab.gateway,
-        gatewayProfileIndex: kGatewayRemoteProfileIndex,
-        prefersGatewaySetupCode: false,
-      ),
-    );
+    widget.controller.openSettings(tab: SettingsTab.gateway);
   }
 
   Future<void> openGatewaySetupCodeEntryInternal({
     String? prefilledSetupCode,
   }) async {
     final setupCode = prefilledSetupCode?.trim() ?? '';
-    if (setupCode.isNotEmpty) {
-      final current = widget
-          .controller
-          .settingsDraft
-          .gatewayProfiles[kGatewayRemoteProfileIndex];
-      await widget.controller.saveSettingsDraft(
-        widget.controller.settingsDraft.copyWithGatewayProfileAt(
-          kGatewayRemoteProfileIndex,
-          current.copyWith(useSetupCode: true, setupCode: setupCode),
-        ),
-      );
+    if (setupCode.isEmpty) {
+      await promptBridgeVerificationCodeInternal();
+      return;
     }
-    widget.controller.openSettings(
-      detail: SettingsDetailPage.gatewayConnection,
-      navigationContext: SettingsNavigationContext(
-        rootLabel: appText('移动端', 'Mobile'),
-        destination: WorkspaceDestination.settings,
-        sectionLabel: appText('集成', 'Integrations'),
-        settingsTab: SettingsTab.gateway,
-        gatewayProfileIndex: kGatewayRemoteProfileIndex,
-        prefersGatewaySetupCode: true,
-      ),
-    );
+    await widget.controller.connectWithSetupCode(setupCode: setupCode);
   }
 
   Future<void> connectWithScannedSetupCodeInternal(String setupCode) async {
@@ -137,17 +109,13 @@ class MobileShellStateInternal extends State<MobileShell> {
       if (!mounted) {
         return;
       }
-      await openGatewaySetupCodeEntryInternal(prefilledSetupCode: setupCode);
-      if (!mounted) {
-        return;
-      }
       final message = error.toString().trim();
       messenger?.showSnackBar(
         SnackBar(
           content: Text(
             appText(
-              '扫码成功，但自动连接失败。已为你填入配置码，请检查后重试。\n$message',
-              'QR captured, but automatic connect failed. The setup code has been prefilled for review.\n$message',
+              '扫码成功，但自动连接失败。请重新输入配置码或检查 Bridge 状态。\n$message',
+              'QR captured, but automatic connect failed. Re-enter the setup code or check Bridge status.\n$message',
             ),
           ),
         ),
@@ -204,7 +172,8 @@ class MobileShellStateInternal extends State<MobileShell> {
         fullscreenDialog: true,
         builder: (_) => MobileGatewayPairingGuidePage(
           supportsQrScan: supportsQrScan,
-          onManualInput: () => unawaited(openGatewaySetupCodeEntryInternal()),
+          onManualInput: () =>
+              unawaited(promptBridgeVerificationCodeInternal()),
           onManualCodeInput: () =>
               unawaited(promptBridgeVerificationCodeInternal()),
           onScannedSetupCode: (setupCode) async {

@@ -48,11 +48,6 @@ abstract final class UiFeatureKeys {
   static const settingsGateway = 'settings.gateway';
   static const settingsAccountAccess = 'settings.account_access';
   static const settingsVaultServer = 'settings.vault_server';
-  static const settingsGatewaySelfHostedBase =
-      'settings.gateway_self_hosted_base';
-  static const settingsGatewayAdvancedCustomMode =
-      'settings.gateway_advanced_custom_mode';
-  static const settingsGatewaySetupCode = 'settings.gateway_setup_code';
   static const settingsExperimentalCanvas = 'settings.experimental_canvas';
   static const settingsExperimentalBridge = 'settings.experimental_bridge';
   static const settingsExperimentalDebug = 'settings.experimental_debug';
@@ -423,17 +418,8 @@ class UiFeatureAccess {
   bool get supportsAccountAccess =>
       isEnabledPath(UiFeatureKeys.settingsAccountAccess);
 
-  bool get supportsGatewaySetupCode =>
-      isEnabledPath(UiFeatureKeys.settingsGatewaySetupCode);
-
   bool get supportsVaultServer =>
       isEnabledPath(UiFeatureKeys.settingsVaultServer);
-
-  bool get supportsGatewaySelfHostedBase =>
-      isEnabledPath(UiFeatureKeys.settingsGatewaySelfHostedBase);
-
-  bool get supportsGatewayAdvancedCustomMode =>
-      isEnabledPath(UiFeatureKeys.settingsGatewayAdvancedCustomMode);
 
   List<SettingsTab> get availableSettingsTabs {
     return SettingsTab.values

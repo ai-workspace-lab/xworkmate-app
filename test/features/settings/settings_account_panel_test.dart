@@ -114,7 +114,6 @@ void main() {
                 tokenConfigured: const AccountTokenConfigured(
                   bridge: true,
                   vault: false,
-                  apisix: false,
                 ),
               ),
               accountBusy: false,
@@ -211,7 +210,6 @@ void main() {
               tokenConfigured: const AccountTokenConfigured(
                 bridge: true,
                 vault: false,
-                apisix: false,
               ),
             ),
             accountBusy: false,

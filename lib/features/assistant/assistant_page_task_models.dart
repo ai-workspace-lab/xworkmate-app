@@ -312,24 +312,13 @@ String sessionDisplayTitleInternal(GatewaySessionSummary session) {
   if (label.isEmpty || label == session.key) {
     return fallbackSessionTitleInternal(session.key);
   }
-  if ((label == 'main' || label == 'agent:main:main') &&
-      (session.derivedTitle ?? '').trim().toLowerCase() == 'main') {
-    return fallbackSessionTitleInternal(session.key);
-  }
   return label;
 }
 
 String fallbackSessionTitleInternal(String sessionKey) {
   final trimmed = sessionKey.trim();
-  if (trimmed == 'main' || trimmed == 'agent:main:main') {
-    return appText('默认任务', 'Default task');
-  }
   if (trimmed.startsWith('draft:')) {
     return appText('新对话', 'New conversation');
-  }
-  final parts = trimmed.split(':');
-  if (parts.length >= 3 && parts.first == 'agent' && parts.last == 'main') {
-    return appText('默认任务', 'Default task');
   }
   return trimmed.isEmpty ? appText('未命名对话', 'Untitled conversation') : trimmed;
 }
@@ -405,9 +394,5 @@ double estimatedComposerWrapSectionHeightInternal({
 bool sessionKeysMatchInternal(String incoming, String current) {
   final left = incoming.trim().toLowerCase();
   final right = current.trim().toLowerCase();
-  if (left == right) {
-    return true;
-  }
-  return (left == 'agent:main:main' && right == 'main') ||
-      (left == 'main' && right == 'agent:main:main');
+  return left == right;
 }

@@ -111,14 +111,10 @@ class SettingsPage extends StatefulWidget {
     super.key,
     required this.controller,
     this.initialTab = SettingsTab.gateway,
-    this.initialDetail,
-    this.navigationContext,
   });
 
   final AppController controller;
   final SettingsTab initialTab;
-  final SettingsDetailPage? initialDetail;
-  final SettingsNavigationContext? navigationContext;
 
   @override
   State<SettingsPage> createState() => _SettingsPageState();
@@ -378,8 +374,6 @@ class _SettingsPageState extends State<SettingsPage> {
           breadcrumbs: buildSettingsBreadcrumbs(
             controller,
             tab: SettingsTab.gateway,
-            detail: null,
-            navigationContext: null,
           ),
           title: appText('设置', 'Settings'),
           subtitle: appText(

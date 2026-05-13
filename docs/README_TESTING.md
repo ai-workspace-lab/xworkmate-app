@@ -34,6 +34,7 @@ go test ./...
 ## CI Coverage
 
 - Pull requests in `xworkmate-app` use the `verify` stage as a static-analysis gate and always run `flutter analyze`.
+- Static analysis also runs `scripts/check-no-app-ffi.sh` so app packaging cannot reintroduce the retired Codex FFI copy/embed path.
 - Widget, integration, and Patrol suites are owned by their dedicated commands and release validation flows, not by the lightweight `verify` gate.
 - Pushes to `main`, version tags, and manual workflow runs publish build artifacts and update the GitHub Release entry for that release mode.
 - `xworkmate-bridge` Go tests run in the companion repository.

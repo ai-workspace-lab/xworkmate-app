@@ -2,10 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../i18n/app_language.dart';
 
-enum WorkspaceDestination {
-  assistant,
-  settings,
-}
+enum WorkspaceDestination { assistant, settings }
 
 extension WorkspaceDestinationCopy on WorkspaceDestination {
   String get label => switch (this) {
@@ -42,11 +39,7 @@ extension WorkspaceDestinationCopy on WorkspaceDestination {
   }
 }
 
-enum AssistantFocusEntry {
-  settings,
-  language,
-  theme,
-}
+enum AssistantFocusEntry { settings, language, theme }
 
 extension AssistantFocusEntryCopy on AssistantFocusEntry {
   String get label => switch (this) {
@@ -162,40 +155,6 @@ extension SettingsTabCopy on SettingsTab {
   String get label => switch (this) {
     SettingsTab.gateway => appText('集成', 'Integrations'),
   };
-}
-
-enum SettingsDetailPage { gatewayConnection }
-
-extension SettingsDetailPageCopy on SettingsDetailPage {
-  String get label => switch (this) {
-    SettingsDetailPage.gatewayConnection => appText(
-      'Gateway 连接参数',
-      'Gateway Connection',
-    ),
-  };
-
-  SettingsTab get tab => switch (this) {
-    SettingsDetailPage.gatewayConnection => SettingsTab.gateway,
-  };
-}
-
-@immutable
-class SettingsNavigationContext {
-  const SettingsNavigationContext({
-    required this.rootLabel,
-    required this.destination,
-    this.sectionLabel,
-    this.settingsTab,
-    this.gatewayProfileIndex,
-    this.prefersGatewaySetupCode,
-  });
-
-  final String rootLabel;
-  final WorkspaceDestination destination;
-  final String? sectionLabel;
-  final SettingsTab? settingsTab;
-  final int? gatewayProfileIndex;
-  final bool? prefersGatewaySetupCode;
 }
 
 class QuickAction {

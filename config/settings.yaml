@@ -17,7 +17,6 @@ acpBridgeServerModeConfig:
     lastSyncAt: 0
     remoteServerSummary:
       endpoint: https://xworkmate-bridge.svc.plus
-      hasAdvancedOverrides: false
   selfHosted:
     serverUrl: ''
     username: ''

@@ -73,24 +73,6 @@ mobile:
       build_modes: [debug, profile, release]
       description: Mobile vault server settings
       ui_surface: settings_page
-    gateway_self_hosted_base:
-      enabled: false
-      release_tier: experimental
-      build_modes: [debug, profile, release]
-      description: Mobile self-hosted gateway base controls
-      ui_surface: settings_page
-    gateway_advanced_custom_mode:
-      enabled: false
-      release_tier: experimental
-      build_modes: [debug, profile, release]
-      description: Mobile advanced gateway override controls
-      ui_surface: settings_page
-    gateway_setup_code:
-      enabled: false
-      release_tier: experimental
-      build_modes: [debug, profile, release]
-      description: Mobile gateway setup code editor
-      ui_surface: settings_page
     experimental_canvas:
       enabled: true
       release_tier: experimental
@@ -180,24 +162,6 @@ desktop:
       build_modes: [debug, profile, release]
       description: Desktop vault server settings
       ui_surface: settings_page
-    gateway_self_hosted_base:
-      enabled: false
-      release_tier: experimental
-      build_modes: [debug, profile, release]
-      description: Desktop self-hosted gateway base controls
-      ui_surface: settings_page
-    gateway_advanced_custom_mode:
-      enabled: false
-      release_tier: experimental
-      build_modes: [debug, profile, release]
-      description: Desktop advanced gateway override controls
-      ui_surface: settings_page
-    gateway_setup_code:
-      enabled: false
-      release_tier: experimental
-      build_modes: [debug, profile, release]
-      description: Desktop gateway setup code editor
-      ui_surface: settings_page
     experimental_canvas:
       enabled: true
       release_tier: experimental
@@ -286,24 +250,6 @@ web:
       release_tier: experimental
       build_modes: []
       description: Web vault server settings disabled
-      ui_surface: settings_page
-    gateway_self_hosted_base:
-      enabled: false
-      release_tier: experimental
-      build_modes: []
-      description: Web self-hosted gateway base controls disabled
-      ui_surface: settings_page
-    gateway_advanced_custom_mode:
-      enabled: false
-      release_tier: experimental
-      build_modes: []
-      description: Web advanced gateway override controls disabled
-      ui_surface: settings_page
-    gateway_setup_code:
-      enabled: false
-      release_tier: experimental
-      build_modes: []
-      description: Web gateway setup code editor disabled
       ui_surface: settings_page
     experimental_canvas:
       enabled: false

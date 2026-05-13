@@ -322,14 +322,7 @@ extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
   }
 
   void openGatewaySettingsInternal() {
-    widget.controller.openSettings(
-      detail: SettingsDetailPage.gatewayConnection,
-      navigationContext: SettingsNavigationContext(
-        rootLabel: appText('助手', 'Assistant'),
-        destination: WorkspaceDestination.assistant,
-        sectionLabel: appText('集成', 'Integrations'),
-      ),
-    );
+    widget.controller.openSettings(tab: SettingsTab.gateway);
   }
 
   Future<void> connectFromSavedSettingsOrShowDialogInternal() async {

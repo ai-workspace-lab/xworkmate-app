@@ -58,6 +58,49 @@ void main() {
     });
 
     test(
+      'normalizes OpenClaw from provider catalog into selectable gateway mode',
+      () async {
+        final controller = AppController(
+          environmentOverride: const <String, String>{},
+          initialBridgeProviderCatalog: const <SingleAgentProvider>[
+            SingleAgentProvider.codex,
+            SingleAgentProvider.openclaw,
+          ],
+          initialAvailableExecutionTargets: const <AssistantExecutionTarget>[
+            AssistantExecutionTarget.agent,
+          ],
+        );
+        addTearDown(controller.dispose);
+
+        expect(
+          controller.assistantProviderCatalog.map((item) => item.providerId),
+          const <String>['codex'],
+        );
+        expect(
+          controller.gatewayProviderCatalog.map((item) => item.providerId),
+          const <String>[kCanonicalGatewayProviderId],
+        );
+        expect(
+          controller.bridgeAvailableExecutionTargets,
+          const <AssistantExecutionTarget>[
+            AssistantExecutionTarget.agent,
+            AssistantExecutionTarget.gateway,
+          ],
+        );
+
+        await controller.sessionsController.switchSession('draft:test-task-a');
+        await controller.setAssistantExecutionTarget(
+          AssistantExecutionTarget.gateway,
+        );
+
+        expect(
+          controller.assistantProviderForSession('draft:test-task-a'),
+          SingleAgentProvider.openclaw,
+        );
+      },
+    );
+
+    test(
       'switching a session to gateway uses the bridge-provided gateway catalog',
       () async {
         final controller = AppController(
@@ -508,7 +551,6 @@ void main() {
             tokenConfigured: const AccountTokenConfigured(
               bridge: true,
               vault: false,
-              apisix: false,
             ),
           ),
         );
@@ -653,7 +695,6 @@ void main() {
             tokenConfigured: const AccountTokenConfigured(
               bridge: true,
               vault: false,
-              apisix: false,
             ),
           ),
         );
@@ -694,7 +735,6 @@ void main() {
               tokenConfigured: const AccountTokenConfigured(
                 bridge: true,
                 vault: false,
-                apisix: false,
               ),
             );
 
