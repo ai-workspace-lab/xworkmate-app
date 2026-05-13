@@ -2066,6 +2066,50 @@ void main() {
       },
     );
 
+    test('OpenClaw gateway task uses the server default model', () async {
+      final fakeGoTaskService = _BlockingGoTaskServiceClient();
+      final controller = _connectedGatewayController(fakeGoTaskService);
+      addTearDown(() {
+        fakeGoTaskService.completeAll();
+        controller.dispose();
+      });
+
+      await _selectGatewaySession(controller, 'openclaw-default-model-task');
+      await controller.selectAssistantModelForSession(
+        'openclaw-default-model-task',
+        'ollama/kimi-k2.5',
+      );
+
+      final taskFuture = controller.sendChatMessage('use OpenClaw default');
+      await fakeGoTaskService.waitForRequestCount(1);
+
+      final request = fakeGoTaskService.requests.single;
+      expect(request.target, AssistantExecutionTarget.gateway);
+      expect(request.provider, SingleAgentProvider.openclaw);
+      expect(request.model, isEmpty);
+
+      final params = request.toExternalAcpParams();
+      expect(params.containsKey('model'), isFalse);
+      expect(
+        params['routing'],
+        isNot(containsPair('explicitModel', 'ollama/kimi-k2.5')),
+      );
+
+      fakeGoTaskService.complete(
+        'openclaw-default-model-task',
+        const GoTaskServiceResult(
+          success: true,
+          message: 'result',
+          turnId: 'turn-openclaw-default-model',
+          raw: <String, dynamic>{},
+          errorMessage: '',
+          resolvedModel: '',
+          route: GoTaskServiceRoute.externalAcpSingle,
+        ),
+      );
+      await taskFuture;
+    });
+
     test(
       'abortRun removes a queued OpenClaw task without bridge cancel',
       () async {

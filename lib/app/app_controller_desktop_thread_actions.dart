@@ -336,7 +336,9 @@ extension AppControllerDesktopThreadActions on AppController {
       }
     }
     final provider = assistantProviderForSession(sessionKey);
-    final model = assistantModelForSession(sessionKey);
+    final model = currentTarget.isGateway
+        ? ''
+        : assistantModelForSession(sessionKey);
     final routing = buildExternalAcpRoutingForSessionInternal(sessionKey);
     final dispatch = await codeAgentNodeOrchestratorInternal
         .buildGatewayDispatch(
