@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-14T08:20:04.438927+00:00",
+  "generatedAt": "2026-05-13T08:37:25.180831+00:00",
   "targets": [
     "lib/app",
     "lib/runtime",
@@ -16,23 +16,23 @@
     },
     {
       "scope": "lib/runtime",
-      "fileCount": 67,
-      "symbolCount": 377
+      "fileCount": 66,
+      "symbolCount": 372
     },
     {
       "scope": "lib/models",
       "fileCount": 1,
-      "symbolCount": 34
+      "symbolCount": 31
     },
     {
       "scope": "lib/features/assistant",
       "fileCount": 16,
-      "symbolCount": 80
+      "symbolCount": 79
     },
     {
       "scope": "lib/features/settings",
       "fileCount": 4,
-      "symbolCount": 4
+      "symbolCount": 5
     },
     {
       "scope": "lib/features/mobile",
@@ -47,12 +47,12 @@
     {
       "scope": "rust/src",
       "fileCount": 4,
-      "symbolCount": 19
+      "symbolCount": 16
     }
   ],
   "totals": {
-    "fileCount": 130,
-    "symbolCount": 614
+    "fileCount": 129,
+    "symbolCount": 603
   },
   "groups": [
     {
@@ -110,7 +110,7 @@
             {
               "language": "dart",
               "path": "lib/app/app_controller_desktop_core.dart",
-              "line": 54,
+              "line": 57,
               "kind": "enum",
               "name": "CodexCooperationState",
               "signature": "enum CodexCooperationState { notStarted, bridgeOnly, registered }"
@@ -118,7 +118,7 @@
             {
               "language": "dart",
               "path": "lib/app/app_controller_desktop_core.dart",
-              "line": 56,
+              "line": 59,
               "kind": "class",
               "name": "SingleAgentSkillScanRootInternal",
               "signature": "class SingleAgentSkillScanRootInternal {"
@@ -126,7 +126,7 @@
             {
               "language": "dart",
               "path": "lib/app/app_controller_desktop_core.dart",
-              "line": 88,
+              "line": 91,
               "kind": "class",
               "name": "AppController",
               "signature": "class AppController extends ChangeNotifier {"
@@ -156,7 +156,7 @@
             {
               "language": "dart",
               "path": "lib/app/app_controller_desktop_gateway.dart",
-              "line": 49,
+              "line": 48,
               "kind": "extension",
               "name": "AppControllerDesktopGateway",
               "signature": "extension AppControllerDesktopGateway on AppController {"
@@ -171,7 +171,7 @@
             {
               "language": "dart",
               "path": "lib/app/app_controller_desktop_navigation.dart",
-              "line": 48,
+              "line": 47,
               "kind": "extension",
               "name": "AppControllerDesktopNavigation",
               "signature": "extension AppControllerDesktopNavigation on AppController {"
@@ -181,7 +181,7 @@
         {
           "path": "lib/app/app_controller_desktop_runtime_coordination_impl.dart",
           "language": "dart",
-          "symbolCount": 9,
+          "symbolCount": 10,
           "symbols": [
             {
               "language": "dart",
@@ -194,7 +194,7 @@
             {
               "language": "dart",
               "path": "lib/app/app_controller_desktop_runtime_coordination_impl.dart",
-              "line": 90,
+              "line": 98,
               "kind": "top-level function",
               "name": "refreshSingleAgentCapabilitiesRuntimeInternal",
               "signature": "Future<void> refreshSingleAgentCapabilitiesRuntimeInternal( AppController controller, { bool forceRefresh = false, }) async {"
@@ -202,7 +202,7 @@
             {
               "language": "dart",
               "path": "lib/app/app_controller_desktop_runtime_coordination_impl.dart",
-              "line": 158,
+              "line": 170,
               "kind": "top-level function",
               "name": "assistantWorkingDirectoryForSessionRuntimeInternal",
               "signature": "String? assistantWorkingDirectoryForSessionRuntimeInternal( AppController controller, String sessionKey, ) {"
@@ -210,7 +210,15 @@
             {
               "language": "dart",
               "path": "lib/app/app_controller_desktop_runtime_coordination_impl.dart",
-              "line": 178,
+              "line": 181,
+              "kind": "top-level function",
+              "name": "assistantRemoteWorkingDirectoryHintForSessionRuntimeInternal",
+              "signature": "String? assistantRemoteWorkingDirectoryHintForSessionRuntimeInternal( AppController controller, String sessionKey, ) {"
+            },
+            {
+              "language": "dart",
+              "path": "lib/app/app_controller_desktop_runtime_coordination_impl.dart",
+              "line": 200,
               "kind": "top-level function",
               "name": "resolveLocalAssistantWorkingDirectoryForSessionRuntimeInternal",
               "signature": "String? resolveLocalAssistantWorkingDirectoryForSessionRuntimeInternal( AppController controller, String sessionKey, { bool requireLocalExistence = true, }) {"
@@ -218,15 +226,15 @@
             {
               "language": "dart",
               "path": "lib/app/app_controller_desktop_runtime_coordination_impl.dart",
-              "line": 206,
+              "line": 223,
               "kind": "top-level function",
               "name": "buildCodeAgentNodeStateRuntimeInternal",
-              "signature": "CodeAgentNodeState buildCodeAgentNodeStateRuntimeInternal( AppController controller, ) {"
+              "signature": "CodeAgentNodeState buildCodeAgentNodeStateRuntimeInternal( AppController controller, { AssistantExecutionTarget? executionTarget, }) {"
             },
             {
               "language": "dart",
               "path": "lib/app/app_controller_desktop_runtime_coordination_impl.dart",
-              "line": 220,
+              "line": 239,
               "kind": "top-level function",
               "name": "bridgeGatewayModeRuntimeInternal",
               "signature": "GatewayMode bridgeGatewayModeRuntimeInternal(AppController controller) {"
@@ -234,7 +242,7 @@
             {
               "language": "dart",
               "path": "lib/app/app_controller_desktop_runtime_coordination_impl.dart",
-              "line": 230,
+              "line": 249,
               "kind": "top-level function",
               "name": "ensureCodexGatewayRegistrationRuntimeInternal",
               "signature": "Future<void> ensureCodexGatewayRegistrationRuntimeInternal( AppController controller, ) async {"
@@ -242,7 +250,7 @@
             {
               "language": "dart",
               "path": "lib/app/app_controller_desktop_runtime_coordination_impl.dart",
-              "line": 298,
+              "line": 317,
               "kind": "top-level function",
               "name": "clearCodexGatewayRegistrationRuntimeInternal",
               "signature": "void clearCodexGatewayRegistrationRuntimeInternal(AppController controller) {"
@@ -250,7 +258,7 @@
             {
               "language": "dart",
               "path": "lib/app/app_controller_desktop_runtime_coordination_impl.dart",
-              "line": 308,
+              "line": 327,
               "kind": "top-level function",
               "name": "recomputeTasksRuntimeInternal",
               "signature": "void recomputeTasksRuntimeInternal(AppController controller) {"
@@ -288,7 +296,7 @@
             {
               "language": "dart",
               "path": "lib/app/app_controller_desktop_runtime_helpers.dart",
-              "line": 51,
+              "line": 53,
               "kind": "extension",
               "name": "AppControllerDesktopRuntimeHelpers",
               "signature": "extension AppControllerDesktopRuntimeHelpers on AppController {"
@@ -318,25 +326,10 @@
             {
               "language": "dart",
               "path": "lib/app/app_controller_desktop_settings_runtime.dart",
-              "line": 49,
+              "line": 50,
               "kind": "extension",
               "name": "AppControllerDesktopSettingsRuntime",
               "signature": "extension AppControllerDesktopSettingsRuntime on AppController {"
-            }
-          ]
-        },
-        {
-          "path": "lib/app/app_controller_desktop_single_agent.dart",
-          "language": "dart",
-          "symbolCount": 1,
-          "symbols": [
-            {
-              "language": "dart",
-              "path": "lib/app/app_controller_desktop_single_agent.dart",
-              "line": 3,
-              "kind": "extension",
-              "name": "AppControllerDesktopSingleAgent",
-              "signature": "extension AppControllerDesktopSingleAgent on AppController {}"
             }
           ]
         },
@@ -348,7 +341,7 @@
             {
               "language": "dart",
               "path": "lib/app/app_controller_desktop_skill_permissions.dart",
-              "line": 49,
+              "line": 48,
               "kind": "extension",
               "name": "AppControllerDesktopSkillPermissions",
               "signature": "extension AppControllerDesktopSkillPermissions on AppController {"
@@ -363,7 +356,7 @@
             {
               "language": "dart",
               "path": "lib/app/app_controller_desktop_thread_actions.dart",
-              "line": 50,
+              "line": 51,
               "kind": "extension",
               "name": "AppControllerDesktopThreadActions",
               "signature": "extension AppControllerDesktopThreadActions on AppController {"
@@ -394,7 +387,7 @@
             {
               "language": "dart",
               "path": "lib/app/app_controller_desktop_thread_binding.dart",
-              "line": 294,
+              "line": 337,
               "kind": "top-level function",
               "name": "pickDraftThreadExecutionTargetInternal",
               "signature": "AssistantExecutionTarget pickDraftThreadExecutionTargetInternal({ required AssistantExecutionTarget currentTarget, required Iterable<AssistantExecutionTarget> visibleTargets, bool? localWorkspaceAvailable, }) {"
@@ -404,20 +397,28 @@
         {
           "path": "lib/app/app_controller_desktop_thread_sessions.dart",
           "language": "dart",
-          "symbolCount": 3,
+          "symbolCount": 4,
           "symbols": [
             {
               "language": "dart",
               "path": "lib/app/app_controller_desktop_thread_sessions.dart",
-              "line": 51,
+              "line": 55,
               "kind": "top-level function",
               "name": "resolveGatewayThreadConnectionStateInternal",
-              "signature": "AssistantThreadConnectionState resolveGatewayThreadConnectionStateInternal({ required AssistantExecutionTarget target, required bool bridgeReady, required String bridgeLabel, required AccountSyncState? accountSyncState, }) {"
+              "signature": "AssistantThreadConnectionState resolveGatewayThreadConnectionStateInternal({ required AssistantExecutionTarget target, required bool bridgeReady, required String bridgeLabel, required AccountSyncState? accountSyncState, required bool accountSignedIn, required bool bridgeConfigured, bool bridgeDiscoveryAttempted = false, String bridgeDiscoveryError = '', bool providerCatalogEmpty = false, }) {"
             },
             {
               "language": "dart",
               "path": "lib/app/app_controller_desktop_thread_sessions.dart",
-              "line": 99,
+              "line": 180,
+              "kind": "top-level function",
+              "name": "bridgeCapabilityReadyForExecutionTargetInternal",
+              "signature": "bool bridgeCapabilityReadyForExecutionTargetInternal({ required AssistantExecutionTarget target, required bool bridgeConfigured, required List<SingleAgentProvider> providers, required List<AssistantExecutionTarget> availableTargets, }) {"
+            },
+            {
+              "language": "dart",
+              "path": "lib/app/app_controller_desktop_thread_sessions.dart",
+              "line": 192,
               "kind": "extension",
               "name": "AppControllerDesktopThreadSessions",
               "signature": "extension AppControllerDesktopThreadSessions on AppController {"
@@ -425,22 +426,22 @@
             {
               "language": "dart",
               "path": "lib/app/app_controller_desktop_thread_sessions.dart",
-              "line": 470,
+              "line": 655,
               "kind": "top-level function",
-              "name": "resolveAssistantExecutionTargetFromRecordsForTest",
-              "signature": "AssistantExecutionTarget resolveAssistantExecutionTargetFromRecordsForTest( TaskThread? primaryRecord, { TaskThread? fallbackRecord, }) {"
+              "name": "resolveAssistantExecutionTargetFromRecordForTest",
+              "signature": "AssistantExecutionTarget resolveAssistantExecutionTargetFromRecordForTest( TaskThread? record, { required AssistantExecutionTarget defaultExecutionTarget, }) {"
             }
           ]
         },
         {
           "path": "lib/app/app_controller_desktop_thread_sessions_collaboration_impl.dart",
           "language": "dart",
-          "symbolCount": 14,
+          "symbolCount": 13,
           "symbols": [
             {
               "language": "dart",
               "path": "lib/app/app_controller_desktop_thread_sessions_collaboration_impl.dart",
-              "line": 50,
+              "line": 49,
               "kind": "top-level function",
               "name": "loadAiGatewayApiKeyThreadSessionInternal",
               "signature": "Future<String> loadAiGatewayApiKeyThreadSessionInternal( AppController controller, ) async {"
@@ -448,7 +449,7 @@
             {
               "language": "dart",
               "path": "lib/app/app_controller_desktop_thread_sessions_collaboration_impl.dart",
-              "line": 56,
+              "line": 55,
               "kind": "top-level function",
               "name": "saveMultiAgentConfigThreadSessionInternal",
               "signature": "Future<void> saveMultiAgentConfigThreadSessionInternal( AppController controller, MultiAgentConfig config, ) async {"
@@ -456,7 +457,7 @@
             {
               "language": "dart",
               "path": "lib/app/app_controller_desktop_thread_sessions_collaboration_impl.dart",
-              "line": 73,
+              "line": 72,
               "kind": "top-level function",
               "name": "refreshMultiAgentMountsThreadSessionInternal",
               "signature": "Future<void> refreshMultiAgentMountsThreadSessionInternal( AppController controller, { bool sync = false, }) async {"
@@ -464,7 +465,7 @@
             {
               "language": "dart",
               "path": "lib/app/app_controller_desktop_thread_sessions_collaboration_impl.dart",
-              "line": 98,
+              "line": 97,
               "kind": "top-level function",
               "name": "runMultiAgentCollaborationThreadSessionInternal",
               "signature": "Future<void> runMultiAgentCollaborationThreadSessionInternal( AppController controller, { required String rawPrompt, required String composedPrompt, required List<CollaborationAttachment> attachments, required List<String> selectedSkillLabels, }) async {"
@@ -472,7 +473,7 @@
             {
               "language": "dart",
               "path": "lib/app/app_controller_desktop_thread_sessions_collaboration_impl.dart",
-              "line": 269,
+              "line": 283,
               "kind": "top-level function",
               "name": "openOnlineWorkspaceThreadSessionInternal",
               "signature": "Future<void> openOnlineWorkspaceThreadSessionInternal( AppController controller, ) async {"
@@ -480,7 +481,7 @@
             {
               "language": "dart",
               "path": "lib/app/app_controller_desktop_thread_sessions_collaboration_impl.dart",
-              "line": 290,
+              "line": 304,
               "kind": "top-level function",
               "name": "aiGatewayModelChoicesThreadSessionInternal",
               "signature": "List<String> aiGatewayModelChoicesThreadSessionInternal( AppController controller, ) {"
@@ -488,7 +489,7 @@
             {
               "language": "dart",
               "path": "lib/app/app_controller_desktop_thread_sessions_collaboration_impl.dart",
-              "line": 296,
+              "line": 310,
               "kind": "top-level function",
               "name": "connectedGatewayModelChoicesThreadSessionInternal",
               "signature": "List<String> connectedGatewayModelChoicesThreadSessionInternal( AppController controller, ) {"
@@ -496,7 +497,7 @@
             {
               "language": "dart",
               "path": "lib/app/app_controller_desktop_thread_sessions_collaboration_impl.dart",
-              "line": 308,
+              "line": 322,
               "kind": "top-level function",
               "name": "assistantModelChoicesThreadSessionInternal",
               "signature": "List<String> assistantModelChoicesThreadSessionInternal( AppController controller, ) {"
@@ -504,7 +505,7 @@
             {
               "language": "dart",
               "path": "lib/app/app_controller_desktop_thread_sessions_collaboration_impl.dart",
-              "line": 317,
+              "line": 331,
               "kind": "top-level function",
               "name": "assistantModelChoicesForSessionThreadSessionInternal",
               "signature": "List<String> assistantModelChoicesForSessionThreadSessionInternal( AppController controller, String sessionKey, ) {"
@@ -512,7 +513,7 @@
             {
               "language": "dart",
               "path": "lib/app/app_controller_desktop_thread_sessions_collaboration_impl.dart",
-              "line": 332,
+              "line": 346,
               "kind": "top-level function",
               "name": "resolvedDefaultModelThreadSessionInternal",
               "signature": "String resolvedDefaultModelThreadSessionInternal(AppController controller) {"
@@ -520,7 +521,7 @@
             {
               "language": "dart",
               "path": "lib/app/app_controller_desktop_thread_sessions_collaboration_impl.dart",
-              "line": 354,
+              "line": 368,
               "kind": "top-level function",
               "name": "canQuickConnectGatewayThreadSessionInternal",
               "signature": "bool canQuickConnectGatewayThreadSessionInternal(AppController controller) {"
@@ -528,15 +529,7 @@
             {
               "language": "dart",
               "path": "lib/app/app_controller_desktop_thread_sessions_collaboration_impl.dart",
-              "line": 374,
-              "kind": "top-level function",
-              "name": "normalizeAssistantSessionKeyThreadInternal",
-              "signature": "String normalizeAssistantSessionKeyThreadInternal(String sessionKey) {"
-            },
-            {
-              "language": "dart",
-              "path": "lib/app/app_controller_desktop_thread_sessions_collaboration_impl.dart",
-              "line": 379,
+              "line": 388,
               "kind": "top-level function",
               "name": "joinConnectionPartsThreadSessionInternal",
               "signature": "String joinConnectionPartsThreadSessionInternal(List<String> parts) {"
@@ -544,7 +537,7 @@
             {
               "language": "dart",
               "path": "lib/app/app_controller_desktop_thread_sessions_collaboration_impl.dart",
-              "line": 387,
+              "line": 396,
               "kind": "top-level function",
               "name": "gatewayAddressLabelThreadSessionInternal",
               "signature": "String gatewayAddressLabelThreadSessionInternal( GatewayConnectionProfile profile, ) {"
@@ -559,7 +552,7 @@
             {
               "language": "dart",
               "path": "lib/app/app_controller_desktop_thread_storage.dart",
-              "line": 48,
+              "line": 47,
               "kind": "extension",
               "name": "AppControllerDesktopThreadStorage",
               "signature": "extension AppControllerDesktopThreadStorage on AppController {"
@@ -578,6 +571,21 @@
               "kind": "extension",
               "name": "AppControllerDesktopWorkspaceExecution",
               "signature": "extension AppControllerDesktopWorkspaceExecution on AppController {"
+            }
+          ]
+        },
+        {
+          "path": "lib/app/app_controller_openclaw_task_queue.dart",
+          "language": "dart",
+          "symbolCount": 1,
+          "symbols": [
+            {
+              "language": "dart",
+              "path": "lib/app/app_controller_openclaw_task_queue.dart",
+              "line": 9,
+              "kind": "class",
+              "name": "OpenClawGatewayQueuedTurnInternal",
+              "signature": "class OpenClawGatewayQueuedTurnInternal {"
             }
           ]
         },
@@ -708,7 +716,7 @@
             {
               "language": "dart",
               "path": "lib/app/ui_feature_manifest_core.dart",
-              "line": 62,
+              "line": 57,
               "kind": "class",
               "name": "UiFeatureFlag",
               "signature": "class UiFeatureFlag {"
@@ -716,7 +724,7 @@
             {
               "language": "dart",
               "path": "lib/app/ui_feature_manifest_core.dart",
-              "line": 94,
+              "line": 89,
               "kind": "class",
               "name": "UiFeatureManifest",
               "signature": "class UiFeatureManifest {"
@@ -724,7 +732,7 @@
             {
               "language": "dart",
               "path": "lib/app/ui_feature_manifest_core.dart",
-              "line": 341,
+              "line": 336,
               "kind": "class",
               "name": "UiFeatureAccess",
               "signature": "class UiFeatureAccess {"
@@ -732,7 +740,7 @@
             {
               "language": "dart",
               "path": "lib/app/ui_feature_manifest_core.dart",
-              "line": 480,
+              "line": 466,
               "kind": "class",
               "name": "UiFeatureManifestLoader",
               "signature": "class UiFeatureManifestLoader {"
@@ -742,7 +750,7 @@
         {
           "path": "lib/app/workspace_navigation.dart",
           "language": "dart",
-          "symbolCount": 3,
+          "symbolCount": 2,
           "symbols": [
             {
               "language": "dart",
@@ -758,15 +766,7 @@
               "line": 32,
               "kind": "top-level function",
               "name": "buildSettingsBreadcrumbs",
-              "signature": "List<AppBreadcrumbItem> buildSettingsBreadcrumbs( AppController controller, { required SettingsTab tab, SettingsDetailPage? detail, SettingsNavigationContext? navigationContext, }) {"
-            },
-            {
-              "language": "dart",
-              "path": "lib/app/workspace_navigation.dart",
-              "line": 57,
-              "kind": "top-level function",
-              "name": "openSettingsNavigationContext",
-              "signature": "void openSettingsNavigationContext( AppController controller, SettingsNavigationContext context, ) {"
+              "signature": "List<AppBreadcrumbItem> buildSettingsBreadcrumbs( AppController controller, { required SettingsTab tab, }) {"
             }
           ]
         },
@@ -802,7 +802,7 @@
             {
               "language": "dart",
               "path": "lib/app/workspace_page_registry.dart",
-              "line": 60,
+              "line": 56,
               "kind": "top-level function",
               "name": "buildWorkspacePage",
               "signature": "Widget buildWorkspacePage({ required WorkspaceDestination destination, required AppController controller, required ValueChanged<DetailPanelData> onOpenDetail, required WorkspacePageSurface surface, }) {"
@@ -846,7 +846,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_components.dart",
-              "line": 282,
+              "line": 283,
               "kind": "top-level function",
               "name": "groupTasksForRailInternal",
               "signature": "List<AssistantTaskGroupInternal> groupTasksForRailInternal( List<AssistantTaskEntryInternal> tasks, List<AssistantExecutionTarget> visibleExecutionTargets, ) {"
@@ -854,7 +854,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_components.dart",
-              "line": 312,
+              "line": 313,
               "kind": "class",
               "name": "AssistantTaskTileInternal",
               "signature": "class AssistantTaskTileInternal extends StatelessWidget {"
@@ -862,7 +862,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_components.dart",
-              "line": 417,
+              "line": 462,
               "kind": "class",
               "name": "AssistantTaskGroupHeaderInternal",
               "signature": "class AssistantTaskGroupHeaderInternal extends StatelessWidget {"
@@ -870,7 +870,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_components.dart",
-              "line": 481,
+              "line": 526,
               "kind": "class",
               "name": "AssistantEmptyStateInternal",
               "signature": "class AssistantEmptyStateInternal extends StatelessWidget {"
@@ -956,12 +956,12 @@
         {
           "path": "lib/features/assistant/assistant_page_composer_skill_models.dart",
           "language": "dart",
-          "symbolCount": 3,
+          "symbolCount": 2,
           "symbols": [
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_composer_skill_models.dart",
-              "line": 79,
+              "line": 40,
               "kind": "top-level function",
               "name": "skillOptionFromGatewayInternal",
               "signature": "ComposerSkillOptionInternal skillOptionFromGatewayInternal( GatewaySkillSummary skill, ) {"
@@ -969,15 +969,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_composer_skill_models.dart",
-              "line": 106,
-              "kind": "top-level function",
-              "name": "skillOptionFromThreadSkillInternal",
-              "signature": "ComposerSkillOptionInternal skillOptionFromThreadSkillInternal( AssistantThreadSkillEntry skill, ) {"
-            },
-            {
-              "language": "dart",
-              "path": "lib/features/assistant/assistant_page_composer_skill_models.dart",
-              "line": 122,
+              "line": 61,
               "kind": "class",
               "name": "ComposerSkillOptionInternal",
               "signature": "class ComposerSkillOptionInternal {"
@@ -1141,7 +1133,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_main.dart",
-              "line": 270,
+              "line": 278,
               "kind": "enum",
               "name": "AssistantSidePaneInternal",
               "signature": "enum AssistantSidePaneInternal { tasks, navigation, focused }"
@@ -1149,7 +1141,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_main.dart",
-              "line": 272,
+              "line": 280,
               "kind": "class",
               "name": "AssistantUnifiedSidePaneInternal",
               "signature": "class AssistantUnifiedSidePaneInternal extends StatelessWidget {"
@@ -1157,7 +1149,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_main.dart",
-              "line": 344,
+              "line": 352,
               "kind": "class",
               "name": "AssistantSideTabRailInternal",
               "signature": "class AssistantSideTabRailInternal extends StatelessWidget {"
@@ -1165,7 +1157,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_main.dart",
-              "line": 444,
+              "line": 452,
               "kind": "class",
               "name": "AssistantSideTabButtonInternal",
               "signature": "class AssistantSideTabButtonInternal extends StatefulWidget {"
@@ -1173,7 +1165,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_main.dart",
-              "line": 463,
+              "line": 471,
               "kind": "class",
               "name": "AssistantSideTabButtonStateInternal",
               "signature": "class AssistantSideTabButtonStateInternal extends State<AssistantSideTabButtonInternal> {"
@@ -1181,7 +1173,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_main.dart",
-              "line": 512,
+              "line": 520,
               "kind": "class",
               "name": "AssistantLowerPaneInternal",
               "signature": "class AssistantLowerPaneInternal extends StatelessWidget {"
@@ -1189,7 +1181,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_main.dart",
-              "line": 596,
+              "line": 604,
               "kind": "class",
               "name": "ConversationAreaInternal",
               "signature": "class ConversationAreaInternal extends StatelessWidget {"
@@ -1322,7 +1314,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_state_closure.dart",
-              "line": 42,
+              "line": 44,
               "kind": "extension",
               "name": "AssistantPageStateClosureInternal",
               "signature": "extension AssistantPageStateClosureInternal on AssistantPageStateInternal {"
@@ -1432,7 +1424,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_task_models.dart",
-              "line": 294,
+              "line": 295,
               "kind": "top-level function",
               "name": "toolCallStatusLabelInternal",
               "signature": "String toolCallStatusLabelInternal(String status) =>"
@@ -1440,7 +1432,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_task_models.dart",
-              "line": 301,
+              "line": 303,
               "kind": "top-level function",
               "name": "assistantThinkingLabelInternal",
               "signature": "String assistantThinkingLabelInternal(String level) => switch (level) {"
@@ -1448,7 +1440,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_task_models.dart",
-              "line": 308,
+              "line": 310,
               "kind": "top-level function",
               "name": "sessionDisplayTitleInternal",
               "signature": "String sessionDisplayTitleInternal(GatewaySessionSummary session) {"
@@ -1456,7 +1448,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_task_models.dart",
-              "line": 320,
+              "line": 318,
               "kind": "top-level function",
               "name": "fallbackSessionTitleInternal",
               "signature": "String fallbackSessionTitleInternal(String sessionKey) {"
@@ -1464,7 +1456,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_task_models.dart",
-              "line": 335,
+              "line": 326,
               "kind": "top-level function",
               "name": "sessionPreviewInternal",
               "signature": "String? sessionPreviewInternal(GatewaySessionSummary session) {"
@@ -1472,15 +1464,15 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_task_models.dart",
-              "line": 347,
+              "line": 338,
               "kind": "top-level function",
               "name": "sessionStatusInternal",
-              "signature": "String sessionStatusInternal( GatewaySessionSummary session, { required bool sessionPending, }) {"
+              "signature": "String sessionStatusInternal( GatewaySessionSummary session, { required bool sessionPending, String lifecycleStatus = '', }) {"
             },
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_task_models.dart",
-              "line": 363,
+              "line": 359,
               "kind": "top-level function",
               "name": "sessionUpdatedAtLabelInternal",
               "signature": "String sessionUpdatedAtLabelInternal(double? updatedAtMs) {"
@@ -1488,7 +1480,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_task_models.dart",
-              "line": 382,
+              "line": 378,
               "kind": "top-level function",
               "name": "estimatedComposerWrapSectionHeightInternal",
               "signature": "double estimatedComposerWrapSectionHeightInternal({ required int itemCount, required double availableWidth, required double averageChipWidth, }) {"
@@ -1496,7 +1488,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_task_models.dart",
-              "line": 398,
+              "line": 394,
               "kind": "top-level function",
               "name": "sessionKeysMatchInternal",
               "signature": "bool sessionKeysMatchInternal(String incoming, String current) {"
@@ -1806,12 +1798,20 @@
         {
           "path": "lib/features/settings/settings_page_core.dart",
           "language": "dart",
-          "symbolCount": 1,
+          "symbolCount": 2,
           "symbols": [
             {
               "language": "dart",
               "path": "lib/features/settings/settings_page_core.dart",
               "line": 19,
+              "kind": "top-level function",
+              "name": "loadBridgeMetadataForSettingsAbout",
+              "signature": "Future<Map<String, dynamic>> loadBridgeMetadataForSettingsAbout({ required Uri bridgeEndpoint, required Future<String?> Function(Uri endpoint) authorizationResolver, HttpClient Function()? clientFactory, }) async {"
+            },
+            {
+              "language": "dart",
+              "path": "lib/features/settings/settings_page_core.dart",
+              "line": 109,
               "kind": "class",
               "name": "SettingsPage",
               "signature": "class SettingsPage extends StatefulWidget {"
@@ -1823,12 +1823,12 @@
     {
       "group": "lib/models",
       "fileCount": 1,
-      "symbolCount": 34,
+      "symbolCount": 31,
       "files": [
         {
           "path": "lib/models/app_models.dart",
           "language": "dart",
-          "symbolCount": 34,
+          "symbolCount": 31,
           "symbols": [
             {
               "language": "dart",
@@ -1836,12 +1836,12 @@
               "line": 5,
               "kind": "enum",
               "name": "WorkspaceDestination",
-              "signature": "enum WorkspaceDestination {"
+              "signature": "enum WorkspaceDestination { assistant, settings }"
             },
             {
               "language": "dart",
               "path": "lib/models/app_models.dart",
-              "line": 10,
+              "line": 7,
               "kind": "extension",
               "name": "WorkspaceDestinationCopy",
               "signature": "extension WorkspaceDestinationCopy on WorkspaceDestination {"
@@ -1849,15 +1849,15 @@
             {
               "language": "dart",
               "path": "lib/models/app_models.dart",
-              "line": 45,
+              "line": 42,
               "kind": "enum",
               "name": "AssistantFocusEntry",
-              "signature": "enum AssistantFocusEntry {"
+              "signature": "enum AssistantFocusEntry { settings, language, theme }"
             },
             {
               "language": "dart",
               "path": "lib/models/app_models.dart",
-              "line": 51,
+              "line": 44,
               "kind": "extension",
               "name": "AssistantFocusEntryCopy",
               "signature": "extension AssistantFocusEntryCopy on AssistantFocusEntry {"
@@ -1865,7 +1865,7 @@
             {
               "language": "dart",
               "path": "lib/models/app_models.dart",
-              "line": 124,
+              "line": 117,
               "kind": "top-level function",
               "name": "normalizeAssistantNavigationDestinations",
               "signature": "List<AssistantFocusEntry> normalizeAssistantNavigationDestinations( Iterable<AssistantFocusEntry> destinations, ) {"
@@ -1873,7 +1873,7 @@
             {
               "language": "dart",
               "path": "lib/models/app_models.dart",
-              "line": 139,
+              "line": 132,
               "kind": "enum",
               "name": "StatusTone",
               "signature": "enum StatusTone { neutral, accent, success, warning, danger }"
@@ -1881,7 +1881,7 @@
             {
               "language": "dart",
               "path": "lib/models/app_models.dart",
-              "line": 141,
+              "line": 134,
               "kind": "class",
               "name": "StatusInfo",
               "signature": "class StatusInfo {"
@@ -1889,7 +1889,7 @@
             {
               "language": "dart",
               "path": "lib/models/app_models.dart",
-              "line": 148,
+              "line": 141,
               "kind": "enum",
               "name": "AppSidebarState",
               "signature": "enum AppSidebarState { expanded, collapsed, hidden }"
@@ -1897,7 +1897,7 @@
             {
               "language": "dart",
               "path": "lib/models/app_models.dart",
-              "line": 150,
+              "line": 143,
               "kind": "enum",
               "name": "AssistantMode",
               "signature": "enum AssistantMode { code, office }"
@@ -1905,7 +1905,7 @@
             {
               "language": "dart",
               "path": "lib/models/app_models.dart",
-              "line": 152,
+              "line": 145,
               "kind": "extension",
               "name": "AssistantModeCopy",
               "signature": "extension AssistantModeCopy on AssistantMode {"
@@ -1913,7 +1913,7 @@
             {
               "language": "dart",
               "path": "lib/models/app_models.dart",
-              "line": 159,
+              "line": 152,
               "kind": "enum",
               "name": "SettingsTab",
               "signature": "enum SettingsTab { gateway }"
@@ -1921,7 +1921,7 @@
             {
               "language": "dart",
               "path": "lib/models/app_models.dart",
-              "line": 161,
+              "line": 154,
               "kind": "extension",
               "name": "SettingsTabCopy",
               "signature": "extension SettingsTabCopy on SettingsTab {"
@@ -1929,31 +1929,7 @@
             {
               "language": "dart",
               "path": "lib/models/app_models.dart",
-              "line": 167,
-              "kind": "enum",
-              "name": "SettingsDetailPage",
-              "signature": "enum SettingsDetailPage { gatewayConnection }"
-            },
-            {
-              "language": "dart",
-              "path": "lib/models/app_models.dart",
-              "line": 169,
-              "kind": "extension",
-              "name": "SettingsDetailPageCopy",
-              "signature": "extension SettingsDetailPageCopy on SettingsDetailPage {"
-            },
-            {
-              "language": "dart",
-              "path": "lib/models/app_models.dart",
-              "line": 183,
-              "kind": "class",
-              "name": "SettingsNavigationContext",
-              "signature": "class SettingsNavigationContext {"
-            },
-            {
-              "language": "dart",
-              "path": "lib/models/app_models.dart",
-              "line": 201,
+              "line": 160,
               "kind": "class",
               "name": "QuickAction",
               "signature": "class QuickAction {"
@@ -1961,7 +1937,7 @@
             {
               "language": "dart",
               "path": "lib/models/app_models.dart",
-              "line": 213,
+              "line": 172,
               "kind": "class",
               "name": "RecentSession",
               "signature": "class RecentSession {"
@@ -1969,7 +1945,7 @@
             {
               "language": "dart",
               "path": "lib/models/app_models.dart",
-              "line": 225,
+              "line": 184,
               "kind": "class",
               "name": "MetricSummary",
               "signature": "class MetricSummary {"
@@ -1977,7 +1953,7 @@
             {
               "language": "dart",
               "path": "lib/models/app_models.dart",
-              "line": 241,
+              "line": 200,
               "kind": "class",
               "name": "TaskSummary",
               "signature": "class TaskSummary {"
@@ -1985,7 +1961,7 @@
             {
               "language": "dart",
               "path": "lib/models/app_models.dart",
-              "line": 259,
+              "line": 218,
               "kind": "class",
               "name": "ModuleSummary",
               "signature": "class ModuleSummary {"
@@ -1993,7 +1969,7 @@
             {
               "language": "dart",
               "path": "lib/models/app_models.dart",
-              "line": 275,
+              "line": 234,
               "kind": "class",
               "name": "NodeSummary",
               "signature": "class NodeSummary {"
@@ -2001,7 +1977,7 @@
             {
               "language": "dart",
               "path": "lib/models/app_models.dart",
-              "line": 293,
+              "line": 252,
               "kind": "class",
               "name": "AgentSummary",
               "signature": "class AgentSummary {"
@@ -2009,7 +1985,7 @@
             {
               "language": "dart",
               "path": "lib/models/app_models.dart",
-              "line": 309,
+              "line": 268,
               "kind": "class",
               "name": "SkillSummary",
               "signature": "class SkillSummary {"
@@ -2017,7 +1993,7 @@
             {
               "language": "dart",
               "path": "lib/models/app_models.dart",
-              "line": 327,
+              "line": 286,
               "kind": "class",
               "name": "ConnectorSummary",
               "signature": "class ConnectorSummary {"
@@ -2025,7 +2001,7 @@
             {
               "language": "dart",
               "path": "lib/models/app_models.dart",
-              "line": 343,
+              "line": 302,
               "kind": "class",
               "name": "SecretSummary",
               "signature": "class SecretSummary {"
@@ -2033,7 +2009,7 @@
             {
               "language": "dart",
               "path": "lib/models/app_models.dart",
-              "line": 359,
+              "line": 318,
               "kind": "class",
               "name": "SecretReference",
               "signature": "class SecretReference {"
@@ -2041,7 +2017,7 @@
             {
               "language": "dart",
               "path": "lib/models/app_models.dart",
-              "line": 375,
+              "line": 334,
               "kind": "class",
               "name": "ProviderSummary",
               "signature": "class ProviderSummary {"
@@ -2049,7 +2025,7 @@
             {
               "language": "dart",
               "path": "lib/models/app_models.dart",
-              "line": 389,
+              "line": 348,
               "kind": "class",
               "name": "AuditSummary",
               "signature": "class AuditSummary {"
@@ -2057,7 +2033,7 @@
             {
               "language": "dart",
               "path": "lib/models/app_models.dart",
-              "line": 407,
+              "line": 366,
               "kind": "class",
               "name": "SettingSummary",
               "signature": "class SettingSummary {"
@@ -2065,7 +2041,7 @@
             {
               "language": "dart",
               "path": "lib/models/app_models.dart",
-              "line": 419,
+              "line": 378,
               "kind": "class",
               "name": "WorkspaceProfile",
               "signature": "class WorkspaceProfile {"
@@ -2073,7 +2049,7 @@
             {
               "language": "dart",
               "path": "lib/models/app_models.dart",
-              "line": 433,
+              "line": 392,
               "kind": "class",
               "name": "DetailPanelData",
               "signature": "class DetailPanelData {"
@@ -2081,7 +2057,7 @@
             {
               "language": "dart",
               "path": "lib/models/app_models.dart",
-              "line": 455,
+              "line": 414,
               "kind": "class",
               "name": "DetailSection",
               "signature": "class DetailSection {"
@@ -2089,7 +2065,7 @@
             {
               "language": "dart",
               "path": "lib/models/app_models.dart",
-              "line": 462,
+              "line": 421,
               "kind": "class",
               "name": "DetailItem",
               "signature": "class DetailItem {"
@@ -2097,7 +2073,7 @@
             {
               "language": "dart",
               "path": "lib/models/app_models.dart",
-              "line": 469,
+              "line": 428,
               "kind": "class",
               "name": "CommandEntry",
               "signature": "class CommandEntry {"
@@ -2108,8 +2084,8 @@
     },
     {
       "group": "lib/runtime",
-      "fileCount": 67,
-      "symbolCount": 377,
+      "fileCount": 66,
+      "symbolCount": 372,
       "files": [
         {
           "path": "lib/runtime/account_runtime_client.dart",
@@ -2150,7 +2126,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/acp_endpoint_paths.dart",
-              "line": 51,
+              "line": 72,
               "kind": "top-level function",
               "name": "resolveAcpWebSocketEndpoint",
               "signature": "Uri? resolveAcpWebSocketEndpoint(Uri? endpoint) {"
@@ -2158,7 +2134,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/acp_endpoint_paths.dart",
-              "line": 69,
+              "line": 93,
               "kind": "top-level function",
               "name": "resolveAcpHttpRpcEndpoint",
               "signature": "Uri? resolveAcpHttpRpcEndpoint(Uri? endpoint) {"
@@ -2221,53 +2197,14 @@
           ]
         },
         {
-          "path": "lib/runtime/aris_bundle.dart",
-          "language": "dart",
-          "symbolCount": 3,
-          "symbols": [
-            {
-              "language": "dart",
-              "path": "lib/runtime/aris_bundle.dart",
-              "line": 9,
-              "kind": "class",
-              "name": "ArisBundleManifest",
-              "signature": "class ArisBundleManifest {"
-            },
-            {
-              "language": "dart",
-              "path": "lib/runtime/aris_bundle.dart",
-              "line": 69,
-              "kind": "class",
-              "name": "ResolvedArisBundle",
-              "signature": "class ResolvedArisBundle {"
-            },
-            {
-              "language": "dart",
-              "path": "lib/runtime/aris_bundle.dart",
-              "line": 98,
-              "kind": "class",
-              "name": "ArisBundleRepository",
-              "signature": "class ArisBundleRepository {"
-            }
-          ]
-        },
-        {
           "path": "lib/runtime/aris_llm_chat_client.dart",
           "language": "dart",
-          "symbolCount": 2,
+          "symbolCount": 1,
           "symbols": [
             {
               "language": "dart",
               "path": "lib/runtime/aris_llm_chat_client.dart",
-              "line": 8,
-              "kind": "typedef",
-              "name": "ArisProcessStarter",
-              "signature": "typedef ArisProcessStarter = Future<Process> Function( String executable, List<String> arguments, { Map<String, String>? environment, String? workingDirectory, });"
-            },
-            {
-              "language": "dart",
-              "path": "lib/runtime/aris_llm_chat_client.dart",
-              "line": 16,
+              "line": 3,
               "kind": "class",
               "name": "ArisLlmChatClient",
               "signature": "class ArisLlmChatClient {"
@@ -2423,7 +2360,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/codex_runtime.dart",
-              "line": 12,
+              "line": 10,
               "kind": "enum",
               "name": "CodexSandboxMode",
               "signature": "enum CodexSandboxMode {"
@@ -2431,7 +2368,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/codex_runtime.dart",
-              "line": 22,
+              "line": 20,
               "kind": "enum",
               "name": "CodexApprovalPolicy",
               "signature": "enum CodexApprovalPolicy {"
@@ -2439,7 +2376,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/codex_runtime.dart",
-              "line": 32,
+              "line": 30,
               "kind": "enum",
               "name": "CodexAuthMode",
               "signature": "enum CodexAuthMode {"
@@ -2447,7 +2384,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/codex_runtime.dart",
-              "line": 42,
+              "line": 40,
               "kind": "class",
               "name": "CodexThread",
               "signature": "class CodexThread {"
@@ -2455,7 +2392,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/codex_runtime.dart",
-              "line": 75,
+              "line": 73,
               "kind": "class",
               "name": "CodexTurn",
               "signature": "class CodexTurn {"
@@ -2463,7 +2400,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/codex_runtime.dart",
-              "line": 106,
+              "line": 104,
               "kind": "class",
               "name": "CodexAccount",
               "signature": "class CodexAccount {"
@@ -2471,7 +2408,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/codex_runtime.dart",
-              "line": 137,
+              "line": 135,
               "kind": "class",
               "name": "CodexRateLimit",
               "signature": "class CodexRateLimit {"
@@ -2479,7 +2416,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/codex_runtime.dart",
-              "line": 160,
+              "line": 158,
               "kind": "class",
               "name": "CodexUserInput",
               "signature": "class CodexUserInput {"
@@ -2487,7 +2424,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/codex_runtime.dart",
-              "line": 180,
+              "line": 178,
               "kind": "class",
               "name": "CodexAttachment",
               "signature": "class CodexAttachment {"
@@ -2495,7 +2432,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/codex_runtime.dart",
-              "line": 198,
+              "line": 196,
               "kind": "class",
               "name": "CodexLogEvent",
               "signature": "class CodexLogEvent extends CodexEvent {"
@@ -2503,7 +2440,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/codex_runtime.dart",
-              "line": 211,
+              "line": 209,
               "kind": "class",
               "name": "CodexNotificationEvent",
               "signature": "class CodexNotificationEvent extends CodexEvent {"
@@ -2511,7 +2448,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/codex_runtime.dart",
-              "line": 219,
+              "line": 217,
               "kind": "class",
               "name": "CodexTurnEvent",
               "signature": "class CodexTurnEvent extends CodexEvent {"
@@ -2519,7 +2456,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/codex_runtime.dart",
-              "line": 253,
+              "line": 251,
               "kind": "class",
               "name": "CodexRpcError",
               "signature": "class CodexRpcError implements Exception {"
@@ -2527,7 +2464,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/codex_runtime.dart",
-              "line": 273,
+              "line": 271,
               "kind": "enum",
               "name": "CodexConnectionState",
               "signature": "enum CodexConnectionState {"
@@ -2535,7 +2472,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/codex_runtime.dart",
-              "line": 283,
+              "line": 281,
               "kind": "class",
               "name": "CodexRuntime",
               "signature": "class CodexRuntime extends ChangeNotifier {"
@@ -2543,7 +2480,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/codex_runtime.dart",
-              "line": 901,
+              "line": 629,
               "kind": "class",
               "name": "CodexLaunchConfiguration",
               "signature": "class CodexLaunchConfiguration {"
@@ -2627,7 +2564,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/embedded_agent_launch_policy.dart",
-              "line": 4,
+              "line": 6,
               "kind": "top-level function",
               "name": "shouldBlockEmbeddedAgentLaunch",
               "signature": "bool shouldBlockEmbeddedAgentLaunch({ required bool isAppleHost, bool? enabled, }) {"
@@ -2635,10 +2572,10 @@
             {
               "language": "dart",
               "path": "lib/runtime/embedded_agent_launch_policy.dart",
-              "line": 14,
+              "line": 19,
               "kind": "top-level function",
               "name": "shouldBlockGoCoreLaunch",
-              "signature": "bool shouldBlockGoCoreLaunch( GoCoreLaunch _, { required bool isAppleHost, bool? enabled, }) {"
+              "signature": "bool shouldBlockGoCoreLaunch({ required bool isAppleHost, bool? enabled, }) {"
             }
           ]
         },
@@ -2650,7 +2587,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/external_code_agent_acp_desktop_transport.dart",
-              "line": 9,
+              "line": 10,
               "kind": "class",
               "name": "ExternalCodeAgentAcpDesktopTransport",
               "signature": "class ExternalCodeAgentAcpDesktopTransport implements ExternalCodeAgentAcpTransport {"
@@ -2729,7 +2666,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/file_store_support.dart",
-              "line": 210,
+              "line": 220,
               "kind": "top-level function",
               "name": "normalizeStoreDirectoryPath",
               "signature": "String normalizeStoreDirectoryPath(String path) {"
@@ -2737,7 +2674,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/file_store_support.dart",
-              "line": 227,
+              "line": 237,
               "kind": "top-level function",
               "name": "ensureDirectory",
               "signature": "Future<Directory> ensureDirectory(String path) async {"
@@ -2745,7 +2682,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/file_store_support.dart",
-              "line": 235,
+              "line": 245,
               "kind": "top-level function",
               "name": "ensureOwnerOnlyDirectory",
               "signature": "Future<void> ensureOwnerOnlyDirectory(Directory directory) async {"
@@ -2753,7 +2690,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/file_store_support.dart",
-              "line": 242,
+              "line": 252,
               "kind": "top-level function",
               "name": "ensureOwnerOnlyFile",
               "signature": "Future<void> ensureOwnerOnlyFile(File file) async {"
@@ -2761,7 +2698,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/file_store_support.dart",
-              "line": 249,
+              "line": 259,
               "kind": "top-level function",
               "name": "encodeStableFileKey",
               "signature": "String encodeStableFileKey(String key) {"
@@ -2769,7 +2706,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/file_store_support.dart",
-              "line": 253,
+              "line": 263,
               "kind": "top-level function",
               "name": "atomicWriteString",
               "signature": "Future<void> atomicWriteString( File file, String contents, { bool ownerOnly = false, }) async {"
@@ -2777,7 +2714,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/file_store_support.dart",
-              "line": 275,
+              "line": 285,
               "kind": "top-level function",
               "name": "deleteIfExists",
               "signature": "Future<void> deleteIfExists(File file) async {"
@@ -2785,7 +2722,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/file_store_support.dart",
-              "line": 281,
+              "line": 291,
               "kind": "top-level function",
               "name": "decodeYamlDocument",
               "signature": "Object? decodeYamlDocument(String raw) {"
@@ -2793,7 +2730,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/file_store_support.dart",
-              "line": 306,
+              "line": 316,
               "kind": "top-level function",
               "name": "encodeYamlDocument",
               "signature": "String encodeYamlDocument(Object? value) {"
@@ -2803,12 +2740,12 @@
         {
           "path": "lib/runtime/gateway_acp_client.dart",
           "language": "dart",
-          "symbolCount": 4,
+          "symbolCount": 6,
           "symbols": [
             {
               "language": "dart",
               "path": "lib/runtime/gateway_acp_client.dart",
-              "line": 8,
+              "line": 16,
               "kind": "class",
               "name": "GatewayAcpException",
               "signature": "class GatewayAcpException implements Exception {"
@@ -2816,7 +2753,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/gateway_acp_client.dart",
-              "line": 19,
+              "line": 33,
               "kind": "class",
               "name": "GatewayAcpCapabilities",
               "signature": "class GatewayAcpCapabilities {"
@@ -2824,7 +2761,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/gateway_acp_client.dart",
-              "line": 70,
+              "line": 91,
               "kind": "class",
               "name": "GatewayAcpMultiAgentRequest",
               "signature": "class GatewayAcpMultiAgentRequest {"
@@ -2832,10 +2769,26 @@
             {
               "language": "dart",
               "path": "lib/runtime/gateway_acp_client.dart",
-              "line": 90,
+              "line": 111,
               "kind": "class",
               "name": "GatewayAcpClient",
               "signature": "class GatewayAcpClient {"
+            },
+            {
+              "language": "dart",
+              "path": "lib/runtime/gateway_acp_client.dart",
+              "line": 1392,
+              "kind": "top-level function",
+              "name": "gatewayAcpHttpResponseTimeoutFor",
+              "signature": "Duration gatewayAcpHttpResponseTimeoutFor( Uri endpoint, String method, [ Map<String, dynamic> params = const <String, dynamic>{}, ]) {"
+            },
+            {
+              "language": "dart",
+              "path": "lib/runtime/gateway_acp_client.dart",
+              "line": 1412,
+              "kind": "top-level function",
+              "name": "gatewayAcpTaskRuntimeBudgetMinutesForParams",
+              "signature": "int gatewayAcpTaskRuntimeBudgetMinutesForParams(Map<String, dynamic> params) {"
             }
           ]
         },
@@ -2868,7 +2821,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/gateway_runtime_core.dart",
-              "line": 24,
+              "line": 25,
               "kind": "class",
               "name": "GatewayRuntime",
               "signature": "class GatewayRuntime extends ChangeNotifier with GatewayRuntimeHelpersInternal {"
@@ -2929,7 +2882,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/gateway_runtime_helpers.dart",
-              "line": 554,
+              "line": 561,
               "kind": "class",
               "name": "GatewaySetupPayload",
               "signature": "class GatewaySetupPayload {"
@@ -2937,7 +2890,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/gateway_runtime_helpers.dart",
-              "line": 570,
+              "line": 577,
               "kind": "top-level function",
               "name": "decodeGatewaySetupCode",
               "signature": "GatewaySetupPayload? decodeGatewaySetupCode(String rawInput) {"
@@ -2945,7 +2898,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/gateway_runtime_helpers.dart",
-              "line": 590,
+              "line": 597,
               "kind": "top-level function",
               "name": "decodeSetupPayloadJsonInternal",
               "signature": "GatewaySetupPayload? decodeSetupPayloadJsonInternal(String raw) {"
@@ -2953,7 +2906,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/gateway_runtime_helpers.dart",
-              "line": 615,
+              "line": 622,
               "kind": "top-level function",
               "name": "resolveSetupCodeCandidateInternal",
               "signature": "String resolveSetupCodeCandidateInternal(String raw) {"
@@ -2961,7 +2914,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/gateway_runtime_helpers.dart",
-              "line": 650,
+              "line": 657,
               "kind": "top-level function",
               "name": "composeManualUrlInternal",
               "signature": "String? composeManualUrlInternal(String? host, int? port, bool? tls) {"
@@ -2969,7 +2922,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/gateway_runtime_helpers.dart",
-              "line": 660,
+              "line": 667,
               "kind": "top-level function",
               "name": "asMap",
               "signature": "Map<String, dynamic> asMap(Object? value) {"
@@ -2977,7 +2930,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/gateway_runtime_helpers.dart",
-              "line": 670,
+              "line": 677,
               "kind": "top-level function",
               "name": "asList",
               "signature": "List<dynamic> asList(Object? value) {"
@@ -2985,7 +2938,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/gateway_runtime_helpers.dart",
-              "line": 680,
+              "line": 687,
               "kind": "top-level function",
               "name": "stringValue",
               "signature": "String? stringValue(Object? value) {"
@@ -2993,7 +2946,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/gateway_runtime_helpers.dart",
-              "line": 688,
+              "line": 695,
               "kind": "top-level function",
               "name": "boolValue",
               "signature": "bool? boolValue(Object? value) {"
@@ -3001,7 +2954,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/gateway_runtime_helpers.dart",
-              "line": 703,
+              "line": 710,
               "kind": "top-level function",
               "name": "intValue",
               "signature": "int? intValue(Object? value) {"
@@ -3009,7 +2962,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/gateway_runtime_helpers.dart",
-              "line": 716,
+              "line": 723,
               "kind": "top-level function",
               "name": "doubleValue",
               "signature": "double? doubleValue(Object? value) {"
@@ -3017,7 +2970,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/gateway_runtime_helpers.dart",
-              "line": 729,
+              "line": 736,
               "kind": "top-level function",
               "name": "stringList",
               "signature": "List<String> stringList(Object? value) {"
@@ -3025,7 +2978,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/gateway_runtime_helpers.dart",
-              "line": 735,
+              "line": 742,
               "kind": "top-level function",
               "name": "extractMessageText",
               "signature": "String extractMessageText(Map<String, dynamic> message) {"
@@ -3033,7 +2986,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/gateway_runtime_helpers.dart",
-              "line": 756,
+              "line": 763,
               "kind": "top-level function",
               "name": "randomIdInternal",
               "signature": "String randomIdInternal() {"
@@ -3041,7 +2994,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/gateway_runtime_helpers.dart",
-              "line": 766,
+              "line": 773,
               "kind": "class",
               "name": "RpcResponseInternal",
               "signature": "class RpcResponseInternal {"
@@ -3125,7 +3078,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/go_core.dart",
-              "line": 3,
+              "line": 4,
               "kind": "enum",
               "name": "GoCoreLaunchSource",
               "signature": "enum GoCoreLaunchSource { buildArtifact }"
@@ -3133,7 +3086,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/go_core.dart",
-              "line": 5,
+              "line": 7,
               "kind": "class",
               "name": "GoCoreLaunch",
               "signature": "class GoCoreLaunch {"
@@ -3141,7 +3094,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/go_core.dart",
-              "line": 19,
+              "line": 21,
               "kind": "typedef",
               "name": "GoCoreBinaryExistsResolver",
               "signature": "typedef GoCoreBinaryExistsResolver = Future<bool> Function(String command);"
@@ -3149,7 +3102,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/go_core.dart",
-              "line": 21,
+              "line": 24,
               "kind": "class",
               "name": "GoCoreLocator",
               "signature": "class GoCoreLocator {"
@@ -3266,7 +3219,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/go_task_service_client.dart",
-              "line": 357,
+              "line": 359,
               "kind": "class",
               "name": "GoTaskServiceUpdate",
               "signature": "class GoTaskServiceUpdate {"
@@ -3274,7 +3227,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/go_task_service_client.dart",
-              "line": 386,
+              "line": 388,
               "kind": "class",
               "name": "GoTaskServiceArtifact",
               "signature": "class GoTaskServiceArtifact {"
@@ -3282,7 +3235,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/go_task_service_client.dart",
-              "line": 433,
+              "line": 443,
               "kind": "class",
               "name": "GoTaskServiceResult",
               "signature": "class GoTaskServiceResult {"
@@ -3290,7 +3243,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/go_task_service_client.dart",
-              "line": 540,
+              "line": 577,
               "kind": "top-level function",
               "name": "goTaskServiceGatewayEntryState",
               "signature": "String? goTaskServiceGatewayEntryState({ required AssistantExecutionTarget requestedTarget, required GoTaskServiceResult result, }) {"
@@ -3298,7 +3251,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/go_task_service_client.dart",
-              "line": 575,
+              "line": 612,
               "kind": "abstract interface",
               "name": "ExternalCodeAgentAcpTransport",
               "signature": "abstract class ExternalCodeAgentAcpTransport {"
@@ -3306,7 +3259,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/go_task_service_client.dart",
-              "line": 607,
+              "line": 644,
               "kind": "abstract interface",
               "name": "GoTaskServiceClient",
               "signature": "abstract class GoTaskServiceClient {"
@@ -3314,7 +3267,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/go_task_service_client.dart",
-              "line": 641,
+              "line": 678,
               "kind": "top-level function",
               "name": "goTaskServiceUpdateFromAcpNotification",
               "signature": "GoTaskServiceUpdate? goTaskServiceUpdateFromAcpNotification( Map<String, dynamic> notification, ) {"
@@ -3322,7 +3275,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/go_task_service_client.dart",
-              "line": 682,
+              "line": 719,
               "kind": "top-level function",
               "name": "goTaskServiceResultFromAcpResponse",
               "signature": "GoTaskServiceResult goTaskServiceResultFromAcpResponse( Map<String, dynamic> response, { required GoTaskServiceRoute route, String streamedText = '', String? completedMessage, }) {"
@@ -3330,7 +3283,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/go_task_service_client.dart",
-              "line": 743,
+              "line": 913,
               "kind": "top-level function",
               "name": "mergeGoTaskServiceResponseResult",
               "signature": "Map<String, dynamic> mergeGoTaskServiceResponseResult( Map<String, dynamic> response, Map<String, dynamic> overlay, ) {"
@@ -3338,7 +3291,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/go_task_service_client.dart",
-              "line": 767,
+              "line": 937,
               "kind": "top-level function",
               "name": "goTaskServiceBase64Size",
               "signature": "int goTaskServiceBase64Size(String base64) {"
@@ -3415,7 +3368,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/multi_agent_frameworks.dart",
-              "line": 6,
+              "line": 3,
               "kind": "abstract interface",
               "name": "FrameworkPreset",
               "signature": "abstract class FrameworkPreset {"
@@ -3423,7 +3376,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/multi_agent_frameworks.dart",
-              "line": 19,
+              "line": 16,
               "kind": "class",
               "name": "NativeFrameworkPreset",
               "signature": "class NativeFrameworkPreset extends FrameworkPreset {"
@@ -3431,7 +3384,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/multi_agent_frameworks.dart",
-              "line": 48,
+              "line": 45,
               "kind": "class",
               "name": "ArisFrameworkPreset",
               "signature": "class ArisFrameworkPreset extends FrameworkPreset {"
@@ -3464,12 +3417,12 @@
         {
           "path": "lib/runtime/multi_agent_mounts.dart",
           "language": "dart",
-          "symbolCount": 8,
+          "symbolCount": 7,
           "symbols": [
             {
               "language": "dart",
               "path": "lib/runtime/multi_agent_mounts.dart",
-              "line": 11,
+              "line": 9,
               "kind": "class",
               "name": "MultiAgentMountManager",
               "signature": "class MultiAgentMountManager {"
@@ -3477,7 +3430,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/multi_agent_mounts.dart",
-              "line": 139,
+              "line": 90,
               "kind": "abstract interface",
               "name": "CliMountAdapter",
               "signature": "abstract class CliMountAdapter {"
@@ -3485,15 +3438,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/multi_agent_mounts.dart",
-              "line": 191,
-              "kind": "class",
-              "name": "ArisMountAdapter",
-              "signature": "class ArisMountAdapter extends CliMountAdapter {"
-            },
-            {
-              "language": "dart",
-              "path": "lib/runtime/multi_agent_mounts.dart",
-              "line": 277,
+              "line": 112,
               "kind": "class",
               "name": "CodexMountAdapter",
               "signature": "class CodexMountAdapter extends CliMountAdapter {"
@@ -3501,7 +3446,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/multi_agent_mounts.dart",
-              "line": 350,
+              "line": 154,
               "kind": "class",
               "name": "ClaudeMountAdapter",
               "signature": "class ClaudeMountAdapter extends CliMountAdapter {"
@@ -3509,7 +3454,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/multi_agent_mounts.dart",
-              "line": 398,
+              "line": 193,
               "kind": "class",
               "name": "GeminiMountAdapter",
               "signature": "class GeminiMountAdapter extends CliMountAdapter {"
@@ -3517,7 +3462,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/multi_agent_mounts.dart",
-              "line": 446,
+              "line": 232,
               "kind": "class",
               "name": "OpencodeMountAdapter",
               "signature": "class OpencodeMountAdapter extends CliMountAdapter {"
@@ -3525,7 +3470,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/multi_agent_mounts.dart",
-              "line": 515,
+              "line": 273,
               "kind": "class",
               "name": "OpenClawMountAdapter",
               "signature": "class OpenClawMountAdapter extends CliMountAdapter {"
@@ -3546,7 +3491,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/multi_agent_orchestrator_core.dart",
-              "line": 24,
+              "line": 20,
               "kind": "class",
               "name": "MultiAgentOrchestrator",
               "signature": "class MultiAgentOrchestrator extends ChangeNotifier {"
@@ -3812,12 +3757,12 @@
         {
           "path": "lib/runtime/runtime_controllers_derived_tasks.dart",
           "language": "dart",
-          "symbolCount": 6,
+          "symbolCount": 4,
           "symbols": [
             {
               "language": "dart",
               "path": "lib/runtime/runtime_controllers_derived_tasks.dart",
-              "line": 14,
+              "line": 6,
               "kind": "class",
               "name": "DerivedTasksController",
               "signature": "class DerivedTasksController extends ChangeNotifier {"
@@ -3825,23 +3770,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_controllers_derived_tasks.dart",
-              "line": 150,
-              "kind": "top-level function",
-              "name": "normalizeMainSessionKey",
-              "signature": "String normalizeMainSessionKey(String? value) {"
-            },
-            {
-              "language": "dart",
-              "path": "lib/runtime/runtime_controllers_derived_tasks.dart",
-              "line": 155,
-              "kind": "top-level function",
-              "name": "makeAgentSessionKey",
-              "signature": "String makeAgentSessionKey({required String agentId, required String baseKey}) {"
-            },
-            {
-              "language": "dart",
-              "path": "lib/runtime/runtime_controllers_derived_tasks.dart",
-              "line": 164,
+              "line": 142,
               "kind": "top-level function",
               "name": "matchesSessionKey",
               "signature": "bool matchesSessionKey(String incoming, String current) {"
@@ -3849,7 +3778,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_controllers_derived_tasks.dart",
-              "line": 174,
+              "line": 148,
               "kind": "top-level function",
               "name": "encodePrettyJson",
               "signature": "String encodePrettyJson(Object value) {"
@@ -3857,7 +3786,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_controllers_derived_tasks.dart",
-              "line": 179,
+              "line": 153,
               "kind": "top-level function",
               "name": "ephemeralIdInternal",
               "signature": "String ephemeralIdInternal() =>"
@@ -3935,7 +3864,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_controllers_gateway.dart",
-              "line": 173,
+              "line": 146,
               "kind": "class",
               "name": "GatewayChatController",
               "signature": "class GatewayChatController extends ChangeNotifier {"
@@ -3950,7 +3879,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_controllers_settings.dart",
-              "line": 20,
+              "line": 21,
               "kind": "class",
               "name": "SettingsController",
               "signature": "class SettingsController extends ChangeNotifier {"
@@ -3975,7 +3904,7 @@
         {
           "path": "lib/runtime/runtime_controllers_settings_account_impl.dart",
           "language": "dart",
-          "symbolCount": 8,
+          "symbolCount": 9,
           "symbols": [
             {
               "language": "dart",
@@ -4028,7 +3957,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_controllers_settings_account_impl.dart",
-              "line": 414,
+              "line": 424,
               "kind": "top-level function",
               "name": "cancelAccountMfaChallengeSettingsInternal",
               "signature": "Future<void> cancelAccountMfaChallengeSettingsInternal( SettingsController controller, ) async {"
@@ -4036,10 +3965,18 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_controllers_settings_account_impl.dart",
-              "line": 444,
+              "line": 454,
               "kind": "top-level function",
               "name": "normalizeAccountBaseUrlSettingsInternal",
               "signature": "String normalizeAccountBaseUrlSettingsInternal( String raw, { String fallback = '', }) {"
+            },
+            {
+              "language": "dart",
+              "path": "lib/runtime/runtime_controllers_settings_account_impl.dart",
+              "line": 574,
+              "kind": "top-level function",
+              "name": "resolveAcpBridgeServerEffectiveConfigInternal",
+              "signature": "AcpBridgeServerEffectiveConfig resolveAcpBridgeServerEffectiveConfigInternal( SettingsController controller, { required AcpBridgeServerModeConfig config, }) {"
             }
           ]
         },
@@ -4138,7 +4075,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_controllers_settings_secrets_impl.dart",
-              "line": 141,
+              "line": 127,
               "kind": "top-level function",
               "name": "loadGatewayPasswordSettingsInternal",
               "signature": "Future<String> loadGatewayPasswordSettingsInternal( SettingsController controller, { int? profileIndex, }) async {"
@@ -4146,7 +4083,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_controllers_settings_secrets_impl.dart",
-              "line": 167,
+              "line": 139,
               "kind": "top-level function",
               "name": "hasStoredGatewayTokenForProfileSettingsInternal",
               "signature": "bool hasStoredGatewayTokenForProfileSettingsInternal( SettingsController controller, int profileIndex, ) =>"
@@ -4154,7 +4091,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_controllers_settings_secrets_impl.dart",
-              "line": 179,
+              "line": 151,
               "kind": "top-level function",
               "name": "hasStoredGatewayPasswordForProfileSettingsInternal",
               "signature": "bool hasStoredGatewayPasswordForProfileSettingsInternal( SettingsController controller, int profileIndex, ) => controller.secureRefsInternal.containsKey( gatewayPasswordRefForProfileSettingsInternal(controller, profileIndex), );"
@@ -4162,7 +4099,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_controllers_settings_secrets_impl.dart",
-              "line": 186,
+              "line": 158,
               "kind": "top-level function",
               "name": "storedGatewayTokenMaskForProfileSettingsInternal",
               "signature": "String? storedGatewayTokenMaskForProfileSettingsInternal( SettingsController controller, int profileIndex, ) =>"
@@ -4170,7 +4107,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_controllers_settings_secrets_impl.dart",
-              "line": 199,
+              "line": 171,
               "kind": "top-level function",
               "name": "storedGatewayPasswordMaskForProfileSettingsInternal",
               "signature": "String? storedGatewayPasswordMaskForProfileSettingsInternal( SettingsController controller, int profileIndex, ) =>"
@@ -4178,7 +4115,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_controllers_settings_secrets_impl.dart",
-              "line": 208,
+              "line": 180,
               "kind": "top-level function",
               "name": "gatewayTokenRefForProfileSettingsInternal",
               "signature": "String gatewayTokenRefForProfileSettingsInternal( SettingsController controller, int profileIndex, ) {"
@@ -4186,7 +4123,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_controllers_settings_secrets_impl.dart",
-              "line": 221,
+              "line": 193,
               "kind": "top-level function",
               "name": "gatewayPasswordRefForProfileSettingsInternal",
               "signature": "String gatewayPasswordRefForProfileSettingsInternal( SettingsController controller, int profileIndex, ) {"
@@ -4194,7 +4131,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_controllers_settings_secrets_impl.dart",
-              "line": 234,
+              "line": 206,
               "kind": "top-level function",
               "name": "aiGatewayApiKeyRefSettingsInternal",
               "signature": "String aiGatewayApiKeyRefSettingsInternal( SettingsController controller, [ AiGatewayProfile? profile, ]) {"
@@ -4202,7 +4139,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_controllers_settings_secrets_impl.dart",
-              "line": 243,
+              "line": 215,
               "kind": "top-level function",
               "name": "vaultTokenRefSettingsInternal",
               "signature": "String vaultTokenRefSettingsInternal( SettingsController controller, [ VaultConfig? profile, ]) {"
@@ -4210,7 +4147,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_controllers_settings_secrets_impl.dart",
-              "line": 252,
+              "line": 224,
               "kind": "top-level function",
               "name": "ollamaCloudApiKeyRefSettingsInternal",
               "signature": "String ollamaCloudApiKeyRefSettingsInternal( SettingsController controller, [ OllamaCloudConfig? profile, ]) {"
@@ -4218,7 +4155,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_controllers_settings_secrets_impl.dart",
-              "line": 261,
+              "line": 233,
               "kind": "top-level function",
               "name": "saveOllamaCloudApiKeySettingsInternal",
               "signature": "Future<void> saveOllamaCloudApiKeySettingsInternal( SettingsController controller, String value, ) async {"
@@ -4226,7 +4163,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_controllers_settings_secrets_impl.dart",
-              "line": 287,
+              "line": 259,
               "kind": "top-level function",
               "name": "loadOllamaCloudApiKeySettingsInternal",
               "signature": "Future<String> loadOllamaCloudApiKeySettingsInternal( SettingsController controller, ) async {"
@@ -4234,7 +4171,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_controllers_settings_secrets_impl.dart",
-              "line": 304,
+              "line": 267,
               "kind": "top-level function",
               "name": "saveVaultTokenSettingsInternal",
               "signature": "Future<void> saveVaultTokenSettingsInternal( SettingsController controller, String value, ) async {"
@@ -4242,7 +4179,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_controllers_settings_secrets_impl.dart",
-              "line": 330,
+              "line": 293,
               "kind": "top-level function",
               "name": "loadVaultTokenSettingsInternal",
               "signature": "Future<String> loadVaultTokenSettingsInternal( SettingsController controller, ) async {"
@@ -4250,7 +4187,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_controllers_settings_secrets_impl.dart",
-              "line": 346,
+              "line": 301,
               "kind": "top-level function",
               "name": "saveAiGatewayApiKeySettingsInternal",
               "signature": "Future<void> saveAiGatewayApiKeySettingsInternal( SettingsController controller, String value, ) async {"
@@ -4258,7 +4195,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_controllers_settings_secrets_impl.dart",
-              "line": 372,
+              "line": 327,
               "kind": "top-level function",
               "name": "loadAiGatewayApiKeySettingsInternal",
               "signature": "Future<String> loadAiGatewayApiKeySettingsInternal( SettingsController controller, ) async {"
@@ -4266,7 +4203,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_controllers_settings_secrets_impl.dart",
-              "line": 388,
+              "line": 335,
               "kind": "top-level function",
               "name": "clearAiGatewayApiKeySettingsInternal",
               "signature": "Future<void> clearAiGatewayApiKeySettingsInternal( SettingsController controller, ) async {"
@@ -4274,7 +4211,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_controllers_settings_secrets_impl.dart",
-              "line": 398,
+              "line": 345,
               "kind": "top-level function",
               "name": "saveSecretValueByRefSettingsInternal",
               "signature": "Future<void> saveSecretValueByRefSettingsInternal( SettingsController controller, String refName, String value, { required String provider, required String module, }) async {"
@@ -4282,7 +4219,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_controllers_settings_secrets_impl.dart",
-              "line": 425,
+              "line": 372,
               "kind": "top-level function",
               "name": "loadSecretValueByRefSettingsInternal",
               "signature": "Future<String> loadSecretValueByRefSettingsInternal( SettingsController controller, String refName, ) async {"
@@ -4290,7 +4227,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_controllers_settings_secrets_impl.dart",
-              "line": 435,
+              "line": 382,
               "kind": "top-level function",
               "name": "loadVaultTokenForSecretReadsSettingsInternal",
               "signature": "Future<String> loadVaultTokenForSecretReadsSettingsInternal( SettingsController controller, { String tokenOverride = '', }) async {"
@@ -4298,7 +4235,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_controllers_settings_secrets_impl.dart",
-              "line": 454,
+              "line": 393,
               "kind": "top-level function",
               "name": "readVaultSecretByRefSettingsInternal",
               "signature": "Future<String> readVaultSecretByRefSettingsInternal( SettingsController controller, String refName, ) async {"
@@ -4306,7 +4243,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_controllers_settings_secrets_impl.dart",
-              "line": 484,
+              "line": 423,
               "kind": "top-level function",
               "name": "resolveSecretValueSettingsInternal",
               "signature": "Future<String> resolveSecretValueSettingsInternal( SettingsController controller, { String explicitValue = '', String refName = '', String fallbackRefName = '', String accountTarget = '', bool allowVaultLookup = true, bool persistExplicitValue = true, }) async {"
@@ -4329,7 +4266,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_coordinator.dart",
-              "line": 26,
+              "line": 20,
               "kind": "class",
               "name": "RuntimeCoordinator",
               "signature": "class RuntimeCoordinator extends ChangeNotifier {"
@@ -4399,12 +4336,12 @@
         {
           "path": "lib/runtime/runtime_models_account.dart",
           "language": "dart",
-          "symbolCount": 13,
+          "symbolCount": 12,
           "symbols": [
             {
               "language": "dart",
               "path": "lib/runtime/runtime_models_account.dart",
-              "line": 4,
+              "line": 3,
               "kind": "class",
               "name": "AccountSessionSummary",
               "signature": "class AccountSessionSummary {"
@@ -4412,7 +4349,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_models_account.dart",
-              "line": 68,
+              "line": 67,
               "kind": "class",
               "name": "AccountTokenConfigured",
               "signature": "class AccountTokenConfigured {"
@@ -4420,7 +4357,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_models_account.dart",
-              "line": 108,
+              "line": 96,
               "kind": "class",
               "name": "AccountSecretLocator",
               "signature": "class AccountSecretLocator {"
@@ -4428,7 +4365,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_models_account.dart",
-              "line": 166,
+              "line": 154,
               "kind": "class",
               "name": "AccountRemoteProfile",
               "signature": "class AccountRemoteProfile {"
@@ -4436,15 +4373,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_models_account.dart",
-              "line": 267,
-              "kind": "enum",
-              "name": "AcpBridgeServerMode",
-              "signature": "enum AcpBridgeServerMode { cloudSynced }"
-            },
-            {
-              "language": "dart",
-              "path": "lib/runtime/runtime_models_account.dart",
-              "line": 269,
+              "line": 248,
               "kind": "class",
               "name": "AcpBridgeServerRemoteServerSummary",
               "signature": "class AcpBridgeServerRemoteServerSummary {"
@@ -4452,7 +4381,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_models_account.dart",
-              "line": 312,
+              "line": 276,
               "kind": "class",
               "name": "AcpBridgeServerCloudSyncConfig",
               "signature": "class AcpBridgeServerCloudSyncConfig {"
@@ -4460,7 +4389,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_models_account.dart",
-              "line": 370,
+              "line": 334,
               "kind": "class",
               "name": "AcpBridgeServerSelfHostedConfig",
               "signature": "class AcpBridgeServerSelfHostedConfig {"
@@ -4468,15 +4397,15 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_models_account.dart",
-              "line": 423,
+              "line": 387,
               "kind": "class",
-              "name": "AcpBridgeServerAdvancedOverrides",
-              "signature": "class AcpBridgeServerAdvancedOverrides {"
+              "name": "AcpBridgeServerEffectiveConfig",
+              "signature": "class AcpBridgeServerEffectiveConfig {"
             },
             {
               "language": "dart",
               "path": "lib/runtime/runtime_models_account.dart",
-              "line": 509,
+              "line": 442,
               "kind": "class",
               "name": "AcpBridgeServerModeConfig",
               "signature": "class AcpBridgeServerModeConfig {"
@@ -4484,7 +4413,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_models_account.dart",
-              "line": 577,
+              "line": 498,
               "kind": "class",
               "name": "AccountSyncState",
               "signature": "class AccountSyncState {"
@@ -4492,7 +4421,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_models_account.dart",
-              "line": 667,
+              "line": 588,
               "kind": "class",
               "name": "AccountSyncResult",
               "signature": "class AccountSyncResult {"
@@ -4500,7 +4429,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_models_account.dart",
-              "line": 686,
+              "line": 607,
               "kind": "top-level function",
               "name": "isSupportedAccountManagedSecretTarget",
               "signature": "bool isSupportedAccountManagedSecretTarget(String target) {"
@@ -4523,7 +4452,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_models_configs.dart",
-              "line": 136,
+              "line": 121,
               "kind": "top-level function",
               "name": "normalizeGatewayProfiles",
               "signature": "List<GatewayConnectionProfile> normalizeGatewayProfiles({ Iterable<GatewayConnectionProfile>? profiles, }) {"
@@ -4531,15 +4460,15 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_models_configs.dart",
-              "line": 214,
+              "line": 162,
               "kind": "top-level function",
               "name": "replaceGatewayProfileAt",
-              "signature": "List<GatewayConnectionProfile> replaceGatewayProfileAt( List<GatewayConnectionProfile> profiles, int index, GatewayConnectionProfile profile, ) {"
+              "signature": "List<GatewayConnectionProfile> replaceGatewayProfileAt( List<GatewayConnectionProfile> profiles, int _, GatewayConnectionProfile profile, ) {"
             },
             {
               "language": "dart",
               "path": "lib/runtime/runtime_models_configs.dart",
-              "line": 260,
+              "line": 206,
               "kind": "class",
               "name": "OllamaLocalConfig",
               "signature": "class OllamaLocalConfig {"
@@ -4547,7 +4476,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_models_configs.dart",
-              "line": 311,
+              "line": 257,
               "kind": "class",
               "name": "OllamaCloudConfig",
               "signature": "class OllamaCloudConfig {"
@@ -4555,7 +4484,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_models_configs.dart",
-              "line": 378,
+              "line": 324,
               "kind": "class",
               "name": "VaultConfig",
               "signature": "class VaultConfig {"
@@ -4563,7 +4492,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_models_configs.dart",
-              "line": 434,
+              "line": 380,
               "kind": "class",
               "name": "AiGatewayProfile",
               "signature": "class AiGatewayProfile {"
@@ -4571,7 +4500,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_models_configs.dart",
-              "line": 532,
+              "line": 473,
               "kind": "class",
               "name": "AiGatewayConnectionCheck",
               "signature": "class AiGatewayConnectionCheck {"
@@ -4579,7 +4508,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_models_configs.dart",
-              "line": 548,
+              "line": 489,
               "kind": "enum",
               "name": "WebSessionPersistenceMode",
               "signature": "enum WebSessionPersistenceMode { browser, remote }"
@@ -4587,7 +4516,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_models_configs.dart",
-              "line": 550,
+              "line": 491,
               "kind": "extension",
               "name": "WebSessionPersistenceModeCopy",
               "signature": "extension WebSessionPersistenceModeCopy on WebSessionPersistenceMode {"
@@ -4595,7 +4524,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_models_configs.dart",
-              "line": 567,
+              "line": 508,
               "kind": "class",
               "name": "WebSessionPersistenceConfig",
               "signature": "class WebSessionPersistenceConfig {"
@@ -5366,7 +5295,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_models_runtime_payloads.dart",
-              "line": 904,
+              "line": 935,
               "kind": "class",
               "name": "ThreadLifecycleState",
               "signature": "class ThreadLifecycleState {"
@@ -5374,7 +5303,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_models_runtime_payloads.dart",
-              "line": 960,
+              "line": 991,
               "kind": "class",
               "name": "TaskThread",
               "signature": "class TaskThread {"
@@ -5382,7 +5311,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_models_runtime_payloads.dart",
-              "line": 1291,
+              "line": 1332,
               "kind": "top-level function",
               "name": "isNewConversationTaskTitle",
               "signature": "bool isNewConversationTaskTitle(String title) {"
@@ -5390,7 +5319,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_models_runtime_payloads.dart",
-              "line": 1296,
+              "line": 1337,
               "kind": "top-level function",
               "name": "firstUserMessageTaskTitle",
               "signature": "String firstUserMessageTaskTitle( Iterable<GatewayChatMessage> messages, { String fallback = '', }) {"
@@ -5398,7 +5327,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_models_runtime_payloads.dart",
-              "line": 1318,
+              "line": 1359,
               "kind": "top-level function",
               "name": "derivePersistedTaskTitle",
               "signature": "String derivePersistedTaskTitle( String currentTitle, Iterable<GatewayChatMessage> messages, { String fallback = '', bool hasCustomTitle = false, }) {"
@@ -5413,7 +5342,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_models_settings_snapshot.dart",
-              "line": 16,
+              "line": 17,
               "kind": "class",
               "name": "SettingsSnapshot",
               "signature": "class SettingsSnapshot {"
@@ -5482,7 +5411,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/secure_config_store.dart",
-              "line": 13,
+              "line": 9,
               "kind": "class",
               "name": "SecureConfigStore",
               "signature": "class SecureConfigStore {"
@@ -5513,7 +5442,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/settings_store.dart",
-              "line": 22,
+              "line": 20,
               "kind": "enum",
               "name": "SkippedTaskThreadReason",
               "signature": "enum SkippedTaskThreadReason {"
@@ -5521,7 +5450,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/settings_store.dart",
-              "line": 28,
+              "line": 26,
               "kind": "class",
               "name": "SkippedTaskThreadRecord",
               "signature": "class SkippedTaskThreadRecord {"
@@ -5529,7 +5458,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/settings_store.dart",
-              "line": 35,
+              "line": 36,
               "kind": "class",
               "name": "SettingsStore",
               "signature": "class SettingsStore {"
@@ -5721,7 +5650,7 @@
     {
       "group": "rust/src",
       "fileCount": 4,
-      "symbolCount": 19,
+      "symbolCount": 16,
       "files": [
         {
           "path": "rust/src/error.rs",
@@ -5859,7 +5788,7 @@
         {
           "path": "rust/src/types.rs",
           "language": "rust",
-          "symbolCount": 5,
+          "symbolCount": 2,
           "symbols": [
             {
               "language": "rust",
@@ -5874,32 +5803,8 @@
               "path": "rust/src/types.rs",
               "line": 38,
               "kind": "struct",
-              "name": "CodexMessage",
-              "signature": "pub struct CodexMessage {"
-            },
-            {
-              "language": "rust",
-              "path": "rust/src/types.rs",
-              "line": 51,
-              "kind": "struct",
               "name": "CodexEvent",
               "signature": "pub struct CodexEvent {"
-            },
-            {
-              "language": "rust",
-              "path": "rust/src/types.rs",
-              "line": 66,
-              "kind": "struct",
-              "name": "CodexModelInfo",
-              "signature": "pub struct CodexModelInfo {"
-            },
-            {
-              "language": "rust",
-              "path": "rust/src/types.rs",
-              "line": 79,
-              "kind": "struct",
-              "name": "CodexAccountInfo",
-              "signature": "pub struct CodexAccountInfo {"
             }
           ]
         }

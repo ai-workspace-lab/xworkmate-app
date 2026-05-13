@@ -56,7 +56,6 @@ The app only talks to:
 - no production `xworkmate.providers.sync`
 - no production provider catalog from `providerSyncDefinitions`
 - no execution-time use of account-synced `openclawUrl`
-- no execution-time use of account-synced `apisixUrl`
 - no direct app calls to `xworkmate-bridge.svc.plus/*`
 - no direct app calls to `openclaw.svc.plus`
 
@@ -71,7 +70,7 @@ The app only talks to:
 `account/sync_state.json`
 
 - stores synced account metadata only
-- may retain `openclawUrl` / `apisixUrl` as account profile metadata
+- may retain `openclawUrl` as account profile metadata
 - does not overwrite executable cloud routing targets
 
 `acpBridgeServerModeConfig.effective`

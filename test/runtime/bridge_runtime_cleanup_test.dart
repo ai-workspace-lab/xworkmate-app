@@ -41,7 +41,6 @@ void main() {
             tokenConfigured: const AccountTokenConfigured(
               bridge: true,
               vault: false,
-              apisix: false,
             ),
           ),
         );
@@ -79,22 +78,19 @@ void main() {
       },
     );
 
-    test(
-      'keeps the managed bridge endpoint fixed when signed out',
-      () {
-        final controller = AppController(
-          environmentOverride: const <String, String>{
-            'BRIDGE_SERVER_URL': 'https://stale.example.invalid',
-          },
-        );
-        addTearDown(controller.dispose);
+    test('keeps the managed bridge endpoint fixed when signed out', () {
+      final controller = AppController(
+        environmentOverride: const <String, String>{
+          'BRIDGE_SERVER_URL': 'https://stale.example.invalid',
+        },
+      );
+      addTearDown(controller.dispose);
 
-        expect(
-          controller.resolveBridgeAcpEndpointInternal()?.toString(),
-          kManagedBridgeServerUrl,
-        );
-      },
-    );
+      expect(
+        controller.resolveBridgeAcpEndpointInternal()?.toString(),
+        kManagedBridgeServerUrl,
+      );
+    });
 
     test(
       'resolves raw bridge token only for the current managed bridge endpoint',
@@ -133,19 +129,21 @@ void main() {
             tokenConfigured: const AccountTokenConfigured(
               bridge: true,
               vault: false,
-              apisix: false,
             ),
           ),
         );
 
         final controller = AppController(
-          environmentOverride: const <String, String>{},store: store);
+          environmentOverride: const <String, String>{},
+          store: store,
+        );
         addTearDown(controller.dispose);
         await controller.settingsControllerInternal.initialize();
 
-        final bridgeHeader = await controller.resolveGatewayAcpAuthorizationHeaderInternal(
-          Uri.parse('$kManagedBridgeServerUrl/acp/rpc'),
-        );
+        final bridgeHeader = await controller
+            .resolveGatewayAcpAuthorizationHeaderInternal(
+              Uri.parse('$kManagedBridgeServerUrl/acp/rpc'),
+            );
         final unrelatedHeader = await controller
             .resolveGatewayAcpAuthorizationHeaderInternal(
               Uri.parse('https://unrelated.example.com/acp/rpc'),
@@ -159,7 +157,9 @@ void main() {
     test(
       'runtime coordinator only exposes remote and offline gateway modes',
       () {
-        final controller = AppController(environmentOverride: const <String, String>{});
+        final controller = AppController(
+          environmentOverride: const <String, String>{},
+        );
         addTearDown(controller.dispose);
 
         expect(

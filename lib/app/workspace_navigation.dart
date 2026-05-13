@@ -32,36 +32,10 @@ List<AppBreadcrumbItem> buildWorkspaceBreadcrumbs({
 List<AppBreadcrumbItem> buildSettingsBreadcrumbs(
   AppController controller, {
   required SettingsTab tab,
-  SettingsDetailPage? detail,
-  SettingsNavigationContext? navigationContext,
 }) {
-  if (detail == null) {
-    return buildWorkspaceBreadcrumbs(
-      controller: controller,
-      rootLabel: appText('设置', 'Settings'),
-      sectionLabel: tab.label,
-    );
-  }
-
   return buildWorkspaceBreadcrumbs(
     controller: controller,
-    rootLabel: navigationContext?.rootLabel ?? appText('设置', 'Settings'),
-    sectionLabel: navigationContext?.sectionLabel ?? tab.label,
-    detailLabel: detail.label,
-    onRootTap: navigationContext == null
-        ? () => controller.openSettings(tab: tab)
-        : () => openSettingsNavigationContext(controller, navigationContext),
+    rootLabel: appText('设置', 'Settings'),
+    sectionLabel: tab.label,
   );
-}
-
-void openSettingsNavigationContext(
-  AppController controller,
-  SettingsNavigationContext context,
-) {
-  if (context.settingsTab != null ||
-      context.destination == WorkspaceDestination.settings) {
-    controller.openSettings(tab: context.settingsTab ?? SettingsTab.gateway);
-    return;
-  }
-  controller.navigateTo(context.destination);
 }

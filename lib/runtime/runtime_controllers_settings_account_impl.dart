@@ -302,11 +302,7 @@ Future<AccountSyncResult> syncAccountSettingsInternal(
       lastSyncSource: syncedBridgeServerUrl,
       lastSyncError: '',
       profileScope: 'bridge',
-      tokenConfigured: const AccountTokenConfigured(
-        bridge: true,
-        vault: false,
-        apisix: false,
-      ),
+      tokenConfigured: const AccountTokenConfigured(bridge: true, vault: false),
     );
     await _persistAccountSyncStateInternal(controller, nextState);
     final currentSettings = controller.snapshotInternal;
@@ -334,10 +330,7 @@ Future<AccountSyncResult> syncAccountSettingsInternal(
             : currentModeConfig.cloudSynced.accountIdentifier,
         lastSyncAt: nextState.lastSyncAtMs,
         remoteServerSummary: currentModeConfig.cloudSynced.remoteServerSummary
-            .copyWith(
-              endpoint: syncedBridgeServerUrl,
-              hasAdvancedOverrides: false,
-            ),
+            .copyWith(endpoint: syncedBridgeServerUrl),
       ),
     );
     final sanitizedSettings = _sanitizeBridgeOnlyAccountSyncSettings(
@@ -413,7 +406,7 @@ Future<void> logoutAccountSettingsInternal(
             .acpBridgeServerModeConfig
             .cloudSynced
             .remoteServerSummary
-            .copyWith(endpoint: '', hasAdvancedOverrides: false),
+            .copyWith(endpoint: ''),
       );
   await controller.saveSnapshot(
     currentSnapshot.copyWith(

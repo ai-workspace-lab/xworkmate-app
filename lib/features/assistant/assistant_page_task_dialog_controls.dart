@@ -47,6 +47,13 @@ class AssistantTaskDialogModeControlsInternal extends StatelessWidget {
     final providerMenuProviders = controller.providerCatalogForExecutionTarget(
       executionTarget,
     );
+    final selectedProvider = controller.resolveProviderForExecutionTarget(
+      controller
+          .assistantProviderForSession(controller.currentSessionKey)
+          .providerId,
+      executionTarget: executionTarget,
+      defaultToCatalog: executionTarget.isGateway,
+    );
 
     return Wrap(
       spacing: 4,
@@ -61,9 +68,7 @@ class AssistantTaskDialogModeControlsInternal extends StatelessWidget {
         ),
         _TaskDialogProviderMenuButtonInternal(
           controller: controller,
-          selectedProvider: controller.assistantProviderForSession(
-            controller.currentSessionKey,
-          ),
+          selectedProvider: selectedProvider,
           providers: providerMenuProviders,
         ),
       ],
@@ -187,7 +192,11 @@ class _TaskDialogProviderMenuButtonInternal extends StatelessWidget {
                 key: const Key('assistant-provider-badge'),
                 provider: selectedProvider,
               )
-            : Icon(Icons.hub_outlined, size: 14, color: context.palette.textMuted),
+            : Icon(
+                Icons.hub_outlined,
+                size: 14,
+                color: context.palette.textMuted,
+              ),
         label: label,
         tooltip: appText('智能体 Provider', 'Agent Provider'),
       ),

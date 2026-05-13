@@ -35,7 +35,6 @@ import '../runtime/skill_directory_access.dart';
 import 'app_controller_desktop_core.dart';
 import 'app_controller_desktop_gateway.dart';
 import 'app_controller_desktop_settings.dart';
-import 'app_controller_desktop_single_agent.dart';
 import 'app_controller_desktop_thread_sessions.dart';
 import 'app_controller_desktop_thread_actions.dart';
 import 'app_controller_desktop_workspace_execution.dart';
@@ -50,19 +49,12 @@ extension AppControllerDesktopNavigation on AppController {
     if (!capabilities.supportsDestination(destination)) {
       return;
     }
-    final shouldClearSettingsDrillIn =
-        settingsDetailInternal != null ||
-        settingsNavigationContextInternal != null;
     final changed =
-        destinationInternal != destination ||
-        detailPanelInternal != null ||
-        shouldClearSettingsDrillIn;
+        destinationInternal != destination || detailPanelInternal != null;
     if (!changed) {
       return;
     }
     destinationInternal = destination;
-    settingsDetailInternal = null;
-    settingsNavigationContextInternal = null;
     detailPanelInternal = null;
     notifyListeners();
   }
@@ -76,14 +68,9 @@ extension AppControllerDesktopNavigation on AppController {
               : capabilities.allowedDestinations.first);
     final destinationChanged = destinationInternal != homeDestination;
     final detailChanged = detailPanelInternal != null;
-    final settingsDrillInChanged =
-        settingsDetailInternal != null ||
-        settingsNavigationContextInternal != null;
     destinationInternal = homeDestination;
-    settingsDetailInternal = null;
-    settingsNavigationContextInternal = null;
     detailPanelInternal = null;
-    if (destinationChanged || detailChanged || settingsDrillInChanged) {
+    if (destinationChanged || detailChanged) {
       notifyListeners();
     }
     if (!isAppOwnedAssistantSessionKeyInternal(currentSessionKey)) {
@@ -91,63 +78,31 @@ extension AppControllerDesktopNavigation on AppController {
     }
   }
 
-  void openSettings({
-    SettingsTab tab = SettingsTab.gateway,
-    SettingsDetailPage? detail,
-    SettingsNavigationContext? navigationContext,
-  }) {
+  void openSettings({SettingsTab tab = SettingsTab.gateway}) {
     if (!capabilities.supportsDestination(WorkspaceDestination.settings)) {
       return;
     }
-    final requestedTab = detail?.tab ?? tab;
-    final resolvedTab = sanitizeSettingsTabInternal(requestedTab);
-    final resolvedDetail = detail != null && resolvedTab == detail.tab
-        ? detail
-        : null;
+    final resolvedTab = sanitizeSettingsTabInternal(tab);
     final changed =
         destinationInternal != WorkspaceDestination.settings ||
         settingsTabInternal != resolvedTab ||
-        settingsDetailInternal != resolvedDetail ||
-        settingsNavigationContextInternal != navigationContext ||
         detailPanelInternal != null;
     if (!changed) {
       return;
     }
     destinationInternal = WorkspaceDestination.settings;
     settingsTabInternal = resolvedTab;
-    settingsDetailInternal = resolvedDetail;
-    settingsNavigationContextInternal = resolvedDetail == null
-        ? null
-        : navigationContext;
     detailPanelInternal = null;
     notifyListeners();
   }
 
   void setSettingsTab(SettingsTab tab, {bool clearDetail = true}) {
     final resolvedTab = sanitizeSettingsTabInternal(tab);
-    final changed =
-        settingsTabInternal != resolvedTab ||
-        (clearDetail &&
-            (settingsDetailInternal != null ||
-                settingsNavigationContextInternal != null));
+    final changed = settingsTabInternal != resolvedTab;
     if (!changed) {
       return;
     }
     settingsTabInternal = resolvedTab;
-    if (clearDetail) {
-      settingsDetailInternal = null;
-      settingsNavigationContextInternal = null;
-    }
-    notifyListeners();
-  }
-
-  void closeSettingsDetail() {
-    if (settingsDetailInternal == null &&
-        settingsNavigationContextInternal == null) {
-      return;
-    }
-    settingsDetailInternal = null;
-    settingsNavigationContextInternal = null;
     notifyListeners();
   }
 

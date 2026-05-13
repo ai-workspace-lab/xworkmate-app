@@ -102,17 +102,6 @@ if [[ ! -d "$BUILD_APP_PATH" ]]; then
   exit 1
 fi
 
-# Ensure FFI library is embedded if it was copied to macos/Frameworks
-SOURCE_FFI_LIB="$ROOT_DIR/macos/Frameworks/libcodex_ffi.dylib"
-TARGET_FFI_LIB="$BUILD_APP_PATH/Contents/Frameworks/libcodex_ffi.dylib"
-if [[ -f "$SOURCE_FFI_LIB" ]]; then
-  echo "Embedding FFI library into app bundle..."
-  mkdir -p "$(dirname "$TARGET_FFI_LIB")"
-  cp "$SOURCE_FFI_LIB" "$TARGET_FFI_LIB"
-  # Fix install name to be @rpath-based so it is portable within the bundle
-  install_name_tool -id "@rpath/$(basename "$TARGET_FFI_LIB")" "$TARGET_FFI_LIB"
-fi
-
 # Embed xworkmate-go-core for local/non-App-Store builds if available
 if [[ "${XWORKMATE_APP_STORE:-}" != "true" ]]; then
   SOURCE_GO_CORE="$ROOT_DIR/build/bin/xworkmate-go-core"

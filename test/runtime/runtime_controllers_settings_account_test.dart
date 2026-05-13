@@ -397,7 +397,6 @@ void main() {
             tokenConfigured: const AccountTokenConfigured(
               bridge: true,
               vault: false,
-              apisix: false,
             ),
           ),
         );
@@ -407,7 +406,9 @@ void main() {
         );
 
         final controller = AppController(
-          environmentOverride: const <String, String>{},store: store);
+          environmentOverride: const <String, String>{},
+          store: store,
+        );
         addTearDown(controller.dispose);
         await controller.settingsControllerInternal.initialize();
 

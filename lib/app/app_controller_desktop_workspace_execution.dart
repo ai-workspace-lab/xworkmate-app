@@ -87,6 +87,7 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
           sessionsControllerInternal.currentSessionKey,
         )?.executionBinding.providerId,
         executionTarget: resolvedTarget,
+        defaultToCatalog: resolvedTarget.isGateway,
       ),
       selectedProviderSource: ThreadSelectionSource.explicit,
       gatewayEntryState: gatewayEntryStateForTargetInternal(resolvedTarget),

@@ -118,7 +118,7 @@ package-rpm: ## Create the Linux .rpm package
 package-linux: ## Create both Linux packages
 	bash scripts/package-linux.sh
 
-package-mac: ffi-integrate build-go-core ## Create the macOS .app and DMG
+package-mac: build-go-core ## Create the macOS .app and DMG
 	XWORKMATE_APP_STORE=true bash scripts/package-flutter-mac-app.sh
 
 install-mac: package-mac ## Package and install the macOS app into /Applications
@@ -130,28 +130,3 @@ clean: ## Remove generated artifacts
 
 check-export-compliance: ## Verify source and built Apple plist export-compliance flags
 	bash scripts/check-apple-export-compliance.sh
-
-# Rust FFI targets
-.PHONY: rust-build rust-build-release rust-build-debug rust-test ffi-copy ffi-generate
-
-rust-build: rust-build-release ## Build Rust FFI library (release mode)
-
-rust-build-release: ## Build Rust FFI library for macOS (release)
-	@echo "Skip cargo build (external management)"
-
-rust-build-debug: ## Build Rust FFI library in debug mode
-	@echo "Skip cargo build (external management)"
-
-rust-test: ## Run Rust tests
-	cd rust && cargo test
-
-ffi-copy: ## Copy FFI library to macOS Frameworks
-	bash scripts/copy_ffi_framework.sh
-
-ffi-generate: ## Generate FFI bindings using flutter_rust_bridge
-	bash scripts/generate_ffi_bindings.sh
-
-ffi-integrate: ffi-copy ## Copy FFI library (full integration)
-
-# Build with FFI integration
-build-macos-ffi: ffi-copy build-macos ## Build macOS app with FFI integration

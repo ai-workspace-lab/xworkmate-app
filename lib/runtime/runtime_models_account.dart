@@ -1,6 +1,4 @@
 import 'dart:convert';
-import 'runtime_models_configs.dart';
-import 'runtime_models_profiles.dart';
 
 class AccountSessionSummary {
   const AccountSessionSummary({
@@ -67,41 +65,30 @@ class AccountSessionSummary {
 }
 
 class AccountTokenConfigured {
-  const AccountTokenConfigured({
-    required this.bridge,
-    required this.vault,
-    required this.apisix,
-  });
+  const AccountTokenConfigured({required this.bridge, required this.vault});
 
   final bool bridge;
   final bool vault;
-  final bool apisix;
 
   factory AccountTokenConfigured.defaults() {
-    return const AccountTokenConfigured(
-      bridge: false,
-      vault: false,
-      apisix: false,
-    );
+    return const AccountTokenConfigured(bridge: false, vault: false);
   }
 
-  AccountTokenConfigured copyWith({bool? bridge, bool? vault, bool? apisix}) {
+  AccountTokenConfigured copyWith({bool? bridge, bool? vault}) {
     return AccountTokenConfigured(
       bridge: bridge ?? this.bridge,
       vault: vault ?? this.vault,
-      apisix: apisix ?? this.apisix,
     );
   }
 
   Map<String, dynamic> toJson() {
-    return {'bridge': bridge, 'vault': vault, 'apisix': apisix};
+    return {'bridge': bridge, 'vault': vault};
   }
 
   factory AccountTokenConfigured.fromJson(Map<String, dynamic> json) {
     return AccountTokenConfigured(
       bridge: json['bridge'] as bool? ?? false,
       vault: json['vault'] as bool? ?? false,
-      apisix: json['apisix'] as bool? ?? false,
     );
   }
 }
@@ -170,7 +157,6 @@ class AccountRemoteProfile {
     required this.bridgeServerOrigin,
     required this.vaultUrl,
     required this.vaultNamespace,
-    required this.apisixUrl,
     required this.secretLocators,
   });
 
@@ -178,7 +164,6 @@ class AccountRemoteProfile {
   final String bridgeServerOrigin;
   final String vaultUrl;
   final String vaultNamespace;
-  final String apisixUrl;
   final List<AccountSecretLocator> secretLocators;
 
   factory AccountRemoteProfile.defaults() {
@@ -187,7 +172,6 @@ class AccountRemoteProfile {
       bridgeServerOrigin: '',
       vaultUrl: '',
       vaultNamespace: '',
-      apisixUrl: '',
       secretLocators: <AccountSecretLocator>[],
     );
   }
@@ -197,7 +181,6 @@ class AccountRemoteProfile {
     String? bridgeServerOrigin,
     String? vaultUrl,
     String? vaultNamespace,
-    String? apisixUrl,
     List<AccountSecretLocator>? secretLocators,
   }) {
     return AccountRemoteProfile(
@@ -205,7 +188,6 @@ class AccountRemoteProfile {
       bridgeServerOrigin: bridgeServerOrigin ?? this.bridgeServerOrigin,
       vaultUrl: vaultUrl ?? this.vaultUrl,
       vaultNamespace: vaultNamespace ?? this.vaultNamespace,
-      apisixUrl: apisixUrl ?? this.apisixUrl,
       secretLocators: secretLocators ?? this.secretLocators,
     );
   }
@@ -216,7 +198,6 @@ class AccountRemoteProfile {
       'bridgeServerOrigin': bridgeServerOrigin,
       'vaultUrl': vaultUrl,
       'vaultNamespace': vaultNamespace,
-      'apisixUrl': apisixUrl,
       'secretLocators': secretLocators
           .map((item) => item.toJson())
           .toList(growable: false),
@@ -246,7 +227,6 @@ class AccountRemoteProfile {
       vaultUrl: json['vaultUrl'] as String? ?? defaults.vaultUrl,
       vaultNamespace:
           json['vaultNamespace'] as String? ?? defaults.vaultNamespace,
-      apisixUrl: json['apisixUrl'] as String? ?? defaults.apisixUrl,
       secretLocators: decodeLocators(json['secretLocators']),
     );
   }
@@ -266,36 +246,22 @@ class AccountRemoteProfile {
 }
 
 class AcpBridgeServerRemoteServerSummary {
-  const AcpBridgeServerRemoteServerSummary({
-    required this.endpoint,
-    required this.hasAdvancedOverrides,
-  });
+  const AcpBridgeServerRemoteServerSummary({required this.endpoint});
 
   final String endpoint;
-  final bool hasAdvancedOverrides;
 
   factory AcpBridgeServerRemoteServerSummary.defaults() {
-    return const AcpBridgeServerRemoteServerSummary(
-      endpoint: '',
-      hasAdvancedOverrides: false,
-    );
+    return const AcpBridgeServerRemoteServerSummary(endpoint: '');
   }
 
-  AcpBridgeServerRemoteServerSummary copyWith({
-    String? endpoint,
-    bool? hasAdvancedOverrides,
-  }) {
+  AcpBridgeServerRemoteServerSummary copyWith({String? endpoint}) {
     return AcpBridgeServerRemoteServerSummary(
       endpoint: endpoint ?? this.endpoint,
-      hasAdvancedOverrides: hasAdvancedOverrides ?? this.hasAdvancedOverrides,
     );
   }
 
   Map<String, dynamic> toJson() {
-    return <String, dynamic>{
-      'endpoint': endpoint,
-      'hasAdvancedOverrides': hasAdvancedOverrides,
-    };
+    return <String, dynamic>{'endpoint': endpoint};
   }
 
   factory AcpBridgeServerRemoteServerSummary.fromJson(
@@ -303,7 +269,6 @@ class AcpBridgeServerRemoteServerSummary {
   ) {
     return AcpBridgeServerRemoteServerSummary(
       endpoint: json['endpoint'] as String? ?? '',
-      hasAdvancedOverrides: json['hasAdvancedOverrides'] as bool? ?? false,
     );
   }
 }
@@ -419,92 +384,6 @@ class AcpBridgeServerSelfHostedConfig {
   }
 }
 
-class AcpBridgeServerAdvancedOverrides {
-  const AcpBridgeServerAdvancedOverrides({
-    required this.gatewayProfiles,
-    required this.vault,
-    required this.aiGateway,
-    required this.authorizedSkillDirectories,
-  });
-
-  final List<GatewayConnectionProfile> gatewayProfiles;
-  final VaultConfig vault;
-  final AiGatewayProfile aiGateway;
-  final List<AuthorizedSkillDirectory> authorizedSkillDirectories;
-
-  factory AcpBridgeServerAdvancedOverrides.defaults() {
-    return AcpBridgeServerAdvancedOverrides(
-      gatewayProfiles: normalizeGatewayProfiles(),
-      vault: VaultConfig.defaults(),
-      aiGateway: AiGatewayProfile.defaults(),
-      authorizedSkillDirectories: normalizeAuthorizedSkillDirectories(),
-    );
-  }
-
-  AcpBridgeServerAdvancedOverrides copyWith({
-    List<GatewayConnectionProfile>? gatewayProfiles,
-    VaultConfig? vault,
-    AiGatewayProfile? aiGateway,
-    List<AuthorizedSkillDirectory>? authorizedSkillDirectories,
-  }) {
-    return AcpBridgeServerAdvancedOverrides(
-      gatewayProfiles: gatewayProfiles != null
-          ? normalizeGatewayProfiles(profiles: gatewayProfiles)
-          : this.gatewayProfiles,
-      vault: vault ?? this.vault,
-      aiGateway: aiGateway ?? this.aiGateway,
-      authorizedSkillDirectories: authorizedSkillDirectories != null
-          ? normalizeAuthorizedSkillDirectories(
-              directories: authorizedSkillDirectories,
-            )
-          : this.authorizedSkillDirectories,
-    );
-  }
-
-  Map<String, dynamic> toJson() {
-    return <String, dynamic>{
-      'gatewayProfiles': gatewayProfiles
-          .map((item) => item.toJson())
-          .toList(growable: false),
-      'vault': vault.toJson(),
-      'aiGateway': aiGateway.toJson(),
-      'authorizedSkillDirectories': authorizedSkillDirectories
-          .map((item) => item.toJson())
-          .toList(growable: false),
-    };
-  }
-
-  factory AcpBridgeServerAdvancedOverrides.fromJson(Map<String, dynamic> json) {
-    return AcpBridgeServerAdvancedOverrides(
-      gatewayProfiles: normalizeGatewayProfiles(
-        profiles: ((json['gatewayProfiles'] as List?) ?? const <Object>[])
-            .whereType<Map>()
-            .map(
-              (item) => GatewayConnectionProfile.fromJson(
-                item.cast<String, dynamic>(),
-              ),
-            ),
-      ),
-      vault: VaultConfig.fromJson(
-        (json['vault'] as Map?)?.cast<String, dynamic>() ?? const {},
-      ),
-      aiGateway: AiGatewayProfile.fromJson(
-        (json['aiGateway'] as Map?)?.cast<String, dynamic>() ?? const {},
-      ),
-      authorizedSkillDirectories: normalizeAuthorizedSkillDirectories(
-        directories:
-            ((json['authorizedSkillDirectories'] as List?) ?? const <Object>[])
-                .whereType<Map>()
-                .map(
-                  (item) => AuthorizedSkillDirectory.fromJson(
-                    item.cast<String, dynamic>(),
-                  ),
-                ),
-      ),
-    );
-  }
-}
-
 class AcpBridgeServerEffectiveConfig {
   const AcpBridgeServerEffectiveConfig({
     required this.endpoint,
@@ -565,20 +444,17 @@ class AcpBridgeServerModeConfig {
     required this.effective,
     required this.cloudSynced,
     required this.selfHosted,
-    required this.advancedOverrides,
   });
 
   final AcpBridgeServerEffectiveConfig effective;
   final AcpBridgeServerCloudSyncConfig cloudSynced;
   final AcpBridgeServerSelfHostedConfig selfHosted;
-  final AcpBridgeServerAdvancedOverrides advancedOverrides;
 
   factory AcpBridgeServerModeConfig.defaults() {
     return AcpBridgeServerModeConfig(
       effective: AcpBridgeServerEffectiveConfig.defaults(),
       cloudSynced: AcpBridgeServerCloudSyncConfig.defaults(),
       selfHosted: AcpBridgeServerSelfHostedConfig.defaults(),
-      advancedOverrides: AcpBridgeServerAdvancedOverrides.defaults(),
     );
   }
 
@@ -586,21 +462,13 @@ class AcpBridgeServerModeConfig {
     AcpBridgeServerEffectiveConfig? effective,
     AcpBridgeServerCloudSyncConfig? cloudSynced,
     AcpBridgeServerSelfHostedConfig? selfHosted,
-    AcpBridgeServerAdvancedOverrides? advancedOverrides,
   }) {
     return AcpBridgeServerModeConfig(
       effective: effective ?? this.effective,
       cloudSynced: cloudSynced ?? this.cloudSynced,
       selfHosted: selfHosted ?? this.selfHosted,
-      advancedOverrides: advancedOverrides ?? this.advancedOverrides,
     );
   }
-
-  bool get usesSelfHostedBase => effective.source == 'bridge';
-
-  bool get usesCloudSyncBase => !usesSelfHostedBase;
-
-  String get sourceTag => effective.source;
 
   String toJsonString() => jsonEncode(toJson());
 
@@ -609,7 +477,6 @@ class AcpBridgeServerModeConfig {
       'effective': effective.toJson(),
       'cloudSynced': cloudSynced.toJson(),
       'selfHosted': selfHosted.toJson(),
-      'advancedOverrides': advancedOverrides.toJson(),
     };
   }
 
@@ -623,10 +490,6 @@ class AcpBridgeServerModeConfig {
       ),
       selfHosted: AcpBridgeServerSelfHostedConfig.fromJson(
         (json['selfHosted'] as Map?)?.cast<String, dynamic>() ?? const {},
-      ),
-      advancedOverrides: AcpBridgeServerAdvancedOverrides.fromJson(
-        (json['advancedOverrides'] as Map?)?.cast<String, dynamic>() ??
-            const {},
       ),
     );
   }

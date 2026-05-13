@@ -1,15 +1,7 @@
-// ignore_for_file: unused_import, unnecessary_import
-
-import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
+
 import 'package:flutter/foundation.dart';
-import 'gateway_runtime.dart';
 import 'runtime_models.dart';
-import 'secure_config_store.dart';
-import 'runtime_controllers_settings.dart';
-import 'runtime_controllers_gateway.dart';
-import 'runtime_controllers_entities.dart';
 
 class DerivedTasksController extends ChangeNotifier {
   List<DerivedTaskItem> queueInternal = const <DerivedTaskItem>[];
@@ -150,11 +142,7 @@ class DerivedTasksController extends ChangeNotifier {
 bool matchesSessionKey(String incoming, String current) {
   final left = incoming.trim().toLowerCase();
   final right = current.trim().toLowerCase();
-  if (left == right) {
-    return true;
-  }
-  return (left == 'agent:main:main' && right == 'main') ||
-      (left == 'main' && right == 'agent:main:main');
+  return left == right;
 }
 
 String encodePrettyJson(Object value) {
