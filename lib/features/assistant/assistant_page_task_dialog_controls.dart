@@ -29,16 +29,9 @@ class AssistantTaskDialogModeControlsInternal extends StatelessWidget {
     if (supportedExecutionTargets.isEmpty) {
       return const SizedBox.shrink();
     }
-    final visibleExecutionTargets = controller.visibleAssistantExecutionTargets(
-      supportedExecutionTargets,
-    );
-    final resolutionTargets = visibleExecutionTargets.isNotEmpty
-        ? visibleExecutionTargets
-        : supportedExecutionTargets;
-
     final currentExecutionTarget =
         resolveAssistantExecutionTargetFromVisibleTargets(
-          resolutionTargets,
+          supportedExecutionTargets,
           currentTarget: controller.assistantExecutionTarget,
         );
     final executionTarget = collapseAssistantExecutionTargetForDisplay(
@@ -64,7 +57,6 @@ class AssistantTaskDialogModeControlsInternal extends StatelessWidget {
           controller: controller,
           executionTarget: executionTarget,
           supportedExecutionTargets: supportedExecutionTargets,
-          visibleExecutionTargets: visibleExecutionTargets,
         ),
         _TaskDialogProviderMenuButtonInternal(
           controller: controller,
@@ -81,13 +73,11 @@ class _TaskDialogExecutionTargetMenuButtonInternal extends StatelessWidget {
     required this.controller,
     required this.executionTarget,
     required this.supportedExecutionTargets,
-    required this.visibleExecutionTargets,
   });
 
   final AppController controller;
   final AssistantExecutionTarget executionTarget;
   final List<AssistantExecutionTarget> supportedExecutionTargets;
-  final List<AssistantExecutionTarget> visibleExecutionTargets;
 
   @override
   Widget build(BuildContext context) {
@@ -102,10 +92,8 @@ class _TaskDialogExecutionTargetMenuButtonInternal extends StatelessWidget {
       },
       itemBuilder: (context) => supportedExecutionTargets
           .map((value) {
-            final enabled = visibleExecutionTargets.contains(value);
             return PopupMenuItem<AssistantExecutionTarget>(
               value: value,
-              enabled: enabled,
               key: Key('assistant-execution-target-menu-item-${value.name}'),
               child: Row(
                 children: [
@@ -131,7 +119,7 @@ class _TaskDialogExecutionTargetMenuButtonInternal extends StatelessWidget {
     AssistantExecutionTarget value,
   ) async {
     final resolvedTarget = resolveAssistantExecutionTargetFromVisibleTargets(
-      visibleExecutionTargets,
+      supportedExecutionTargets,
       currentTarget: value,
     );
     await controller.setAssistantExecutionTarget(resolvedTarget);

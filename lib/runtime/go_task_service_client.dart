@@ -140,6 +140,23 @@ class ExternalCodeAgentAcpRoutingConfig {
 
   bool get isAuto => mode == ExternalCodeAgentAcpRoutingMode.auto;
 
+  ExternalCodeAgentAcpRoutingConfig withoutExplicitModel() {
+    if (explicitModel.trim().isEmpty) {
+      return this;
+    }
+    return ExternalCodeAgentAcpRoutingConfig(
+      mode: mode,
+      preferredGatewayTarget: preferredGatewayTarget,
+      explicitExecutionTarget: explicitExecutionTarget,
+      explicitProviderId: explicitProviderId,
+      explicitModel: '',
+      explicitSkills: explicitSkills,
+      allowSkillInstall: allowSkillInstall,
+      availableSkills: availableSkills,
+      installApproval: installApproval,
+    );
+  }
+
   Map<String, dynamic> toJson() {
     return <String, dynamic>{
       'routingMode': mode.name,
@@ -254,7 +271,10 @@ class GoTaskServiceRequest {
       routing ?? _synthesizedRouting();
 
   Map<String, dynamic> toExternalAcpParams() {
-    final resolvedRouting = effectiveRouting;
+    final resolvedRouting = normalizedTarget.isGateway
+        ? effectiveRouting.withoutExplicitModel()
+        : effectiveRouting;
+    final requestModel = normalizedTarget.isGateway ? '' : model.trim();
     final providerId = provider.isUnspecified ? '' : provider.providerId;
     final agentProviderId = normalizedTarget.isGateway ? '' : providerId;
     final params = <String, dynamic>{
@@ -294,7 +314,7 @@ class GoTaskServiceRequest {
       if (agentProviderId.isNotEmpty) 'provider': agentProviderId,
       if (remoteWorkingDirectoryHint.trim().isNotEmpty)
         'remoteWorkingDirectoryHint': remoteWorkingDirectoryHint.trim(),
-      if (model.trim().isNotEmpty) 'model': model.trim(),
+      if (requestModel.isNotEmpty) 'model': requestModel,
       if (thinking.trim().isNotEmpty) 'thinking': thinking.trim(),
       'routing': resolvedRouting.toJson(),
       if (routingHint.trim().isNotEmpty) 'routingHint': routingHint.trim(),
@@ -321,7 +341,7 @@ class GoTaskServiceRequest {
     final explicitProviderId = provider.isUnspecified || gatewayTarget.isGateway
         ? ''
         : provider.providerId;
-    final explicitModelValue = model.trim();
+    final explicitModelValue = gatewayTarget.isGateway ? '' : model.trim();
     final explicitSkillsValue = selectedSkills
         .map((item) => item.trim())
         .where((item) => item.isNotEmpty)
