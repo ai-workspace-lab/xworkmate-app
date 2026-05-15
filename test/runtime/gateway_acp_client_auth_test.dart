@@ -533,6 +533,86 @@ void main() {
     );
 
     test(
+      'recovers OpenClaw task result from completed session update when final SSE envelope is lost',
+      () async {
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        addTearDown(() => server.close(force: true));
+        server.listen((request) async {
+          await utf8.decoder.bind(request).join();
+          final event = jsonEncode(<String, dynamic>{
+            'jsonrpc': '2.0',
+            'method': 'session.update',
+            'params': <String, dynamic>{
+              'sessionId': 'draft:test-task-a',
+              'threadId': 'draft:test-task-a',
+              'turnId': 'turn-1',
+              'type': 'status',
+              'event': 'completed',
+              'pending': false,
+              'error': false,
+              'message': 'stable completed output',
+              'result': <String, dynamic>{
+                'success': true,
+                'output': 'stable completed output',
+                'turnId': 'turn-1',
+                'artifacts': <Map<String, dynamic>>[
+                  <String, dynamic>{
+                    'relativePath': 'exports/final.md',
+                    'downloadUrl':
+                        'https://xworkmate-bridge.svc.plus/artifacts/openclaw/download'
+                        '?sessionKey=draft:test-task-a&runId=turn-1&relativePath=exports%2Ffinal.md',
+                    'contentType': 'text/markdown',
+                    'sizeBytes': 42,
+                  },
+                ],
+              },
+            },
+          });
+          final eventBytes = utf8.encode('data: $event\n\n');
+          request.response.headers.set(
+            HttpHeaders.contentTypeHeader,
+            'text/event-stream',
+          );
+          request.response.contentLength = eventBytes.length + 128;
+          final socket = await request.response.detachSocket();
+          socket.add(eventBytes);
+          await socket.flush();
+          socket.destroy();
+        });
+        final endpoint = Uri.parse('http://127.0.0.1:${server.port}');
+        final transport = ExternalCodeAgentAcpDesktopTransport(
+          client: GatewayAcpClient(endpointResolver: () => endpoint),
+          endpointResolver: (_) => endpoint,
+        );
+        addTearDown(transport.dispose);
+
+        final result = await transport.executeTask(
+          const GoTaskServiceRequest(
+            sessionId: 'draft:test-task-a',
+            threadId: 'draft:test-task-a',
+            target: AssistantExecutionTarget.gateway,
+            provider: SingleAgentProvider.openclaw,
+            prompt: 'create files',
+            workingDirectory: '/tmp/workspace',
+            model: '',
+            thinking: 'off',
+            selectedSkills: <String>[],
+            inlineAttachments: <GatewayChatAttachmentPayload>[],
+            localAttachments: <CollaborationAttachment>[],
+            agentId: '',
+            metadata: <String, dynamic>{},
+          ),
+          onUpdate: (_) {},
+        );
+
+        expect(result.success, isTrue);
+        expect(result.message, 'stable completed output');
+        expect(result.artifacts, hasLength(1));
+        expect(result.artifacts.single.relativePath, 'exports/final.md');
+      },
+    );
+
+    test(
       'retries interrupted TLS handshakes before surfacing ACP diagnostics',
       () async {
         final server = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
