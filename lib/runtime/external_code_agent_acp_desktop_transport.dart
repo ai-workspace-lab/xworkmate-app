@@ -95,6 +95,7 @@ class ExternalCodeAgentAcpDesktopTransport
   }) async {
     var streamedText = '';
     String? completedMessage;
+    Map<String, dynamic>? completedResultSnapshot;
     try {
       final endpointOverride = _taskEndpointResolver == null
           ? _endpointResolver(request.target)
@@ -123,6 +124,9 @@ class ExternalCodeAgentAcpDesktopTransport
           }
           if (update.isDone && update.message.trim().isNotEmpty) {
             completedMessage = update.message.trim();
+            completedResultSnapshot = _completedResultSnapshotFromUpdate(
+              update,
+            );
           }
           onUpdate(update);
         },
@@ -133,7 +137,20 @@ class ExternalCodeAgentAcpDesktopTransport
         streamedText: streamedText,
         completedMessage: completedMessage,
       );
-    } on GatewayAcpException {
+    } on GatewayAcpException catch (error) {
+      if (error.code == 'ACP_HTTP_CONNECTION_CLOSED' &&
+          completedResultSnapshot != null) {
+        return goTaskServiceResultFromAcpResponse(
+          <String, dynamic>{
+            'jsonrpc': '2.0',
+            'id': 'recovered-from-completed-session-update',
+            'result': completedResultSnapshot,
+          },
+          route: request.route,
+          streamedText: streamedText,
+          completedMessage: completedMessage,
+        );
+      }
       rethrow;
     } on SocketException catch (error) {
       final timeout = _socketExceptionLooksLikeConnectTimeout(error);
@@ -182,6 +199,48 @@ class ExternalCodeAgentAcpDesktopTransport
 
   @override
   Future<void> dispose() => _client.dispose();
+
+  Map<String, dynamic>? _completedResultSnapshotFromUpdate(
+    GoTaskServiceUpdate update,
+  ) {
+    if (!update.isDone) {
+      return null;
+    }
+    final payload = update.payload;
+    final embeddedResult = _castMap(payload['result']);
+    final snapshot = <String, dynamic>{...embeddedResult, ...payload};
+    snapshot.remove('sessionId');
+    snapshot.remove('threadId');
+    snapshot.remove('type');
+    snapshot.remove('event');
+    snapshot.remove('pending');
+    snapshot.remove('result');
+    snapshot['turnId'] = update.turnId;
+    snapshot['success'] = !update.error;
+    final text = _firstNonEmptyString(snapshot, const <String>[
+      'output',
+      'message',
+      'summary',
+      'text',
+      'delta',
+    ]);
+    if (text.isNotEmpty) {
+      snapshot['output'] = text;
+      snapshot['message'] = text;
+      snapshot['summary'] = text;
+    }
+    return snapshot;
+  }
+
+  String _firstNonEmptyString(Map<String, dynamic> values, List<String> keys) {
+    for (final key in keys) {
+      final value = values[key]?.toString().trim() ?? '';
+      if (value.isNotEmpty) {
+        return value;
+      }
+    }
+    return '';
+  }
 
   Map<String, dynamic> _castMap(Object? value) {
     if (value is Map<String, dynamic>) {
