@@ -575,8 +575,8 @@ void main() {
             'jsonrpc': '2.0',
             'method': 'session.update',
             'params': <String, dynamic>{
-              'sessionId': 'draft:test-task-a',
-              'threadId': 'draft:test-task-a',
+              'sessionId': 'draft:unit-task-a',
+              'threadId': 'draft:unit-task-a',
               'turnId': 'turn-1',
               'type': 'status',
               'event': 'completed',
@@ -592,7 +592,7 @@ void main() {
                     'relativePath': 'exports/final.md',
                     'downloadUrl':
                         'https://xworkmate-bridge.svc.plus/artifacts/openclaw/download'
-                        '?sessionKey=draft:test-task-a&runId=turn-1&relativePath=exports%2Ffinal.md',
+                        '?sessionKey=draft:unit-task-a&runId=turn-1&relativePath=exports%2Ffinal.md',
                     'contentType': 'text/markdown',
                     'sizeBytes': 42,
                   },
@@ -620,8 +620,8 @@ void main() {
 
         final result = await transport.executeTask(
           const GoTaskServiceRequest(
-            sessionId: 'draft:test-task-a',
-            threadId: 'draft:test-task-a',
+            sessionId: 'draft:unit-task-a',
+            threadId: 'draft:unit-task-a',
             target: AssistantExecutionTarget.gateway,
             provider: SingleAgentProvider.openclaw,
             prompt: 'create files',
@@ -660,7 +660,7 @@ void main() {
             final event = jsonEncode(<String, dynamic>{
               'jsonrpc': '2.0',
               'method': 'xworkmate.bridge.accepted',
-              'params': <String, dynamic>{'sessionId': 'draft:test-task-a'},
+              'params': <String, dynamic>{'sessionId': 'draft:unit-task-a'},
             });
             final eventBytes = utf8.encode('data: $event\n\n');
             request.response.headers.set(
@@ -682,8 +682,8 @@ void main() {
                 'id': id,
                 'result': <String, dynamic>{
                   'status': 'completed',
-                  'sessionId': 'draft:test-task-a',
-                  'threadId': 'draft:test-task-a',
+                  'sessionId': 'draft:unit-task-a',
+                  'threadId': 'draft:unit-task-a',
                   'task': <String, dynamic>{
                     'state': 'completed',
                     'turnId': 'turn-recovered',
@@ -697,7 +697,7 @@ void main() {
                         'relativePath': 'exports/snapshot.md',
                         'downloadUrl':
                             'https://xworkmate-bridge.svc.plus/artifacts/openclaw/download'
-                            '?sessionKey=draft:test-task-a&runId=turn-recovered&relativePath=exports%2Fsnapshot.md',
+                            '?sessionKey=draft:unit-task-a&runId=turn-recovered&relativePath=exports%2Fsnapshot.md',
                         'contentType': 'text/markdown',
                         'sizeBytes': 64,
                       },
@@ -723,8 +723,8 @@ void main() {
 
         final result = await transport.executeTask(
           const GoTaskServiceRequest(
-            sessionId: 'draft:test-task-a',
-            threadId: 'draft:test-task-a',
+            sessionId: 'draft:unit-task-a',
+            threadId: 'draft:unit-task-a',
             target: AssistantExecutionTarget.gateway,
             provider: SingleAgentProvider.openclaw,
             prompt: 'create files',
