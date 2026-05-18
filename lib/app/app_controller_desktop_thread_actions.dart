@@ -3,6 +3,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'app_metadata.dart';
 import 'app_capabilities.dart';
@@ -649,8 +650,13 @@ extension AppControllerDesktopThreadActions on AppController {
         turn.completer.completeError(error, stackTrace);
       }
     } finally {
-      openClawGatewayActiveTasksInternal -= 1;
+      openClawGatewayActiveTasksInternal = math.max(
+        0,
+        openClawGatewayActiveTasksInternal - 1,
+      );
       drainOpenClawGatewayQueueInternal();
+      recomputeTasksInternal();
+      notifyIfActiveInternal();
     }
   }
 
