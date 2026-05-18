@@ -18,7 +18,7 @@ void main() {
         );
         addTearDown(controller.dispose);
 
-        await controller.sessionsController.switchSession('draft:test-task-a');
+        await controller.sessionsController.switchSession('draft:unit-task-a');
 
         await tester.pumpWidget(
           _buildTestApp(child: _buildLowerPane(controller: controller)),
@@ -79,7 +79,7 @@ void main() {
       );
       addTearDown(controller.dispose);
 
-      await controller.sessionsController.switchSession('draft:test-task-a');
+      await controller.sessionsController.switchSession('draft:unit-task-a');
 
       await tester.pumpWidget(
         _buildTestApp(child: _buildLowerPane(controller: controller)),
@@ -113,7 +113,7 @@ void main() {
       );
 
       final gatewayThread = controller
-          .requireTaskThreadForSessionInternal('draft:test-task-a')
+          .requireTaskThreadForSessionInternal('draft:unit-task-a')
           .copyWith(
             executionBinding: ExecutionBinding(
               executionMode: threadExecutionModeFromAssistantExecutionTarget(
@@ -154,7 +154,7 @@ void main() {
       await tester.pumpAndSettle();
 
       final agentThread = controller
-          .requireTaskThreadForSessionInternal('draft:test-task-a')
+          .requireTaskThreadForSessionInternal('draft:unit-task-a')
           .copyWith(
             executionBinding: ExecutionBinding(
               executionMode: threadExecutionModeFromAssistantExecutionTarget(
@@ -216,7 +216,7 @@ void main() {
       );
       addTearDown(controller.dispose);
 
-      await controller.sessionsController.switchSession('draft:test-task-a');
+      await controller.sessionsController.switchSession('draft:unit-task-a');
 
       await tester.pumpWidget(
         _buildTestApp(child: _buildLowerPane(controller: controller)),
@@ -277,12 +277,12 @@ void main() {
       );
       addTearDown(controller.dispose);
 
-      await controller.sessionsController.switchSession('draft:test-task-a');
+      await controller.sessionsController.switchSession('draft:unit-task-a');
       controller.initializeAssistantThreadContext(
-        'draft:test-task-a',
+        'draft:unit-task-a',
         executionTarget: AssistantExecutionTarget.gateway,
         messageViewMode: controller.assistantMessageViewModeForSession(
-          'draft:test-task-a',
+          'draft:unit-task-a',
         ),
       );
       controller.notifyListeners();
@@ -331,12 +331,12 @@ void main() {
         );
         addTearDown(controller.dispose);
 
-        await controller.sessionsController.switchSession('draft:test-task-a');
+        await controller.sessionsController.switchSession('draft:unit-task-a');
         controller.initializeAssistantThreadContext(
-          'draft:test-task-a',
+          'draft:unit-task-a',
           executionTarget: AssistantExecutionTarget.gateway,
           messageViewMode: controller.assistantMessageViewModeForSession(
-            'draft:test-task-a',
+            'draft:unit-task-a',
           ),
         );
         controller.notifyListeners();
@@ -367,7 +367,7 @@ void main() {
       );
       addTearDown(controller.dispose);
 
-      await controller.sessionsController.switchSession('draft:test-task-a');
+      await controller.sessionsController.switchSession('draft:unit-task-a');
 
       var sendCount = 0;
 
