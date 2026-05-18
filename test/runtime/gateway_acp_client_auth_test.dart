@@ -645,6 +645,112 @@ void main() {
     );
 
     test(
+      'recovers OpenClaw task result from bridge session snapshot after SSE connection close',
+      () async {
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        addTearDown(() => server.close(force: true));
+        final requestPaths = <String>[];
+        server.listen((request) async {
+          final body = await utf8.decoder.bind(request).join();
+          requestPaths.add(request.uri.path);
+          final decoded = jsonDecode(body) as Map<String, dynamic>;
+          final method = decoded['method']?.toString() ?? '';
+          final id = decoded['id']?.toString() ?? 'request-id';
+          if (method == 'session.start') {
+            final event = jsonEncode(<String, dynamic>{
+              'jsonrpc': '2.0',
+              'method': 'xworkmate.bridge.accepted',
+              'params': <String, dynamic>{'sessionId': 'draft:test-task-a'},
+            });
+            final eventBytes = utf8.encode('data: $event\n\n');
+            request.response.headers.set(
+              HttpHeaders.contentTypeHeader,
+              'text/event-stream',
+            );
+            request.response.contentLength = eventBytes.length + 128;
+            final socket = await request.response.detachSocket();
+            socket.add(eventBytes);
+            await socket.flush();
+            socket.destroy();
+            return;
+          }
+          if (method == 'xworkmate.sessions.get') {
+            request.response.headers.contentType = ContentType.json;
+            request.response.write(
+              jsonEncode(<String, dynamic>{
+                'jsonrpc': '2.0',
+                'id': id,
+                'result': <String, dynamic>{
+                  'status': 'completed',
+                  'sessionId': 'draft:test-task-a',
+                  'threadId': 'draft:test-task-a',
+                  'task': <String, dynamic>{
+                    'state': 'completed',
+                    'turnId': 'turn-recovered',
+                  },
+                  'result': <String, dynamic>{
+                    'success': true,
+                    'output': 'recovered from bridge session snapshot',
+                    'turnId': 'turn-recovered',
+                    'artifacts': <Map<String, dynamic>>[
+                      <String, dynamic>{
+                        'relativePath': 'exports/snapshot.md',
+                        'downloadUrl':
+                            'https://xworkmate-bridge.svc.plus/artifacts/openclaw/download'
+                            '?sessionKey=draft:test-task-a&runId=turn-recovered&relativePath=exports%2Fsnapshot.md',
+                        'contentType': 'text/markdown',
+                        'sizeBytes': 64,
+                      },
+                    ],
+                  },
+                },
+              }),
+            );
+            await request.response.close();
+            return;
+          }
+          request.response.statusCode = HttpStatus.badRequest;
+          await request.response.close();
+        });
+        final endpoint = Uri.parse('http://127.0.0.1:${server.port}');
+        final transport = ExternalCodeAgentAcpDesktopTransport(
+          client: GatewayAcpClient(endpointResolver: () => endpoint),
+          endpointResolver: (_) => endpoint,
+          taskEndpointResolver: (_) =>
+              endpoint.replace(path: '/gateway/openclaw'),
+        );
+        addTearDown(transport.dispose);
+
+        final result = await transport.executeTask(
+          const GoTaskServiceRequest(
+            sessionId: 'draft:test-task-a',
+            threadId: 'draft:test-task-a',
+            target: AssistantExecutionTarget.gateway,
+            provider: SingleAgentProvider.openclaw,
+            prompt: 'create files',
+            workingDirectory: '/tmp/workspace',
+            model: '',
+            thinking: 'off',
+            selectedSkills: <String>[],
+            inlineAttachments: <GatewayChatAttachmentPayload>[],
+            localAttachments: <CollaborationAttachment>[],
+            agentId: '',
+            metadata: <String, dynamic>{},
+          ),
+          onUpdate: (_) {},
+        );
+
+        expect(result.success, isTrue);
+        expect(result.message, 'recovered from bridge session snapshot');
+        expect(result.artifacts.single.relativePath, 'exports/snapshot.md');
+        expect(
+          requestPaths,
+          containsAll(<String>['/gateway/openclaw', '/acp/rpc']),
+        );
+      },
+    );
+
+    test(
       'retries interrupted TLS handshakes before surfacing ACP diagnostics',
       () async {
         final server = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
