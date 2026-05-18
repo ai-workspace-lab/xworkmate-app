@@ -61,9 +61,57 @@ void main() {
         ),
       ),
     );
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 100));
 
     expect(find.text('current session message'), findsAtLeastNWidgets(1));
     expect(find.text('stale gateway message'), findsNothing);
+  });
+
+  testWidgets('preserves unsent composer drafts per assistant session', (
+    tester,
+  ) async {
+    final controller = AppController(
+      environmentOverride: const <String, String>{},
+    );
+    addTearDown(controller.dispose);
+    final pageKey = GlobalKey<AssistantPageStateInternal>();
+
+    await controller.sessionsController.switchSession('draft-session-a');
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(),
+        home: Material(
+          child: SizedBox(
+            width: 1280,
+            height: 760,
+            child: AssistantPage(
+              key: pageKey,
+              controller: controller,
+              showStandaloneTaskRail: false,
+              onOpenDetail: (_) {},
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 100));
+
+    final state = pageKey.currentState!;
+    state.composerDraftSessionKeyInternal = 'draft-session-a';
+    state.inputControllerInternal.text = 'draft prompt A';
+
+    state.syncComposerDraftForActiveSessionInternal('draft-session-b');
+    expect(state.inputControllerInternal.text, isEmpty);
+
+    state.inputControllerInternal.text = 'draft prompt B';
+    state.syncComposerDraftForActiveSessionInternal('draft-session-a');
+    expect(state.inputControllerInternal.text, 'draft prompt A');
+
+    state.syncComposerDraftForActiveSessionInternal('draft-session-b');
+    expect(state.inputControllerInternal.text, 'draft prompt B');
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(milliseconds: 100));
   });
 }
