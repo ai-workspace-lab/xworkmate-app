@@ -86,7 +86,9 @@ extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
     if (rawPrompt.isEmpty) {
       return;
     }
-    if (controller.hasAssistantPendingRun) {
+    if (controller.assistantSessionHasPendingRun(
+      controller.currentSessionKey,
+    )) {
       await createNewThreadInternal();
     }
     final submittedSessionKey = controller.currentSessionKey;
@@ -343,7 +345,16 @@ extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
     if (!mounted) {
       return;
     }
-    composerFocusNodeInternal.requestFocus();
+    void requestFocus() {
+      if (!mounted) {
+        return;
+      }
+      FocusScope.of(context).requestFocus(composerFocusNodeInternal);
+      composerFocusNodeInternal.requestFocus();
+    }
+
+    requestFocus();
+    WidgetsBinding.instance.addPostFrameCallback((_) => requestFocus());
   }
 
   Future<bool> runTaskSessionActionWithRetryInternal(
