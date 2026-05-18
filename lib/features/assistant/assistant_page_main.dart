@@ -98,6 +98,8 @@ class AssistantPageStateInternal extends State<AssistantPage> {
   AssistantFocusEntry? activeFocusedDestinationInternal;
   final Map<String, AssistantTaskSeedInternal> taskSeedsInternal =
       <String, AssistantTaskSeedInternal>{};
+  final Map<String, String> composerDraftBySessionKeyInternal =
+      <String, String>{};
   final Set<String> archivedTaskKeysInternal = <String>{};
   List<ComposerAttachmentInternal> attachmentsInternal =
       const <ComposerAttachmentInternal>[];
@@ -109,11 +111,13 @@ class AssistantPageStateInternal extends State<AssistantPage> {
   double workspaceLowerPaneHeightAdjustmentInternal = 0;
   bool artifactPaneCollapsedInternal = true;
   double artifactPaneWidthInternal = assistantArtifactPaneDefaultWidthInternal;
+  String composerDraftSessionKeyInternal = '';
 
   @override
   void initState() {
     super.initState();
     inputControllerInternal = TextEditingController();
+    composerDraftSessionKeyInternal = widget.controller.currentSessionKey;
     threadSearchControllerInternal = TextEditingController();
     conversationControllerInternal = ScrollController();
     composerFocusNodeInternal = FocusNode();
@@ -164,6 +168,7 @@ class AssistantPageStateInternal extends State<AssistantPage> {
       animation: widget.controller,
       builder: (context, _) {
         final controller = widget.controller;
+        syncComposerDraftForActiveSessionInternal(controller.currentSessionKey);
         final messages = List<GatewayChatMessage>.from(controller.chatMessages);
         final timelineItems = buildTimelineItemsInternal(controller, messages);
         final tasks = buildTaskEntriesInternal(controller);
@@ -272,6 +277,50 @@ class AssistantPageStateInternal extends State<AssistantPage> {
         );
       },
     );
+  }
+
+  void saveComposerDraftForSessionInternal(String sessionKey) {
+    final normalizedSessionKey = sessionKey.trim();
+    if (normalizedSessionKey.isEmpty) {
+      return;
+    }
+    final draft = inputControllerInternal.text;
+    if (draft.trim().isEmpty) {
+      composerDraftBySessionKeyInternal.remove(normalizedSessionKey);
+      return;
+    }
+    composerDraftBySessionKeyInternal[normalizedSessionKey] = draft;
+  }
+
+  void restoreComposerDraftForSessionInternal(String sessionKey) {
+    final normalizedSessionKey = sessionKey.trim();
+    final draft = composerDraftBySessionKeyInternal[normalizedSessionKey] ?? '';
+    if (inputControllerInternal.text == draft) {
+      return;
+    }
+    inputControllerInternal.value = TextEditingValue(
+      text: draft,
+      selection: TextSelection.collapsed(offset: draft.length),
+    );
+  }
+
+  void clearComposerDraftForSessionInternal(String sessionKey) {
+    final normalizedSessionKey = sessionKey.trim();
+    if (normalizedSessionKey.isEmpty) {
+      return;
+    }
+    composerDraftBySessionKeyInternal.remove(normalizedSessionKey);
+  }
+
+  void syncComposerDraftForActiveSessionInternal(String sessionKey) {
+    final normalizedSessionKey = sessionKey.trim();
+    if (normalizedSessionKey.isEmpty ||
+        normalizedSessionKey == composerDraftSessionKeyInternal) {
+      return;
+    }
+    saveComposerDraftForSessionInternal(composerDraftSessionKeyInternal);
+    composerDraftSessionKeyInternal = normalizedSessionKey;
+    restoreComposerDraftForSessionInternal(normalizedSessionKey);
   }
 }
 

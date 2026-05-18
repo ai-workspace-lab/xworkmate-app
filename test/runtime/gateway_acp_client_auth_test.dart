@@ -228,6 +228,38 @@ void main() {
     });
   });
 
+  group('Gateway ACP task runtime budget', () {
+    test(
+      'treats explicit document and media formats as long artifact tasks',
+      () {
+        expect(
+          gatewayAcpTaskRuntimeBudgetMinutesForParams(const <String, dynamic>{
+            'taskPrompt': '围绕上述话题输出一篇800-1000字左右的文章 markdown格式',
+          }),
+          30,
+        );
+        expect(
+          gatewayAcpTaskRuntimeBudgetMinutesForParams(const <String, dynamic>{
+            'taskPrompt': 'save the final article as article.docx',
+          }),
+          30,
+        );
+        expect(
+          gatewayAcpTaskRuntimeBudgetMinutesForParams(const <String, dynamic>{
+            'taskPrompt': '生成封面图 png 和短视频 mp4',
+          }),
+          30,
+        );
+        expect(
+          gatewayAcpTaskRuntimeBudgetMinutesForParams(const <String, dynamic>{
+            'taskPrompt': '导出 jpg、pptx 和 xls 文件',
+          }),
+          30,
+        );
+      },
+    );
+  });
+
   group('GatewayAcpClient authorization', () {
     test('normalizes raw resolver token into bearer header for HTTP', () async {
       final capture = await _startAcpHttpServer();
