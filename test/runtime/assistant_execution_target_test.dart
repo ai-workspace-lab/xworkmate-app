@@ -852,6 +852,23 @@ void main() {
           ),
           isTrue,
         );
+        expect(
+          controller.shouldResumeGatewaySessionForNextSendInternal(
+            'draft:test-task-a',
+          ),
+          isTrue,
+        );
+
+        controller.upsertTaskThreadInternal(
+          'draft:test-task-a',
+          lastResultCode: gatewayAcpHttpConnectTimeoutCode,
+        );
+        expect(
+          controller.shouldResumeGatewaySessionForNextSendInternal(
+            'draft:test-task-a',
+          ),
+          isFalse,
+        );
       },
     );
 
@@ -868,107 +885,110 @@ void main() {
       expect(fakeGoTaskService.requests.single.resumeSession, isFalse);
     });
 
-    test('sendChatMessage restarts after ACP HTTP connection close', () async {
-      final localWorkspace = await Directory.systemTemp.createTemp(
-        'xworkmate-acp-interrupt-artifacts-',
-      );
-      addTearDown(() async {
-        if (await localWorkspace.exists()) {
-          await localWorkspace.delete(recursive: true);
-        }
-      });
-      final fakeGoTaskService = _RecordingGoTaskServiceClient()
-        ..updatesBeforeNextOutcome.add(
-          const GoTaskServiceUpdate(
-            sessionId: 'draft:test-task-a',
-            threadId: 'draft:test-task-a',
-            turnId: 'turn-1',
-            type: 'delta',
-            text: 'partial output that must not persist',
-            message: '',
-            pending: true,
-            error: false,
-            route: GoTaskServiceRoute.externalAcpSingle,
-            payload: <String, dynamic>{},
-          ),
-        )
-        ..outcomes.add(
-          const GatewayAcpException(
-            'ACP HTTP connection closed before the response finished arriving',
-            code: 'ACP_HTTP_CONNECTION_CLOSED',
-          ),
-        )
-        ..outcomes.add(
-          GoTaskServiceResult(
-            success: true,
-            message: '全部 6 个文件已生成 ✅',
-            turnId: 'turn-2',
-            raw: <String, dynamic>{'artifacts': _generatedArtifactPayloads()},
-            errorMessage: '',
-            resolvedModel: '',
-            route: GoTaskServiceRoute.externalAcpSingle,
-          ),
+    test(
+      'sendChatMessage resumes existing task after response interruption',
+      () async {
+        final localWorkspace = await Directory.systemTemp.createTemp(
+          'xworkmate-acp-interrupt-artifacts-',
         );
-      final controller = _connectedController(fakeGoTaskService);
-      addTearDown(controller.dispose);
-      controller.resolvedUserHomeDirectoryInternal = localWorkspace.path;
+        addTearDown(() async {
+          if (await localWorkspace.exists()) {
+            await localWorkspace.delete(recursive: true);
+          }
+        });
+        final fakeGoTaskService = _RecordingGoTaskServiceClient()
+          ..updatesBeforeNextOutcome.add(
+            const GoTaskServiceUpdate(
+              sessionId: 'draft:test-task-a',
+              threadId: 'draft:test-task-a',
+              turnId: 'turn-1',
+              type: 'delta',
+              text: 'partial output that must not persist',
+              message: '',
+              pending: true,
+              error: false,
+              route: GoTaskServiceRoute.externalAcpSingle,
+              payload: <String, dynamic>{},
+            ),
+          )
+          ..outcomes.add(
+            const GatewayAcpException(
+              'ACP HTTP connection closed before the response finished arriving',
+              code: 'ACP_HTTP_CONNECTION_CLOSED',
+            ),
+          )
+          ..outcomes.add(
+            GoTaskServiceResult(
+              success: true,
+              message: '全部 6 个文件已生成 ✅',
+              turnId: 'turn-2',
+              raw: <String, dynamic>{'artifacts': _generatedArtifactPayloads()},
+              errorMessage: '',
+              resolvedModel: '',
+              route: GoTaskServiceRoute.externalAcpSingle,
+            ),
+          );
+        final controller = _connectedController(fakeGoTaskService);
+        addTearDown(controller.dispose);
+        controller.resolvedUserHomeDirectoryInternal = localWorkspace.path;
 
-      await controller.sessionsController.switchSession('draft:test-task-a');
+        await controller.sessionsController.switchSession('draft:test-task-a');
 
-      await controller.sendChatMessage('first turn');
+        await controller.sendChatMessage('first turn');
 
-      expect(fakeGoTaskService.requests, hasLength(1));
-      expect(fakeGoTaskService.requests.single.resumeSession, isFalse);
-      expect(
-        controller
-            .taskThreadForSessionInternal('draft:test-task-a')
-            ?.lifecycleState
-            .status,
-        'ready',
-      );
-      expect(
-        controller.chatMessages.last.text,
-        'Bridge 响应读取中断，本轮结果未完成。请重新发送请求。错误码：ACP_HTTP_CONNECTION_CLOSED',
-      );
-      expect(
-        controller.chatMessages.map((message) => message.text),
-        isNot(contains('partial output that must not persist')),
-      );
-      expect(
-        controller
-            .taskThreadForSessionInternal('draft:test-task-a')
-            ?.lastArtifactSyncStatus,
-        'failed',
-      );
-
-      await controller.sendChatMessage('follow up');
-
-      expect(fakeGoTaskService.requests, hasLength(2));
-      expect(fakeGoTaskService.requests.last.resumeSession, isFalse);
-      expect(
-        controller.localSessionMessagesInternal['draft:test-task-a']!.map(
-          (message) => message.text,
-        ),
-        contains('全部 6 个文件已生成 ✅'),
-      );
-      final thread = controller.taskThreadForSessionInternal(
-        'draft:test-task-a',
-      );
-      expect(thread?.lifecycleState.status, 'ready');
-      expect(thread?.lastArtifactSyncStatus, 'synced');
-      expect(thread?.lastArtifactSyncAtMs, greaterThan(0));
-      final workspacePath = controller.assistantWorkspacePathForSession(
-        'draft:test-task-a',
-      );
-      for (final artifact in _generatedArtifactPayloads()) {
-        final relativePath = artifact['relativePath']! as String;
-        final content = artifact['content']! as String;
+        expect(fakeGoTaskService.requests, hasLength(1));
+        expect(fakeGoTaskService.requests.single.resumeSession, isFalse);
         expect(
-          await File('$workspacePath/$relativePath').readAsString(),
-          content,
+          controller
+              .taskThreadForSessionInternal('draft:test-task-a')
+              ?.lifecycleState
+              .status,
+          'ready',
         );
-      }
-    });
+        expect(
+          controller.chatMessages.last.text,
+          'Bridge 响应读取中断，本轮结果未完成。请重新发送请求。错误码：ACP_HTTP_CONNECTION_CLOSED',
+        );
+        expect(
+          controller.chatMessages.map((message) => message.text),
+          isNot(contains('partial output that must not persist')),
+        );
+        expect(
+          controller
+              .taskThreadForSessionInternal('draft:test-task-a')
+              ?.lastArtifactSyncStatus,
+          'failed',
+        );
+
+        await controller.sendChatMessage('follow up');
+
+        expect(fakeGoTaskService.requests, hasLength(2));
+        expect(fakeGoTaskService.requests.last.resumeSession, isTrue);
+        expect(
+          controller.localSessionMessagesInternal['draft:test-task-a']!.map(
+            (message) => message.text,
+          ),
+          contains('全部 6 个文件已生成 ✅'),
+        );
+        final thread = controller.taskThreadForSessionInternal(
+          'draft:test-task-a',
+        );
+        expect(thread?.lifecycleState.status, 'ready');
+        expect(thread?.lastArtifactSyncStatus, 'synced');
+        expect(thread?.lastArtifactSyncAtMs, greaterThan(0));
+        final workspacePath = controller.assistantWorkspacePathForSession(
+          'draft:test-task-a',
+        );
+        for (final artifact in _generatedArtifactPayloads()) {
+          final relativePath = artifact['relativePath']! as String;
+          final content = artifact['content']! as String;
+          expect(
+            await File('$workspacePath/$relativePath').readAsString(),
+            content,
+          );
+        }
+      },
+    );
 
     test(
       'sendChatMessage starts a new session after ACP HTTP connect timeout',
@@ -1091,7 +1111,7 @@ void main() {
 
         expect(fakeGoTaskService.requests, hasLength(2));
         expect(fakeGoTaskService.requests.first.resumeSession, isFalse);
-        expect(fakeGoTaskService.requests.last.resumeSession, isFalse);
+        expect(fakeGoTaskService.requests.last.resumeSession, isTrue);
 
         final transcript = controller.chatMessages
             .map((message) => message.text)
@@ -2101,6 +2121,10 @@ void main() {
         await _selectGatewaySession(controller, 'queue-task-a');
         final taskAFuture = controller.sendChatMessage('same prompt');
         await fakeGoTaskService.waitForRequestCount(1);
+        await expectLater(
+          taskAFuture.timeout(const Duration(milliseconds: 250)),
+          completes,
+        );
 
         await _selectGatewaySession(controller, 'queue-task-b');
         final taskBFuture = controller.sendChatMessage('same prompt');
@@ -2115,6 +2139,14 @@ void main() {
           controller,
           'queue-task-c',
           'queued',
+        );
+        await expectLater(
+          taskBFuture.timeout(const Duration(milliseconds: 250)),
+          completes,
+        );
+        await expectLater(
+          taskCFuture.timeout(const Duration(milliseconds: 250)),
+          completes,
         );
 
         expect(fakeGoTaskService.requests, hasLength(1));
@@ -2145,7 +2177,11 @@ void main() {
             route: GoTaskServiceRoute.externalAcpSingle,
           ),
         );
-        await taskAFuture;
+        await _waitForThreadLifecycleStatus(
+          controller,
+          'queue-task-a',
+          'ready',
+        );
         await fakeGoTaskService.waitForRequestCount(2);
 
         final taskBRequest = fakeGoTaskService.requests[1];
@@ -2170,7 +2206,11 @@ void main() {
             route: GoTaskServiceRoute.externalAcpSingle,
           ),
         );
-        await taskBFuture;
+        await _waitForThreadLifecycleStatus(
+          controller,
+          'queue-task-b',
+          'ready',
+        );
         await fakeGoTaskService.waitForRequestCount(3);
 
         final taskCRequest = fakeGoTaskService.requests[2];
@@ -2189,7 +2229,11 @@ void main() {
             route: GoTaskServiceRoute.externalAcpSingle,
           ),
         );
-        await taskCFuture;
+        await _waitForThreadLifecycleStatus(
+          controller,
+          'queue-task-c',
+          'ready',
+        );
       },
     );
 
@@ -2209,6 +2253,10 @@ void main() {
 
       final taskFuture = controller.sendChatMessage('use OpenClaw default');
       await fakeGoTaskService.waitForRequestCount(1);
+      await expectLater(
+        taskFuture.timeout(const Duration(milliseconds: 250)),
+        completes,
+      );
 
       final request = fakeGoTaskService.requests.single;
       expect(request.target, AssistantExecutionTarget.gateway);
@@ -2234,7 +2282,11 @@ void main() {
           route: GoTaskServiceRoute.externalAcpSingle,
         ),
       );
-      await taskFuture;
+      await _waitForThreadLifecycleStatus(
+        controller,
+        'openclaw-default-model-task',
+        'ready',
+      );
     });
 
     test(
@@ -2285,6 +2337,11 @@ void main() {
           ),
         );
         await runningFuture;
+        await _waitForThreadLifecycleStatus(
+          controller,
+          'running-openclaw-task',
+          'ready',
+        );
         await Future<void>.delayed(const Duration(milliseconds: 50));
         expect(fakeGoTaskService.requests, hasLength(1));
       },
@@ -2367,9 +2424,15 @@ void main() {
         addTearDown(controller.dispose);
 
         await _selectGatewaySession(controller, 'openclaw-failed-task');
-        await controller.sendChatMessage('输出 word 文档');
+        final failedSubmitFuture = controller.sendChatMessage('输出 word 文档');
 
+        await _waitForThreadLastResultCode(
+          controller,
+          'openclaw-failed-task',
+          'ACP_HTTP_CONNECTION_CLOSED',
+        );
         expect(fakeGoTaskService.requests, hasLength(1));
+        await failedSubmitFuture;
         expect(
           controller.assistantSessionHasPendingRun('openclaw-failed-task'),
           isFalse,
@@ -2384,13 +2447,19 @@ void main() {
         );
 
         await _selectGatewaySession(controller, 'openclaw-second-task');
-        await controller.sendChatMessage('输出 markdown格式');
+        final secondSubmitFuture = controller.sendChatMessage('输出 markdown格式');
 
+        await _waitForThreadLastResultCode(
+          controller,
+          'openclaw-second-task',
+          'SUCCESS',
+        );
         expect(fakeGoTaskService.requests, hasLength(2));
         expect(
           fakeGoTaskService.requests.last.sessionId,
           'openclaw-second-task',
         );
+        await secondSubmitFuture;
         expect(controller.openClawGatewayActiveTasksInternal, 0);
         expect(
           controller.chatMessages.map((message) => message.text),
@@ -2400,7 +2469,7 @@ void main() {
     );
 
     test(
-      'sendChatMessage restarts stale interrupted and error states',
+      'sendChatMessage resumes existing interrupted and error states',
       () async {
         late final AppController controller;
         final observedRequestStatuses = <String>[];
@@ -2449,7 +2518,7 @@ void main() {
         final interruptedFuture = controller.sendChatMessage('continue');
         await fakeGoTaskService.waitForRequestCount(1);
         expect(observedRequestStatuses.single, 'running');
-        expect(fakeGoTaskService.requests.single.resumeSession, isFalse);
+        expect(fakeGoTaskService.requests.single.resumeSession, isTrue);
         expect(
           controller.assistantSessionHasPendingRun('interrupted-task'),
           isTrue,
@@ -2493,7 +2562,7 @@ void main() {
         final retryFuture = controller.sendChatMessage('retry');
         await fakeGoTaskService.waitForRequestCount(2);
         expect(observedRequestStatuses.last, 'running');
-        expect(fakeGoTaskService.requests.last.resumeSession, isFalse);
+        expect(fakeGoTaskService.requests.last.resumeSession, isTrue);
         expect(controller.assistantSessionHasPendingRun('retry-task'), isTrue);
         fakeGoTaskService.complete(
           'retry-task',
@@ -2511,7 +2580,7 @@ void main() {
       },
     );
 
-    test('sendChatMessage resumes only after a confirmed success', () async {
+    test('sendChatMessage resumes after confirmed session activity', () async {
       final fakeGoTaskService = _RecordingGoTaskServiceClient()
         ..outcomes.add(
           const GoTaskServiceResult(
@@ -2761,6 +2830,31 @@ Future<void> _waitForThreadLifecycleStatus(
       .status;
   throw StateError(
     'Timed out waiting for $sessionKey status $status. Current status: $currentStatus.',
+  );
+}
+
+Future<void> _waitForThreadLastResultCode(
+  AppController controller,
+  String sessionKey,
+  String resultCode,
+) async {
+  final deadline = DateTime.now().add(const Duration(seconds: 15));
+  while (DateTime.now().isBefore(deadline)) {
+    final currentResultCode = controller
+        .taskThreadForSessionInternal(sessionKey)
+        ?.lifecycleState
+        .lastResultCode;
+    if (currentResultCode?.toUpperCase() == resultCode.toUpperCase()) {
+      return;
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+  }
+  final currentResultCode = controller
+      .taskThreadForSessionInternal(sessionKey)
+      ?.lifecycleState
+      .lastResultCode;
+  throw StateError(
+    'Timed out waiting for $sessionKey result code $resultCode. Current result code: $currentResultCode.',
   );
 }
 

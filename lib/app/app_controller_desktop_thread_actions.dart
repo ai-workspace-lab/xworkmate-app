@@ -516,7 +516,6 @@ extension AppControllerDesktopThreadActions on AppController {
         .add(turn);
     markOpenClawGatewayQueuedTurnInternal(turn.sessionKey);
     drainOpenClawGatewayQueueInternal();
-    await turn.completer.future;
   }
 
   void markOpenClawGatewayQueuedTurnInternal(String sessionKey) {
@@ -586,9 +585,6 @@ extension AppControllerDesktopThreadActions on AppController {
       lastTaskArtifactRelativePaths: const <String>[],
       updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
     );
-    if (!turn.completer.isCompleted) {
-      turn.completer.complete();
-    }
     recomputeTasksInternal();
     notifyIfActiveInternal();
     drainOpenClawGatewayQueueInternal();
@@ -607,12 +603,8 @@ extension AppControllerDesktopThreadActions on AppController {
         openClawGatewayQueuedTurnsBySessionInternal.remove(turn.sessionKey);
       }
       if (turn.cancelled) {
-        if (!turn.completer.isCompleted) {
-          turn.completer.complete();
-        }
         continue;
       }
-      turn.started = true;
       openClawGatewayActiveTasksInternal += 1;
       unawaited(runOpenClawGatewayQueuedTurnInternal(turn));
     }
@@ -642,21 +634,24 @@ extension AppControllerDesktopThreadActions on AppController {
           resumeSessionHint: turn.resumeSessionHint,
         ),
       );
-      if (!turn.completer.isCompleted) {
-        turn.completer.complete();
-      }
-    } catch (error, stackTrace) {
-      if (!turn.completer.isCompleted) {
-        turn.completer.completeError(error, stackTrace);
+    } catch (error) {
+      if (!disposedInternal) {
+        applyGatewayChatFailureInternal(
+          sessionKey: turn.sessionKey,
+          target: turn.target,
+          error: error,
+        );
       }
     } finally {
       openClawGatewayActiveTasksInternal = math.max(
         0,
         openClawGatewayActiveTasksInternal - 1,
       );
-      drainOpenClawGatewayQueueInternal();
-      recomputeTasksInternal();
-      notifyIfActiveInternal();
+      if (!disposedInternal) {
+        drainOpenClawGatewayQueueInternal();
+        recomputeTasksInternal();
+        notifyIfActiveInternal();
+      }
     }
   }
 
@@ -884,7 +879,12 @@ extension AppControllerDesktopThreadActions on AppController {
     final lastResultCode = taskThreadForSessionInternal(
       normalizedSessionKey,
     )?.lifecycleState.lastResultCode?.trim().toUpperCase();
-    return lastResultCode == 'SUCCESS';
+    return lastResultCode != 'RUNNING' &&
+        lastResultCode != 'QUEUED' &&
+        lastResultCode != 'ABORTED' &&
+        lastResultCode != gatewayAcpHttpConnectTimeoutCode &&
+        lastResultCode != gatewayAcpHttpConnectFailedCode &&
+        lastResultCode != gatewayAcpHttpHandshakeInterruptedCode;
   }
 
   String gatewayTerminalResultCodeInternal(GoTaskServiceResult result) {

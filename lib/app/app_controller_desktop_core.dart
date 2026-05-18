@@ -263,9 +263,6 @@ class AppController extends ChangeNotifier {
     disposedInternal = true;
     for (final turn in openClawGatewayQueuedTurnsInternal) {
       turn.cancelled = true;
-      if (!turn.completer.isCompleted) {
-        turn.completer.complete();
-      }
     }
     openClawGatewayQueuedTurnsInternal.clear();
     openClawGatewayQueuedTurnsBySessionInternal.clear();

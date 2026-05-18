@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import '../runtime/go_task_service_client.dart';
 import '../runtime/runtime_models.dart';
 
@@ -42,8 +40,6 @@ class OpenClawGatewayQueuedTurnInternal {
   final String agentId;
   final Map<String, dynamic> metadata;
   final bool resumeSessionHint;
-  final Completer<void> completer = Completer<void>();
 
   bool cancelled = false;
-  bool started = false;
 }
