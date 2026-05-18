@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
+import 'acp_endpoint_paths.dart';
 import 'gateway_acp_client.dart';
 import 'go_task_service_client.dart';
 import 'runtime_models.dart';
@@ -151,6 +152,19 @@ class ExternalCodeAgentAcpDesktopTransport
           completedMessage: completedMessage,
         );
       }
+      if (error.code == 'ACP_HTTP_CONNECTION_CLOSED') {
+        final recovered = await _recoverTaskResultAfterConnectionClosed(
+          request,
+          taskEndpoint: _taskEndpointResolver == null
+              ? _endpointResolver(request.target)
+              : _taskEndpointResolver.call(request),
+          streamedText: streamedText,
+          completedMessage: completedMessage,
+        );
+        if (recovered != null) {
+          return recovered;
+        }
+      }
       rethrow;
     } on SocketException catch (error) {
       final timeout = _socketExceptionLooksLikeConnectTimeout(error);
@@ -169,6 +183,82 @@ class ExternalCodeAgentAcpDesktopTransport
         code: 'EXTERNAL_ACP_GATEWAY_ERROR',
       );
     }
+  }
+
+  Future<GoTaskServiceResult?> _recoverTaskResultAfterConnectionClosed(
+    GoTaskServiceRequest request, {
+    required Uri? taskEndpoint,
+    required String streamedText,
+    required String? completedMessage,
+  }) async {
+    final endpoint = _sessionSnapshotEndpoint(taskEndpoint);
+    if (endpoint == null) {
+      return null;
+    }
+    for (var attempt = 0; attempt < 60; attempt += 1) {
+      if (attempt > 0) {
+        await Future<void>.delayed(const Duration(seconds: 2));
+      }
+      Map<String, dynamic> response;
+      try {
+        response = await _client.request(
+          method: 'xworkmate.sessions.get',
+          params: <String, dynamic>{
+            'sessionId': request.sessionId,
+            'threadId': request.threadId,
+          },
+          endpointOverride: endpoint,
+        );
+      } on GatewayAcpException {
+        continue;
+      } on SocketException {
+        continue;
+      }
+      final snapshot = _castMap(response['result']);
+      final task = _castMap(snapshot['task']);
+      final status = (task['state'] ?? snapshot['status'] ?? '')
+          .toString()
+          .trim()
+          .toLowerCase();
+      final result = _castMap(snapshot['result']);
+      if (result.isNotEmpty &&
+          (status == 'completed' ||
+              status == 'failed' ||
+              status == 'cancelled' ||
+              status == 'canceled')) {
+        return goTaskServiceResultFromAcpResponse(
+          <String, dynamic>{
+            'jsonrpc': '2.0',
+            'id': 'recovered-from-session-snapshot',
+            'result': result,
+          },
+          route: request.route,
+          streamedText: streamedText,
+          completedMessage: completedMessage,
+        );
+      }
+    }
+    return null;
+  }
+
+  Uri? _sessionSnapshotEndpoint(Uri? taskEndpoint) {
+    final controlEndpoint = resolveAcpHttpRpcEndpoint(
+      _endpointResolver(AssistantExecutionTarget.gateway),
+    );
+    if (controlEndpoint != null) {
+      return controlEndpoint;
+    }
+    final taskPath = taskEndpoint?.path.trim() ?? '';
+    if (taskEndpoint != null &&
+        (taskPath == '/gateway/openclaw' ||
+            taskPath.endsWith('/gateway/openclaw'))) {
+      return taskEndpoint.replace(
+        path: '/acp/rpc',
+        query: null,
+        fragment: null,
+      );
+    }
+    return resolveAcpHttpRpcEndpoint(taskEndpoint);
   }
 
   @override
