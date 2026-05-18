@@ -10,6 +10,32 @@ import 'package:xworkmate/runtime/go_task_service_client.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
 
 void main() {
+  test(
+    'empty environment override keeps thread workspaces out of real HOME',
+    () async {
+      final realHome = Platform.environment['HOME']?.trim() ?? '';
+      final controller = AppController(
+        environmentOverride: const <String, String>{},
+      );
+      addTearDown(controller.dispose);
+
+      await controller.sessionsController.switchSession('draft:test-task-a');
+
+      expect(controller.userHomeDirectory, isNot(isEmpty));
+      if (realHome.isNotEmpty) {
+        expect(controller.userHomeDirectory, isNot(realHome));
+      }
+      expect(
+        controller.localThreadWorkspacePathInternal('draft:test-task-a'),
+        isNot(contains('$realHome/.xworkmate/threads/draft-test-task-a')),
+      );
+      expect(
+        controller.localThreadWorkspaceDisplayPathInternal('draft:test-task-a'),
+        '\$HOME/.xworkmate/threads/draft-test-task-a',
+      );
+    },
+  );
+
   test('does not expose gateway chat messages from another session', () async {
     final controller = AppController(
       environmentOverride: const <String, String>{},

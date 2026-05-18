@@ -457,8 +457,11 @@ extension AppControllerDesktopSettingsRuntime on AppController {
 
   Future<void> initializeInternal() async {
     try {
-      resolvedUserHomeDirectoryInternal =
-          await skillDirectoryAccessServiceInternal.resolveUserHomeDirectory();
+      resolvedUserHomeDirectoryInternal = environmentOverrideInternal == null
+          ? await skillDirectoryAccessServiceInternal.resolveUserHomeDirectory()
+          : resolveUserHomeDirectoryFromControllerEnvironmentInternal(
+              environmentOverrideInternal,
+            );
       await settingsControllerInternal.initialize();
       final loadedAppUiState = await storeInternal.loadAppUiState();
       final sanitizedAppUiState = sanitizeAppUiStateInternal(loadedAppUiState);

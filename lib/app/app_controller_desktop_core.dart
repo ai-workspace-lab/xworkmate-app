@@ -199,6 +199,12 @@ class AppController extends ChangeNotifier {
     environmentOverrideInternal = environmentOverride == null
         ? null
         : Map<String, String>.unmodifiable(environmentOverride);
+    if (environmentOverrideInternal != null) {
+      resolvedUserHomeDirectoryInternal =
+          resolveUserHomeDirectoryFromControllerEnvironmentInternal(
+            environmentOverrideInternal,
+          );
+    }
     gatewayAcpClientInternal = GatewayAcpClient(
       endpointResolver: resolveGatewayAcpEndpointInternal,
       authorizationResolver: resolveGatewayAcpAuthorizationHeaderInternal,
@@ -716,4 +722,23 @@ class AppController extends ChangeNotifier {
 
   double get assistantSkillCount => skills.length.toDouble();
   int get currentAssistantSkillCount => skills.length;
+}
+
+String resolveUserHomeDirectoryFromControllerEnvironmentInternal(
+  Map<String, String>? environment,
+) {
+  if (environment == null) {
+    return resolveUserHomeDirectory();
+  }
+  final resolved = resolveUserHomeDirectory(environment: environment);
+  if (resolved.isNotEmpty) {
+    return resolved;
+  }
+  if (Platform.environment.containsKey('FLUTTER_TEST')) {
+    final suffix = DateTime.now().microsecondsSinceEpoch;
+    return Directory.systemTemp
+        .createTempSync('xworkmate-test-home-$suffix-')
+        .path;
+  }
+  return '';
 }
