@@ -51,12 +51,14 @@ fi
 eval "$(python3 "$ROOT_DIR/scripts/ci/build_version.py" --format shell)"
 BUILD_DATE_LINE="$(sed -n 's/^build-date:[[:space:]]*//p' "$PUBSPEC_PATH" | head -n 1)"
 BUILD_ID_LINE="$(sed -n 's/^build-id:[[:space:]]*//p' "$PUBSPEC_PATH" | head -n 1)"
+GIT_BUILD_DATE="$(cd "$ROOT_DIR" && git show -s --format=%cs HEAD 2>/dev/null || true)"
+GIT_BUILD_COMMIT="$(cd "$ROOT_DIR" && git rev-parse --short HEAD 2>/dev/null || true)"
 
 APP_VERSION="$DISPLAY_VERSION"
 APP_RELEASE_VERSION="$PLATFORM_RELEASE_VERSION"
 APP_BUILD="$BUILD_NUMBER"
-APP_BUILD_DATE="${BUILD_DATE_LINE:-unknown}"
-APP_BUILD_COMMIT="${BUILD_ID_LINE:-unknown}"
+APP_BUILD_DATE="${GIT_BUILD_DATE:-${BUILD_DATE_LINE:-unknown}}"
+APP_BUILD_COMMIT="${GIT_BUILD_COMMIT:-${BUILD_ID_LINE:-unknown}}"
 
 BUILD_APP_PATH="$APP_DIR/build/macos/Build/Products/$PRODUCTS_DIR_NAME/$APP_NAME.app"
 DIST_APP_PATH="$DIST_DIR/$APP_NAME.app"
