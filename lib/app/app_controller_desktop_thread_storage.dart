@@ -375,7 +375,10 @@ extension AppControllerDesktopThreadStorage on AppController {
         assistantThreadMessagesInternal[normalizedSessionKey] ??
         const <GatewayChatMessage>[];
     final preview = assistantThreadPreviewInternal(messages);
-    final title = assistantCustomTaskTitle(normalizedSessionKey);
+    final customTitle = assistantCustomTaskTitle(normalizedSessionKey);
+    final derivedTitle = customTitle.isEmpty
+        ? assistantThreadTitleFromMessagesInternal(messages)
+        : customTitle;
     final lastMessage = messages.isNotEmpty ? messages.last : null;
     final updatedAtMs =
         resolvedRecord?.updatedAtMs ??
@@ -384,7 +387,7 @@ extension AppControllerDesktopThreadStorage on AppController {
     return GatewaySessionSummary(
       key: normalizedSessionKey,
       kind: 'assistant',
-      displayName: title.isEmpty ? null : title,
+      displayName: derivedTitle.isEmpty ? null : derivedTitle,
       surface: 'Assistant',
       subject: preview,
       room: null,
@@ -400,9 +403,41 @@ extension AppControllerDesktopThreadStorage on AppController {
       totalTokens: null,
       model: assistantModelForSession(normalizedSessionKey),
       contextTokens: null,
-      derivedTitle: title.isEmpty ? null : title,
+      derivedTitle: derivedTitle.isEmpty ? null : derivedTitle,
       lastMessagePreview: preview,
     );
+  }
+
+  String assistantThreadTitleFromMessagesInternal(
+    List<GatewayChatMessage> messages,
+  ) {
+    for (final message in messages) {
+      final role = message.role.trim().toLowerCase();
+      if (role != 'user') {
+        continue;
+      }
+      final text = _compactAssistantThreadTitleTextInternal(message.text);
+      if (text.isNotEmpty) {
+        return text;
+      }
+    }
+    return '';
+  }
+
+  String _compactAssistantThreadTitleTextInternal(String text) {
+    final firstLine = text
+        .split(RegExp(r'[\r\n]+'))
+        .map((line) => line.trim())
+        .firstWhere((line) => line.isNotEmpty, orElse: () => '');
+    if (firstLine.isEmpty) {
+      return '';
+    }
+    final compact = firstLine.replaceAll(RegExp(r'\s+'), ' ').trim();
+    const maxTitleLength = 34;
+    if (compact.length <= maxTitleLength) {
+      return compact;
+    }
+    return '${compact.substring(0, maxTitleLength).trimRight()}...';
   }
 
   String? assistantThreadPreviewInternal(List<GatewayChatMessage> messages) {

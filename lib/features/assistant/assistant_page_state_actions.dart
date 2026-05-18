@@ -89,6 +89,7 @@ extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
     if (controller.hasAssistantPendingRun) {
       await createNewThreadInternal();
     }
+    final submittedSessionKey = controller.currentSessionKey;
 
     final autoAgent = pickAutoAgentInternal(controller, rawPrompt);
     if (autoAgent != null) {
@@ -153,6 +154,7 @@ extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
             .toList(growable: false),
         selectedSkillLabels: selectedSkillLabels,
       );
+      clearComposerDraftForSessionInternal(submittedSessionKey);
     } catch (_) {
       if (!mounted) {
         rethrow;
@@ -390,11 +392,16 @@ extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
   }
 
   Future<void> switchSessionWithRetryInternal(String sessionKey) async {
+    saveComposerDraftForSessionInternal(widget.controller.currentSessionKey);
     final switched = await runTaskSessionActionWithRetryInternal(
       appText('切换会话', 'Switch session'),
       () => widget.controller.switchSession(sessionKey),
     );
     if (switched) {
+      composerDraftSessionKeyInternal = widget.controller.currentSessionKey;
+      restoreComposerDraftForSessionInternal(
+        widget.controller.currentSessionKey,
+      );
       focusComposerInternal();
     }
   }

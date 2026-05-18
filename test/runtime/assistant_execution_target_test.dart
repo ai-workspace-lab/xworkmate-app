@@ -945,8 +945,12 @@ void main() {
 
       expect(fakeGoTaskService.requests, hasLength(2));
       expect(fakeGoTaskService.requests.last.resumeSession, isFalse);
-      await _waitForLastChatMessageText(controller, '全部 6 个文件已生成 ✅');
-      expect(controller.chatMessages.last.text, '全部 6 个文件已生成 ✅');
+      expect(
+        controller.localSessionMessagesInternal['draft:test-task-a']!.map(
+          (message) => message.text,
+        ),
+        contains('全部 6 个文件已生成 ✅'),
+      );
       final thread = controller.taskThreadForSessionInternal(
         'draft:test-task-a',
       );
@@ -1409,6 +1413,129 @@ void main() {
         contains('result A'),
       );
     });
+
+    test(
+      'background task completion does not overwrite the selected session',
+      () async {
+        final localHome = await Directory.systemTemp.createTemp(
+          'xworkmate-background-completion-home-',
+        );
+        addTearDown(() async {
+          if (await localHome.exists()) {
+            await localHome.delete(recursive: true);
+          }
+        });
+        final fakeGoTaskService = _BlockingGoTaskServiceClient();
+        final controller = _connectedController(fakeGoTaskService);
+        addTearDown(controller.dispose);
+        controller.resolvedUserHomeDirectoryInternal = localHome.path;
+
+        const sessionA = 'background-task-a';
+        const sessionB = 'background-task-b';
+        await controller.switchSession(sessionA);
+        final taskAFuture = controller.sendChatMessage('生成 A 的 markdown 文件');
+        await fakeGoTaskService.waitForRequestCount(1);
+
+        await controller.switchSession(sessionB);
+        final taskBFuture = controller.sendChatMessage('生成 B 的 markdown 文件');
+        await fakeGoTaskService.waitForRequestCount(2);
+        expect(controller.currentSessionKey, sessionB);
+
+        fakeGoTaskService.complete(
+          sessionA,
+          const GoTaskServiceResult(
+            success: true,
+            message: 'result A',
+            turnId: 'turn-a',
+            raw: <String, dynamic>{
+              'artifacts': <Map<String, dynamic>>[
+                <String, dynamic>{
+                  'relativePath': 'a.md',
+                  'content': 'artifact A',
+                  'contentType': 'text/markdown',
+                },
+              ],
+            },
+            errorMessage: '',
+            resolvedModel: '',
+            route: GoTaskServiceRoute.externalAcpSingle,
+          ),
+        );
+        await taskAFuture;
+
+        expect(controller.currentSessionKey, sessionB);
+        expect(
+          controller.chatMessages.map((message) => message.text),
+          isNot(contains('result A')),
+        );
+        expect(
+          controller
+              .requireTaskThreadForSessionInternal(sessionA)
+              .lastArtifactSyncStatus,
+          'synced',
+        );
+        expect(
+          controller
+              .requireTaskThreadForSessionInternal(sessionB)
+              .lastArtifactSyncStatus,
+          'running',
+        );
+        final sessionBSnapshot = await controller.loadAssistantArtifactSnapshot(
+          sessionKey: sessionB,
+        );
+        expect(sessionBSnapshot.resultEntries, isEmpty);
+        expect(
+          controller
+              .requireTaskThreadForSessionInternal(sessionB)
+              .lastTaskArtifactRelativePaths,
+          isEmpty,
+        );
+        expect(
+          await File(
+            '${controller.assistantWorkspacePathForSession(sessionA)}/a.md',
+          ).readAsString(),
+          'artifact A',
+        );
+
+        fakeGoTaskService.complete(
+          sessionB,
+          const GoTaskServiceResult(
+            success: true,
+            message: 'result B',
+            turnId: 'turn-b',
+            raw: <String, dynamic>{
+              'artifacts': <Map<String, dynamic>>[
+                <String, dynamic>{
+                  'relativePath': 'b.md',
+                  'content': 'artifact B',
+                  'contentType': 'text/markdown',
+                },
+              ],
+            },
+            errorMessage: '',
+            resolvedModel: '',
+            route: GoTaskServiceRoute.externalAcpSingle,
+          ),
+        );
+        await taskBFuture;
+
+        expect(controller.currentSessionKey, sessionB);
+        expect(
+          controller.chatMessages.map((message) => message.text),
+          contains('result B'),
+        );
+        expect(
+          controller.chatMessages.map((message) => message.text),
+          isNot(contains('result A')),
+        );
+        final completedSessionBPaths =
+            (await controller.loadAssistantArtifactSnapshot(
+              sessionKey: sessionB,
+            )).fileEntries.map((entry) => entry.relativePath).toList();
+        expect(completedSessionBPaths, contains('b.md'));
+        expect(completedSessionBPaths, isNot(contains('a.md')));
+      },
+    );
 
     test(
       'sendChatMessage keeps same-prompt draft task artifacts isolated',
@@ -2214,6 +2341,63 @@ void main() {
       expect(overflowThread.lastTaskArtifactRelativePaths, isEmpty);
       expect(fakeGoTaskService.requests, isEmpty);
     });
+
+    test(
+      'OpenClaw transport interruption releases queue slot for another task',
+      () async {
+        final fakeGoTaskService = _RecordingGoTaskServiceClient()
+          ..outcomes.add(
+            const GatewayAcpException(
+              'ACP HTTP connection closed before the response finished arriving',
+              code: 'ACP_HTTP_CONNECTION_CLOSED',
+            ),
+          )
+          ..outcomes.add(
+            const GoTaskServiceResult(
+              success: true,
+              message: 'second task completed',
+              turnId: 'turn-second',
+              raw: <String, dynamic>{},
+              errorMessage: '',
+              resolvedModel: '',
+              route: GoTaskServiceRoute.externalAcpSingle,
+            ),
+          );
+        final controller = _connectedGatewayController(fakeGoTaskService);
+        addTearDown(controller.dispose);
+
+        await _selectGatewaySession(controller, 'openclaw-failed-task');
+        await controller.sendChatMessage('输出 word 文档');
+
+        expect(fakeGoTaskService.requests, hasLength(1));
+        expect(
+          controller.assistantSessionHasPendingRun('openclaw-failed-task'),
+          isFalse,
+        );
+        expect(controller.openClawGatewayActiveTasksInternal, 0);
+        expect(
+          controller
+              .requireTaskThreadForSessionInternal('openclaw-failed-task')
+              .lifecycleState
+              .lastResultCode,
+          'ACP_HTTP_CONNECTION_CLOSED',
+        );
+
+        await _selectGatewaySession(controller, 'openclaw-second-task');
+        await controller.sendChatMessage('输出 markdown格式');
+
+        expect(fakeGoTaskService.requests, hasLength(2));
+        expect(
+          fakeGoTaskService.requests.last.sessionId,
+          'openclaw-second-task',
+        );
+        expect(controller.openClawGatewayActiveTasksInternal, 0);
+        expect(
+          controller.chatMessages.map((message) => message.text),
+          contains('second task completed'),
+        );
+      },
+    );
 
     test(
       'sendChatMessage restarts stale interrupted and error states',
