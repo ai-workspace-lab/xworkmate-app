@@ -344,6 +344,9 @@ String sessionStatusInternal(
   if (session.abortedLastRun == true) {
     return 'failed';
   }
+  if (normalizedLifecycle == 'queued') {
+    return 'queued';
+  }
   if (sessionPending) {
     return 'running';
   }

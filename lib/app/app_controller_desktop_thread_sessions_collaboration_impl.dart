@@ -160,12 +160,18 @@ Future<void> runMultiAgentCollaborationThreadSessionInternal(
     );
     controller.recomputeTasksInternal();
     try {
+      final taskPrompt = controller.taskWorkspaceContextPromptInternal(
+        sessionKey: sessionKey,
+        userPrompt: composedPrompt,
+        workingDirectory: workingDirectory,
+        remoteWorkingDirectoryHint: remoteWorkingDirectoryHint?.trim() ?? '',
+      );
       final result = await controller.goTaskServiceClientInternal.executeTask(
         GoTaskServiceRequest(
           sessionId: sessionKey,
           threadId: sessionKey,
           target: controller.assistantExecutionTargetForSession(sessionKey),
-          prompt: composedPrompt,
+          prompt: taskPrompt,
           workingDirectory: workingDirectory,
           remoteWorkingDirectoryHint: remoteWorkingDirectoryHint?.trim() ?? '',
           model: controller.assistantModelForSession(sessionKey),

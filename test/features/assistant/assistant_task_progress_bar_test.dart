@@ -57,6 +57,32 @@ void main() {
     expect(indicator.value, 0.82);
   });
 
+  testWidgets('shows queued progress while a task waits to run', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _buildTestApp(
+        assistantTaskProgressState(
+          pending: true,
+          lifecycleStatus: 'queued',
+          lastResultCode: 'queued',
+          artifactSyncStatus: 'queued',
+        ),
+        onStop: () {},
+      ),
+    );
+
+    expect(find.text('任务已排队，等待执行...'), findsOneWidget);
+    expect(
+      find.byKey(const Key('assistant-task-progress-stop-button')),
+      findsOneWidget,
+    );
+    final indicator = tester.widget<LinearProgressIndicator>(
+      find.byKey(const Key('assistant-task-progress-indicator')),
+    );
+    expect(indicator.value, 0.18);
+  });
+
   testWidgets('shows interrupted state after ACP connection closes', (
     tester,
   ) async {
