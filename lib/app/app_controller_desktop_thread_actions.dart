@@ -67,6 +67,8 @@ extension AppControllerDesktopThreadActions on AppController {
   bool assistantSessionHasPendingRun(String sessionKey) {
     final normalized = normalizedAssistantSessionKeyInternal(sessionKey);
     return aiGatewayPendingSessionKeysInternal.contains(normalized) ||
+        (openClawGatewayQueuedTurnsBySessionInternal[normalized]?.isNotEmpty ??
+            false) ||
         (multiAgentRunPendingInternal &&
             matchesSessionKey(
               normalized,
@@ -417,11 +419,21 @@ extension AppControllerDesktopThreadActions on AppController {
     required String agentId,
     required Map<String, dynamic> metadata,
     required bool resumeSessionHint,
+    bool appendUserTurn = true,
   }) async {
     final resumeSession =
         resumeSessionHint ||
-        shouldResumeGatewaySessionForNextSendInternal(sessionKey);
-    appendGatewayUserTurnInternal(sessionKey, message);
+        (appendUserTurn &&
+            shouldResumeGatewaySessionForNextSendInternal(sessionKey));
+    final taskPrompt = taskWorkspaceContextPromptInternal(
+      sessionKey: sessionKey,
+      userPrompt: message,
+      workingDirectory: workingDirectory,
+      remoteWorkingDirectoryHint: remoteWorkingDirectoryHint,
+    );
+    if (appendUserTurn) {
+      appendGatewayUserTurnInternal(sessionKey, message);
+    }
     markGatewayChatRunInternal(sessionKey);
     try {
       final result = await goTaskServiceClientInternal.executeTask(
@@ -430,7 +442,7 @@ extension AppControllerDesktopThreadActions on AppController {
           threadId: sessionKey,
           target: target,
           provider: provider,
-          prompt: message,
+          prompt: taskPrompt,
           workingDirectory: workingDirectory,
           remoteWorkingDirectoryHint: remoteWorkingDirectoryHint,
           model: model,
@@ -482,6 +494,53 @@ extension AppControllerDesktopThreadActions on AppController {
     }
   }
 
+  String taskWorkspaceContextPromptInternal({
+    required String sessionKey,
+    required String userPrompt,
+    required String workingDirectory,
+    required String remoteWorkingDirectoryHint,
+  }) {
+    final requestText = userPrompt.trim().isEmpty
+        ? 'See attached.'
+        : userPrompt.trim();
+    final buffer = StringBuffer()
+      ..writeln('TaskThread workspace context:')
+      ..writeln('- sessionKey: $sessionKey')
+      ..writeln('- localWorkspace: ${workingDirectory.trim()}');
+    final remoteHint = remoteWorkingDirectoryHint.trim();
+    if (remoteHint.isNotEmpty) {
+      buffer.writeln('- remoteWorkspaceHint: $remoteHint');
+    }
+    buffer.writeln(
+      '- currentTaskWorkspace: ${remoteHint.isNotEmpty ? remoteHint : workingDirectory.trim()}',
+    );
+    buffer
+      ..writeln()
+      ..writeln('Workspace isolation rules:')
+      ..writeln(
+        '1. Treat currentTaskWorkspace as the only writable workspace for this TaskThread execution.',
+      )
+      ..writeln(
+        '2. Create, modify, and export task files inside currentTaskWorkspace or its task artifact scope.',
+      )
+      ..writeln(
+        '3. Do not use arbitrary global directories, OpenClaw media cache, Downloads, Desktop, or /tmp as final deliverable locations.',
+      )
+      ..writeln(
+        '4. If a tool creates output outside currentTaskWorkspace, copy or export the final deliverables into currentTaskWorkspace before claiming completion.',
+      )
+      ..writeln(
+        '5. When reporting files, prefer paths inside currentTaskWorkspace or paths relative to currentTaskWorkspace.',
+      )
+      ..writeln(
+        '6. The app syncs final artifacts from currentTaskWorkspace back into localWorkspace.',
+      )
+      ..writeln()
+      ..writeln('User request:')
+      ..write(requestText);
+    return buffer.toString();
+  }
+
   bool usesOpenClawGatewayQueueInternal(
     AssistantExecutionTarget target,
     SingleAgentProvider provider,
@@ -493,6 +552,7 @@ extension AppControllerDesktopThreadActions on AppController {
   Future<void> enqueueOpenClawGatewayTurnInternal(
     OpenClawGatewayQueuedTurnInternal turn,
   ) async {
+    appendGatewayUserTurnInternal(turn.sessionKey, turn.message);
     if (openClawGatewayActiveTasksInternal >=
             openClawGatewayMaxActiveTasksInternal &&
         openClawGatewayQueuedTurnsInternal.length >=
@@ -632,6 +692,7 @@ extension AppControllerDesktopThreadActions on AppController {
           agentId: turn.agentId,
           metadata: turn.metadata,
           resumeSessionHint: turn.resumeSessionHint,
+          appendUserTurn: false,
         ),
       );
     } catch (error) {

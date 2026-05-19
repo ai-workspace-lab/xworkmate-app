@@ -2,7 +2,13 @@ import 'package:flutter/material.dart';
 
 import '../i18n/app_language.dart';
 
-enum AssistantTaskProgressPhase { idle, running, syncingArtifacts, interrupted }
+enum AssistantTaskProgressPhase {
+  idle,
+  queued,
+  running,
+  syncingArtifacts,
+  interrupted,
+}
 
 class AssistantTaskProgressState {
   const AssistantTaskProgressState({
@@ -26,6 +32,7 @@ class AssistantTaskProgressState {
   bool get visible => phase != AssistantTaskProgressPhase.idle;
   bool get interrupted => phase == AssistantTaskProgressPhase.interrupted;
   bool get running =>
+      phase == AssistantTaskProgressPhase.queued ||
       phase == AssistantTaskProgressPhase.running ||
       phase == AssistantTaskProgressPhase.syncingArtifacts;
 }
@@ -146,6 +153,15 @@ AssistantTaskProgressState assistantTaskProgressState({
   final budget = runtimeBudgetMinutes == null || runtimeBudgetMinutes <= 0
       ? null
       : runtimeBudgetMinutes;
+  final result = lastResultCode.trim().toUpperCase();
+  if (status == 'queued' || syncStatus == 'queued' || result == 'QUEUED') {
+    return AssistantTaskProgressState(
+      phase: AssistantTaskProgressPhase.queued,
+      label: appText('任务已排队，等待执行...', 'Task queued, waiting to run...'),
+      value: 0.18,
+      runtimeBudgetMinutes: budget,
+    );
+  }
   if (pending && syncStatus == 'syncing') {
     return AssistantTaskProgressState(
       phase: AssistantTaskProgressPhase.syncingArtifacts,
@@ -161,7 +177,6 @@ AssistantTaskProgressState assistantTaskProgressState({
       runtimeBudgetMinutes: budget,
     );
   }
-  final result = lastResultCode.trim().toUpperCase();
   if (status == 'interrupted' || syncStatus == 'interrupted') {
     return AssistantTaskProgressState(
       phase: AssistantTaskProgressPhase.interrupted,
