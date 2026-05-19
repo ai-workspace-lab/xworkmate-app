@@ -43,7 +43,9 @@ void main() {
         );
         addTearDown(controller.dispose);
 
-        await controller.sessionsController.switchSession('draft:unit-task-a');
+        await controller.sessionsController.switchSession(
+          'unit-fixture-task-a',
+        );
         await controller.setAssistantExecutionTarget(
           AssistantExecutionTarget.gateway,
         );
@@ -75,7 +77,9 @@ void main() {
         );
         addTearDown(controller.dispose);
 
-        await controller.sessionsController.switchSession('draft:unit-task-a');
+        await controller.sessionsController.switchSession(
+          'unit-fixture-task-a',
+        );
         await controller.setAssistantExecutionTarget(
           AssistantExecutionTarget.gateway,
         );
@@ -108,7 +112,9 @@ void main() {
         );
         addTearDown(controller.dispose);
 
-        await controller.sessionsController.switchSession('draft:unit-task-a');
+        await controller.sessionsController.switchSession(
+          'unit-fixture-task-a',
+        );
         await controller.setAssistantExecutionTarget(
           AssistantExecutionTarget.gateway,
         );
@@ -271,7 +277,7 @@ void main() {
       final controller = await _isolatedController();
       addTearDown(controller.dispose);
 
-      await controller.sessionsController.switchSession('draft:unit-task-a');
+      await controller.sessionsController.switchSession('unit-fixture-task-a');
       await controller.setAssistantExecutionTarget(
         AssistantExecutionTarget.gateway,
       );
@@ -298,7 +304,7 @@ void main() {
       final controller = await _isolatedController();
       addTearDown(controller.dispose);
 
-      await controller.sessionsController.switchSession('draft:unit-task-a');
+      await controller.sessionsController.switchSession('unit-fixture-task-a');
       await controller.setAssistantExecutionTarget(
         AssistantExecutionTarget.gateway,
       );
@@ -320,7 +326,9 @@ void main() {
         final controller = await _isolatedController();
         addTearDown(controller.dispose);
 
-        await controller.sessionsController.switchSession('draft:unit-task-a');
+        await controller.sessionsController.switchSession(
+          'unit-fixture-task-a',
+        );
         await controller.setAssistantExecutionTarget(
           AssistantExecutionTarget.gateway,
         );
@@ -350,7 +358,9 @@ void main() {
         final controller = await _isolatedController();
         addTearDown(controller.dispose);
 
-        await controller.sessionsController.switchSession('draft:unit-task-a');
+        await controller.sessionsController.switchSession(
+          'unit-fixture-task-a',
+        );
         await controller.setAssistantExecutionTarget(
           AssistantExecutionTarget.gateway,
         );
@@ -380,7 +390,9 @@ void main() {
         final controller = await _isolatedController();
         addTearDown(controller.dispose);
 
-        await controller.sessionsController.switchSession('draft:unit-task-a');
+        await controller.sessionsController.switchSession(
+          'unit-fixture-task-a',
+        );
         await controller.setAssistantExecutionTarget(
           AssistantExecutionTarget.gateway,
         );
@@ -407,7 +419,7 @@ void main() {
       final controller = await _isolatedController();
       addTearDown(controller.dispose);
 
-      await controller.sessionsController.switchSession('draft:unit-task-a');
+      await controller.sessionsController.switchSession('unit-fixture-task-a');
       await controller.setAssistantExecutionTarget(
         AssistantExecutionTarget.gateway,
       );

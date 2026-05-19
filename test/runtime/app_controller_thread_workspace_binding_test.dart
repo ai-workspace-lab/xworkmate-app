@@ -8,8 +8,112 @@ import 'package:xworkmate/app/app_controller_desktop_thread_binding.dart';
 import 'package:xworkmate/runtime/assistant_artifacts.dart';
 import 'package:xworkmate/runtime/go_task_service_client.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
+import 'package:xworkmate/runtime/secure_config_store.dart';
 
 void main() {
+  test(
+    'startup removes known test task pollution and preserves real history',
+    () async {
+      final storeRoot = await Directory.systemTemp.createTemp(
+        'xworkmate-test-pollution-store-',
+      );
+      addTearDown(() async {
+        if (await storeRoot.exists()) {
+          await storeRoot.delete(recursive: true);
+        }
+      });
+
+      final store = _RecordingSecureConfigStore(rootPath: storeRoot.path);
+      await store.initialize();
+      final pollutedSessionKey = _pollutedUnitSessionKey();
+      const realSessionKey = 'real-history-session';
+      await store.saveTaskThreads(<TaskThread>[
+        _persistedThread(
+          sessionKey: pollutedSessionKey,
+          title: 'Unit test fixture',
+          workspacePath:
+              '${storeRoot.path}/home/.xworkmate/threads/${_pollutedUnitWorkspaceName()}',
+        ),
+        _persistedThread(
+          sessionKey: realSessionKey,
+          title: 'Real history task',
+          workspacePath:
+              '${storeRoot.path}/home/.xworkmate/threads/real-history-session',
+        ),
+      ]);
+      await store.saveAppUiState(
+        AppUiState.defaults().copyWith(
+          assistantLastSessionKey: pollutedSessionKey,
+        ),
+      );
+
+      final controller = AppController(
+        store: store,
+        environmentOverride: const <String, String>{},
+      );
+      addTearDown(controller.dispose);
+
+      await _waitForControllerInitialization(controller);
+
+      expect(
+        controller.taskThreadForSessionInternal(pollutedSessionKey),
+        isNull,
+      );
+      expect(
+        controller.assistantSessions.map((item) => item.key),
+        allOf(contains(realSessionKey), isNot(contains(pollutedSessionKey))),
+      );
+      expect(controller.currentSessionKey, isNot(pollutedSessionKey));
+      expect(controller.appUiState.assistantLastSessionKey, isEmpty);
+      expect(store.clearAssistantLocalStateCalled, isFalse);
+
+      final persistedThreadIds = (await store.loadTaskThreads())
+          .map((thread) => thread.threadId)
+          .toList(growable: false);
+      expect(persistedThreadIds, <String>[realSessionKey]);
+      expect((await store.loadAppUiState()).assistantLastSessionKey, isEmpty);
+    },
+  );
+
+  test('source tree does not contain known real draft test fixtures', () async {
+    final blocked = <String>[
+      _pollutedUnitSessionKey(),
+      _pollutedTestSessionKey(),
+      _pollutedUnitWorkspaceName(),
+      _pollutedTestWorkspaceName(),
+    ];
+    final roots = <String>['lib', 'test', 'scripts', 'docs'];
+    final violations = <String>[];
+    for (final root in roots) {
+      final directory = Directory(root);
+      if (!await directory.exists()) {
+        continue;
+      }
+      await for (final entity in directory.list(recursive: true)) {
+        if (entity is! File) {
+          continue;
+        }
+        final path = entity.path;
+        if (path.contains('/build/') || path.contains('/.dart_tool/')) {
+          continue;
+        }
+        String content;
+        try {
+          content = await entity.readAsString();
+        } catch (_) {
+          continue;
+        }
+        for (final fixture in blocked) {
+          if (content.contains(fixture)) {
+            violations.add('$path contains $fixture');
+          }
+        }
+      }
+    }
+
+    expect(violations, isEmpty);
+  });
+
   test(
     'empty environment override keeps thread workspaces out of real HOME',
     () async {
@@ -19,19 +123,21 @@ void main() {
       );
       addTearDown(controller.dispose);
 
-      await controller.sessionsController.switchSession('draft:unit-task-a');
+      await controller.sessionsController.switchSession('unit-fixture-task-a');
 
       expect(controller.userHomeDirectory, isNot(isEmpty));
       if (realHome.isNotEmpty) {
         expect(controller.userHomeDirectory, isNot(realHome));
       }
       expect(
-        controller.localThreadWorkspacePathInternal('draft:unit-task-a'),
-        isNot(contains('$realHome/.xworkmate/threads/draft-unit-task-a')),
+        controller.localThreadWorkspacePathInternal('unit-fixture-task-a'),
+        isNot(contains('$realHome/.xworkmate/threads/unit-fixture-task-a')),
       );
       expect(
-        controller.localThreadWorkspaceDisplayPathInternal('draft:unit-task-a'),
-        '\$HOME/.xworkmate/threads/draft-unit-task-a',
+        controller.localThreadWorkspaceDisplayPathInternal(
+          'unit-fixture-task-a',
+        ),
+        '\$HOME/.xworkmate/threads/unit-fixture-task-a',
       );
     },
   );
@@ -212,9 +318,9 @@ void main() {
       });
 
       controller.upsertTaskThreadInternal(
-        'draft:unit-task-a',
+        'unit-fixture-task-a',
         workspaceBinding: WorkspaceBinding(
-          workspaceId: 'draft:unit-task-a',
+          workspaceId: 'unit-fixture-task-a',
           workspaceKind: WorkspaceKind.localFs,
           workspacePath: localWorkspace.path,
           displayPath: localWorkspace.path,
@@ -227,21 +333,21 @@ void main() {
       expect(
         assistantWorkingDirectoryForSessionRuntimeInternal(
           controller,
-          'draft:unit-task-a',
+          'unit-fixture-task-a',
         ),
         localWorkspace.path,
       );
       expect(
         resolveLocalAssistantWorkingDirectoryForSessionRuntimeInternal(
           controller,
-          'draft:unit-task-a',
+          'unit-fixture-task-a',
         ),
         localWorkspace.path,
       );
       expect(
         assistantRemoteWorkingDirectoryHintForSessionRuntimeInternal(
           controller,
-          'draft:unit-task-a',
+          'unit-fixture-task-a',
         ),
         remoteWorkspace.path,
       );
@@ -298,9 +404,9 @@ void main() {
     });
 
     controller.upsertTaskThreadInternal(
-      'draft:unit-task-a',
+      'unit-fixture-task-a',
       workspaceBinding: WorkspaceBinding(
-        workspaceId: 'draft:unit-task-a',
+        workspaceId: 'unit-fixture-task-a',
         workspaceKind: WorkspaceKind.localFs,
         workspacePath: localWorkspace.path,
         displayPath: localWorkspace.path,
@@ -327,20 +433,20 @@ void main() {
     );
 
     await controller.persistGoTaskArtifactsForSessionInternal(
-      'draft:unit-task-a',
+      'unit-fixture-task-a',
       result,
     );
 
     final artifact = File('${localWorkspace.path}/notes/hello.txt');
     expect(await artifact.readAsString(), 'artifact body');
     await controller.persistGoTaskArtifactsForSessionInternal(
-      'draft:unit-task-a',
+      'unit-fixture-task-a',
       result,
     );
     final versionedArtifact = File('${localWorkspace.path}/notes/hello.v2.txt');
     expect(await versionedArtifact.readAsString(), 'artifact body');
     final snapshot = await controller.loadAssistantArtifactSnapshot(
-      sessionKey: 'draft:unit-task-a',
+      sessionKey: 'unit-fixture-task-a',
     );
     expect(snapshot.resultEntries.map((entry) => entry.relativePath), <String>[
       'notes/hello.v2.txt',
@@ -351,7 +457,7 @@ void main() {
     );
     expect(
       controller
-          .requireTaskThreadForSessionInternal('draft:unit-task-a')
+          .requireTaskThreadForSessionInternal('unit-fixture-task-a')
           .lastArtifactSyncStatus,
       'synced',
     );
@@ -377,9 +483,9 @@ void main() {
       await staleArtifact.writeAsString('stale task output');
 
       controller.upsertTaskThreadInternal(
-        'draft:unit-task-a',
+        'unit-fixture-task-a',
         workspaceBinding: WorkspaceBinding(
-          workspaceId: 'draft:unit-task-a',
+          workspaceId: 'unit-fixture-task-a',
           workspaceKind: WorkspaceKind.localFs,
           workspacePath: localWorkspace.path,
           displayPath: localWorkspace.path,
@@ -406,12 +512,12 @@ void main() {
       );
 
       await controller.persistGoTaskArtifactsForSessionInternal(
-        'draft:unit-task-a',
+        'unit-fixture-task-a',
         result,
       );
 
       final snapshot = await controller.loadAssistantArtifactSnapshot(
-        sessionKey: 'draft:unit-task-a',
+        sessionKey: 'unit-fixture-task-a',
       );
       final currentRelativePaths = snapshot.resultEntries
           .map((entry) => entry.relativePath)
@@ -432,7 +538,7 @@ void main() {
           previewable: true,
           workspacePath: localWorkspace.path,
         ),
-        sessionKey: 'draft:unit-task-a',
+        sessionKey: 'unit-fixture-task-a',
       );
       expect(stalePreview.kind, AssistantArtifactPreviewKind.markdown);
       expect(stalePreview.content, 'stale task output');
@@ -472,9 +578,9 @@ void main() {
       });
 
       controller.upsertTaskThreadInternal(
-        'draft:unit-task-a',
+        'unit-fixture-task-a',
         workspaceBinding: WorkspaceBinding(
-          workspaceId: 'draft:unit-task-a',
+          workspaceId: 'unit-fixture-task-a',
           workspaceKind: WorkspaceKind.localFs,
           workspacePath: localWorkspace.path,
           displayPath: localWorkspace.path,
@@ -504,7 +610,7 @@ void main() {
       final clientFactory = _proxiedClientFactory(server.port);
       await HttpOverrides.runZoned(() async {
         await controller.persistGoTaskArtifactsForSessionInternal(
-          'draft:unit-task-a',
+          'unit-fixture-task-a',
           result,
         );
       }, createHttpClient: clientFactory);
@@ -513,7 +619,7 @@ void main() {
       expect(await artifact.readAsString(), 'downloaded artifact body');
       expect(observedAuthorization, 'Bearer bridge-token');
       final snapshot = await controller.loadAssistantArtifactSnapshot(
-        sessionKey: 'draft:unit-task-a',
+        sessionKey: 'unit-fixture-task-a',
       );
       expect(
         snapshot.fileEntries.map((entry) => entry.relativePath),
@@ -521,7 +627,7 @@ void main() {
       );
       expect(
         controller
-            .requireTaskThreadForSessionInternal('draft:unit-task-a')
+            .requireTaskThreadForSessionInternal('unit-fixture-task-a')
             .lastArtifactSyncStatus,
         'synced',
       );
@@ -710,9 +816,9 @@ void main() {
         }
       });
       controller.upsertTaskThreadInternal(
-        'draft:unit-task-a',
+        'unit-fixture-task-a',
         workspaceBinding: WorkspaceBinding(
-          workspaceId: 'draft:unit-task-a',
+          workspaceId: 'unit-fixture-task-a',
           workspaceKind: WorkspaceKind.localFs,
           workspacePath: localWorkspace.path,
           displayPath: localWorkspace.path,
@@ -730,7 +836,7 @@ void main() {
               'relativePath': 'reports/resume.bin',
               'downloadUrl':
                   'http://xworkmate-bridge.svc.plus:${server.port}/artifacts/openclaw/download'
-                  '?sessionKey=draft:unit-task-a&runId=run-1&relativePath=reports%2Fresume.bin'
+                  '?sessionKey=unit-fixture-task-a&runId=run-1&relativePath=reports%2Fresume.bin'
                   '&expires=9999999999&sig=test-signature',
               'contentType': 'application/octet-stream',
               'sizeBytes': body.length,
@@ -746,7 +852,7 @@ void main() {
       final clientFactory = _proxiedClientFactory(server.port);
       await HttpOverrides.runZoned(() async {
         await controller.persistGoTaskArtifactsForSessionInternal(
-          'draft:unit-task-a',
+          'unit-fixture-task-a',
           result,
         );
       }, createHttpClient: clientFactory);
@@ -759,7 +865,7 @@ void main() {
       );
       expect(
         controller
-            .requireTaskThreadForSessionInternal('draft:unit-task-a')
+            .requireTaskThreadForSessionInternal('unit-fixture-task-a')
             .lastArtifactSyncStatus,
         'synced',
       );
@@ -814,9 +920,9 @@ void main() {
         }
       });
       controller.upsertTaskThreadInternal(
-        'draft:unit-task-a',
+        'unit-fixture-task-a',
         workspaceBinding: WorkspaceBinding(
-          workspaceId: 'draft:unit-task-a',
+          workspaceId: 'unit-fixture-task-a',
           workspaceKind: WorkspaceKind.localFs,
           workspacePath: localWorkspace.path,
           displayPath: localWorkspace.path,
@@ -846,7 +952,7 @@ void main() {
       final clientFactory = _proxiedClientFactory(server.port);
       await HttpOverrides.runZoned(() async {
         await controller.persistGoTaskArtifactsForSessionInternal(
-          'draft:unit-task-a',
+          'unit-fixture-task-a',
           result,
         );
       }, createHttpClient: clientFactory);
@@ -858,7 +964,7 @@ void main() {
       );
       expect(
         controller
-            .requireTaskThreadForSessionInternal('draft:unit-task-a')
+            .requireTaskThreadForSessionInternal('unit-fixture-task-a')
             .lastArtifactSyncStatus,
         'synced',
       );
@@ -897,9 +1003,9 @@ void main() {
       }
     });
     controller.upsertTaskThreadInternal(
-      'draft:unit-task-a',
+      'unit-fixture-task-a',
       workspaceBinding: WorkspaceBinding(
-        workspaceId: 'draft:unit-task-a',
+        workspaceId: 'unit-fixture-task-a',
         workspaceKind: WorkspaceKind.localFs,
         workspacePath: localWorkspace.path,
         displayPath: localWorkspace.path,
@@ -940,7 +1046,7 @@ void main() {
     final clientFactory = _proxiedClientFactory(server.port);
     await HttpOverrides.runZoned(() async {
       await controller.persistGoTaskArtifactsForSessionInternal(
-        'draft:unit-task-a',
+        'unit-fixture-task-a',
         result,
       );
     }, createHttpClient: clientFactory);
@@ -958,7 +1064,7 @@ void main() {
       isFalse,
     );
     final snapshot = await controller.loadAssistantArtifactSnapshot(
-      sessionKey: 'draft:unit-task-a',
+      sessionKey: 'unit-fixture-task-a',
     );
     expect(
       snapshot.fileEntries.map((entry) => entry.relativePath),
@@ -966,7 +1072,7 @@ void main() {
     );
     expect(
       controller
-          .requireTaskThreadForSessionInternal('draft:unit-task-a')
+          .requireTaskThreadForSessionInternal('unit-fixture-task-a')
           .lastArtifactSyncStatus,
       'partial',
     );
@@ -999,9 +1105,9 @@ void main() {
       }
     });
     controller.upsertTaskThreadInternal(
-      'draft:unit-task-a',
+      'unit-fixture-task-a',
       workspaceBinding: WorkspaceBinding(
-        workspaceId: 'draft:unit-task-a',
+        workspaceId: 'unit-fixture-task-a',
         workspaceKind: WorkspaceKind.localFs,
         workspacePath: localWorkspace.path,
         displayPath: localWorkspace.path,
@@ -1034,7 +1140,7 @@ void main() {
     final clientFactory = _proxiedClientFactory(server.port);
     await HttpOverrides.runZoned(() async {
       await controller.persistGoTaskArtifactsForSessionInternal(
-        'draft:unit-task-a',
+        'unit-fixture-task-a',
         result,
       );
     }, createHttpClient: clientFactory);
@@ -1050,7 +1156,7 @@ void main() {
     expect(leftovers, isEmpty);
     expect(
       controller
-          .requireTaskThreadForSessionInternal('draft:unit-task-a')
+          .requireTaskThreadForSessionInternal('unit-fixture-task-a')
           .lastArtifactSyncStatus,
       'download-failed',
     );
@@ -1073,9 +1179,9 @@ void main() {
         }
       });
       controller.upsertTaskThreadInternal(
-        'draft:unit-task-a',
+        'unit-fixture-task-a',
         workspaceBinding: WorkspaceBinding(
-          workspaceId: 'draft:unit-task-a',
+          workspaceId: 'unit-fixture-task-a',
           workspaceKind: WorkspaceKind.localFs,
           workspacePath: localWorkspace.path,
           displayPath: localWorkspace.path,
@@ -1095,13 +1201,13 @@ void main() {
       );
 
       await controller.persistGoTaskArtifactsForSessionInternal(
-        'draft:unit-task-a',
+        'unit-fixture-task-a',
         result,
       );
 
       expect(await localWorkspace.list(recursive: true).toList(), isEmpty);
       final thread = controller.requireTaskThreadForSessionInternal(
-        'draft:unit-task-a',
+        'unit-fixture-task-a',
       );
       expect(thread.lastArtifactSyncStatus, 'no-exported-artifacts');
       expect(thread.lastArtifactSyncAtMs, greaterThan(0));
@@ -1125,9 +1231,9 @@ void main() {
     final staleArtifact = File('${localWorkspace.path}/old-task-report.md');
     await staleArtifact.writeAsString('stale task output');
     controller.upsertTaskThreadInternal(
-      'draft:unit-task-a',
+      'unit-fixture-task-a',
       workspaceBinding: WorkspaceBinding(
-        workspaceId: 'draft:unit-task-a',
+        workspaceId: 'unit-fixture-task-a',
         workspaceKind: WorkspaceKind.localFs,
         workspacePath: localWorkspace.path,
         displayPath: localWorkspace.path,
@@ -1146,18 +1252,18 @@ void main() {
     );
 
     await controller.persistGoTaskArtifactsForSessionInternal(
-      'draft:unit-task-a',
+      'unit-fixture-task-a',
       result,
     );
 
     expect(
       controller
-          .requireTaskThreadForSessionInternal('draft:unit-task-a')
+          .requireTaskThreadForSessionInternal('unit-fixture-task-a')
           .lastArtifactSyncStatus,
       'no-artifacts',
     );
     final snapshot = await controller.loadAssistantArtifactSnapshot(
-      sessionKey: 'draft:unit-task-a',
+      sessionKey: 'unit-fixture-task-a',
     );
     expect(snapshot.resultEntries, isEmpty);
     expect(
@@ -1184,9 +1290,9 @@ void main() {
     });
 
     controller.upsertTaskThreadInternal(
-      'draft:unit-task-a',
+      'unit-fixture-task-a',
       workspaceBinding: WorkspaceBinding(
-        workspaceId: 'draft:unit-task-a',
+        workspaceId: 'unit-fixture-task-a',
         workspaceKind: WorkspaceKind.localFs,
         workspacePath: localWorkspace.path,
         displayPath: localWorkspace.path,
@@ -1213,7 +1319,7 @@ void main() {
     );
 
     await controller.persistGoTaskArtifactsForSessionInternal(
-      'draft:unit-task-a',
+      'unit-fixture-task-a',
       result,
     );
 
@@ -1223,7 +1329,7 @@ void main() {
     );
     expect(
       controller
-          .requireTaskThreadForSessionInternal('draft:unit-task-a')
+          .requireTaskThreadForSessionInternal('unit-fixture-task-a')
           .lastArtifactSyncStatus,
       'no-artifacts',
     );
@@ -1237,4 +1343,67 @@ HttpClient Function(SecurityContext?) _proxiedClientFactory(int port) {
   );
   var index = 0;
   return (_) => clients[index++];
+}
+
+String _pollutedUnitSessionKey() =>
+    'draft'
+    ':unit-task-a';
+String _pollutedTestSessionKey() =>
+    'draft'
+    ':test-task-a';
+String _pollutedUnitWorkspaceName() =>
+    'draft'
+    '-unit-task-a';
+String _pollutedTestWorkspaceName() =>
+    'draft'
+    '-test-task-a';
+
+TaskThread _persistedThread({
+  required String sessionKey,
+  required String title,
+  required String workspacePath,
+}) {
+  return TaskThread(
+    threadId: sessionKey,
+    title: title,
+    workspaceBinding: WorkspaceBinding(
+      workspaceId: sessionKey,
+      workspaceKind: WorkspaceKind.localFs,
+      workspacePath: workspacePath,
+      displayPath: workspacePath,
+      writable: true,
+    ),
+    executionBinding: const ExecutionBinding(
+      executionMode: ThreadExecutionMode.gateway,
+      executorId: 'openclaw',
+      providerId: 'openclaw',
+      endpointId: '',
+    ),
+  );
+}
+
+class _RecordingSecureConfigStore extends SecureConfigStore {
+  _RecordingSecureConfigStore({required String rootPath})
+    : super(
+        secretRootPathResolver: () async => '$rootPath/secrets',
+        appDataRootPathResolver: () async => '$rootPath/app-data',
+        supportRootPathResolver: () async => '$rootPath/support',
+        enableSecureStorage: false,
+      );
+
+  bool clearAssistantLocalStateCalled = false;
+
+  @override
+  Future<void> clearAssistantLocalState() async {
+    clearAssistantLocalStateCalled = true;
+    await super.clearAssistantLocalState();
+  }
+}
+
+Future<void> _waitForControllerInitialization(AppController controller) async {
+  final deadline = DateTime.now().add(const Duration(seconds: 5));
+  while (controller.initializing && DateTime.now().isBefore(deadline)) {
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+  }
+  expect(controller.initializing, isFalse);
 }

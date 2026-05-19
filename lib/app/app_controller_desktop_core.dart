@@ -137,7 +137,21 @@ class AppController extends ChangeNotifier {
     GoTaskServiceClient? goTaskServiceClient,
     MultiAgentMountManager? multiAgentMountManager,
   }) {
-    storeInternal = store ?? SecureConfigStore();
+    environmentOverrideInternal = environmentOverride == null
+        ? null
+        : Map<String, String>.unmodifiable(environmentOverride);
+    if (environmentOverrideInternal != null) {
+      resolvedUserHomeDirectoryInternal =
+          resolveUserHomeDirectoryFromControllerEnvironmentInternal(
+            environmentOverrideInternal,
+          );
+    }
+    storeInternal =
+        store ??
+        createDefaultSecureConfigStoreForControllerEnvironmentInternal(
+          resolvedUserHomeDirectoryInternal,
+          environmentOverride: environmentOverrideInternal,
+        );
     uiFeatureManifestInternal =
         uiFeatureManifest ?? loadRepoUiFeatureManifestSyncInternal();
     hostUiFeaturePlatformInternal = Platform.isIOS || Platform.isAndroid
@@ -196,15 +210,6 @@ class AppController extends ChangeNotifier {
         skillDirectoryAccessService ?? createSkillDirectoryAccessService();
     singleAgentSharedSkillScanRootOverridesInternal =
         singleAgentSharedSkillScanRootOverrides?.toList(growable: false);
-    environmentOverrideInternal = environmentOverride == null
-        ? null
-        : Map<String, String>.unmodifiable(environmentOverride);
-    if (environmentOverrideInternal != null) {
-      resolvedUserHomeDirectoryInternal =
-          resolveUserHomeDirectoryFromControllerEnvironmentInternal(
-            environmentOverrideInternal,
-          );
-    }
     gatewayAcpClientInternal = GatewayAcpClient(
       endpointResolver: resolveGatewayAcpEndpointInternal,
       authorizationResolver: resolveGatewayAcpAuthorizationHeaderInternal,
@@ -738,4 +743,29 @@ String resolveUserHomeDirectoryFromControllerEnvironmentInternal(
         .path;
   }
   return '';
+}
+
+SecureConfigStore
+createDefaultSecureConfigStoreForControllerEnvironmentInternal(
+  String resolvedUserHomeDirectory, {
+  required Map<String, String>? environmentOverride,
+}) {
+  if (environmentOverride == null || resolvedUserHomeDirectory.trim().isEmpty) {
+    return SecureConfigStore();
+  }
+  final supportRoot =
+      defaultUserSettingsRootPath(
+        environment: <String, String>{
+          ...environmentOverride,
+          'HOME': resolvedUserHomeDirectory,
+        },
+        operatingSystem: Platform.operatingSystem,
+      ) ??
+      '${resolvedUserHomeDirectory.trim()}/.xworkmate';
+  return SecureConfigStore(
+    appDataRootPathResolver: () async => supportRoot,
+    supportRootPathResolver: () async => supportRoot,
+    secretRootPathResolver: () async => '$supportRoot/secrets',
+    enableSecureStorage: false,
+  );
 }

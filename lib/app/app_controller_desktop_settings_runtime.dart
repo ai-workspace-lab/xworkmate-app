@@ -471,6 +471,11 @@ extension AppControllerDesktopSettingsRuntime on AppController {
         await storeInternal.saveAppUiState(sanitizedAppUiState);
       }
       final storedAssistantThreads = await storeInternal.loadTaskThreads();
+      final sanitizedAssistantThreads =
+          discardKnownPollutedTestTaskThreadsInternal(storedAssistantThreads);
+      if (sanitizedAssistantThreads.length != storedAssistantThreads.length) {
+        await storeInternal.saveTaskThreads(sanitizedAssistantThreads);
+      }
       final skippedInvalidThreadRecords =
           storeInternal.lastSkippedInvalidTaskThreadRecords;
       startupTaskThreadWarningInternal = skippedInvalidThreadRecords.isEmpty
@@ -514,7 +519,7 @@ extension AppControllerDesktopSettingsRuntime on AppController {
       } catch (_) {
         // Keep initialization resilient when remote account restore fails.
       }
-      restoreAssistantThreadsInternal(storedAssistantThreads);
+      restoreAssistantThreadsInternal(sanitizedAssistantThreads);
       await restoreSharedSingleAgentLocalSkillsCacheInternal();
       if (disposedInternal) {
         return;
