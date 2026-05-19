@@ -83,11 +83,13 @@ render-release-docs: ## Render feature matrix, roadmap, release notes, and chang
 docs-public-api: ## Generate the public API inventory docs payload
 	python3 scripts/docs/extract_public_api_inventory.py
 
-sync-version: ## Show the version/build metadata sourced from pubspec.yaml
+sync-version: ## Sync Flutter/Xcode build metadata from pubspec.yaml
+	$(FLUTTER) build macos --config-only --build-name=$(APP_VERSION) --build-number=$(APP_BUILD_NUMBER) $(APP_DART_DEFINE_VERSION) $(APP_DART_DEFINE_BUILD) $(APP_DART_DEFINE_BUILD_DATE) $(APP_DART_DEFINE_BUILD_COMMIT)
 	@echo "version=$(APP_VERSION)"
 	@echo "build=$(APP_BUILD_NUMBER)"
 	@echo "build-date=$(PUBSPEC_BUILD_DATE)"
 	@echo "build-id=$(PUBSPEC_BUILD_ID)"
+	@sed -n 's/^FLUTTER_BUILD_NAME=/xcode-build-name=/p; s/^FLUTTER_BUILD_NUMBER=/xcode-build-number=/p' macos/Flutter/ephemeral/Flutter-Generated.xcconfig
 
 run: ## Run the app on a device or desktop target (DEVICE=macos by default)
 	$(FLUTTER) run -d $(DEVICE)
