@@ -45,6 +45,31 @@ import 'app_controller_desktop_runtime_helpers.dart';
 
 // ignore_for_file: invalid_use_of_visible_for_testing_member, invalid_use_of_protected_member
 extension AppControllerDesktopThreadStorage on AppController {
+  Set<String> knownPollutedTestTaskSessionKeysInternal() => <String>{
+    'draft'
+        ':unit-task-a',
+    'draft'
+        ':test-task-a',
+    'test-fixture:unit-task-a',
+    'test-fixture:test-task-a',
+  };
+
+  bool isKnownPollutedTestTaskSessionKeyInternal(String sessionKey) {
+    final normalized = normalizedAssistantSessionKeyInternal(sessionKey);
+    return knownPollutedTestTaskSessionKeysInternal().contains(normalized);
+  }
+
+  List<TaskThread> discardKnownPollutedTestTaskThreadsInternal(
+    List<TaskThread> records,
+  ) {
+    return records
+        .where(
+          (record) =>
+              !isKnownPollutedTestTaskSessionKeyInternal(record.sessionKey),
+        )
+        .toList(growable: false);
+  }
+
   Future<void> applyPersistedAiGatewaySettingsInternal(
     SettingsSnapshot snapshot,
   ) async {
@@ -205,7 +230,14 @@ extension AppControllerDesktopThreadStorage on AppController {
               );
             })
             .toList(growable: false);
-    return state.copyWith(assistantNavigationDestinations: allowedNavigation);
+    final assistantLastSessionKey =
+        isKnownPollutedTestTaskSessionKeyInternal(state.assistantLastSessionKey)
+        ? ''
+        : state.assistantLastSessionKey;
+    return state.copyWith(
+      assistantLastSessionKey: assistantLastSessionKey,
+      assistantNavigationDestinations: allowedNavigation,
+    );
   }
 
   SettingsSnapshot sanitizeOllamaCloudSettingsInternal(
@@ -714,6 +746,9 @@ extension AppControllerDesktopThreadStorage on AppController {
         record.sessionKey,
       );
       if (sessionKey.isEmpty) {
+        continue;
+      }
+      if (isKnownPollutedTestTaskSessionKeyInternal(sessionKey)) {
         continue;
       }
       if (!record.workspaceBinding.isComplete) {
