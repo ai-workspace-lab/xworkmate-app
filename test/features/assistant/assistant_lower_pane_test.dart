@@ -18,7 +18,9 @@ void main() {
         );
         addTearDown(controller.dispose);
 
-        await controller.sessionsController.switchSession('draft:unit-task-a');
+        await controller.sessionsController.switchSession(
+          'unit-fixture-task-a',
+        );
 
         await tester.pumpWidget(
           _buildTestApp(child: _buildLowerPane(controller: controller)),
@@ -79,7 +81,7 @@ void main() {
       );
       addTearDown(controller.dispose);
 
-      await controller.sessionsController.switchSession('draft:unit-task-a');
+      await controller.sessionsController.switchSession('unit-fixture-task-a');
 
       await tester.pumpWidget(
         _buildTestApp(child: _buildLowerPane(controller: controller)),
@@ -113,7 +115,7 @@ void main() {
       );
 
       final gatewayThread = controller
-          .requireTaskThreadForSessionInternal('draft:unit-task-a')
+          .requireTaskThreadForSessionInternal('unit-fixture-task-a')
           .copyWith(
             executionBinding: ExecutionBinding(
               executionMode: threadExecutionModeFromAssistantExecutionTarget(
@@ -154,7 +156,7 @@ void main() {
       await tester.pumpAndSettle();
 
       final agentThread = controller
-          .requireTaskThreadForSessionInternal('draft:unit-task-a')
+          .requireTaskThreadForSessionInternal('unit-fixture-task-a')
           .copyWith(
             executionBinding: ExecutionBinding(
               executionMode: threadExecutionModeFromAssistantExecutionTarget(
@@ -216,7 +218,7 @@ void main() {
       );
       addTearDown(controller.dispose);
 
-      await controller.sessionsController.switchSession('draft:unit-task-a');
+      await controller.sessionsController.switchSession('unit-fixture-task-a');
 
       await tester.pumpWidget(
         _buildTestApp(child: _buildLowerPane(controller: controller)),
@@ -277,12 +279,12 @@ void main() {
       );
       addTearDown(controller.dispose);
 
-      await controller.sessionsController.switchSession('draft:unit-task-a');
+      await controller.sessionsController.switchSession('unit-fixture-task-a');
       controller.initializeAssistantThreadContext(
-        'draft:unit-task-a',
+        'unit-fixture-task-a',
         executionTarget: AssistantExecutionTarget.gateway,
         messageViewMode: controller.assistantMessageViewModeForSession(
-          'draft:unit-task-a',
+          'unit-fixture-task-a',
         ),
       );
       controller.notifyListeners();
@@ -331,12 +333,14 @@ void main() {
         );
         addTearDown(controller.dispose);
 
-        await controller.sessionsController.switchSession('draft:unit-task-a');
+        await controller.sessionsController.switchSession(
+          'unit-fixture-task-a',
+        );
         controller.initializeAssistantThreadContext(
-          'draft:unit-task-a',
+          'unit-fixture-task-a',
           executionTarget: AssistantExecutionTarget.gateway,
           messageViewMode: controller.assistantMessageViewModeForSession(
-            'draft:unit-task-a',
+            'unit-fixture-task-a',
           ),
         );
         controller.notifyListeners();
@@ -367,7 +371,7 @@ void main() {
       );
       addTearDown(controller.dispose);
 
-      await controller.sessionsController.switchSession('draft:unit-task-a');
+      await controller.sessionsController.switchSession('unit-fixture-task-a');
 
       var sendCount = 0;
 

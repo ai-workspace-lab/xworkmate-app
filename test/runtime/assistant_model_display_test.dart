@@ -10,7 +10,7 @@ void main() {
       );
       addTearDown(controller.dispose);
 
-      await controller.sessionsController.switchSession('draft:unit-task-a');
+      await controller.sessionsController.switchSession('unit-fixture-task-a');
 
       expect(controller.resolvedAssistantModel, isNotEmpty);
       expect(controller.assistantModelChoices, isEmpty);
@@ -30,7 +30,9 @@ void main() {
         );
         addTearDown(controller.dispose);
 
-        await controller.sessionsController.switchSession('draft:unit-task-a');
+        await controller.sessionsController.switchSession(
+          'unit-fixture-task-a',
+        );
         await controller.setAssistantExecutionTarget(
           AssistantExecutionTarget.gateway,
         );

@@ -88,13 +88,15 @@ void main() {
           ],
         );
 
-        await controller.sessionsController.switchSession('draft:unit-task-a');
+        await controller.sessionsController.switchSession(
+          'unit-fixture-task-a',
+        );
         await controller.setAssistantExecutionTarget(
           AssistantExecutionTarget.gateway,
         );
 
         expect(
-          controller.assistantProviderForSession('draft:unit-task-a'),
+          controller.assistantProviderForSession('unit-fixture-task-a'),
           SingleAgentProvider.openclaw,
         );
       },
@@ -125,7 +127,9 @@ void main() {
         );
         addTearDown(controller.dispose);
 
-        await controller.sessionsController.switchSession('draft:unit-task-a');
+        await controller.sessionsController.switchSession(
+          'unit-fixture-task-a',
+        );
 
         expect(controller.currentAssistantExecutionTarget.isAgent, isTrue);
         expect(
@@ -138,14 +142,14 @@ void main() {
         );
 
         final record = controller.requireTaskThreadForSessionInternal(
-          'draft:unit-task-a',
+          'unit-fixture-task-a',
         );
         expect(
           record.executionBinding.executionMode,
           ThreadExecutionMode.gateway,
         );
         expect(
-          controller.assistantProviderForSession('draft:unit-task-a'),
+          controller.assistantProviderForSession('unit-fixture-task-a'),
           SingleAgentProvider.openclaw,
         );
       },
@@ -396,17 +400,19 @@ void main() {
         );
         addTearDown(controller.dispose);
 
-        await controller.sessionsController.switchSession('draft:unit-task-a');
+        await controller.sessionsController.switchSession(
+          'unit-fixture-task-a',
+        );
         await controller.setAssistantExecutionTarget(
           AssistantExecutionTarget.gateway,
         );
 
         final record = controller.requireTaskThreadForSessionInternal(
-          'draft:unit-task-a',
+          'unit-fixture-task-a',
         );
 
         expect(
-          controller.assistantExecutionTargetForSession('draft:unit-task-a'),
+          controller.assistantExecutionTargetForSession('unit-fixture-task-a'),
           AssistantExecutionTarget.gateway,
         );
         expect(record.executionBinding.providerId, isEmpty);
@@ -430,13 +436,15 @@ void main() {
         );
         addTearDown(controller.dispose);
 
-        await controller.sessionsController.switchSession('draft:unit-task-a');
+        await controller.sessionsController.switchSession(
+          'unit-fixture-task-a',
+        );
         await controller.setAssistantExecutionTarget(
           AssistantExecutionTarget.gateway,
         );
 
         final routing = controller.buildExternalAcpRoutingForSessionInternal(
-          'draft:unit-task-a',
+          'unit-fixture-task-a',
         );
 
         expect(routing.mode, ExternalCodeAgentAcpRoutingMode.explicit);
@@ -565,7 +573,9 @@ void main() {
         );
         addTearDown(controller.dispose);
 
-        await controller.sessionsController.switchSession('draft:unit-task-a');
+        await controller.sessionsController.switchSession(
+          'unit-fixture-task-a',
+        );
         await Future<void>.delayed(const Duration(milliseconds: 200));
 
         expect(controller.assistantProviderCatalog, isEmpty);
@@ -627,7 +637,9 @@ void main() {
         );
         addTearDown(controller.dispose);
 
-        await controller.sessionsController.switchSession('draft:unit-task-a');
+        await controller.sessionsController.switchSession(
+          'unit-fixture-task-a',
+        );
         await controller.setAssistantExecutionTarget(
           AssistantExecutionTarget.gateway,
         );
@@ -738,7 +750,9 @@ void main() {
               ),
             );
 
-        await controller.sessionsController.switchSession('draft:unit-task-a');
+        await controller.sessionsController.switchSession(
+          'unit-fixture-task-a',
+        );
         await controller.setAssistantExecutionTarget(
           AssistantExecutionTarget.agent,
         );
@@ -776,16 +790,18 @@ void main() {
         );
         addTearDown(controller.dispose);
 
-        await controller.sessionsController.switchSession('draft:unit-task-a');
+        await controller.sessionsController.switchSession(
+          'unit-fixture-task-a',
+        );
         expect(
           controller.hasCommittedUserTurnForGatewaySessionInternal(
-            'draft:unit-task-a',
+            'unit-fixture-task-a',
           ),
           isFalse,
         );
 
         controller.appendLocalSessionMessageInternal(
-          'draft:unit-task-a',
+          'unit-fixture-task-a',
           GatewayChatMessage(
             id: 'error-1',
             role: 'assistant',
@@ -802,13 +818,13 @@ void main() {
 
         expect(
           controller.hasCommittedUserTurnForGatewaySessionInternal(
-            'draft:unit-task-a',
+            'unit-fixture-task-a',
           ),
           isFalse,
         );
 
         controller.appendLocalSessionMessageInternal(
-          'draft:unit-task-a',
+          'unit-fixture-task-a',
           GatewayChatMessage(
             id: 'assistant-1',
             role: 'assistant',
@@ -825,13 +841,13 @@ void main() {
 
         expect(
           controller.hasCommittedUserTurnForGatewaySessionInternal(
-            'draft:unit-task-a',
+            'unit-fixture-task-a',
           ),
           isFalse,
         );
 
         controller.appendLocalSessionMessageInternal(
-          'draft:unit-task-a',
+          'unit-fixture-task-a',
           GatewayChatMessage(
             id: 'user-1',
             role: 'user',
@@ -848,24 +864,24 @@ void main() {
 
         expect(
           controller.hasCommittedUserTurnForGatewaySessionInternal(
-            'draft:unit-task-a',
+            'unit-fixture-task-a',
           ),
           isTrue,
         );
         expect(
           controller.shouldResumeGatewaySessionForNextSendInternal(
-            'draft:unit-task-a',
+            'unit-fixture-task-a',
           ),
           isTrue,
         );
 
         controller.upsertTaskThreadInternal(
-          'draft:unit-task-a',
+          'unit-fixture-task-a',
           lastResultCode: gatewayAcpHttpConnectTimeoutCode,
         );
         expect(
           controller.shouldResumeGatewaySessionForNextSendInternal(
-            'draft:unit-task-a',
+            'unit-fixture-task-a',
           ),
           isFalse,
         );
@@ -877,7 +893,7 @@ void main() {
       final controller = _connectedController(fakeGoTaskService);
       addTearDown(controller.dispose);
 
-      await controller.sessionsController.switchSession('draft:unit-task-a');
+      await controller.sessionsController.switchSession('unit-fixture-task-a');
 
       await controller.sendChatMessage('first turn');
 
@@ -899,8 +915,8 @@ void main() {
         final fakeGoTaskService = _RecordingGoTaskServiceClient()
           ..updatesBeforeNextOutcome.add(
             const GoTaskServiceUpdate(
-              sessionId: 'draft:unit-task-a',
-              threadId: 'draft:unit-task-a',
+              sessionId: 'unit-fixture-task-a',
+              threadId: 'unit-fixture-task-a',
               turnId: 'turn-1',
               type: 'delta',
               text: 'partial output that must not persist',
@@ -932,7 +948,9 @@ void main() {
         addTearDown(controller.dispose);
         controller.resolvedUserHomeDirectoryInternal = localWorkspace.path;
 
-        await controller.sessionsController.switchSession('draft:unit-task-a');
+        await controller.sessionsController.switchSession(
+          'unit-fixture-task-a',
+        );
 
         await controller.sendChatMessage('first turn');
 
@@ -940,7 +958,7 @@ void main() {
         expect(fakeGoTaskService.requests.single.resumeSession, isFalse);
         expect(
           controller
-              .taskThreadForSessionInternal('draft:unit-task-a')
+              .taskThreadForSessionInternal('unit-fixture-task-a')
               ?.lifecycleState
               .status,
           'ready',
@@ -955,7 +973,7 @@ void main() {
         );
         expect(
           controller
-              .taskThreadForSessionInternal('draft:unit-task-a')
+              .taskThreadForSessionInternal('unit-fixture-task-a')
               ?.lastArtifactSyncStatus,
           'failed',
         );
@@ -965,19 +983,19 @@ void main() {
         expect(fakeGoTaskService.requests, hasLength(2));
         expect(fakeGoTaskService.requests.last.resumeSession, isTrue);
         expect(
-          controller.localSessionMessagesInternal['draft:unit-task-a']!.map(
+          controller.localSessionMessagesInternal['unit-fixture-task-a']!.map(
             (message) => message.text,
           ),
           contains('全部 6 个文件已生成 ✅'),
         );
         final thread = controller.taskThreadForSessionInternal(
-          'draft:unit-task-a',
+          'unit-fixture-task-a',
         );
         expect(thread?.lifecycleState.status, 'ready');
         expect(thread?.lastArtifactSyncStatus, 'synced');
         expect(thread?.lastArtifactSyncAtMs, greaterThan(0));
         final workspacePath = controller.assistantWorkspacePathForSession(
-          'draft:unit-task-a',
+          'unit-fixture-task-a',
         );
         for (final artifact in _generatedArtifactPayloads()) {
           final relativePath = artifact['relativePath']! as String;
@@ -1014,14 +1032,16 @@ void main() {
         final controller = _connectedController(fakeGoTaskService);
         addTearDown(controller.dispose);
 
-        await controller.sessionsController.switchSession('draft:unit-task-a');
+        await controller.sessionsController.switchSession(
+          'unit-fixture-task-a',
+        );
 
         await controller.sendChatMessage('first turn');
 
         expect(fakeGoTaskService.requests, hasLength(1));
         expect(fakeGoTaskService.requests.single.resumeSession, isFalse);
         final failedThread = controller.taskThreadForSessionInternal(
-          'draft:unit-task-a',
+          'unit-fixture-task-a',
         );
         expect(failedThread?.lifecycleState.status, 'ready');
         expect(
@@ -1048,7 +1068,7 @@ void main() {
           'retried from a confirmed new start',
         );
         final thread = controller.taskThreadForSessionInternal(
-          'draft:unit-task-a',
+          'unit-fixture-task-a',
         );
         expect(thread?.lifecycleState.status, 'ready');
         expect(thread?.lifecycleState.lastResultCode, 'success');
@@ -1071,8 +1091,8 @@ void main() {
         final fakeGoTaskService = _RecordingGoTaskServiceClient()
           ..updatesBeforeNextOutcome.add(
             const GoTaskServiceUpdate(
-              sessionId: 'draft:unit-task-a',
-              threadId: 'draft:unit-task-a',
+              sessionId: 'unit-fixture-task-a',
+              threadId: 'unit-fixture-task-a',
               turnId: 'turn-1',
               type: 'delta',
               text: 'guard partial output must not persist',
@@ -1104,7 +1124,9 @@ void main() {
         addTearDown(controller.dispose);
         controller.resolvedUserHomeDirectoryInternal = localWorkspace.path;
 
-        await controller.sessionsController.switchSession('draft:unit-task-a');
+        await controller.sessionsController.switchSession(
+          'unit-fixture-task-a',
+        );
 
         await controller.sendChatMessage('first turn');
         await controller.sendChatMessage('follow up');
@@ -1124,7 +1146,7 @@ void main() {
         );
 
         final thread = controller.taskThreadForSessionInternal(
-          'draft:unit-task-a',
+          'unit-fixture-task-a',
         );
         expect(thread?.lifecycleState.status, 'ready');
         expect(thread?.lastArtifactSyncStatus, 'no-exported-artifacts');
@@ -1148,8 +1170,8 @@ void main() {
         final fakeGoTaskService = _RecordingGoTaskServiceClient()
           ..updatesBeforeNextOutcome.add(
             const GoTaskServiceUpdate(
-              sessionId: 'draft:unit-task-a',
-              threadId: 'draft:unit-task-a',
+              sessionId: 'unit-fixture-task-a',
+              threadId: 'unit-fixture-task-a',
               turnId: 'turn-1',
               type: 'delta',
               text: guardMessage,
@@ -1181,7 +1203,9 @@ void main() {
         addTearDown(controller.dispose);
         controller.resolvedUserHomeDirectoryInternal = localWorkspace.path;
 
-        await controller.sessionsController.switchSession('draft:unit-task-a');
+        await controller.sessionsController.switchSession(
+          'unit-fixture-task-a',
+        );
         await controller.sendChatMessage('create files');
 
         final transcript = controller.chatMessages
@@ -1190,7 +1214,7 @@ void main() {
         expect(transcript, isNot(contains('未检测到 OpenClaw 本轮导出的实际文件')));
         expect(transcript, isNot(contains('口头下载声明')));
         final thread = controller.taskThreadForSessionInternal(
-          'draft:unit-task-a',
+          'unit-fixture-task-a',
         );
         expect(thread?.lifecycleState.lastResultCode, 'artifact_missing');
         expect(thread?.lastArtifactSyncStatus, 'no-exported-artifacts');
@@ -1212,8 +1236,8 @@ void main() {
         final fakeGoTaskService = _RecordingGoTaskServiceClient()
           ..updatesBeforeNextOutcome.add(
             const GoTaskServiceUpdate(
-              sessionId: 'draft:unit-task-a',
-              threadId: 'draft:unit-task-a',
+              sessionId: 'unit-fixture-task-a',
+              threadId: 'unit-fixture-task-a',
               turnId: 'turn-1',
               type: 'delta',
               text: 'handshake partial output must not persist',
@@ -1245,14 +1269,16 @@ void main() {
         addTearDown(controller.dispose);
         controller.resolvedUserHomeDirectoryInternal = localWorkspace.path;
 
-        await controller.sessionsController.switchSession('draft:unit-task-a');
+        await controller.sessionsController.switchSession(
+          'unit-fixture-task-a',
+        );
 
         await controller.sendChatMessage('first turn');
 
         expect(fakeGoTaskService.requests, hasLength(1));
         expect(fakeGoTaskService.requests.single.resumeSession, isFalse);
         final failedThread = controller.taskThreadForSessionInternal(
-          'draft:unit-task-a',
+          'unit-fixture-task-a',
         );
         expect(failedThread?.lifecycleState.status, 'ready');
         expect(
@@ -1276,13 +1302,13 @@ void main() {
         await _waitForLastChatMessageText(controller, '全部 6 个文件已生成 ✅');
         expect(controller.chatMessages.last.text, '全部 6 个文件已生成 ✅');
         final thread = controller.taskThreadForSessionInternal(
-          'draft:unit-task-a',
+          'unit-fixture-task-a',
         );
         expect(thread?.lifecycleState.status, 'ready');
         expect(thread?.lastArtifactSyncStatus, 'synced');
         expect(thread?.lastArtifactSyncAtMs, greaterThan(0));
         final workspacePath = controller.assistantWorkspacePathForSession(
-          'draft:unit-task-a',
+          'unit-fixture-task-a',
         );
         for (final artifact in _generatedArtifactPayloads()) {
           final relativePath = artifact['relativePath']! as String;
@@ -1303,7 +1329,9 @@ void main() {
         );
         addTearDown(controller.dispose);
 
-        await controller.sessionsController.switchSession('draft:unit-task-a');
+        await controller.sessionsController.switchSession(
+          'unit-fixture-task-a',
+        );
 
         final userMessage = GatewayChatMessage(
           id: 'local-user-1',
@@ -1329,19 +1357,19 @@ void main() {
         );
 
         controller.appendLocalSessionMessageInternal(
-          'draft:unit-task-a',
+          'unit-fixture-task-a',
           userMessage,
           persistInThreadContext: true,
         );
         controller.appendLocalSessionMessageInternal(
-          'draft:unit-task-a',
+          'unit-fixture-task-a',
           assistantMessage,
           persistInThreadContext: true,
         );
-        controller.assistantThreadMessagesInternal['draft:unit-task-a'] =
+        controller.assistantThreadMessagesInternal['unit-fixture-task-a'] =
             List<GatewayChatMessage>.from(
               controller
-                  .requireTaskThreadForSessionInternal('draft:unit-task-a')
+                  .requireTaskThreadForSessionInternal('unit-fixture-task-a')
                   .messages,
             );
 
