@@ -9,6 +9,8 @@ class SidebarTaskItem {
     required this.executionTarget,
     required this.isCurrent,
     required this.pending,
+    this.lifecycleStatus = '',
+    this.lastResultCode = '',
     this.draft = false,
   });
 
@@ -19,6 +21,8 @@ class SidebarTaskItem {
   final AssistantExecutionTarget executionTarget;
   final bool isCurrent;
   final bool pending;
+  final String lifecycleStatus;
+  final String lastResultCode;
   final bool draft;
 }
 
@@ -502,6 +506,7 @@ class _SidebarTaskTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = context.palette;
     final theme = Theme.of(context);
+    final statusInfo = _sidebarTaskStatusInfo(item);
     return Material(
       color: item.isCurrent ? palette.surfacePrimary : Colors.transparent,
       borderRadius: BorderRadius.circular(8),
@@ -595,6 +600,11 @@ class _SidebarTaskTile extends StatelessWidget {
                       color: palette.textMuted,
                     ),
                   ),
+                  if (statusInfo != null)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: _SidebarTaskStatusChip(status: statusInfo),
+                    ),
                   if (onArchive != null)
                     IconButton(
                       key: ValueKey<String>(
@@ -620,6 +630,67 @@ class _SidebarTaskTile extends StatelessWidget {
       ),
     );
   }
+}
+
+class _SidebarTaskStatusChip extends StatelessWidget {
+  const _SidebarTaskStatusChip({required this.status});
+
+  final StatusInfo status;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final colors = switch (status.tone) {
+      StatusTone.accent => (palette.accentMuted, palette.accent),
+      StatusTone.warning => (palette.surfacePrimary, palette.warning),
+      StatusTone.success => (palette.surfacePrimary, palette.success),
+      StatusTone.danger => (palette.surfacePrimary, palette.danger),
+      StatusTone.neutral => (palette.surfacePrimary, palette.textMuted),
+    };
+    return Container(
+      key: const Key('workspace-sidebar-task-status-chip'),
+      constraints: const BoxConstraints(minHeight: 18),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: colors.$1,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: colors.$2.withValues(alpha: 0.22)),
+      ),
+      child: Text(
+        status.label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+          color: colors.$2,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+}
+
+StatusInfo? _sidebarTaskStatusInfo(SidebarTaskItem item) {
+  if (item.draft && !item.pending) {
+    return null;
+  }
+  final lifecycleStatus = item.lifecycleStatus.trim().toLowerCase();
+  final lastResultCode = item.lastResultCode.trim();
+  final normalizedResultCode = lastResultCode.toLowerCase();
+  if (lifecycleStatus == 'queued' || normalizedResultCode == 'queued') {
+    return StatusInfo(appText('Pending', 'Pending'), StatusTone.warning);
+  }
+  if (item.pending ||
+      lifecycleStatus == 'running' ||
+      normalizedResultCode == 'running') {
+    return StatusInfo(appText('运行', 'Running'), StatusTone.accent);
+  }
+  if (lifecycleStatus == 'ready' &&
+      lastResultCode.isNotEmpty &&
+      normalizedResultCode != 'queued' &&
+      normalizedResultCode != 'running') {
+    return StatusInfo(appText('结束', 'Done'), StatusTone.neutral);
+  }
+  return null;
 }
 
 String _sidebarTaskUpdatedAtLabel(double? updatedAtMs) {
