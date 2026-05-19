@@ -898,7 +898,21 @@ void main() {
       await controller.sendChatMessage('first turn');
 
       expect(fakeGoTaskService.requests, hasLength(1));
-      expect(fakeGoTaskService.requests.single.resumeSession, isFalse);
+      final request = fakeGoTaskService.requests.single;
+      expect(request.resumeSession, isFalse);
+      expect(request.prompt, contains('TaskThread workspace context:'));
+      expect(request.prompt, contains('- sessionKey: unit-fixture-task-a'));
+      expect(request.prompt, contains(request.workingDirectory));
+      expect(request.prompt, contains(request.remoteWorkingDirectoryHint));
+      expect(request.prompt, contains('User request:\nfirst turn'));
+      expect(
+        controller.chatMessages.map((message) => message.text),
+        contains('first turn'),
+      );
+      expect(
+        controller.chatMessages.map((message) => message.text).join('\n'),
+        isNot(contains('TaskThread workspace context:')),
+      );
     });
 
     test(
@@ -1632,11 +1646,15 @@ void main() {
         final taskBRequest = fakeGoTaskService.requests[1];
         expect(taskARequest.sessionId, sessionA);
         expect(taskBRequest.sessionId, sessionB);
-        expect(taskARequest.prompt, taskBRequest.prompt);
+        expect(taskARequest.prompt, isNot(taskBRequest.prompt));
+        expect(taskARequest.prompt, contains(prompt));
+        expect(taskBRequest.prompt, contains(prompt));
         expect(taskARequest.resumeSession, isFalse);
         expect(taskBRequest.resumeSession, isFalse);
         expect(taskARequest.workingDirectory, endsWith('/$sessionA'));
         expect(taskBRequest.workingDirectory, endsWith('/$sessionB'));
+        expect(taskARequest.prompt, contains(taskARequest.workingDirectory));
+        expect(taskBRequest.prompt, contains(taskBRequest.workingDirectory));
         expect(
           taskARequest.workingDirectory,
           isNot(taskBRequest.workingDirectory),
@@ -2192,6 +2210,26 @@ void main() {
               .status,
           'queued',
         );
+        expect(
+          controller.assistantSessionHasPendingRun('queue-task-b'),
+          isTrue,
+        );
+        expect(
+          controller.assistantSessionHasPendingRun('queue-task-c'),
+          isTrue,
+        );
+        expect(
+          controller.localSessionMessagesInternal['queue-task-b']!.map(
+            (message) => message.text,
+          ),
+          contains('same prompt'),
+        );
+        expect(
+          controller.localSessionMessagesInternal['queue-task-c']!.map(
+            (message) => message.text,
+          ),
+          contains('different prompt'),
+        );
 
         fakeGoTaskService.complete(
           'queue-task-a',
@@ -2214,9 +2252,12 @@ void main() {
 
         final taskBRequest = fakeGoTaskService.requests[1];
         expect(taskBRequest.sessionId, 'queue-task-b');
-        expect(taskBRequest.prompt, 'same prompt');
+        expect(taskBRequest.prompt, contains('TaskThread workspace context:'));
+        expect(taskBRequest.prompt, contains('- sessionKey: queue-task-b'));
+        expect(taskBRequest.prompt, contains('User request:\nsame prompt'));
         expect(taskBRequest.resumeSession, isFalse);
         expect(taskBRequest.workingDirectory, endsWith('/queue-task-b'));
+        expect(taskBRequest.prompt, contains(taskBRequest.workingDirectory));
         expect(
           taskBRequest.remoteWorkingDirectoryHint,
           endsWith('/threads/queue-task-b'),
@@ -2239,12 +2280,25 @@ void main() {
           'queue-task-b',
           'ready',
         );
+        expect(
+          controller.localSessionMessagesInternal['queue-task-b']!
+              .where(
+                (message) =>
+                    message.role == 'user' && message.text == 'same prompt',
+              )
+              .length,
+          1,
+        );
         await fakeGoTaskService.waitForRequestCount(3);
 
         final taskCRequest = fakeGoTaskService.requests[2];
         expect(taskCRequest.sessionId, 'queue-task-c');
-        expect(taskCRequest.prompt, 'different prompt');
+        expect(
+          taskCRequest.prompt,
+          contains('User request:\ndifferent prompt'),
+        );
         expect(taskCRequest.workingDirectory, endsWith('/queue-task-c'));
+        expect(taskCRequest.prompt, contains(taskCRequest.workingDirectory));
         fakeGoTaskService.complete(
           'queue-task-c',
           const GoTaskServiceResult(
