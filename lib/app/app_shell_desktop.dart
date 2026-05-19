@@ -56,6 +56,7 @@ class _AppShellState extends State<AppShell> {
         .map((session) {
           final sessionKey = session.key.trim();
           final preview = session.lastMessagePreview?.trim() ?? '';
+          final thread = controller.taskThreadForSessionInternal(sessionKey);
           return SidebarTaskItem(
             sessionKey: sessionKey,
             title: session.label.trim().isEmpty
@@ -68,6 +69,8 @@ class _AppShellState extends State<AppShell> {
             ),
             isCurrent: sessionKey == currentSessionKey,
             pending: controller.assistantSessionHasPendingRun(sessionKey),
+            lifecycleStatus: thread?.lifecycleState.status ?? '',
+            lastResultCode: thread?.lifecycleState.lastResultCode ?? '',
             draft: sessionKey.startsWith('draft:'),
           );
         })
