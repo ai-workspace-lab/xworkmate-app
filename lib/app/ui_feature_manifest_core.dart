@@ -46,6 +46,7 @@ abstract final class UiFeatureKeys {
   static const assistantLocalRuntime = 'assistant.local_runtime';
 
   static const settingsGateway = 'settings.gateway';
+  static const settingsArchivedTasks = 'settings.archived_tasks';
   static const settingsAccountAccess = 'settings.account_access';
   static const settingsVaultServer = 'settings.vault_server';
   static const settingsExperimentalCanvas = 'settings.experimental_canvas';
@@ -362,7 +363,10 @@ class UiFeatureAccess {
       };
 
   static const Map<String, SettingsTab> settingsTabMappingsInternal =
-      <String, SettingsTab>{UiFeatureKeys.settingsGateway: SettingsTab.gateway};
+      <String, SettingsTab>{
+        UiFeatureKeys.settingsGateway: SettingsTab.gateway,
+        UiFeatureKeys.settingsArchivedTasks: SettingsTab.archivedTasks,
+      };
 
   bool isEnabledPath(String path) {
     final parts = path.split('.');

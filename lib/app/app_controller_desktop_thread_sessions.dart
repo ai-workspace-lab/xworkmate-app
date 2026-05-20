@@ -650,6 +650,24 @@ extension AppControllerDesktopThreadSessions on AppController {
       );
     return items;
   }
+
+  List<GatewaySessionSummary> archivedAssistantSessionsInternal() {
+    final items = <GatewaySessionSummary>[];
+    for (final record in assistantThreadRecordsInternal.values) {
+      final sessionKey = normalizedAssistantSessionKeyInternal(
+        record.sessionKey,
+      );
+      if (!isAppOwnedAssistantSessionKeyInternal(sessionKey) ||
+          !record.archived) {
+        continue;
+      }
+      items.add(assistantSessionSummaryForInternal(sessionKey, record: record));
+    }
+    items.sort((left, right) {
+      return (right.updatedAtMs ?? 0).compareTo(left.updatedAtMs ?? 0);
+    });
+    return items;
+  }
 }
 
 AssistantExecutionTarget resolveAssistantExecutionTargetFromRecordForTest(

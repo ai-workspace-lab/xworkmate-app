@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 
 import '../../app/app_controller.dart';
 import '../../app/app_metadata.dart';
+import '../../app/ui_feature_manifest.dart';
 import '../../app/workspace_navigation.dart';
 import '../../i18n/app_language.dart';
 import '../../models/app_models.dart';
@@ -15,6 +16,7 @@ import '../../widgets/settings_page_shell.dart';
 import '../../widgets/surface_card.dart';
 import 'settings_account_panel.dart';
 import 'settings_about_panel.dart';
+import 'settings_archived_tasks_panel.dart';
 
 Future<Map<String, dynamic>> loadBridgeMetadataForSettingsAbout({
   required Uri bridgeEndpoint,
@@ -326,6 +328,14 @@ class _SettingsPageState extends State<SettingsPage> {
     });
   }
 
+  Future<void> _restoreArchivedTask(String sessionKey) async {
+    await widget.controller.saveAssistantTaskArchived(sessionKey, false);
+  }
+
+  Future<void> _deleteArchivedTask(String sessionKey) async {
+    await widget.controller.deleteArchivedAssistantTask(sessionKey);
+  }
+
   Future<SettingsAboutSnapshot> _loadAboutSnapshot() async {
     final bridgeMetadata = await _loadBridgeMetadata();
     return SettingsAboutSnapshot(
@@ -368,13 +378,14 @@ class _SettingsPageState extends State<SettingsPage> {
         final accountMfaRequired =
             controller.settingsController.accountMfaRequired;
         final accountSession = controller.settingsController.accountSession;
+        final currentTab = controller.settingsTab;
+        final availableTabs = controller
+            .featuresFor(resolveUiFeaturePlatformFromContext(context))
+            .availableSettingsTabs;
 
         return SettingsPageBodyShell(
           padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
-          breadcrumbs: buildSettingsBreadcrumbs(
-            controller,
-            tab: SettingsTab.gateway,
-          ),
+          breadcrumbs: buildSettingsBreadcrumbs(controller, tab: currentTab),
           title: appText('设置', 'Settings'),
           subtitle: appText(
             '配置 XWorkmate 工作区、网关默认项、界面与诊断选项',
@@ -391,47 +402,112 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           ),
           bodyChildren: <Widget>[
-            SurfaceCard(
-              key: const ValueKey('settings-account-panel-card'),
-              child: SettingsAccountPanel(
-                settings: currentSettings,
-                accountSession: accountSession,
-                accountState: accountState,
-                accountBusy: accountBusy,
-                accountStatus: accountStatus,
-                accountSignedIn: accountSignedIn,
-                accountMfaRequired: accountMfaRequired,
-                accountBaseUrlController: _accountBaseUrlController,
-                accountIdentifierController: _accountIdentifierController,
-                accountPasswordController: _accountPasswordController,
-                accountMfaCodeController: _accountMfaCodeController,
-                bridgeUrlController: _bridgeUrlController,
-                bridgeTokenController: _bridgeTokenController,
-                onSaveAccountProfile: ({required bool isManualBridge}) =>
-                    _persistAccountProfileSettings(
-                      widget.controller.settings,
-                      isManualBridge: isManualBridge,
-                    ),
-                onLogin: () => _loginAccount(widget.controller.settings),
-                onVerifyMfa: () =>
-                    _verifyAccountMfa(widget.controller.settings),
-                onCancelMfa: _cancelAccountMfa,
-                onSync: () => _syncAccount(widget.controller.settings),
-                onLogout: _logoutAccount,
+            if (availableTabs.length > 1) ...[
+              _SettingsTabSelector(
+                currentTab: currentTab,
+                availableTabs: availableTabs,
+                onChanged: (tab) => controller.openSettings(tab: tab),
               ),
-            ),
-            const SizedBox(height: 24),
-            SurfaceCard(
-              key: const ValueKey('settings-about-panel-card'),
-              child: SettingsAboutPanel(
-                snapshot: _aboutSnapshot,
-                busy: _aboutBusy,
-                onRefresh: _refreshAboutSnapshot,
+              const SizedBox(height: 18),
+            ],
+            if (currentTab == SettingsTab.gateway) ...[
+              SurfaceCard(
+                key: const ValueKey('settings-account-panel-card'),
+                child: SettingsAccountPanel(
+                  settings: currentSettings,
+                  accountSession: accountSession,
+                  accountState: accountState,
+                  accountBusy: accountBusy,
+                  accountStatus: accountStatus,
+                  accountSignedIn: accountSignedIn,
+                  accountMfaRequired: accountMfaRequired,
+                  accountBaseUrlController: _accountBaseUrlController,
+                  accountIdentifierController: _accountIdentifierController,
+                  accountPasswordController: _accountPasswordController,
+                  accountMfaCodeController: _accountMfaCodeController,
+                  bridgeUrlController: _bridgeUrlController,
+                  bridgeTokenController: _bridgeTokenController,
+                  onSaveAccountProfile: ({required bool isManualBridge}) =>
+                      _persistAccountProfileSettings(
+                        widget.controller.settings,
+                        isManualBridge: isManualBridge,
+                      ),
+                  onLogin: () => _loginAccount(widget.controller.settings),
+                  onVerifyMfa: () =>
+                      _verifyAccountMfa(widget.controller.settings),
+                  onCancelMfa: _cancelAccountMfa,
+                  onSync: () => _syncAccount(widget.controller.settings),
+                  onLogout: _logoutAccount,
+                ),
               ),
-            ),
+              const SizedBox(height: 24),
+              SurfaceCard(
+                key: const ValueKey('settings-about-panel-card'),
+                child: SettingsAboutPanel(
+                  snapshot: _aboutSnapshot,
+                  busy: _aboutBusy,
+                  onRefresh: _refreshAboutSnapshot,
+                ),
+              ),
+            ] else if (currentTab == SettingsTab.archivedTasks)
+              SurfaceCard(
+                key: const ValueKey('settings-archived-tasks-panel-card'),
+                child: SettingsArchivedTasksPanel(
+                  sessions: controller.archivedAssistantSessions,
+                  onRestore: _restoreArchivedTask,
+                  onDelete: _deleteArchivedTask,
+                ),
+              ),
           ],
         );
       },
+    );
+  }
+}
+
+class _SettingsTabSelector extends StatelessWidget {
+  const _SettingsTabSelector({
+    required this.currentTab,
+    required this.availableTabs,
+    required this.onChanged,
+  });
+
+  final SettingsTab currentTab;
+  final List<SettingsTab> availableTabs;
+  final ValueChanged<SettingsTab> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final selectedTab = availableTabs.contains(currentTab)
+        ? currentTab
+        : availableTabs.first;
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: SegmentedButton<SettingsTab>(
+        key: const ValueKey('settings-tab-selector'),
+        segments: [
+          for (final tab in availableTabs)
+            ButtonSegment<SettingsTab>(
+              value: tab,
+              icon: Icon(
+                tab == SettingsTab.archivedTasks
+                    ? Icons.inventory_2_outlined
+                    : Icons.hub_outlined,
+              ),
+              label: Text(tab.label),
+            ),
+        ],
+        selected: <SettingsTab>{selectedTab},
+        onSelectionChanged: (selection) {
+          if (selection.isEmpty) {
+            return;
+          }
+          final next = selection.first;
+          if (next != selectedTab) {
+            onChanged(next);
+          }
+        },
+      ),
     );
   }
 }
