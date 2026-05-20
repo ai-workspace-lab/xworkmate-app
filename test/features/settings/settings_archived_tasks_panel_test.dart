@@ -95,6 +95,22 @@ void main() {
       find.byKey(const ValueKey('settings-archived-task-confirm-delete')),
     );
     await tester.pumpAndSettle();
+    expect(find.text('确认彻底删除'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('settings-archived-task-confirm-delete-yes')),
+      findsOneWidget,
+    );
+    expect(calls, isNot(contains('delete:draft:archived-task')));
+
+    await tester.enterText(
+      find.byKey(const ValueKey('settings-archived-task-delete-yes-input')),
+      'Yes',
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('settings-archived-task-confirm-delete-yes')),
+    );
+    await tester.pumpAndSettle();
 
     expect(calls, contains('delete:draft:archived-task'));
   });
