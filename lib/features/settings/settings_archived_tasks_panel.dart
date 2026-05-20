@@ -82,8 +82,8 @@ class SettingsArchivedTasksPanel extends StatelessWidget {
         title: Text(appText('彻底删除归档记录', 'Delete archived record')),
         content: Text(
           appText(
-            '将从 XWorkmate 中删除「${session.label}」的任务记录和消息状态。此操作不会删除本地线程工作目录里的文件。',
-            'This removes "${session.label}" from XWorkmate task records and message state. Files in the local thread workspace are not deleted.',
+            '将从 XWorkmate 中删除「${session.label}」的任务记录、消息状态和本地线程工作目录。此操作不可撤销。',
+            'This removes "${session.label}" from XWorkmate task records, message state, and the local thread workspace. This cannot be undone.',
           ),
         ),
         actions: [
@@ -104,7 +104,98 @@ class SettingsArchivedTasksPanel extends StatelessWidget {
         ],
       ),
     );
+    if (result != true || !context.mounted) {
+      return false;
+    }
+    return _confirmDeleteWithYes(context, session);
+  }
+
+  Future<bool> _confirmDeleteWithYes(
+    BuildContext context,
+    GatewaySessionSummary session,
+  ) async {
+    final palette = context.palette;
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) =>
+          _DeleteYesConfirmationDialog(session: session, palette: palette),
+    );
     return result ?? false;
+  }
+}
+
+class _DeleteYesConfirmationDialog extends StatefulWidget {
+  const _DeleteYesConfirmationDialog({
+    required this.session,
+    required this.palette,
+  });
+
+  final GatewaySessionSummary session;
+  final AppPalette palette;
+
+  @override
+  State<_DeleteYesConfirmationDialog> createState() =>
+      _DeleteYesConfirmationDialogState();
+}
+
+class _DeleteYesConfirmationDialogState
+    extends State<_DeleteYesConfirmationDialog> {
+  final TextEditingController _confirmationController = TextEditingController();
+
+  bool get _confirmed => _confirmationController.text.trim() == 'Yes';
+
+  @override
+  void dispose() {
+    _confirmationController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(appText('确认彻底删除', 'Confirm permanent delete')),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            appText(
+              '此操作会删除「${widget.session.label}」的归档记录和任务目录。请输入 Yes 继续。',
+              'This deletes "${widget.session.label}" archived records and task directory. Type Yes to continue.',
+            ),
+          ),
+          const SizedBox(height: 14),
+          TextField(
+            key: const ValueKey('settings-archived-task-delete-yes-input'),
+            controller: _confirmationController,
+            autofocus: true,
+            onChanged: (_) => setState(() {}),
+            decoration: InputDecoration(
+              labelText: appText('输入 Yes', 'Type Yes'),
+              border: const OutlineInputBorder(),
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(false),
+          child: Text(appText('取消', 'Cancel')),
+        ),
+        FilledButton.icon(
+          key: const ValueKey('settings-archived-task-confirm-delete-yes'),
+          onPressed: _confirmed ? () => Navigator.of(context).pop(true) : null,
+          style: FilledButton.styleFrom(
+            backgroundColor: widget.palette.danger,
+            foregroundColor: Colors.white,
+            disabledBackgroundColor: widget.palette.strokeSoft,
+            disabledForegroundColor: widget.palette.textMuted,
+          ),
+          icon: const Icon(Icons.delete_forever_outlined),
+          label: Text(appText('彻底删除', 'Delete permanently')),
+        ),
+      ],
+    );
   }
 }
 
