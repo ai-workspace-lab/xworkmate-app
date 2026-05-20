@@ -471,10 +471,22 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
     if (record == null || !record.archived) {
       return;
     }
+    final workspaceBinding = record.workspaceBinding;
+    final workspacePath = workspaceBinding.workspacePath.trim();
     final wasCurrent = matchesSessionKey(
       sessionsControllerInternal.currentSessionKey,
       normalizedSessionKey,
     );
+    if (workspaceBinding.workspaceKind == WorkspaceKind.localFs &&
+        isManagedLocalThreadWorkspacePathInternal(
+          workspacePath,
+          normalizedSessionKey,
+        )) {
+      final workspaceDirectory = Directory(workspacePath);
+      if (await workspaceDirectory.exists()) {
+        await workspaceDirectory.delete(recursive: true);
+      }
+    }
     taskThreadRepositoryInternal.removeWhere(
       (key, _) =>
           normalizedAssistantSessionKeyInternal(key) == normalizedSessionKey,
