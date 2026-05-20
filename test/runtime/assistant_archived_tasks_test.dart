@@ -66,7 +66,7 @@ void main() {
       },
     );
 
-    test('deletes only archived task records from controller state', () async {
+    test('deletes archived task records and local task directory', () async {
       final home = await Directory.systemTemp.createTemp(
         'xworkmate-delete-archived-task-home-',
       );
@@ -87,6 +87,15 @@ void main() {
         executionTarget: AssistantExecutionTarget.gateway,
         messageViewMode: AssistantMessageViewMode.rendered,
       );
+      final workspacePath = controller.assistantWorkspacePathForSession(
+        sessionKey,
+      );
+      expect(workspacePath, isNotEmpty);
+      final workspaceDirectory = Directory(workspacePath);
+      await workspaceDirectory.create(recursive: true);
+      await File(
+        '${workspaceDirectory.path}/artifact.md',
+      ).writeAsString('archived task artifact');
       await controller.saveAssistantTaskArchived(sessionKey, true);
 
       expect(
@@ -102,6 +111,7 @@ void main() {
         isNot(contains(sessionKey)),
       );
       expect(controller.hasAssistantTaskStateInternal(sessionKey), isFalse);
+      expect(await workspaceDirectory.exists(), isFalse);
     });
   });
 }
