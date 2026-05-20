@@ -512,6 +512,8 @@ class AppController extends ChangeNotifier {
       sessionsControllerInternal.sessions;
   List<GatewaySessionSummary> get assistantSessions =>
       assistantSessionsInternal();
+  List<GatewaySessionSummary> get archivedAssistantSessions =>
+      archivedAssistantSessionsInternal();
   List<GatewaySkillSummary> get skills => skillsControllerInternal.items;
   List<GatewayModelSummary> get models => modelsControllerInternal.items;
   List<GatewayCronJobSummary> get cronJobs => cronJobsControllerInternal.items;

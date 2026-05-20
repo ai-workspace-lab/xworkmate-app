@@ -458,4 +458,44 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
     recomputeTasksInternal();
     notifyIfActiveInternal();
   }
+
+  Future<void> deleteArchivedAssistantTask(String sessionKey) async {
+    final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
+      sessionKey,
+    );
+    if (normalizedSessionKey.isEmpty ||
+        !isAppOwnedAssistantSessionKeyInternal(normalizedSessionKey)) {
+      return;
+    }
+    final record = assistantThreadRecordsInternal[normalizedSessionKey];
+    if (record == null || !record.archived) {
+      return;
+    }
+    final wasCurrent = matchesSessionKey(
+      sessionsControllerInternal.currentSessionKey,
+      normalizedSessionKey,
+    );
+    taskThreadRepositoryInternal.removeWhere(
+      (key, _) =>
+          normalizedAssistantSessionKeyInternal(key) == normalizedSessionKey,
+    );
+    assistantThreadMessagesInternal.remove(normalizedSessionKey);
+    localSessionMessagesInternal.remove(normalizedSessionKey);
+    aiGatewayStreamingTextBySessionInternal.remove(normalizedSessionKey);
+    aiGatewayPendingSessionKeysInternal.remove(normalizedSessionKey);
+    aiGatewayAbortedSessionKeysInternal.remove(normalizedSessionKey);
+    assistantThreadTurnQueuesInternal.remove(normalizedSessionKey);
+    openClawGatewayQueuedTurnsBySessionInternal.remove(normalizedSessionKey);
+    openClawGatewayQueuedTurnsInternal.removeWhere(
+      (turn) =>
+          normalizedAssistantSessionKeyInternal(turn.sessionKey) ==
+          normalizedSessionKey,
+    );
+    recomputeTasksInternal();
+    if (wasCurrent) {
+      await ensureActiveAssistantThreadInternal();
+    }
+    await flushAssistantThreadPersistenceInternal();
+    notifyIfActiveInternal();
+  }
 }

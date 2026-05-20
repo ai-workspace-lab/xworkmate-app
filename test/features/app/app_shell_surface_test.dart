@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xworkmate/app/app_controller.dart';
 import 'package:xworkmate/app/app_shell_desktop.dart';
+import 'package:xworkmate/models/app_models.dart';
 import 'package:xworkmate/theme/app_theme.dart';
 
 void main() {
@@ -14,7 +15,9 @@ void main() {
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
 
-      final controller = AppController(environmentOverride: const <String, String>{});
+      final controller = AppController(
+        environmentOverride: const <String, String>{},
+      );
       addTearDown(controller.dispose);
 
       await tester.pumpWidget(
@@ -40,7 +43,9 @@ void main() {
       addTearDown(tester.view.resetPhysicalSize);
       addTearDown(tester.view.resetDevicePixelRatio);
 
-      final controller = AppController(environmentOverride: const <String, String>{});
+      final controller = AppController(
+        environmentOverride: const <String, String>{},
+      );
       addTearDown(controller.dispose);
 
       await tester.pumpWidget(
@@ -65,6 +70,14 @@ void main() {
 
       expect(
         find.byKey(const Key('settings-account-panel-card')),
+        findsOneWidget,
+      );
+
+      controller.openSettings(tab: SettingsTab.archivedTasks);
+      await tester.pump();
+
+      expect(
+        find.byKey(const Key('settings-archived-tasks-panel-card')),
         findsOneWidget,
       );
     });
