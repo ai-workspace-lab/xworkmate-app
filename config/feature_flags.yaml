@@ -61,6 +61,12 @@ mobile:
       build_modes: [debug, profile, release]
       description: Mobile bridge and integration settings
       ui_surface: settings_page
+    archived_tasks:
+      enabled: true
+      release_tier: stable
+      build_modes: [debug, profile, release]
+      description: Mobile archived task management
+      ui_surface: settings_page
     account_access:
       enabled: true
       release_tier: stable
@@ -150,6 +156,12 @@ desktop:
       build_modes: [debug, profile, release]
       description: Desktop bridge and integration settings
       ui_surface: settings_page
+    archived_tasks:
+      enabled: true
+      release_tier: stable
+      build_modes: [debug, profile, release]
+      description: Desktop archived task management
+      ui_surface: settings_page
     account_access:
       enabled: true
       release_tier: stable
@@ -238,6 +250,12 @@ web:
       release_tier: stable
       build_modes: [debug, profile, release]
       description: Web bridge and integration settings
+      ui_surface: settings_page
+    archived_tasks:
+      enabled: true
+      release_tier: stable
+      build_modes: [debug, profile, release]
+      description: Web archived task management
       ui_surface: settings_page
     account_access:
       enabled: true
