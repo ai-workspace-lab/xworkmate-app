@@ -89,6 +89,7 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.text('彻底删除归档记录'), findsOneWidget);
+    expect(find.text('彻底删除'), findsOneWidget);
 
     await tester.tap(
       find.byKey(const ValueKey('settings-archived-task-confirm-delete')),

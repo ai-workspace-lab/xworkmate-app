@@ -75,6 +75,7 @@ class SettingsArchivedTasksPanel extends StatelessWidget {
     BuildContext context,
     GatewaySessionSummary session,
   ) async {
+    final palette = context.palette;
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -90,11 +91,15 @@ class SettingsArchivedTasksPanel extends StatelessWidget {
             onPressed: () => Navigator.of(context).pop(false),
             child: Text(appText('取消', 'Cancel')),
           ),
-          FilledButton.tonalIcon(
+          FilledButton.icon(
             key: const ValueKey('settings-archived-task-confirm-delete'),
             onPressed: () => Navigator.of(context).pop(true),
+            style: FilledButton.styleFrom(
+              backgroundColor: palette.danger,
+              foregroundColor: Colors.white,
+            ),
             icon: const Icon(Icons.delete_outline_rounded),
-            label: Text(appText('删除记录', 'Delete record')),
+            label: Text(appText('彻底删除', 'Delete permanently')),
           ),
         ],
       ),
