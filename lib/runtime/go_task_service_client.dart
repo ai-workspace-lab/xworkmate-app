@@ -589,6 +589,11 @@ Object? _firstGoTaskArtifactList(Map<String, dynamic> result) {
   ]) {
     if (candidate is List) {
       artifacts.addAll(candidate);
+    } else if (candidate is Map) {
+      final items = _castList(candidate.cast<String, dynamic>()['items']);
+      if (items.isNotEmpty) {
+        artifacts.addAll(items);
+      }
     }
   }
   return artifacts.isEmpty ? null : artifacts;
@@ -723,7 +728,7 @@ GoTaskServiceUpdate? goTaskServiceUpdateFromAcpNotification(
         payload['text']?.toString() ??
         _castMap(payload['message'])['content']?.toString() ??
         '',
-    message: payload['message']?.toString() ?? '',
+    message: _extractGoTaskDisplayText(payload['message']),
     pending: _boolValue(payload['pending']) ?? false,
     error: _boolValue(payload['error']) ?? false,
     route:
