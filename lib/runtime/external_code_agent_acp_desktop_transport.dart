@@ -220,7 +220,7 @@ class ExternalCodeAgentAcpDesktopTransport
           .toString()
           .trim()
           .toLowerCase();
-      final result = _castMap(snapshot['result']);
+      final result = _recoveredResultFromSessionSnapshot(snapshot);
       if (result.isNotEmpty &&
           (status == 'completed' ||
               status == 'failed' ||
@@ -307,7 +307,7 @@ class ExternalCodeAgentAcpDesktopTransport
     snapshot.remove('result');
     snapshot['turnId'] = update.turnId;
     snapshot['success'] = !update.error;
-    final text = _firstNonEmptyString(snapshot, const <String>[
+    final text = _firstNonEmptyDisplayText(snapshot, const <String>[
       'output',
       'message',
       'summary',
@@ -322,14 +322,112 @@ class ExternalCodeAgentAcpDesktopTransport
     return snapshot;
   }
 
-  String _firstNonEmptyString(Map<String, dynamic> values, List<String> keys) {
+  Map<String, dynamic> _recoveredResultFromSessionSnapshot(
+    Map<String, dynamic> snapshot,
+  ) {
+    final result = <String, dynamic>{..._castMap(snapshot['result'])};
+    final artifactRecord = _castMap(snapshot['artifacts']);
+    final artifactItems = _listValue(artifactRecord['items']);
+    if (artifactItems.isNotEmpty && !_hasArtifactList(result)) {
+      result['artifacts'] = artifactItems;
+    }
+    for (final entry in <String, String>{
+      'remoteWorkingDirectory': 'remoteWorkingDirectory',
+      'remoteWorkspaceRefKind': 'remoteWorkspaceRefKind',
+      'resultSummary': 'summary',
+    }.entries) {
+      final value = artifactRecord[entry.key]?.toString().trim() ?? '';
+      if (value.isNotEmpty &&
+          (result[entry.value]?.toString().trim().isEmpty ?? true)) {
+        result[entry.value] = value;
+      }
+    }
+    return result;
+  }
+
+  bool _hasArtifactList(Map<String, dynamic> result) {
+    for (final key in const <String>['artifacts', 'files', 'attachments']) {
+      if (_listValue(result[key]).isNotEmpty) {
+        return true;
+      }
+      final recordItems = _listValue(_castMap(result[key])['items']);
+      if (recordItems.isNotEmpty) {
+        return true;
+      }
+    }
+    for (final key in const <String>['payload', 'result', 'data']) {
+      final nested = _castMap(result[key]);
+      if (nested.isNotEmpty && _hasArtifactList(nested)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  List<Object?> _listValue(Object? value) {
+    return value is List ? value : const <Object?>[];
+  }
+
+  String _firstNonEmptyDisplayText(
+    Map<String, dynamic> values,
+    List<String> keys,
+  ) {
     for (final key in keys) {
-      final value = values[key]?.toString().trim() ?? '';
+      final value = _displayText(values[key]).trim();
       if (value.isNotEmpty) {
         return value;
       }
     }
     return '';
+  }
+
+  String _displayText(Object? value, [Set<Object>? visited]) {
+    final seen = visited ?? <Object>{};
+    if (value == null) {
+      return '';
+    }
+    if (value is String) {
+      return value.trim();
+    }
+    if (value is Map) {
+      if (!seen.add(value)) {
+        return '';
+      }
+      final map = value.cast<String, dynamic>();
+      for (final key in const <String>[
+        'output',
+        'summary',
+        'resultSummary',
+        'message',
+        'content',
+        'text',
+        'delta',
+        'output_text',
+      ]) {
+        final extracted = _displayText(map[key], seen);
+        if (extracted.isNotEmpty) {
+          return extracted;
+        }
+      }
+      for (final key in const <String>['result', 'payload', 'data']) {
+        final extracted = _displayText(map[key], seen);
+        if (extracted.isNotEmpty) {
+          return extracted;
+        }
+      }
+      return '';
+    }
+    if (value is List) {
+      if (!seen.add(value)) {
+        return '';
+      }
+      return value
+          .map((item) => _displayText(item, seen))
+          .where((item) => item.isNotEmpty)
+          .join('\n')
+          .trim();
+    }
+    return value.toString().trim();
   }
 
   Map<String, dynamic> _castMap(Object? value) {

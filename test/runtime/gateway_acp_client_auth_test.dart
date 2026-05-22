@@ -184,6 +184,31 @@ void main() {
       expect(result.artifacts.single.content, 'nested artifact body');
     });
 
+    test('uses bridge artifact record items as artifacts', () {
+      final result = goTaskServiceResultFromAcpResponse(<String, dynamic>{
+        'jsonrpc': '2.0',
+        'id': 'request-id',
+        'result': <String, dynamic>{
+          'success': true,
+          'message': 'created from snapshot record',
+          'artifacts': <String, dynamic>{
+            'items': <Map<String, dynamic>>[
+              <String, dynamic>{
+                'relativePath': 'exports/report.md',
+                'content': 'snapshot artifact body',
+                'contentType': 'text/markdown',
+              },
+            ],
+          },
+        },
+      }, route: GoTaskServiceRoute.externalAcpSingle);
+
+      expect(result.message, 'created from snapshot record');
+      expect(result.artifacts, hasLength(1));
+      expect(result.artifacts.single.relativePath, 'exports/report.md');
+      expect(result.artifacts.single.content, 'snapshot artifact body');
+    });
+
     test('uses bridge files and attachments aliases as artifacts', () {
       final result = goTaskServiceResultFromAcpResponse(<String, dynamic>{
         'jsonrpc': '2.0',
@@ -582,7 +607,9 @@ void main() {
               'event': 'completed',
               'pending': false,
               'error': false,
-              'message': 'stable completed output',
+              'message': <String, dynamic>{
+                'content': 'stable completed output',
+              },
               'result': <String, dynamic>{
                 'success': true,
                 'output': 'stable completed output',
@@ -692,7 +719,9 @@ void main() {
                     'success': true,
                     'output': 'recovered from bridge session snapshot',
                     'turnId': 'turn-recovered',
-                    'artifacts': <Map<String, dynamic>>[
+                  },
+                  'artifacts': <String, dynamic>{
+                    'items': <Map<String, dynamic>>[
                       <String, dynamic>{
                         'relativePath': 'exports/snapshot.md',
                         'downloadUrl':
@@ -702,6 +731,9 @@ void main() {
                         'sizeBytes': 64,
                       },
                     ],
+                    'remoteWorkingDirectory': '/remote/openclaw/workspace',
+                    'remoteWorkspaceRefKind': 'remotePath',
+                    'resultSummary': 'recovered from top-level artifacts',
                   },
                 },
               }),
@@ -743,6 +775,8 @@ void main() {
         expect(result.success, isTrue);
         expect(result.message, 'recovered from bridge session snapshot');
         expect(result.artifacts.single.relativePath, 'exports/snapshot.md');
+        expect(result.remoteWorkingDirectory, '/remote/openclaw/workspace');
+        expect(result.remoteWorkspaceRefKind, WorkspaceRefKind.remotePath);
         expect(
           requestPaths,
           containsAll(<String>['/gateway/openclaw', '/acp/rpc']),
