@@ -478,6 +478,62 @@ void main() {
       },
     );
 
+    test('skill selection ignores stale local imported skills', () {
+      final controller = AppController(
+        environmentOverride: const <String, String>{},
+      );
+      addTearDown(controller.dispose);
+      controller.initializeAssistantThreadContext(
+        'unit-skill-source-task',
+        executionTarget: AssistantExecutionTarget.gateway,
+        messageViewMode: AssistantMessageViewMode.rendered,
+      );
+      controller.upsertTaskThreadInternal(
+        'unit-skill-source-task',
+        importedSkills: const <AssistantThreadSkillEntry>[
+          AssistantThreadSkillEntry(
+            key: '/tmp/local-only/SKILL.md',
+            label: 'Local Only',
+            description: 'stale local skill',
+            sourcePath: '/tmp/local-only/SKILL.md',
+            sourceLabel: 'local',
+          ),
+        ],
+        selectedSkillKeys: const <String>['/tmp/local-only/SKILL.md'],
+        selectedSkillsSource: ThreadSelectionSource.explicit,
+      );
+      controller.skillsControllerInternal.itemsInternal =
+          const <GatewaySkillSummary>[
+            GatewaySkillSummary(
+              name: 'Bridge Skill',
+              description: 'Bridge skill',
+              source: 'bridge',
+              skillKey: 'bridge-skill',
+              primaryEnv: null,
+              eligible: true,
+              disabled: false,
+              missingBins: <String>[],
+              missingEnv: <String>[],
+              missingConfig: <String>[],
+            ),
+          ];
+
+      final routing = controller.buildExternalAcpRoutingForSessionInternal(
+        'unit-skill-source-task',
+      );
+
+      expect(routing.availableSkills.map((item) => item.id), const <String>[
+        'bridge-skill',
+      ]);
+      expect(routing.explicitSkills, isEmpty);
+      expect(
+        controller.assistantSelectedSkillKeysForSession(
+          'unit-skill-source-task',
+        ),
+        isEmpty,
+      );
+    });
+
     test(
       'locks the gateway provider catalog to the canonical openclaw contract',
       () {
