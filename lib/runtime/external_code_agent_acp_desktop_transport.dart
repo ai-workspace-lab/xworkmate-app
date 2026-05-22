@@ -14,13 +14,19 @@ class ExternalCodeAgentAcpDesktopTransport
     required GatewayAcpClient client,
     required Uri? Function(AssistantExecutionTarget target) endpointResolver,
     Uri? Function(GoTaskServiceRequest request)? taskEndpointResolver,
+    Duration recoveryPollDelay = const Duration(seconds: 2),
+    int recoveryMaxAttempts = 300,
   }) : _client = client,
        _endpointResolver = endpointResolver,
-       _taskEndpointResolver = taskEndpointResolver;
+       _taskEndpointResolver = taskEndpointResolver,
+       _recoveryPollDelay = recoveryPollDelay,
+       _recoveryMaxAttempts = recoveryMaxAttempts;
 
   final GatewayAcpClient _client;
   final Uri? Function(AssistantExecutionTarget target) _endpointResolver;
   final Uri? Function(GoTaskServiceRequest request)? _taskEndpointResolver;
+  final Duration _recoveryPollDelay;
+  final int _recoveryMaxAttempts;
 
   @visibleForTesting
   GatewayAcpClient get clientForTest => _client;
@@ -195,9 +201,10 @@ class ExternalCodeAgentAcpDesktopTransport
     if (endpoint == null) {
       return null;
     }
-    for (var attempt = 0; attempt < 60; attempt += 1) {
+    final attempts = _recoveryMaxAttempts <= 0 ? 1 : _recoveryMaxAttempts;
+    for (var attempt = 0; attempt < attempts; attempt += 1) {
       if (attempt > 0) {
-        await Future<void>.delayed(const Duration(seconds: 2));
+        await Future<void>.delayed(_recoveryPollDelay);
       }
       Map<String, dynamic> response;
       try {
@@ -220,17 +227,33 @@ class ExternalCodeAgentAcpDesktopTransport
           .toString()
           .trim()
           .toLowerCase();
+      final terminal =
+          status == 'completed' ||
+          status == 'failed' ||
+          status == 'cancelled' ||
+          status == 'canceled';
+      if (!terminal) {
+        continue;
+      }
       final result = _recoveredResultFromSessionSnapshot(snapshot);
-      if (result.isNotEmpty &&
-          (status == 'completed' ||
-              status == 'failed' ||
-              status == 'cancelled' ||
-              status == 'canceled')) {
+      if (result.isNotEmpty) {
         return goTaskServiceResultFromAcpResponse(
           <String, dynamic>{
             'jsonrpc': '2.0',
             'id': 'recovered-from-session-snapshot',
             'result': result,
+          },
+          route: request.route,
+          streamedText: streamedText,
+          completedMessage: completedMessage,
+        );
+      }
+      if (status == 'failed' || status == 'cancelled' || status == 'canceled') {
+        return goTaskServiceResultFromAcpResponse(
+          <String, dynamic>{
+            'jsonrpc': '2.0',
+            'id': 'recovered-from-terminal-session-snapshot',
+            'result': _failureResultFromSessionSnapshot(snapshot, status),
           },
           route: request.route,
           streamedText: streamedText,
@@ -341,6 +364,40 @@ class ExternalCodeAgentAcpDesktopTransport
           (result[entry.value]?.toString().trim().isEmpty ?? true)) {
         result[entry.value] = value;
       }
+    }
+    return result;
+  }
+
+  Map<String, dynamic> _failureResultFromSessionSnapshot(
+    Map<String, dynamic> snapshot,
+    String status,
+  ) {
+    final task = _castMap(snapshot['task']);
+    final error = _castMap(snapshot['error']);
+    final message = _firstNonEmptyDisplayText(
+      <String, dynamic>{...error, ...snapshot, 'taskMessage': task['message']},
+      const <String>[
+        'message',
+        'error',
+        'errorMessage',
+        'reason',
+        'taskMessage',
+        'code',
+      ],
+    );
+    final code = _firstNonEmptyDisplayText(
+      <String, dynamic>{...error, ...snapshot, 'taskCode': task['code']},
+      const <String>['code', 'errorCode', 'taskCode'],
+    );
+    final result = <String, dynamic>{
+      'success': false,
+      'status': status,
+      'turnId': task['turnId']?.toString().trim() ?? '',
+      'error': message.isNotEmpty ? message : 'Bridge session ended: $status',
+      'message': message.isNotEmpty ? message : 'Bridge session ended: $status',
+    };
+    if (code.isNotEmpty) {
+      result['code'] = code;
     }
     return result;
   }
