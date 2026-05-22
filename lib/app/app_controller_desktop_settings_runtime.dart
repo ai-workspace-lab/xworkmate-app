@@ -33,7 +33,6 @@ import '../runtime/mode_switcher.dart';
 import '../runtime/agent_registry.dart';
 import '../runtime/multi_agent_orchestrator.dart';
 import '../runtime/platform_environment.dart';
-import '../runtime/skill_directory_access.dart';
 import 'app_controller_desktop_core.dart';
 import 'app_controller_desktop_navigation.dart';
 import 'app_controller_desktop_gateway.dart';
@@ -152,70 +151,6 @@ extension AppControllerDesktopSettingsRuntime on AppController {
       settings.copyWith(launchAtLogin: enabled),
       refreshAfterSave: false,
     );
-  }
-
-  Future<AuthorizedSkillDirectory?> authorizeSkillDirectory({
-    String suggestedPath = '',
-  }) {
-    return skillDirectoryAccessServiceInternal.authorizeDirectory(
-      suggestedPath: suggestedPath,
-    );
-  }
-
-  Future<List<AuthorizedSkillDirectory>> authorizeSkillDirectories({
-    List<String> suggestedPaths = const <String>[],
-  }) {
-    return skillDirectoryAccessServiceInternal.authorizeDirectories(
-      suggestedPaths: suggestedPaths,
-    );
-  }
-
-  Future<void> saveAuthorizedSkillDirectories(
-    List<AuthorizedSkillDirectory> directories,
-  ) async {
-    if (disposedInternal) {
-      return;
-    }
-    final previous = settings;
-    final previousDraft = settingsDraftInternal;
-    final hadDraftChanges = hasSettingsDraftChanges;
-    final draftInitialized = settingsDraftInitializedInternal;
-    final pendingSettingsApply = pendingSettingsApplyInternal;
-    final pendingGatewayApply = pendingGatewayApplyInternal;
-    final pendingAiGatewayApply = pendingAiGatewayApplyInternal;
-    await persistSettingsSnapshotInternal(
-      previous.copyWith(
-        authorizedSkillDirectories: normalizeAuthorizedSkillDirectories(
-          directories: directories,
-        ),
-      ),
-    );
-    if (disposedInternal) {
-      return;
-    }
-    await applyPersistedSettingsSideEffectsInternal(
-      previous: previous,
-      current: settings,
-      refreshAfterSave: false,
-    );
-    lastAppliedSettingsInternal = settings;
-    if (draftInitialized && hadDraftChanges) {
-      settingsDraftInternal = previousDraft.copyWith(
-        authorizedSkillDirectories: settings.authorizedSkillDirectories,
-      );
-      settingsDraftInitializedInternal = true;
-      pendingSettingsApplyInternal = pendingSettingsApply;
-      pendingGatewayApplyInternal = pendingGatewayApply;
-      pendingAiGatewayApplyInternal = pendingAiGatewayApply;
-    } else {
-      settingsDraftInternal = settings;
-      settingsDraftInitializedInternal = true;
-      pendingSettingsApplyInternal = false;
-      pendingGatewayApplyInternal = false;
-      pendingAiGatewayApplyInternal = false;
-      settingsDraftStatusMessageInternal = '';
-    }
-    notifyListeners();
   }
 
   Future<void> toggleAssistantNavigationDestination(
@@ -458,7 +393,7 @@ extension AppControllerDesktopSettingsRuntime on AppController {
   Future<void> initializeInternal() async {
     try {
       resolvedUserHomeDirectoryInternal = environmentOverrideInternal == null
-          ? await skillDirectoryAccessServiceInternal.resolveUserHomeDirectory()
+          ? resolveUserHomeDirectory()
           : resolveUserHomeDirectoryFromControllerEnvironmentInternal(
               environmentOverrideInternal,
             );
@@ -520,7 +455,6 @@ extension AppControllerDesktopSettingsRuntime on AppController {
         // Keep initialization resilient when remote account restore fails.
       }
       restoreAssistantThreadsInternal(sanitizedAssistantThreads);
-      await restoreSharedSingleAgentLocalSkillsCacheInternal();
       if (disposedInternal) {
         return;
       }
@@ -553,7 +487,6 @@ extension AppControllerDesktopSettingsRuntime on AppController {
       await restoreInitialAssistantSessionSelectionInternal();
       await ensureActiveAssistantThreadInternal();
       await ensureDesktopTaskThreadBindingInternal(currentSessionKey);
-      unawaited(startupRefreshSharedSingleAgentLocalSkillsCacheInternal());
       runtimeEventsSubscriptionInternal = runtimeCoordinatorInternal
           .gateway
           .events
@@ -733,22 +666,6 @@ extension AppControllerDesktopSettingsRuntime on AppController {
       key.startsWith('gateway_token_') ||
       key.startsWith('gateway_password_');
 
-  bool authorizedSkillDirectoriesChangedInternal(
-    SettingsSnapshot previous,
-    SettingsSnapshot current,
-  ) {
-    return jsonEncode(
-          previous.authorizedSkillDirectories
-              .map((item) => item.toJson())
-              .toList(growable: false),
-        ) !=
-        jsonEncode(
-          current.authorizedSkillDirectories
-              .map((item) => item.toJson())
-              .toList(growable: false),
-        );
-  }
-
   Future<void> persistSettingsSnapshotInternal(
     SettingsSnapshot snapshot,
   ) async {
@@ -806,12 +723,6 @@ extension AppControllerDesktopSettingsRuntime on AppController {
       await desktopPlatformServiceInternal.setLaunchAtLogin(
         current.launchAtLogin,
       );
-      if (disposedInternal) {
-        return;
-      }
-    }
-    if (authorizedSkillDirectoriesChangedInternal(previous, current)) {
-      await refreshSharedSingleAgentLocalSkillsCacheInternal(forceRescan: true);
       if (disposedInternal) {
         return;
       }

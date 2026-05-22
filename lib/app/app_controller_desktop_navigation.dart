@@ -31,7 +31,6 @@ import '../runtime/mode_switcher.dart';
 import '../runtime/agent_registry.dart';
 import '../runtime/multi_agent_orchestrator.dart';
 import '../runtime/platform_environment.dart';
-import '../runtime/skill_directory_access.dart';
 import 'app_controller_desktop_core.dart';
 import 'app_controller_desktop_gateway.dart';
 import 'app_controller_desktop_settings.dart';
