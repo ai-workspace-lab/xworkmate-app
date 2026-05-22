@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'acp_endpoint_paths.dart';
+import 'gateway_runtime_errors.dart';
+import 'gateway_runtime_session_client.dart';
 import 'runtime_models.dart';
 
 const int gatewayAcpHttpHandshakeInterruptedRetryCount = 5;
@@ -1372,6 +1374,94 @@ class GatewayAcpClient {
       }
     }
     throw const FormatException('Unterminated JSON document');
+  }
+}
+
+class GatewayAcpRuntimeSessionClient implements GatewayRuntimeSessionClient {
+  GatewayAcpRuntimeSessionClient({required this.client});
+
+  final GatewayAcpClient client;
+  final StreamController<GatewayRuntimeSessionUpdate> _updates =
+      StreamController<GatewayRuntimeSessionUpdate>.broadcast();
+
+  @override
+  Stream<GatewayRuntimeSessionUpdate> get updates => _updates.stream;
+
+  @override
+  Future<GatewayRuntimeSessionConnectResult> connect(
+    GatewayRuntimeSessionConnectRequest request,
+  ) async {
+    final envelope = await client.request(
+      method: 'xworkmate.gateway.connect',
+      params: request.toJson(),
+      onNotification: _handleNotification,
+    );
+    final result = client.asMap(envelope['result']);
+    _throwGatewayResultIfNeeded(result, 'gateway connect failed');
+    return GatewayRuntimeSessionConnectResult.fromJson(result);
+  }
+
+  @override
+  Future<dynamic> request({
+    required String runtimeId,
+    required String method,
+    Map<String, dynamic>? params,
+    Duration timeout = const Duration(seconds: 15),
+  }) async {
+    final envelope = await client.request(
+      method: 'xworkmate.gateway.request',
+      params: <String, dynamic>{
+        'runtimeId': runtimeId,
+        'method': method,
+        'params': params ?? const <String, dynamic>{},
+        'timeoutMs': timeout.inMilliseconds,
+      },
+      onNotification: _handleNotification,
+    );
+    final result = client.asMap(envelope['result']);
+    _throwGatewayResultIfNeeded(result, '$method request failed');
+    return result['payload'];
+  }
+
+  @override
+  Future<void> disconnect({required String runtimeId}) async {
+    await client.request(
+      method: 'xworkmate.gateway.disconnect',
+      params: <String, dynamic>{'runtimeId': runtimeId},
+      onNotification: _handleNotification,
+    );
+  }
+
+  @override
+  Future<void> dispose() async {
+    await _updates.close();
+  }
+
+  void _handleNotification(Map<String, dynamic> notification) {
+    final method = notification['method']?.toString().trim() ?? '';
+    if (!method.startsWith('xworkmate.gateway.')) {
+      return;
+    }
+    try {
+      _updates.add(GatewayRuntimeSessionUpdate.fromNotification(notification));
+    } on GatewayRuntimeException {
+      // Other bridge notifications are intentionally ignored by this adapter.
+    }
+  }
+
+  void _throwGatewayResultIfNeeded(
+    Map<String, dynamic> result,
+    String fallbackMessage,
+  ) {
+    if (client.boolValue(result['ok']) ?? false) {
+      return;
+    }
+    final error = client.asMap(result['error']);
+    throw GatewayRuntimeException(
+      client.stringValue(error['message']) ?? fallbackMessage,
+      code: client.stringValue(error['code']),
+      details: error['details'] ?? error,
+    );
   }
 }
 
