@@ -785,6 +785,194 @@ void main() {
     );
 
     test(
+      'keeps polling running OpenClaw snapshot after SSE connection close',
+      () async {
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        addTearDown(() => server.close(force: true));
+        var snapshotPolls = 0;
+        server.listen((request) async {
+          final body = await utf8.decoder.bind(request).join();
+          final decoded = jsonDecode(body) as Map<String, dynamic>;
+          final method = decoded['method']?.toString() ?? '';
+          final id = decoded['id']?.toString() ?? 'request-id';
+          if (method == 'session.start') {
+            final event = jsonEncode(<String, dynamic>{
+              'jsonrpc': '2.0',
+              'method': 'xworkmate.bridge.accepted',
+              'params': <String, dynamic>{'sessionId': 'unit-fixture-task-b'},
+            });
+            final eventBytes = utf8.encode('data: $event\n\n');
+            request.response.headers.set(
+              HttpHeaders.contentTypeHeader,
+              'text/event-stream',
+            );
+            request.response.contentLength = eventBytes.length + 128;
+            final socket = await request.response.detachSocket();
+            socket.add(eventBytes);
+            await socket.flush();
+            socket.destroy();
+            return;
+          }
+          if (method == 'xworkmate.sessions.get') {
+            snapshotPolls += 1;
+            final completed = snapshotPolls >= 3;
+            request.response.headers.contentType = ContentType.json;
+            request.response.write(
+              jsonEncode(<String, dynamic>{
+                'jsonrpc': '2.0',
+                'id': id,
+                'result': <String, dynamic>{
+                  'status': completed ? 'completed' : 'running',
+                  'sessionId': 'unit-fixture-task-b',
+                  'threadId': 'unit-fixture-task-b',
+                  'task': <String, dynamic>{
+                    'state': completed ? 'completed' : 'running',
+                    'turnId': 'turn-recovered-running',
+                  },
+                  if (completed)
+                    'result': <String, dynamic>{
+                      'success': true,
+                      'output': 'recovered after running snapshot',
+                      'turnId': 'turn-recovered-running',
+                    },
+                },
+              }),
+            );
+            await request.response.close();
+            return;
+          }
+          request.response.statusCode = HttpStatus.badRequest;
+          await request.response.close();
+        });
+        final endpoint = Uri.parse('http://127.0.0.1:${server.port}');
+        final transport = ExternalCodeAgentAcpDesktopTransport(
+          client: GatewayAcpClient(endpointResolver: () => endpoint),
+          endpointResolver: (_) => endpoint,
+          taskEndpointResolver: (_) =>
+              endpoint.replace(path: '/gateway/openclaw'),
+          recoveryPollDelay: Duration.zero,
+          recoveryMaxAttempts: 4,
+        );
+        addTearDown(transport.dispose);
+
+        final result = await transport.executeTask(
+          const GoTaskServiceRequest(
+            sessionId: 'unit-fixture-task-b',
+            threadId: 'unit-fixture-task-b',
+            target: AssistantExecutionTarget.gateway,
+            provider: SingleAgentProvider.openclaw,
+            prompt: 'wait for result',
+            workingDirectory: '/tmp/workspace',
+            model: '',
+            thinking: 'off',
+            selectedSkills: <String>[],
+            inlineAttachments: <GatewayChatAttachmentPayload>[],
+            localAttachments: <CollaborationAttachment>[],
+            agentId: '',
+            metadata: <String, dynamic>{},
+          ),
+          onUpdate: (_) {},
+        );
+
+        expect(snapshotPolls, 3);
+        expect(result.success, isTrue);
+        expect(result.message, 'recovered after running snapshot');
+      },
+    );
+
+    test(
+      'recovers terminal failed OpenClaw snapshot without displayable result',
+      () async {
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        addTearDown(() => server.close(force: true));
+        server.listen((request) async {
+          final body = await utf8.decoder.bind(request).join();
+          final decoded = jsonDecode(body) as Map<String, dynamic>;
+          final method = decoded['method']?.toString() ?? '';
+          final id = decoded['id']?.toString() ?? 'request-id';
+          if (method == 'session.start') {
+            final event = jsonEncode(<String, dynamic>{
+              'jsonrpc': '2.0',
+              'method': 'xworkmate.bridge.accepted',
+              'params': <String, dynamic>{'sessionId': 'unit-fixture-task-c'},
+            });
+            final eventBytes = utf8.encode('data: $event\n\n');
+            request.response.headers.set(
+              HttpHeaders.contentTypeHeader,
+              'text/event-stream',
+            );
+            request.response.contentLength = eventBytes.length + 128;
+            final socket = await request.response.detachSocket();
+            socket.add(eventBytes);
+            await socket.flush();
+            socket.destroy();
+            return;
+          }
+          if (method == 'xworkmate.sessions.get') {
+            request.response.headers.contentType = ContentType.json;
+            request.response.write(
+              jsonEncode(<String, dynamic>{
+                'jsonrpc': '2.0',
+                'id': id,
+                'result': <String, dynamic>{
+                  'status': 'failed',
+                  'sessionId': 'unit-fixture-task-c',
+                  'threadId': 'unit-fixture-task-c',
+                  'task': <String, dynamic>{
+                    'state': 'failed',
+                    'turnId': 'turn-failed',
+                  },
+                  'error': <String, dynamic>{
+                    'code': 'OPENCLAW_WAIT_FAILED',
+                    'message': 'openclaw wait failed',
+                  },
+                },
+              }),
+            );
+            await request.response.close();
+            return;
+          }
+          request.response.statusCode = HttpStatus.badRequest;
+          await request.response.close();
+        });
+        final endpoint = Uri.parse('http://127.0.0.1:${server.port}');
+        final transport = ExternalCodeAgentAcpDesktopTransport(
+          client: GatewayAcpClient(endpointResolver: () => endpoint),
+          endpointResolver: (_) => endpoint,
+          taskEndpointResolver: (_) =>
+              endpoint.replace(path: '/gateway/openclaw'),
+          recoveryPollDelay: Duration.zero,
+          recoveryMaxAttempts: 1,
+        );
+        addTearDown(transport.dispose);
+
+        final result = await transport.executeTask(
+          const GoTaskServiceRequest(
+            sessionId: 'unit-fixture-task-c',
+            threadId: 'unit-fixture-task-c',
+            target: AssistantExecutionTarget.gateway,
+            provider: SingleAgentProvider.openclaw,
+            prompt: 'fail task',
+            workingDirectory: '/tmp/workspace',
+            model: '',
+            thinking: 'off',
+            selectedSkills: <String>[],
+            inlineAttachments: <GatewayChatAttachmentPayload>[],
+            localAttachments: <CollaborationAttachment>[],
+            agentId: '',
+            metadata: <String, dynamic>{},
+          ),
+          onUpdate: (_) {},
+        );
+
+        expect(result.success, isFalse);
+        expect(result.status, 'failed');
+        expect(result.code, 'OPENCLAW_WAIT_FAILED');
+        expect(result.errorMessage, contains('openclaw wait failed'));
+      },
+    );
+
+    test(
       'retries interrupted TLS handshakes before surfacing ACP diagnostics',
       () async {
         final server = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
