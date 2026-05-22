@@ -93,6 +93,14 @@ class AppController extends ChangeNotifier {
     hostUiFeaturePlatformInternal = Platform.isIOS || Platform.isAndroid
         ? UiFeaturePlatform.mobile
         : UiFeaturePlatform.desktop;
+    settingsControllerInternal = SettingsController(
+      storeInternal,
+      accountClientFactory: accountClientFactory,
+    );
+    gatewayAcpClientInternal = GatewayAcpClient(
+      endpointResolver: resolveGatewayAcpEndpointInternal,
+      authorizationResolver: resolveGatewayAcpAuthorizationHeaderInternal,
+    );
 
     final resolvedRuntimeCoordinator =
         runtimeCoordinator ??
@@ -100,6 +108,9 @@ class AppController extends ChangeNotifier {
           gateway: GatewayRuntime(
             store: storeInternal,
             identityStore: DeviceIdentityStore(storeInternal),
+            sessionClient: GatewayAcpRuntimeSessionClient(
+              client: gatewayAcpClientInternal,
+            ),
           ),
           codex: CodexRuntime(),
           configBridge: CodexConfigBridge(),
@@ -111,10 +122,6 @@ class AppController extends ChangeNotifier {
     );
     codeAgentBridgeRegistryInternal = AgentRegistry(
       runtimeCoordinatorInternal.gateway,
-    );
-    settingsControllerInternal = SettingsController(
-      storeInternal,
-      accountClientFactory: accountClientFactory,
     );
     agentsControllerInternal = GatewayAgentsController(
       runtimeCoordinatorInternal.gateway,
@@ -142,10 +149,6 @@ class AppController extends ChangeNotifier {
     tasksControllerInternal = DerivedTasksController();
     desktopPlatformServiceInternal =
         desktopPlatformService ?? createDesktopPlatformService();
-    gatewayAcpClientInternal = GatewayAcpClient(
-      endpointResolver: resolveGatewayAcpEndpointInternal,
-      authorizationResolver: resolveGatewayAcpAuthorizationHeaderInternal,
-    );
     runtimeCoordinatorInternal.attachDispatchResolver(
       GoRuntimeDispatchDesktopClient(
         client: gatewayAcpClientInternal,
