@@ -507,7 +507,9 @@ class GatewayRuntime extends ChangeNotifier with GatewayRuntimeHelpersInternal {
     }
     reconnectTimerInternal?.cancel();
     if (sessionClientInternal != null) {
-      await sessionClientInternal!.disconnect(runtimeId: runtimeIdInternal);
+      if (isConnected) {
+        await sessionClientInternal!.disconnect(runtimeId: runtimeIdInternal);
+      }
       snapshotInternal =
           GatewayConnectionSnapshot.initial(
             mode: snapshotInternal.mode,
