@@ -35,7 +35,6 @@ import '../runtime/mode_switcher.dart';
 import '../runtime/agent_registry.dart';
 import '../runtime/multi_agent_orchestrator.dart';
 import '../runtime/platform_environment.dart';
-import '../runtime/skill_directory_access.dart';
 import 'app_controller_desktop_core.dart';
 import 'app_controller_desktop_navigation.dart';
 import 'app_controller_desktop_gateway.dart';
@@ -711,12 +710,6 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     multiAgentOrchestratorInternal.updateConfig(current.multiAgent);
     if (previous.codeAgentRuntimeMode != current.codeAgentRuntimeMode) {
       registerCodexExternalProviderInternal();
-      if (disposedInternal) {
-        return;
-      }
-    }
-    if (authorizedSkillDirectoriesChangedInternal(previous, current)) {
-      await refreshSharedSingleAgentLocalSkillsCacheInternal(forceRescan: true);
       if (disposedInternal) {
         return;
       }

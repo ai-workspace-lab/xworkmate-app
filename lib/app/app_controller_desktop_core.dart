@@ -40,7 +40,6 @@ import '../runtime/agent_registry.dart';
 import '../runtime/multi_agent_mounts.dart';
 import '../runtime/multi_agent_orchestrator.dart';
 import '../runtime/platform_environment.dart';
-import '../runtime/skill_directory_access.dart';
 import 'task_thread_repositories.dart';
 import 'app_controller_openclaw_task_queue.dart';
 import 'app_controller_desktop_navigation.dart';
@@ -56,68 +55,7 @@ import 'app_controller_desktop_runtime_helpers.dart';
 
 enum CodexCooperationState { notStarted, bridgeOnly, registered }
 
-class SingleAgentSkillScanRootInternal {
-  const SingleAgentSkillScanRootInternal({
-    required this.path,
-    required this.source,
-    required this.scope,
-    this.bookmark = '',
-  });
-
-  final String path;
-  final String source;
-  final String scope;
-  final String bookmark;
-
-  SingleAgentSkillScanRootInternal copyWith({
-    String? path,
-    String? source,
-    String? scope,
-    String? bookmark,
-  }) {
-    return SingleAgentSkillScanRootInternal(
-      path: path ?? this.path,
-      source: source ?? this.source,
-      scope: scope ?? this.scope,
-      bookmark: bookmark ?? this.bookmark,
-    );
-  }
-}
-
-const String singleAgentLocalSkillsCacheRelativePathInternal =
-    'cache/single-agent-local-skills.json';
-const int singleAgentLocalSkillsCacheSchemaVersionInternal = 4;
-
 class AppController extends ChangeNotifier {
-  static const List<SingleAgentSkillScanRootInternal>
-  defaultSingleAgentGlobalSkillScanRootsInternal =
-      <SingleAgentSkillScanRootInternal>[
-        SingleAgentSkillScanRootInternal(
-          path: '~/.agents/skills',
-          source: 'agents',
-          scope: 'user',
-        ),
-        SingleAgentSkillScanRootInternal(
-          path: '~/.codex/skills',
-          source: 'codex',
-          scope: 'user',
-        ),
-        SingleAgentSkillScanRootInternal(
-          path: '~/.workbuddy/skills',
-          source: 'workbuddy',
-          scope: 'user',
-        ),
-      ];
-  static const List<SingleAgentSkillScanRootInternal>
-  defaultSingleAgentWorkspaceSkillScanRootsInternal =
-      <SingleAgentSkillScanRootInternal>[
-        SingleAgentSkillScanRootInternal(
-          path: 'skills',
-          source: 'workspace',
-          scope: 'workspace',
-        ),
-      ];
-
   static const String draftAiGatewayApiKeyKeyInternal = 'ai_gateway_api_key';
   static const String draftVaultTokenKeyInternal = 'vault_token';
   static const String draftOllamaApiKeyKeyInternal = 'ollama_cloud_api_key';
@@ -130,10 +68,8 @@ class AppController extends ChangeNotifier {
     List<SingleAgentProvider>? initialBridgeProviderCatalog,
     List<SingleAgentProvider>? initialGatewayProviderCatalog,
     List<AssistantExecutionTarget>? initialAvailableExecutionTargets,
-    SkillDirectoryAccessService? skillDirectoryAccessService,
     AccountRuntimeClient Function(String baseUrl)? accountClientFactory,
     Map<String, String>? environmentOverride,
-    List<String>? singleAgentSharedSkillScanRootOverrides,
     GoTaskServiceClient? goTaskServiceClient,
     MultiAgentMountManager? multiAgentMountManager,
   }) {
@@ -206,10 +142,6 @@ class AppController extends ChangeNotifier {
     tasksControllerInternal = DerivedTasksController();
     desktopPlatformServiceInternal =
         desktopPlatformService ?? createDesktopPlatformService();
-    skillDirectoryAccessServiceInternal =
-        skillDirectoryAccessService ?? createSkillDirectoryAccessService();
-    singleAgentSharedSkillScanRootOverridesInternal =
-        singleAgentSharedSkillScanRootOverrides?.toList(growable: false);
     gatewayAcpClientInternal = GatewayAcpClient(
       endpointResolver: resolveGatewayAcpEndpointInternal,
       authorizationResolver: resolveGatewayAcpAuthorizationHeaderInternal,
@@ -271,7 +203,6 @@ class AppController extends ChangeNotifier {
     }
     openClawGatewayQueuedTurnsInternal.clear();
     openClawGatewayQueuedTurnsBySessionInternal.clear();
-    unawaited(persistSharedSingleAgentLocalSkillsCacheInternal());
     runtimeEventsSubscriptionInternal?.cancel();
     detachChildListenersInternal();
     runtimeCoordinatorInternal.dispose();
@@ -310,8 +241,6 @@ class AppController extends ChangeNotifier {
   late final DevicesController dogsControllerInternal;
   late final DerivedTasksController tasksControllerInternal;
   late final DesktopPlatformService desktopPlatformServiceInternal;
-  late final SkillDirectoryAccessService skillDirectoryAccessServiceInternal;
-  late final List<String>? singleAgentSharedSkillScanRootOverridesInternal;
   late final GatewayAcpClient gatewayAcpClientInternal;
   late final GoTaskServiceClient goTaskServiceClientInternal;
   late final MultiAgentOrchestrator multiAgentOrchestratorInternal;
@@ -340,10 +269,6 @@ class AppController extends ChangeNotifier {
       <String, String>{};
   final DesktopThreadArtifactService threadArtifactServiceInternal =
       DesktopThreadArtifactService();
-  List<AssistantThreadSkillEntry> singleAgentSharedImportedSkillsInternal =
-      const <AssistantThreadSkillEntry>[];
-  bool singleAgentLocalSkillsHydratedInternal = false;
-  Future<void>? singleAgentSharedSkillsRefreshInFlightInternal;
   final Map<String, HttpClient> aiGatewayStreamingClientsInternal =
       <String, HttpClient>{};
   final Set<String> aiGatewayPendingSessionKeysInternal = <String>{};
@@ -388,38 +313,6 @@ class AppController extends ChangeNotifier {
       SettingsSnapshot.defaults();
   Future<void> assistantThreadPersistQueueInternal = Future<void>.value();
   Future<void> settingsObservationQueueInternal = Future<void>.value();
-
-  List<SingleAgentSkillScanRootInternal>
-  get singleAgentSharedSkillScanRootsInternal {
-    final configuredRoots =
-        (singleAgentSharedSkillScanRootOverridesInternal?.map(
-          singleAgentSharedSkillScanRootFromOverrideInternal,
-        ))?.toList(growable: false) ??
-        defaultSingleAgentGlobalSkillScanRootsInternal;
-    final authorizedByPath = <String, AuthorizedSkillDirectory>{
-      for (final directory in settings.authorizedSkillDirectories)
-        normalizeAuthorizedSkillDirectoryPath(directory.path): directory,
-    };
-    final resolvedRoots = <SingleAgentSkillScanRootInternal>[];
-    final seenPaths = <String>{};
-    for (final root in configuredRoots) {
-      final resolvedPath = resolveSingleAgentSkillRootPathInternal(root.path);
-      if (resolvedPath.isEmpty || !seenPaths.add(resolvedPath)) {
-        continue;
-      }
-      final authorizedDirectory = authorizedByPath.remove(resolvedPath);
-      final bookmark = authorizedDirectory?.bookmark.trim() ?? '';
-      resolvedRoots.add(root.copyWith(bookmark: bookmark));
-    }
-    for (final directory in authorizedByPath.values) {
-      resolvedRoots.add(
-        singleAgentSharedSkillScanRootFromAuthorizedDirectoryInternal(
-          directory,
-        ),
-      );
-    }
-    return resolvedRoots;
-  }
 
   AppUiState get appUiState => appUiStateInternal;
 
@@ -492,14 +385,6 @@ class AppController extends ChangeNotifier {
   SettingsSnapshot get settings => settingsControllerInternal.snapshot;
   SettingsSnapshot get settingsDraft =>
       settingsDraftInitializedInternal ? settingsDraftInternal : settings;
-  bool get supportsSkillDirectoryAuthorization =>
-      skillDirectoryAccessServiceInternal.isSupported;
-  List<AuthorizedSkillDirectory> get authorizedSkillDirectories =>
-      settings.authorizedSkillDirectories;
-  List<String> get recommendedAuthorizedSkillDirectoryPaths =>
-      defaultSingleAgentGlobalSkillScanRootsInternal
-          .map((item) => item.path)
-          .toList(growable: false);
   String get userHomeDirectory => resolvedUserHomeDirectoryInternal;
   String get settingsYamlPath => defaultUserSettingsFilePath() ?? '';
   bool get hasSettingsDraftChanges =>
