@@ -173,7 +173,7 @@ class AssistantTaskRailStateInternal extends State<AssistantTaskRailInternal> {
                     MetaPillInternal(
                       label:
                           '${appText('技能', 'Skills')} ${widget.controller.currentAssistantSkillCount}',
-                      icon: Icons.auto_awesome_rounded,
+                      icon: Icons.key_rounded,
                     ),
                   ],
                 ),
