@@ -388,70 +388,6 @@ class GatewayChatMessage {
   }
 }
 
-class AssistantThreadSkillEntry {
-  const AssistantThreadSkillEntry({
-    required this.key,
-    required this.label,
-    required this.description,
-    this.source = '',
-    required this.sourcePath,
-    this.scope = '',
-    required this.sourceLabel,
-  });
-
-  final String key;
-  final String label;
-  final String description;
-  final String source;
-  final String sourcePath;
-  final String scope;
-  final String sourceLabel;
-
-  AssistantThreadSkillEntry copyWith({
-    String? key,
-    String? label,
-    String? description,
-    String? source,
-    String? sourcePath,
-    String? scope,
-    String? sourceLabel,
-  }) {
-    return AssistantThreadSkillEntry(
-      key: key ?? this.key,
-      label: label ?? this.label,
-      description: description ?? this.description,
-      source: source ?? this.source,
-      sourcePath: sourcePath ?? this.sourcePath,
-      scope: scope ?? this.scope,
-      sourceLabel: sourceLabel ?? this.sourceLabel,
-    );
-  }
-
-  Map<String, dynamic> toJson() {
-    return {
-      'key': key,
-      'label': label,
-      'description': description,
-      'source': source,
-      'sourcePath': sourcePath,
-      'scope': scope,
-      'sourceLabel': sourceLabel,
-    };
-  }
-
-  factory AssistantThreadSkillEntry.fromJson(Map<String, dynamic> json) {
-    return AssistantThreadSkillEntry(
-      key: json['key']?.toString() ?? '',
-      label: json['label']?.toString() ?? '',
-      description: json['description']?.toString() ?? '',
-      source: json['source']?.toString() ?? '',
-      sourcePath: json['sourcePath']?.toString() ?? '',
-      scope: json['scope']?.toString() ?? '',
-      sourceLabel: json['sourceLabel']?.toString() ?? '',
-    );
-  }
-}
-
 const int taskThreadSchemaVersion = 20260411;
 
 enum ThreadRealm { local, remote }
@@ -729,7 +665,6 @@ class ThreadContextState {
     required this.messages,
     required this.selectedModelId,
     required this.selectedSkillKeys,
-    required this.importedSkills,
     required this.permissionLevel,
     required this.messageViewMode,
     required this.latestResolvedRuntimeModel,
@@ -747,7 +682,6 @@ class ThreadContextState {
   final List<GatewayChatMessage> messages;
   final String selectedModelId;
   final List<String> selectedSkillKeys;
-  final List<AssistantThreadSkillEntry> importedSkills;
   final AssistantPermissionLevel permissionLevel;
   final AssistantMessageViewMode messageViewMode;
   final String latestResolvedRuntimeModel;
@@ -765,7 +699,6 @@ class ThreadContextState {
     List<GatewayChatMessage>? messages,
     String? selectedModelId,
     List<String>? selectedSkillKeys,
-    List<AssistantThreadSkillEntry>? importedSkills,
     AssistantPermissionLevel? permissionLevel,
     AssistantMessageViewMode? messageViewMode,
     String? latestResolvedRuntimeModel,
@@ -784,7 +717,6 @@ class ThreadContextState {
       messages: messages ?? this.messages,
       selectedModelId: selectedModelId ?? this.selectedModelId,
       selectedSkillKeys: selectedSkillKeys ?? this.selectedSkillKeys,
-      importedSkills: importedSkills ?? this.importedSkills,
       permissionLevel: permissionLevel ?? this.permissionLevel,
       messageViewMode: messageViewMode ?? this.messageViewMode,
       latestResolvedRuntimeModel:
@@ -814,9 +746,6 @@ class ThreadContextState {
       'messages': messages.map((item) => item.toJson()).toList(growable: false),
       'selectedModelId': selectedModelId,
       'selectedSkillKeys': selectedSkillKeys,
-      'importedSkills': importedSkills
-          .map((item) => item.toJson())
-          .toList(growable: false),
       'permissionLevel': permissionLevel.name,
       'messageViewMode': messageViewMode.name,
       'latestResolvedRuntimeModel': latestResolvedRuntimeModel,
@@ -850,18 +779,6 @@ class ThreadContextState {
               )
               .toList(growable: false)
         : const <GatewayChatMessage>[];
-    final rawImportedSkills = json['importedSkills'];
-    final importedSkills = rawImportedSkills is List
-        ? rawImportedSkills
-              .whereType<Map>()
-              .map(
-                (item) => AssistantThreadSkillEntry.fromJson(
-                  item.cast<String, dynamic>(),
-                ),
-              )
-              .where((item) => item.key.trim().isNotEmpty)
-              .toList(growable: false)
-        : const <AssistantThreadSkillEntry>[];
     final rawSelectedSkillKeys = json['selectedSkillKeys'];
     final selectedSkillKeys = rawSelectedSkillKeys is List
         ? rawSelectedSkillKeys
@@ -874,7 +791,6 @@ class ThreadContextState {
       messages: messages,
       selectedModelId: json['selectedModelId']?.toString() ?? '',
       selectedSkillKeys: selectedSkillKeys,
-      importedSkills: importedSkills,
       permissionLevel: AssistantPermissionLevelCopy.fromJsonValue(
         json['permissionLevel']?.toString(),
       ),
@@ -1002,7 +918,6 @@ class TaskThread {
     List<GatewayChatMessage>? messages,
     bool? archived,
     AssistantMessageViewMode? messageViewMode,
-    List<AssistantThreadSkillEntry>? importedSkills,
     List<String>? selectedSkillKeys,
     String? assistantModelId,
     String? gatewayEntryState,
@@ -1041,8 +956,6 @@ class TaskThread {
              messages: messages ?? const <GatewayChatMessage>[],
              selectedModelId: assistantModelId?.trim() ?? '',
              selectedSkillKeys: selectedSkillKeys ?? const <String>[],
-             importedSkills:
-                 importedSkills ?? const <AssistantThreadSkillEntry>[],
              permissionLevel:
                  permissionLevel ?? AssistantPermissionLevel.defaultAccess,
              messageViewMode:
@@ -1090,8 +1003,6 @@ class TaskThread {
 
   String get sessionKey => threadId;
   List<GatewayChatMessage> get messages => contextState.messages;
-  List<AssistantThreadSkillEntry> get importedSkills =>
-      contextState.importedSkills;
   List<String> get selectedSkillKeys => contextState.selectedSkillKeys;
   String get assistantModelId => contextState.selectedModelId;
   AssistantMessageViewMode get messageViewMode => contextState.messageViewMode;
@@ -1134,7 +1045,6 @@ class TaskThread {
     List<GatewayChatMessage>? messages,
     bool? archived,
     AssistantMessageViewMode? messageViewMode,
-    List<AssistantThreadSkillEntry>? importedSkills,
     List<String>? selectedSkillKeys,
     String? assistantModelId,
     ThreadSelectionSource? assistantModelSource,
@@ -1158,7 +1068,6 @@ class TaskThread {
       contextState: (contextState ?? this.contextState).copyWith(
         messages: messages,
         messageViewMode: messageViewMode,
-        importedSkills: importedSkills,
         selectedSkillKeys: selectedSkillKeys,
         selectedModelId: assistantModelId,
         selectedModelSource: assistantModelSource,
@@ -1276,7 +1185,6 @@ class TaskThread {
         'messages': json['messages'],
         'selectedModelId': json['assistantModelId'],
         'selectedSkillKeys': json['selectedSkillKeys'],
-        'importedSkills': json['importedSkills'],
         'permissionLevel': json['permissionLevel'],
         'messageViewMode': json['messageViewMode'],
         'latestResolvedRuntimeModel': json['latestResolvedRuntimeModel'],

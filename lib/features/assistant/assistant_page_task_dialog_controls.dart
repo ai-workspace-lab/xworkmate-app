@@ -23,9 +23,8 @@ class AssistantTaskDialogModeControlsInternal extends StatelessWidget {
     final uiFeatures = controller.featuresFor(
       resolveUiFeaturePlatformFromContext(context),
     );
-    final supportedExecutionTargets = compactAssistantExecutionTargets(
-      uiFeatures.availableExecutionTargets,
-    );
+    final supportedExecutionTargets = controller
+        .visibleAssistantExecutionTargets(uiFeatures.availableExecutionTargets);
     if (supportedExecutionTargets.isEmpty) {
       return const SizedBox.shrink();
     }

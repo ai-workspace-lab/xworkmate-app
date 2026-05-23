@@ -94,6 +94,7 @@ class SkillPickerPopoverInternal extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = context.palette;
     final theme = Theme.of(context);
+    final groupedSkills = skillPickerSectionsInternal(filteredSkills);
     return Material(
       key: const Key('assistant-skill-picker-popover'),
       color: Colors.transparent,
@@ -174,25 +175,100 @@ class SkillPickerPopoverInternal extends StatelessWidget {
                           ),
                         ),
                       )
-                    : ListView.separated(
+                    : ListView.builder(
                         padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
-                        itemCount: filteredSkills.length,
-                        separatorBuilder: (_, _) => const SizedBox(height: 8),
+                        itemCount: groupedSkills.length,
                         itemBuilder: (context, index) {
-                          final skill = filteredSkills[index];
-                          return SkillPickerTileInternal(
-                            key: ValueKey<String>(
-                              'assistant-skill-option-${skill.key}',
+                          final row = groupedSkills[index];
+                          if (row.headerLabel != null) {
+                            return SkillPickerGroupHeaderInternal(
+                              key: ValueKey<String>(
+                                'assistant-skill-group-${row.headerLabel}',
+                              ),
+                              label: row.headerLabel!,
+                            );
+                          }
+                          final skill = row.skill!;
+                          return Padding(
+                            padding: EdgeInsets.only(
+                              bottom: index == groupedSkills.length - 1 ? 0 : 8,
                             ),
-                            option: skill,
-                            selected: selectedSkillKeys.contains(skill.key),
-                            onTap: () => onToggleSkill(skill.key),
+                            child: SkillPickerTileInternal(
+                              key: ValueKey<String>(
+                                'assistant-skill-option-${skill.key}',
+                              ),
+                              option: skill,
+                              selected: selectedSkillKeys.contains(skill.key),
+                              onTap: () => onToggleSkill(skill.key),
+                            ),
                           );
                         },
                       ),
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+List<SkillPickerRowInternal> skillPickerSectionsInternal(
+  List<ComposerSkillOptionInternal> skills,
+) {
+  final groupsByLabel = <String, List<ComposerSkillOptionInternal>>{};
+  final groupSortOrders = <String, int>{};
+  for (final skill in skills) {
+    groupsByLabel.putIfAbsent(skill.groupLabel, () => []).add(skill);
+    groupSortOrders[skill.groupLabel] = skill.groupSortOrder;
+  }
+  final labels = groupsByLabel.keys.toList(growable: false)
+    ..sort((a, b) {
+      final orderCompare = (groupSortOrders[a] ?? 999).compareTo(
+        groupSortOrders[b] ?? 999,
+      );
+      if (orderCompare != 0) {
+        return orderCompare;
+      }
+      return a.compareTo(b);
+    });
+
+  final rows = <SkillPickerRowInternal>[];
+  for (final label in labels) {
+    rows.add(SkillPickerRowInternal.header(label));
+    for (final skill in groupsByLabel[label]!) {
+      rows.add(SkillPickerRowInternal.skill(skill));
+    }
+  }
+  return rows;
+}
+
+class SkillPickerRowInternal {
+  const SkillPickerRowInternal.header(this.headerLabel) : skill = null;
+  const SkillPickerRowInternal.skill(this.skill) : headerLabel = null;
+
+  final String? headerLabel;
+  final ComposerSkillOptionInternal? skill;
+}
+
+class SkillPickerGroupHeaderInternal extends StatelessWidget {
+  const SkillPickerGroupHeaderInternal({super.key, required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final palette = context.palette;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(4, 6, 4, 8),
+      child: Text(
+        label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: theme.textTheme.labelMedium?.copyWith(
+          color: palette.textSecondary,
+          fontWeight: FontWeight.w700,
         ),
       ),
     );

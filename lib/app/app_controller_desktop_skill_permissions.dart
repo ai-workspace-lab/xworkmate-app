@@ -45,32 +45,6 @@ import 'app_controller_desktop_runtime_helpers.dart';
 
 // ignore_for_file: invalid_use_of_visible_for_testing_member, invalid_use_of_protected_member
 extension AppControllerDesktopSkillPermissions on AppController {
-  Future<void> replaceSingleAgentThreadSkillsInternal(
-    String sessionKey,
-    List<AssistantThreadSkillEntry> importedSkills,
-  ) async {
-    final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
-      sessionKey,
-    );
-    final importedKeys = importedSkills.map((item) => item.key).toSet();
-    final nextSelected =
-        (assistantThreadRecordsInternal[normalizedSessionKey]
-                    ?.selectedSkillKeys ??
-                const <String>[])
-            .where(importedKeys.contains)
-            .toList(growable: false);
-    upsertTaskThreadInternal(
-      normalizedSessionKey,
-      importedSkills: importedSkills,
-      selectedSkillKeys: nextSelected,
-      selectedSkillsSource: assistantThreadRecordsInternal[normalizedSessionKey]
-          ?.contextState
-          .selectedSkillsSource,
-      updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-    );
-    notifyIfActiveInternal();
-  }
-
   void upsertTaskThreadInternal(
     String sessionKey, {
     ThreadOwnerScope? ownerScope,
@@ -84,7 +58,6 @@ extension AppControllerDesktopSkillPermissions on AppController {
     bool? archived,
     AssistantExecutionTarget? executionTarget,
     AssistantMessageViewMode? messageViewMode,
-    List<AssistantThreadSkillEntry>? importedSkills,
     List<String>? selectedSkillKeys,
     String? assistantModelId,
     SingleAgentProvider? selectedProvider,
@@ -120,15 +93,19 @@ extension AppControllerDesktopSkillPermissions on AppController {
           ThreadExecutionMode.gateway => AssistantExecutionTarget.gateway,
           null => AssistantExecutionTarget.agent,
         };
-    final nextImportedSkills =
-        importedSkills ??
-        existing?.importedSkills ??
-        const <AssistantThreadSkillEntry>[];
-    final importedKeys = nextImportedSkills.map((item) => item.key).toSet();
-    final nextSelectedSkillKeys =
-        (selectedSkillKeys ?? existing?.selectedSkillKeys ?? const <String>[])
-            .where(importedKeys.contains)
-            .toList(growable: false);
+    final bridgeSkillKeys = skills
+        .map((item) => item.skillKey.trim())
+        .where((item) => item.isNotEmpty)
+        .toSet();
+    final selectedSkillCandidates =
+        selectedSkillKeys ?? existing?.selectedSkillKeys ?? const <String>[];
+    final nextSelectedSkillKeys = selectedSkillCandidates
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty)
+        .where(
+          (item) => bridgeSkillKeys.isEmpty || bridgeSkillKeys.contains(item),
+        )
+        .toList(growable: false);
     final nextMessages =
         messages ??
         existing?.messages ??
@@ -213,7 +190,6 @@ extension AppControllerDesktopSkillPermissions on AppController {
                         nextExecutionTarget,
                       ),
                   selectedSkillKeys: const <String>[],
-                  importedSkills: const <AssistantThreadSkillEntry>[],
                   permissionLevel: AssistantPermissionLevel.defaultAccess,
                   messageViewMode: AssistantMessageViewMode.rendered,
                   latestResolvedRuntimeModel: '',
@@ -230,7 +206,6 @@ extension AppControllerDesktopSkillPermissions on AppController {
             .copyWith(
               messages: nextMessages,
               messageViewMode: messageViewMode,
-              importedSkills: nextImportedSkills,
               selectedSkillKeys: nextSelectedSkillKeys,
               selectedModelId:
                   assistantModelId ??

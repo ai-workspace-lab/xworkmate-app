@@ -532,9 +532,8 @@ extension AppControllerDesktopThreadStorage on AppController {
         archived: record.archived,
         messageViewMode: record.messageViewMode,
         selectedSkillKeys: record.selectedSkillKeys
-            .where(
-              (item) => record.importedSkills.any((skill) => skill.key == item),
-            )
+            .map((item) => item.trim())
+            .where((item) => item.isNotEmpty)
             .toList(growable: false),
         assistantModelId: record.assistantModelId.trim().isEmpty
             ? resolvedAssistantModelForTargetInternal(normalizedExecutionTarget)
