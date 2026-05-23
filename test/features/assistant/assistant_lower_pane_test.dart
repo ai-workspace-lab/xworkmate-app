@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:xworkmate/app/app_controller.dart';
 import 'package:xworkmate/features/assistant/assistant_page_composer_clipboard.dart';
 import 'package:xworkmate/features/assistant/assistant_page_composer_skill_models.dart';
+import 'package:xworkmate/features/assistant/assistant_page_composer_skill_picker.dart';
 import 'package:xworkmate/features/assistant/assistant_page_main.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
 import 'package:xworkmate/theme/app_theme.dart';
@@ -320,7 +321,7 @@ void main() {
     });
 
     testWidgets(
-      'keeps task dialog modes selectable when only OpenClaw is live',
+      'does not fabricate agent mode when only OpenClaw gateway is live',
       (tester) async {
         final controller = AppController(
           environmentOverride: const <String, String>{},
@@ -355,13 +356,89 @@ void main() {
         );
         await tester.pumpAndSettle();
 
-        final agentItem = tester
-            .widget<PopupMenuItem<AssistantExecutionTarget>>(
-              find.byKey(
-                const Key('assistant-execution-target-menu-item-agent'),
-              ),
-            );
-        expect(agentItem.enabled, isTrue);
+        expect(
+          find.byKey(const Key('assistant-execution-target-menu-item-agent')),
+          findsNothing,
+        );
+        expect(
+          find.byKey(const Key('assistant-execution-target-menu-item-gateway')),
+          findsOneWidget,
+        );
+      },
+    );
+
+    testWidgets(
+      'allows switching from Gateway back to Agent when bridge reports both',
+      (tester) async {
+        final controller = AppController(
+          environmentOverride: const <String, String>{},
+          initialBridgeProviderCatalog: const <SingleAgentProvider>[
+            SingleAgentProvider.codex,
+            SingleAgentProvider.opencode,
+          ],
+          initialGatewayProviderCatalog: const <SingleAgentProvider>[
+            SingleAgentProvider.openclaw,
+          ],
+          initialAvailableExecutionTargets: const <AssistantExecutionTarget>[
+            AssistantExecutionTarget.agent,
+            AssistantExecutionTarget.gateway,
+          ],
+        );
+        addTearDown(controller.dispose);
+
+        await controller.sessionsController.switchSession(
+          'unit-fixture-task-a',
+        );
+        controller.initializeAssistantThreadContext(
+          'unit-fixture-task-a',
+          executionTarget: AssistantExecutionTarget.gateway,
+          messageViewMode: controller.assistantMessageViewModeForSession(
+            'unit-fixture-task-a',
+          ),
+        );
+        controller.notifyListeners();
+
+        await tester.pumpWidget(
+          _buildTestApp(child: _buildLowerPane(controller: controller)),
+        );
+        await tester.pumpAndSettle();
+
+        expect(controller.currentAssistantExecutionTarget.isGateway, isTrue);
+
+        await tester.tap(
+          find.byKey(const Key('assistant-execution-target-button')),
+        );
+        await tester.pumpAndSettle();
+
+        expect(
+          find.byKey(const Key('assistant-execution-target-menu-item-agent')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const Key('assistant-execution-target-menu-item-gateway')),
+          findsOneWidget,
+        );
+
+        await tester.tap(
+          find.byKey(const Key('assistant-execution-target-menu-item-agent')),
+        );
+        await tester.pumpAndSettle();
+
+        expect(controller.currentAssistantExecutionTarget.isAgent, isTrue);
+        expect(
+          controller
+              .providerCatalogForExecutionTarget(AssistantExecutionTarget.agent)
+              .map((provider) => provider.providerId),
+          const <String>['codex', 'opencode'],
+        );
+        expect(
+          controller
+              .providerCatalogForExecutionTarget(
+                AssistantExecutionTarget.gateway,
+              )
+              .map((provider) => provider.providerId),
+          const <String>[kCanonicalGatewayProviderId],
+        );
       },
     );
 
@@ -395,6 +472,113 @@ void main() {
       await tester.pump();
 
       expect(sendCount, 1);
+    });
+
+    testWidgets('groups all visible skills by source', (tester) async {
+      final toggledKeys = <String>[];
+      final searchController = TextEditingController();
+      final focusNode = FocusNode();
+      addTearDown(searchController.dispose);
+      addTearDown(focusNode.dispose);
+
+      await tester.pumpWidget(
+        _buildTestApp(
+          child: SkillPickerPopoverInternal(
+            maxHeight: 360,
+            searchController: searchController,
+            searchFocusNode: focusNode,
+            selectedSkillKeys: const <String>[],
+            filteredSkills: const <ComposerSkillOptionInternal>[
+              ComposerSkillOptionInternal(
+                key: 'pdf',
+                label: 'PDF',
+                description: 'Create PDF files',
+                sourceLabel: 'openclaw-workspace',
+                groupLabel: 'Workspace Skills',
+                groupSortOrder: 0,
+                icon: Icons.key_rounded,
+              ),
+              ComposerSkillOptionInternal(
+                key: 'browser-automation',
+                label: 'Browser Automation',
+                description: 'Automate browsers',
+                sourceLabel: 'agents-skills-personal',
+                groupLabel: 'Agent Skills',
+                groupSortOrder: 1,
+                icon: Icons.key_rounded,
+              ),
+              ComposerSkillOptionInternal(
+                key: 'gateway-search',
+                label: 'Gateway Search',
+                description: 'Search through the gateway',
+                sourceLabel: 'gateway',
+                groupLabel: 'Gateway Skills',
+                groupSortOrder: 2,
+                icon: Icons.key_rounded,
+              ),
+            ],
+            isLoading: false,
+            hasQuery: false,
+            onQueryChanged: (_) {},
+            onToggleSkill: toggledKeys.add,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Workspace Skills'), findsOneWidget);
+      expect(find.text('Agent Skills'), findsOneWidget);
+      expect(find.text('Gateway Skills'), findsOneWidget);
+
+      await tester.tap(
+        find.byKey(
+          const ValueKey<String>('assistant-skill-option-browser-automation'),
+        ),
+      );
+      await tester.pump();
+
+      expect(toggledKeys, const <String>['browser-automation']);
+    });
+
+    testWidgets('search results only keep groups with matching skills', (
+      tester,
+    ) async {
+      final searchController = TextEditingController(text: 'gateway');
+      final focusNode = FocusNode();
+      addTearDown(searchController.dispose);
+      addTearDown(focusNode.dispose);
+
+      await tester.pumpWidget(
+        _buildTestApp(
+          child: SkillPickerPopoverInternal(
+            maxHeight: 360,
+            searchController: searchController,
+            searchFocusNode: focusNode,
+            selectedSkillKeys: const <String>[],
+            filteredSkills: const <ComposerSkillOptionInternal>[
+              ComposerSkillOptionInternal(
+                key: 'gateway-search',
+                label: 'Gateway Search',
+                description: 'Search through the gateway',
+                sourceLabel: 'gateway',
+                groupLabel: 'Gateway Skills',
+                groupSortOrder: 2,
+                icon: Icons.key_rounded,
+              ),
+            ],
+            isLoading: false,
+            hasQuery: true,
+            onQueryChanged: (_) {},
+            onToggleSkill: (_) {},
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Gateway Skills'), findsOneWidget);
+      expect(find.text('Gateway Search'), findsOneWidget);
+      expect(find.text('Workspace Skills'), findsNothing);
+      expect(find.text('Agent Skills'), findsNothing);
     });
   });
 }
