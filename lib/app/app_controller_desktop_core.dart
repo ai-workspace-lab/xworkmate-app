@@ -184,9 +184,8 @@ class AppController extends ChangeNotifier {
     bridgeGatewayProviderCatalogInternal = normalizeSingleAgentProviderList(
       initialGatewayProviderCatalog ?? const <SingleAgentProvider>[],
     );
-    bridgeAvailableExecutionTargetsInternal = compactAssistantExecutionTargets(
-      initialAvailableExecutionTargets ?? const <AssistantExecutionTarget>[],
-    );
+    bridgeAvailableExecutionTargetsInternal =
+        initialAvailableExecutionTargets ?? const <AssistantExecutionTarget>[];
     bridgeCapabilitiesRefreshAttemptedInternal =
         bridgeAgentProviderCatalogInternal.isNotEmpty ||
         bridgeGatewayProviderCatalogInternal.isNotEmpty;
@@ -503,7 +502,9 @@ class AppController extends ChangeNotifier {
         !targets.contains(AssistantExecutionTarget.gateway)) {
       targets.add(AssistantExecutionTarget.gateway);
     }
-    return compactAssistantExecutionTargets(targets);
+    return AssistantExecutionTarget.values
+        .where(targets.contains)
+        .toList(growable: false);
   }
 
   List<SingleAgentProvider> providerCatalogForExecutionTarget(

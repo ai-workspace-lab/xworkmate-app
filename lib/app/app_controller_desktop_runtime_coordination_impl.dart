@@ -67,9 +67,7 @@ Future<void> refreshAcpCapabilitiesRuntimeInternal(
     controller.bridgeGatewayProviderCatalogInternal =
         normalizeSingleAgentProviderList(capabilities.gatewayProviderCatalog);
     controller.bridgeAvailableExecutionTargetsInternal =
-        compactAssistantExecutionTargets(
-          capabilities.availableExecutionTargets,
-        );
+        capabilities.availableExecutionTargets;
   } else if (refreshError != null) {
     controller.bridgeCapabilitiesRefreshErrorInternal = refreshError
         .toString()
@@ -106,20 +104,12 @@ Future<void> refreshSingleAgentCapabilitiesRuntimeInternal(
     controller.bridgeGatewayProviderCatalogInternal =
         normalizeSingleAgentProviderList(capabilities.gatewayProviderCatalog);
     controller.bridgeAvailableExecutionTargetsInternal =
-        compactAssistantExecutionTargets(
-          capabilities.availableExecutionTargets,
-        );
+        capabilities.availableExecutionTargets;
     controller.bridgeCapabilitiesRefreshAttemptedInternal = true;
     controller.bridgeCapabilitiesRefreshErrorInternal = '';
   } catch (error) {
     controller.bridgeCapabilitiesRefreshAttemptedInternal = true;
     controller.bridgeCapabilitiesRefreshErrorInternal = error.toString().trim();
-    controller.bridgeAgentProviderCatalogInternal =
-        const <SingleAgentProvider>[];
-    controller.bridgeGatewayProviderCatalogInternal =
-        const <SingleAgentProvider>[];
-    controller.bridgeAvailableExecutionTargetsInternal =
-        const <AssistantExecutionTarget>[];
   }
   if (!controller.disposedInternal) {
     controller.notifyListeners();

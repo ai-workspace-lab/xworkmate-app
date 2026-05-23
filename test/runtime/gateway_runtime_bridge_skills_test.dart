@@ -59,6 +59,8 @@ void main() {
                 'payload': <String, dynamic>{
                   'workspaceDir': '/home/ubuntu/.openclaw/workspace',
                   'managedSkillsDir': '/home/ubuntu/.openclaw/skills',
+                  'agentId': 'main',
+                  'agentSkillFilter': <String>['it-infra-continuous-png'],
                   'skills': <Map<String, dynamic>>[
                     <String, dynamic>{
                       'name': 'it-infra-continuous-png',
@@ -67,6 +69,25 @@ void main() {
                       'skillKey': 'it-infra-continuous-png',
                       'eligible': true,
                       'disabled': false,
+                      'blockedByAgentFilter': false,
+                      'modelVisible': true,
+                      'commandVisible': true,
+                      'missing': <String, dynamic>{
+                        'bins': <String>[],
+                        'env': <String>[],
+                        'config': <String>[],
+                      },
+                    },
+                    <String, dynamic>{
+                      'name': 'blocked-for-agent',
+                      'description': 'Visible in status, hidden from model.',
+                      'source': 'openclaw-workspace',
+                      'skillKey': 'blocked-for-agent',
+                      'eligible': true,
+                      'disabled': false,
+                      'blockedByAgentFilter': true,
+                      'modelVisible': false,
+                      'commandVisible': false,
                       'missing': <String, dynamic>{
                         'bins': <String>[],
                         'env': <String>[],
@@ -133,9 +154,12 @@ void main() {
         (observedGatewayRequests.single['params'] as Map)['agentId'],
         'main',
       );
-      expect(controller.items, hasLength(1));
-      expect(controller.items.single.skillKey, 'it-infra-continuous-png');
-      expect(controller.items.single.eligible, isTrue);
+      expect(controller.items, hasLength(2));
+      expect(controller.items.map((item) => item.skillKey), const <String>[
+        'it-infra-continuous-png',
+        'blocked-for-agent',
+      ]);
+      expect(controller.items.first.eligible, isTrue);
     },
   );
 }
