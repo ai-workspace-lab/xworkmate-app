@@ -104,6 +104,8 @@ class GatewayRuntime extends ChangeNotifier with GatewayRuntimeHelpersInternal {
   GatewayRuntimeSessionClient? get sessionClientForTest =>
       sessionClientInternal;
 
+  bool get canConnectBridgeSession => sessionClientInternal != null;
+
   Future<void> initialize() async {
     sessionUpdatesInternal ??= sessionClientInternal?.updates.listen(
       _handleSessionUpdateInternal,
@@ -535,6 +537,23 @@ class GatewayRuntime extends ChangeNotifier with GatewayRuntimeHelpersInternal {
           hasDeviceToken: snapshotInternal.hasDeviceToken,
         );
     notifyListeners();
+  }
+
+  Future<void> ensureBridgeSessionConnected({
+    String selectedAgentId = '',
+  }) async {
+    if (isConnected || sessionClientInternal == null) {
+      return;
+    }
+    await connectProfile(
+      GatewayConnectionProfile.defaultsGateway().copyWith(
+        mode: RuntimeConnectionMode.remote,
+        host: '127.0.0.1',
+        port: 18789,
+        tls: false,
+        selectedAgentId: selectedAgentId,
+      ),
+    );
   }
 
   Future<Map<String, dynamic>> health() => _healthInternal();
