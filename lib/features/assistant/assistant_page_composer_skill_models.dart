@@ -45,6 +45,7 @@ ComposerSkillOptionInternal skillOptionFromGatewayInternal(
       : skill.skillKey.trim();
   final label = skill.name.trim().isEmpty ? key : skill.name.trim();
   final sourceLabel = skill.source.trim().isEmpty ? 'Gateway' : skill.source;
+  final group = skillGroupForSourceInternal(skill.source);
   final description = skill.description.trim().isEmpty
       ? appText('可在当前任务中调用的技能。', 'Skill available in the current task.')
       : skill.description.trim();
@@ -54,8 +55,52 @@ ComposerSkillOptionInternal skillOptionFromGatewayInternal(
     label: label,
     description: description,
     sourceLabel: sourceLabel,
+    groupLabel: group.label,
+    groupSortOrder: group.sortOrder,
     icon: Icons.key_rounded,
   );
+}
+
+ComposerSkillGroupInternal skillGroupForSourceInternal(String source) {
+  final normalized = source.trim().toLowerCase();
+  if (normalized == 'openclaw-workspace') {
+    return const ComposerSkillGroupInternal(
+      label: 'Workspace Skills',
+      sortOrder: 0,
+    );
+  }
+  if (normalized.startsWith('agents-skills-') ||
+      normalized == 'agent' ||
+      normalized.startsWith('agent-') ||
+      normalized.contains('personal')) {
+    return const ComposerSkillGroupInternal(
+      label: 'Agent Skills',
+      sortOrder: 1,
+    );
+  }
+  if (normalized == 'bridge' || normalized == 'gateway') {
+    return const ComposerSkillGroupInternal(
+      label: 'Gateway Skills',
+      sortOrder: 2,
+    );
+  }
+  if (normalized.isEmpty) {
+    return const ComposerSkillGroupInternal(
+      label: 'Gateway Skills',
+      sortOrder: 2,
+    );
+  }
+  return const ComposerSkillGroupInternal(label: 'Other Skills', sortOrder: 3);
+}
+
+class ComposerSkillGroupInternal {
+  const ComposerSkillGroupInternal({
+    required this.label,
+    required this.sortOrder,
+  });
+
+  final String label;
+  final int sortOrder;
 }
 
 class ComposerSkillOptionInternal {
@@ -64,6 +109,8 @@ class ComposerSkillOptionInternal {
     required this.label,
     required this.description,
     required this.sourceLabel,
+    required this.groupLabel,
+    required this.groupSortOrder,
     required this.icon,
   });
 
@@ -71,5 +118,7 @@ class ComposerSkillOptionInternal {
   final String label;
   final String description;
   final String sourceLabel;
+  final String groupLabel;
+  final int groupSortOrder;
   final IconData icon;
 }
