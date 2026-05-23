@@ -6,12 +6,11 @@ import 'package:xworkmate/runtime/device_identity_store.dart';
 import 'package:xworkmate/runtime/gateway_acp_client.dart';
 import 'package:xworkmate/runtime/gateway_runtime.dart';
 import 'package:xworkmate/runtime/runtime_controllers.dart';
-import 'package:xworkmate/runtime/runtime_models.dart';
 import 'package:xworkmate/runtime/secure_config_store.dart';
 
 void main() {
   test(
-    'SkillsController loads OpenClaw skills through bridge gateway request',
+    'SkillsController lazily connects and loads OpenClaw skills through bridge gateway request',
     () async {
       final observedMethods = <String>[];
       final observedGatewayRequests = <Map<String, dynamic>>[];
@@ -121,20 +120,6 @@ void main() {
         await server.close(force: true);
         await tempDir.delete(recursive: true);
       });
-
-      await runtime.connectProfile(
-        const GatewayConnectionProfile(
-          mode: RuntimeConnectionMode.remote,
-          useSetupCode: false,
-          setupCode: '',
-          host: 'xworkmate-bridge.svc.plus',
-          port: 443,
-          tls: true,
-          tokenRef: '',
-          passwordRef: '',
-          selectedAgentId: 'main',
-        ),
-      );
 
       final controller = SkillsController(runtime);
       await controller.refresh(agentId: 'main');
