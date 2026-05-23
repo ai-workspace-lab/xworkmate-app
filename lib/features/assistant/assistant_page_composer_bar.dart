@@ -509,7 +509,7 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
                             borderRadius: BorderRadius.circular(AppRadius.chip),
                             onTap: toggleSkillPickerInternal,
                             child: ComposerToolbarChipInternal(
-                              icon: Icons.auto_awesome_rounded,
+                              icon: Icons.key_rounded,
                               tooltip: skillsTooltipInternal(
                                 selectedSkills.length,
                               ),
