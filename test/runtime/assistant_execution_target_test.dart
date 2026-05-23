@@ -476,9 +476,89 @@ void main() {
         expect(option.key, 'browser-fetch');
         expect(option.label, 'Browser Fetch');
         expect(option.description, 'Bridge-managed browser skill');
+        expect(option.groupLabel, 'Gateway Skills');
         expect(option.icon, Icons.key_rounded);
       },
     );
+
+    test('all bridge skill sources remain selectable and routed', () async {
+      final fakeGoTaskService = _RecordingGoTaskServiceClient();
+      final controller = _connectedGatewayController(fakeGoTaskService);
+      addTearDown(controller.dispose);
+      controller.skillsControllerInternal.itemsInternal =
+          const <GatewaySkillSummary>[
+            GatewaySkillSummary(
+              name: 'Workspace PDF',
+              description: 'Write PDF documents',
+              source: 'openclaw-workspace',
+              skillKey: 'pdf',
+              primaryEnv: null,
+              eligible: true,
+              disabled: false,
+              missingBins: <String>[],
+              missingEnv: <String>[],
+              missingConfig: <String>[],
+            ),
+            GatewaySkillSummary(
+              name: 'Browser Automation',
+              description: 'Use browser automation',
+              source: 'agents-skills-personal',
+              skillKey: 'browser-automation',
+              primaryEnv: null,
+              eligible: true,
+              disabled: false,
+              missingBins: <String>[],
+              missingEnv: <String>[],
+              missingConfig: <String>[],
+            ),
+            GatewaySkillSummary(
+              name: 'Gateway Search',
+              description: 'Search through the gateway',
+              source: 'gateway',
+              skillKey: 'gateway-search',
+              primaryEnv: null,
+              eligible: true,
+              disabled: false,
+              missingBins: <String>[],
+              missingEnv: <String>[],
+              missingConfig: <String>[],
+            ),
+          ];
+      await _selectGatewaySession(controller, 'unit-skill-source-groups-task');
+
+      await controller.toggleAssistantSkillForSession(
+        'unit-skill-source-groups-task',
+        'browser-automation',
+      );
+
+      final routing = controller.buildExternalAcpRoutingForSessionInternal(
+        'unit-skill-source-groups-task',
+      );
+      expect(routing.availableSkills.map((item) => item.id), const <String>[
+        'pdf',
+        'browser-automation',
+        'gateway-search',
+      ]);
+      expect(routing.explicitSkills, const <String>['browser-automation']);
+      expect(
+        controller.assistantSelectedSkillKeysForSession(
+          'unit-skill-source-groups-task',
+        ),
+        const <String>['browser-automation'],
+      );
+
+      await controller.sendChatMessage(
+        '打开网页完成检查',
+        selectedSkillLabels: const <String>[
+          'Browser Automation (browser-automation)',
+        ],
+      );
+
+      expect(fakeGoTaskService.requests, hasLength(1));
+      expect(fakeGoTaskService.requests.single.selectedSkills, const <String>[
+        'Browser Automation (browser-automation)',
+      ]);
+    });
 
     test(
       'selected bridge skill is passed to task context with stable key',
@@ -520,7 +600,7 @@ void main() {
       },
     );
 
-    test('skill selection ignores stale local imported skills', () {
+    test('skill selection ignores stale non-bridge skill keys', () {
       final controller = AppController(
         environmentOverride: const <String, String>{},
       );
@@ -532,16 +612,7 @@ void main() {
       );
       controller.upsertTaskThreadInternal(
         'unit-skill-source-task',
-        importedSkills: const <AssistantThreadSkillEntry>[
-          AssistantThreadSkillEntry(
-            key: '/tmp/local-only/SKILL.md',
-            label: 'Local Only',
-            description: 'stale local skill',
-            sourcePath: '/tmp/local-only/SKILL.md',
-            sourceLabel: 'local',
-          ),
-        ],
-        selectedSkillKeys: const <String>['/tmp/local-only/SKILL.md'],
+        selectedSkillKeys: const <String>['stale-non-bridge-skill'],
         selectedSkillsSource: ThreadSelectionSource.explicit,
       );
       controller.skillsControllerInternal.itemsInternal =
