@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xworkmate/app/app_controller.dart';
 import 'package:xworkmate/app/app_controller_desktop_external_acp_routing.dart';
@@ -475,6 +476,47 @@ void main() {
         expect(option.key, 'browser-fetch');
         expect(option.label, 'Browser Fetch');
         expect(option.description, 'Bridge-managed browser skill');
+        expect(option.icon, Icons.key_rounded);
+      },
+    );
+
+    test(
+      'selected bridge skill is passed to task context with stable key',
+      () async {
+        final fakeGoTaskService = _RecordingGoTaskServiceClient();
+        final controller = _connectedGatewayController(fakeGoTaskService);
+        addTearDown(controller.dispose);
+        controller.skillsControllerInternal.itemsInternal =
+            const <GatewaySkillSummary>[
+              GatewaySkillSummary(
+                name: 'PDF Writer',
+                description: 'Write PDF documents',
+                source: 'openclaw-workspace',
+                skillKey: 'pdf',
+                primaryEnv: null,
+                eligible: true,
+                disabled: false,
+                missingBins: <String>[],
+                missingEnv: <String>[],
+                missingConfig: <String>[],
+              ),
+            ];
+        await _selectGatewaySession(controller, 'unit-skill-context-task');
+        await controller.toggleAssistantSkillForSession(
+          'unit-skill-context-task',
+          'pdf',
+        );
+
+        await controller.sendChatMessage(
+          '生成 PDF',
+          selectedSkillLabels: const <String>['PDF Writer (pdf)'],
+        );
+
+        expect(fakeGoTaskService.requests, hasLength(1));
+        final request = fakeGoTaskService.requests.single;
+        expect(request.selectedSkills, const <String>['PDF Writer (pdf)']);
+        expect(request.prompt, contains('Preferred skills:'));
+        expect(request.prompt, contains('- PDF Writer (pdf)'));
       },
     );
 
