@@ -26,15 +26,20 @@ class SkillsController extends ChangeNotifier {
 
   Future<void> refresh({String? agentId}) async {
     if (!runtimeInternal.isConnected) {
-      itemsInternal = const <GatewaySkillSummary>[];
-      errorInternal = null;
-      notifyListeners();
-      return;
+      if (!runtimeInternal.canConnectBridgeSession) {
+        itemsInternal = const <GatewaySkillSummary>[];
+        errorInternal = null;
+        notifyListeners();
+        return;
+      }
     }
     loadingInternal = true;
     errorInternal = null;
     notifyListeners();
     try {
+      await runtimeInternal.ensureBridgeSessionConnected(
+        selectedAgentId: agentId?.trim() ?? '',
+      );
       itemsInternal = await runtimeInternal.listSkills(agentId: agentId);
     } catch (error) {
       errorInternal = error.toString();
