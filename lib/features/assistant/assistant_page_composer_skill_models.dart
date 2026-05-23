@@ -54,7 +54,7 @@ ComposerSkillOptionInternal skillOptionFromGatewayInternal(
     label: label,
     description: description,
     sourceLabel: sourceLabel,
-    icon: Icons.auto_awesome_rounded,
+    icon: Icons.key_rounded,
   );
 }
 

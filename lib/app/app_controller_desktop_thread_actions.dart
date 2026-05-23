@@ -424,9 +424,13 @@ extension AppControllerDesktopThreadActions on AppController {
         resumeSessionHint ||
         (appendUserTurn &&
             shouldResumeGatewaySessionForNextSendInternal(sessionKey));
+    final messageWithSkills = messageWithSelectedSkillsContextInternal(
+      message: message,
+      selectedSkillLabels: selectedSkillLabels,
+    );
     final taskPrompt = taskWorkspaceContextPromptInternal(
       sessionKey: sessionKey,
-      userPrompt: message,
+      userPrompt: messageWithSkills,
       workingDirectory: workingDirectory,
       remoteWorkingDirectoryHint: remoteWorkingDirectoryHint,
     );
@@ -491,6 +495,20 @@ extension AppControllerDesktopThreadActions on AppController {
       recomputeTasksInternal();
       notifyIfActiveInternal();
     }
+  }
+
+  String messageWithSelectedSkillsContextInternal({
+    required String message,
+    required List<String> selectedSkillLabels,
+  }) {
+    final labels = selectedSkillLabels
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty)
+        .toList(growable: false);
+    if (labels.isEmpty || message.contains('Preferred skills:')) {
+      return message;
+    }
+    return 'Preferred skills:\n${labels.map((name) => '- $name').join('\n')}\n\n$message';
   }
 
   String taskWorkspaceContextPromptInternal({

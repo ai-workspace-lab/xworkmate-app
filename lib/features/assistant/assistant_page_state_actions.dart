@@ -290,7 +290,13 @@ extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
         option.key: option,
     };
     return selectedSkillKeysForInternal(controller)
-        .map((key) => optionsByKey[key]?.label)
+        .map((key) {
+          final option = optionsByKey[key];
+          if (option == null) {
+            return null;
+          }
+          return option.label == key ? key : '${option.label} ($key)';
+        })
         .whereType<String>()
         .toList(growable: false);
   }
