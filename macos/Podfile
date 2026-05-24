@@ -94,7 +94,7 @@ post_install do |installer|
     target.build_configurations.each do |config|
       config.build_settings['MACOSX_DEPLOYMENT_TARGET'] = '11.5'
 
-      next unless ['mobile_scanner', 'patrol', 'CocoaAsyncSocket', 'Pods-Runner', 'Pods-RunnerTests'].include?(target.name)
+      next unless ['patrol', 'CocoaAsyncSocket', 'Pods-Runner', 'Pods-RunnerTests'].include?(target.name)
 
       append_ignored_attributes_suppression.call(config.build_settings)
       append_deprecation_suppression.call(config.build_settings)

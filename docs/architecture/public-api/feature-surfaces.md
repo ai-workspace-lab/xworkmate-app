@@ -153,7 +153,7 @@
 - Source: `lib/features/mobile/mobile_shell_core.dart`
 - Type: `class`
 - Responsibility:
-  移动端的统一入口壳层，负责 tab 切换、pairing guide、setup code 连接流和 mobile-safe sheet。
+  移动端的统一入口壳层，只负责 assistant/settings tab 切换与移动端页面容器。
 
 ### Constructor Parameters
 
@@ -165,9 +165,8 @@
 
 | Method | Parameters | Returns | Meaning |
 | --- | --- | --- | --- |
-| `showConnectSheetInternal` | none | `void` | 打开 gateway connection detail |
-| `openGatewaySetupCodeEntryInternal` | `{String? prefilledSetupCode}` | `Future<void>` | 进入 setup-code 输入流 |
-| `connectWithScannedSetupCodeInternal` | `String setupCode` | `Future<void>` | 用扫码结果触发连接 |
+| `selectTabInternal` | `MobileShellTab tab` | `void` | 在 assistant/settings 之间切换 |
+| `buildCurrentPageInternal` | none | `Widget` | 构建当前移动端 page |
 | `showPairingGuidePageFlowInternal` | none | `Future<void>` | 打开 pairing guide 页面 |
 
 ### Notes
