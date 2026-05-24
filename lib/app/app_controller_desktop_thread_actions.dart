@@ -210,7 +210,6 @@ extension AppControllerDesktopThreadActions on AppController {
       nextSessionKey,
       executionTarget: nextTarget,
       messageViewMode: nextViewMode,
-      updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
     );
     await ensureDesktopTaskThreadBindingInternal(
       nextSessionKey,
