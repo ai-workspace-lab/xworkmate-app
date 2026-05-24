@@ -30,6 +30,9 @@ void main() {
 
       expect(find.text('助手'), findsOneWidget);
       expect(find.text('设置'), findsOneWidget);
+      expect(find.text('Mobile-safe'), findsNothing);
+      expect(find.text('安全审批'), findsNothing);
+      expect(find.byKey(const Key('mobile-safe-strip')), findsNothing);
       expect(find.text('任务'), findsNothing);
       expect(find.text('工作区'), findsNothing);
       expect(find.text('密钥'), findsNothing);

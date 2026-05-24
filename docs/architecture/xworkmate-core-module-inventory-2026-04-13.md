@@ -129,7 +129,7 @@ Status: `Active`
 - 移动端顶层 tab 只保留 `assistant`、`settings`
 - 删除 `workspace / tasks / secrets` 顶层 tab
 - 删除 `MobileWorkspaceLauncherInternal`
-- 配对、Bridge connect、setup code 等流程保留为 `settings` detail flow 与 mobile-safe strip/sheet 能力，不再占独立 top-level surface
+- 删除 iOS/移动端 Mobile-safe 审批、配对 guide、setup code 扫码入口；gateway 相关配置继续收口到 `settings`
 
 ## Assistant
 
