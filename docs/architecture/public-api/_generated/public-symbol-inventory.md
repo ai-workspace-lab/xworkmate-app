@@ -551,17 +551,6 @@ _No extracted public top-level symbols._
 | 66 | `top-level function` | `thinkingTooltipInternal` | `String thinkingTooltipInternal(String level) => appText( '推理强度: ${assistantThinkingLabelInternal(level)}', 'Reasoning: ${assistantThinkingLabelInternal(level)}', );` |
 | 71 | `top-level function` | `skillOptionTooltipInternal` | `String skillOptionTooltipInternal(ComposerSkillOptionInternal option) {` |
 
-### `lib/features/mobile/mobile_gateway_pairing_guide_page.dart`
-
-- Language: `dart`
-- Public symbols: `3`
-
-| Line | Kind | Name | Signature |
-| ---: | --- | --- | --- |
-| 13 | `class` | `MobileGatewayPairingGuidePage` | `class MobileGatewayPairingGuidePage extends StatelessWidget {` |
-| 265 | `class` | `MobileGatewayQrScannerPage` | `class MobileGatewayQrScannerPage extends StatefulWidget {` |
-| 361 | `top-level function` | `resolveGatewaySetupCodeFromScan` | `String? resolveGatewaySetupCodeFromScan(String raw) {` |
-
 ### `lib/features/mobile/mobile_shell.dart`
 
 - Language: `dart`
@@ -589,33 +578,6 @@ _No extracted public top-level symbols._
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
 | 19 | `class` | `BottomPillNavInternal` | `class BottomPillNavInternal extends StatelessWidget {` |
-
-### `lib/features/mobile/mobile_shell_sheet.dart`
-
-- Language: `dart`
-- Public symbols: `10`
-
-| Line | Kind | Name | Signature |
-| ---: | --- | --- | --- |
-| 19 | `class` | `MobileSafeSheetInternal` | `class MobileSafeSheetInternal extends StatelessWidget {` |
-| 305 | `class` | `MobileSafeSectionInternal` | `class MobileSafeSectionInternal extends StatelessWidget {` |
-| 326 | `class` | `MobileFactChipInternal` | `class MobileFactChipInternal extends StatelessWidget {` |
-| 364 | `class` | `MobileSafetyNoticeInternal` | `class MobileSafetyNoticeInternal extends StatelessWidget {` |
-| 413 | `class` | `MobilePendingApprovalCardInternal` | `class MobilePendingApprovalCardInternal extends StatelessWidget {` |
-| 507 | `class` | `MobilePairedDeviceCardInternal` | `class MobilePairedDeviceCardInternal extends StatelessWidget {` |
-| 599 | `top-level function` | `confirmMobileActionInternal` | `Future<bool?> confirmMobileActionInternal( BuildContext context, { required String title, required String message, }) {` |
-| 625 | `top-level function` | `mobileSecurePathLabelInternal` | `String mobileSecurePathLabelInternal({ required GatewayConnectionProfile profile, required GatewayConnectionSnapshot connection, }) {` |
-| 644 | `top-level function` | `mobileTargetLabelInternal` | `String mobileTargetLabelInternal(AppController controller) {` |
-| 657 | `top-level function` | `mobileRelativeTimeInternal` | `String mobileRelativeTimeInternal(int? timestampMs) {` |
-
-### `lib/features/mobile/mobile_shell_strip.dart`
-
-- Language: `dart`
-- Public symbols: `1`
-
-| Line | Kind | Name | Signature |
-| ---: | --- | --- | --- |
-| 19 | `class` | `MobileSafeStripInternal` | `class MobileSafeStripInternal extends StatelessWidget {` |
 
 ### `lib/features/settings/settings_about_panel.dart`
 

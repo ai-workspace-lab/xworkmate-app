@@ -39,12 +39,11 @@ post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
 
-    next unless ['mobile_scanner', 'Pods-Runner', 'Pods-RunnerTests'].include?(target.name)
+    next unless ['Pods-Runner', 'Pods-RunnerTests'].include?(target.name)
 
     target.build_configurations.each do |config|
-      # mobile_scanner and the generated Pods aggregate targets need to avoid
-      # arm64 on simulators here because MLImage ships a device-only object
-      # slice that fails when the Apple Silicon simulator tries to link it.
+      # The generated Pods aggregate targets need to avoid simulator slices
+      # that native dependencies do not ship consistently.
       config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = 'arm64 i386 armv7'
     end
   end
