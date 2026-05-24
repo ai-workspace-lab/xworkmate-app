@@ -1,7 +1,3 @@
-// ignore_for_file: unused_import, unnecessary_import
-
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 
 import '../../app/app_controller.dart';
@@ -9,14 +5,10 @@ import '../../app/ui_feature_manifest.dart';
 import '../../app/workspace_page_registry.dart';
 import '../../i18n/app_language.dart';
 import '../../models/app_models.dart';
-import '../../runtime/runtime_models.dart';
 import '../../theme/app_palette.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/detail_drawer.dart';
-import 'mobile_gateway_pairing_guide_page.dart';
 import 'mobile_shell_nav.dart';
-import 'mobile_shell_sheet.dart';
-import 'mobile_shell_strip.dart';
 
 enum MobileShellTab { assistant, settings }
 
@@ -64,152 +56,6 @@ class MobileShellStateInternal extends State<MobileShell> {
     widget.controller.openDetail(detail);
   }
 
-  void prefetchMobileSafeStateInternal() {
-    if (!widget.controller.runtime.isConnected) {
-      return;
-    }
-    unawaited(widget.controller.refreshGatewayHealth());
-    unawaited(widget.controller.refreshDevices(quiet: true));
-  }
-
-  void showConnectSheetInternal() {
-    widget.controller.openSettings(tab: SettingsTab.gateway);
-  }
-
-  Future<void> openGatewaySetupCodeEntryInternal({
-    String? prefilledSetupCode,
-  }) async {
-    final setupCode = prefilledSetupCode?.trim() ?? '';
-    if (setupCode.isEmpty) {
-      await promptBridgeVerificationCodeInternal();
-      return;
-    }
-    await widget.controller.connectWithSetupCode(setupCode: setupCode);
-  }
-
-  Future<void> connectWithScannedSetupCodeInternal(String setupCode) async {
-    final messenger = ScaffoldMessenger.maybeOf(context);
-    try {
-      await widget.controller.connectWithSetupCode(setupCode: setupCode);
-      if (!mounted) {
-        return;
-      }
-      prefetchMobileSafeStateInternal();
-      messenger?.showSnackBar(
-        SnackBar(
-          content: Text(
-            appText(
-              '已写入配置码并开始连接 xworkmate-bridge。',
-              'Setup code applied and xworkmate-bridge connection started.',
-            ),
-          ),
-        ),
-      );
-    } catch (error) {
-      if (!mounted) {
-        return;
-      }
-      final message = error.toString().trim();
-      messenger?.showSnackBar(
-        SnackBar(
-          content: Text(
-            appText(
-              '扫码成功，但自动连接失败。请重新输入配置码或检查 Bridge 状态。\n$message',
-              'QR captured, but automatic connect failed. Re-enter the setup code or check Bridge status.\n$message',
-            ),
-          ),
-        ),
-      );
-    }
-  }
-
-  Future<void> promptBridgeVerificationCodeInternal() async {
-    final codeController = TextEditingController();
-    final enteredCode = await showDialog<String>(
-      context: context,
-      builder: (dialogContext) {
-        return AlertDialog(
-          title: Text(appText('输入配置码', 'Enter Setup Code')),
-          content: TextField(
-            controller: codeController,
-            autofocus: true,
-            textCapitalization: TextCapitalization.characters,
-            decoration: InputDecoration(
-              labelText: appText('配置码', 'Setup Code'),
-              hintText: appText('粘贴配置码', 'Paste setup code'),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: Text(appText('取消', 'Cancel')),
-            ),
-            FilledButton(
-              onPressed: () =>
-                  Navigator.of(dialogContext).pop(codeController.text.trim()),
-              child: Text(appText('连接', 'Connect')),
-            ),
-          ],
-        );
-      },
-    );
-    codeController.dispose();
-    final resolved = enteredCode?.trim() ?? '';
-    if (resolved.isEmpty || !mounted) {
-      return;
-    }
-    await connectWithScannedSetupCodeInternal(resolved);
-  }
-
-  void showPairingGuidePageInternal() {
-    unawaited(showPairingGuidePageFlowInternal());
-  }
-
-  Future<void> showPairingGuidePageFlowInternal() async {
-    final supportsQrScan = Theme.of(context).platform == TargetPlatform.iOS;
-    await Navigator.of(context).push<void>(
-      MaterialPageRoute<void>(
-        fullscreenDialog: true,
-        builder: (_) => MobileGatewayPairingGuidePage(
-          supportsQrScan: supportsQrScan,
-          onManualInput: () =>
-              unawaited(promptBridgeVerificationCodeInternal()),
-          onManualCodeInput: () =>
-              unawaited(promptBridgeVerificationCodeInternal()),
-          onScannedSetupCode: (setupCode) async {
-            await connectWithScannedSetupCodeInternal(setupCode);
-          },
-        ),
-      ),
-    );
-  }
-
-  void showMobileSafeSheetInternal() {
-    prefetchMobileSafeStateInternal();
-    showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (sheetContext) {
-        return FractionallySizedBox(
-          heightFactor: 0.94,
-          child: MobileSafeSheetInternal(
-            controller: widget.controller,
-            onClose: () => Navigator.of(sheetContext).pop(),
-            onOpenGatewayConnect: () {
-              Navigator.of(sheetContext).pop();
-              WidgetsBinding.instance.addPostFrameCallback((_) {
-                if (mounted) {
-                  showPairingGuidePageInternal();
-                }
-              });
-            },
-          ),
-        );
-      },
-    );
-  }
-
   Widget buildCurrentPageInternal() {
     return buildWorkspacePage(
       destination: widget.controller.destination,
@@ -253,12 +99,6 @@ class MobileShellStateInternal extends State<MobileShell> {
                   padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
                   child: Column(
                     children: [
-                      MobileSafeStripInternal(
-                        controller: widget.controller,
-                        onOpenSafeSheet: showMobileSafeSheetInternal,
-                        onOpenGatewayConnect: showPairingGuidePageInternal,
-                      ),
-                      const SizedBox(height: 10),
                       Expanded(
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(
