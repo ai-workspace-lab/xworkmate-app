@@ -349,6 +349,54 @@ void main() {
     });
 
     test(
+      'switching sessions does not refresh task ordering timestamp',
+      () async {
+        final localHome = await Directory.systemTemp.createTemp(
+          'xworkmate-stable-task-selection-home-',
+        );
+        addTearDown(() async {
+          if (await localHome.exists()) {
+            await localHome.delete(recursive: true);
+          }
+        });
+        final controller = AppController(
+          environmentOverride: const <String, String>{},
+        );
+        addTearDown(controller.dispose);
+        controller.resolvedUserHomeDirectoryInternal = localHome.path;
+
+        const newerTask = 'draft:newer-task';
+        const olderTask = 'draft:older-task';
+        const newerUpdatedAtMs = 2000.0;
+        const olderUpdatedAtMs = 1000.0;
+        controller.upsertTaskThreadInternal(
+          newerTask,
+          executionTarget: AssistantExecutionTarget.gateway,
+          messageViewMode: AssistantMessageViewMode.rendered,
+          updatedAtMs: newerUpdatedAtMs,
+        );
+        controller.upsertTaskThreadInternal(
+          olderTask,
+          executionTarget: AssistantExecutionTarget.gateway,
+          messageViewMode: AssistantMessageViewMode.rendered,
+          updatedAtMs: olderUpdatedAtMs,
+        );
+
+        await controller.switchSession(olderTask);
+
+        expect(controller.currentSessionKey, olderTask);
+        expect(
+          controller.requireTaskThreadForSessionInternal(olderTask).updatedAtMs,
+          olderUpdatedAtMs,
+        );
+        expect(
+          controller.assistantSessions.map((item) => item.key).take(2),
+          <String>[newerTask, olderTask],
+        );
+      },
+    );
+
+    test(
       'returns unspecified when a saved provider is no longer in the current catalog',
       () {
         final controller = AppController(
