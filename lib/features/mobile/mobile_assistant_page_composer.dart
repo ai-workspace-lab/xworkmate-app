@@ -164,14 +164,14 @@ class MobileAssistantComposer extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Padding(
-                padding: const EdgeInsets.only(right: 8, bottom: 4),
+                padding: const EdgeInsets.only(right: 8, bottom: 5),
                 child: CircleAvatar(
-                  radius: 20,
+                  radius: 18,
                   backgroundColor: palette.surfaceSecondary,
                   child: IconButton(
                     key: const Key('mobile-assistant-composer-add-button'),
                     padding: EdgeInsets.zero,
-                    icon: Icon(Icons.add, color: palette.textPrimary, size: 24),
+                    icon: Icon(Icons.add, color: palette.textPrimary, size: 22),
                     onPressed: showConfigurationMenu,
                   ),
                 ),
@@ -221,9 +221,9 @@ class MobileAssistantComposer extends StatelessWidget {
                  ),
                ),
                Padding(
-                 padding: const EdgeInsets.only(left: 8, bottom: 4),
+                 padding: const EdgeInsets.only(left: 8, bottom: 5),
                  child: CircleAvatar(
-                   radius: 20,
+                   radius: 18,
                    backgroundColor: palette.textPrimary,
                    child: IconButton(
                      key: const Key('mobile-assistant-send-button'),

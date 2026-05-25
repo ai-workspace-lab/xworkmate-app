@@ -5,6 +5,7 @@ import '../../app/app_controller.dart';
 import '../../app/app_controller_desktop_thread_binding.dart';
 import '../../app/ui_feature_manifest.dart';
 import '../../i18n/app_language.dart';
+import '../../models/app_models.dart';
 import '../../theme/app_palette.dart';
 
 class MobileAssistantListPage extends StatefulWidget {
@@ -239,19 +240,21 @@ class _MobileAssistantListPageState extends State<MobileAssistantListPage> {
                   ),
                   const Divider(),
                   ListTile(
-                    leading: Icon(CupertinoIcons.settings, color: palette.textPrimary),
-                    title: Text(appText('设置', 'Settings'), style: TextStyle(color: palette.textPrimary)),
+                    leading: Icon(CupertinoIcons.person, color: palette.textPrimary),
+                    title: Text(appText('账号登录', 'Account Login'), style: TextStyle(color: palette.textPrimary)),
                     onTap: () {
                       Navigator.pop(context);
-                      // TODO: Navigate to settings
+                      widget.controller.openSettings(tab: SettingsTab.gateway);
+                      widget.controller.navigateTo(WorkspaceDestination.settings);
                     },
                   ),
                   ListTile(
-                    leading: Icon(CupertinoIcons.person, color: palette.textPrimary),
-                    title: Text(appText('个人中心', 'Profile'), style: TextStyle(color: palette.textPrimary)),
+                    leading: Icon(Icons.inventory_2_outlined, color: palette.textPrimary),
+                    title: Text(appText('归档管理', 'Archived Tasks'), style: TextStyle(color: palette.textPrimary)),
                     onTap: () {
                       Navigator.pop(context);
-                      // TODO: Navigate to profile
+                      widget.controller.openSettings(tab: SettingsTab.archivedTasks);
+                      widget.controller.navigateTo(WorkspaceDestination.settings);
                     },
                   ),
                   const Spacer(),
@@ -261,6 +264,12 @@ class _MobileAssistantListPageState extends State<MobileAssistantListPage> {
                     title: Text(appText('关于', 'About'), style: TextStyle(color: palette.textPrimary)),
                     onTap: () {
                       Navigator.pop(context);
+                      showAboutDialog(
+                        context: context,
+                        applicationName: 'XWorkmate',
+                        applicationVersion: '1.0.0',
+                        applicationLegalese: '© 2026 Cloud Neutral Toolkit',
+                      );
                     },
                   ),
                 ],
