@@ -145,7 +145,7 @@ class ExternalCodeAgentAcpDesktopTransport
         completedMessage: completedMessage,
       );
     } on GatewayAcpException catch (error) {
-      if (error.code == 'ACP_HTTP_CONNECTION_CLOSED' &&
+      if (_isRecoverableTaskStreamClosure(error) &&
           completedResultSnapshot != null) {
         return goTaskServiceResultFromAcpResponse(
           <String, dynamic>{
@@ -158,8 +158,8 @@ class ExternalCodeAgentAcpDesktopTransport
           completedMessage: completedMessage,
         );
       }
-      if (error.code == 'ACP_HTTP_CONNECTION_CLOSED') {
-        final recovered = await _recoverTaskResultAfterConnectionClosed(
+      if (_isRecoverableTaskStreamClosure(error)) {
+        final recovered = await _recoverTaskResultAfterStreamClosure(
           request,
           taskEndpoint: _taskEndpointResolver == null
               ? _endpointResolver(request.target)
@@ -191,7 +191,12 @@ class ExternalCodeAgentAcpDesktopTransport
     }
   }
 
-  Future<GoTaskServiceResult?> _recoverTaskResultAfterConnectionClosed(
+  bool _isRecoverableTaskStreamClosure(GatewayAcpException error) {
+    return error.code == 'ACP_HTTP_CONNECTION_CLOSED' ||
+        error.code == 'ACP_SSE_NO_RESULT';
+  }
+
+  Future<GoTaskServiceResult?> _recoverTaskResultAfterStreamClosure(
     GoTaskServiceRequest request, {
     required Uri? taskEndpoint,
     required String streamedText,
