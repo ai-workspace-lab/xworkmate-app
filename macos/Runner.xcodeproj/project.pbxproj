@@ -450,7 +450,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "/bin/bash \"${PROJECT_DIR}/../scripts/macos_generate_missing_dsyms.sh\"\n";
+			shellScript = "/bin/bash \"${PROJECT_DIR}/../scripts/ensure-framework-dsyms.sh\"\n";
 			showEnvVarsInLog = 0;
 		};
 /* End PBXShellScriptBuildPhase section */
