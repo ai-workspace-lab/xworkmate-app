@@ -66,8 +66,10 @@ extension AppControllerDesktopThreadActions on AppController {
   bool assistantSessionHasPendingRun(String sessionKey) {
     final normalized = normalizedAssistantSessionKeyInternal(sessionKey);
     return aiGatewayPendingSessionKeysInternal.contains(normalized) ||
-        (openClawGatewayQueuedTurnsBySessionInternal[normalized]?.isNotEmpty ??
-            false) ||
+        openClawGatewayQueuedTurnsBySessionInternal[normalized]?.any(
+              (turn) => !turn.cancelled,
+            ) ==
+            true ||
         (multiAgentRunPendingInternal &&
             matchesSessionKey(
               normalized,
@@ -638,33 +640,64 @@ extension AppControllerDesktopThreadActions on AppController {
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey,
     );
-    final queuedForSession =
-        openClawGatewayQueuedTurnsBySessionInternal[normalizedSessionKey];
+    if (!removeQueuedOpenClawGatewayTurnsForSessionInternal(
+      normalizedSessionKey,
+    )) {
+      return false;
+    }
+    markOpenClawGatewayTurnAbortedInternal(normalizedSessionKey);
+    drainOpenClawGatewayQueueInternal();
+    return true;
+  }
+
+  bool removeQueuedOpenClawGatewayTurnsForSessionInternal(String sessionKey) {
+    final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
+      sessionKey,
+    );
+    final queuedForSession = openClawGatewayQueuedTurnsBySessionInternal.remove(
+      normalizedSessionKey,
+    );
     if (queuedForSession == null || queuedForSession.isEmpty) {
       return false;
     }
-    final turn = queuedForSession.removeAt(0);
-    if (queuedForSession.isEmpty) {
-      openClawGatewayQueuedTurnsBySessionInternal.remove(normalizedSessionKey);
+    for (final turn in queuedForSession) {
+      turn.cancelled = true;
+      openClawGatewayQueuedTurnsInternal.remove(turn);
     }
-    openClawGatewayQueuedTurnsInternal.remove(turn);
-    turn.cancelled = true;
+    return true;
+  }
+
+  void markOpenClawGatewayTurnAbortedInternal(String sessionKey) {
+    final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
+      sessionKey,
+    );
     clearAiGatewayStreamingTextInternal(normalizedSessionKey);
+    aiGatewayPendingSessionKeysInternal.remove(normalizedSessionKey);
+    final nowMs = DateTime.now().millisecondsSinceEpoch.toDouble();
     upsertTaskThreadInternal(
       normalizedSessionKey,
       lifecycleStatus: 'ready',
-      lastRunAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+      lastRunAtMs: nowMs,
       lastResultCode: 'aborted',
       lastRemoteWorkingDirectory: '',
-      lastArtifactSyncAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+      lastArtifactSyncAtMs: nowMs,
       lastArtifactSyncStatus: 'failed',
       lastTaskArtifactRelativePaths: const <String>[],
-      updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+      updatedAtMs: nowMs,
     );
     recomputeTasksInternal();
     notifyIfActiveInternal();
-    drainOpenClawGatewayQueueInternal();
-    return true;
+  }
+
+  void removeOpenClawGatewayQueuedTurnIndexInternal(
+    OpenClawGatewayQueuedTurnInternal turn,
+  ) {
+    final queuedForSession =
+        openClawGatewayQueuedTurnsBySessionInternal[turn.sessionKey];
+    queuedForSession?.remove(turn);
+    if (queuedForSession != null && queuedForSession.isEmpty) {
+      openClawGatewayQueuedTurnsBySessionInternal.remove(turn.sessionKey);
+    }
   }
 
   void drainOpenClawGatewayQueueInternal() {
@@ -672,12 +705,7 @@ extension AppControllerDesktopThreadActions on AppController {
             openClawGatewayMaxActiveTasksInternal &&
         openClawGatewayQueuedTurnsInternal.isNotEmpty) {
       final turn = openClawGatewayQueuedTurnsInternal.removeAt(0);
-      final queuedForSession =
-          openClawGatewayQueuedTurnsBySessionInternal[turn.sessionKey];
-      queuedForSession?.remove(turn);
-      if (queuedForSession != null && queuedForSession.isEmpty) {
-        openClawGatewayQueuedTurnsBySessionInternal.remove(turn.sessionKey);
-      }
+      removeOpenClawGatewayQueuedTurnIndexInternal(turn);
       if (turn.cancelled) {
         continue;
       }
@@ -1017,27 +1045,18 @@ extension AppControllerDesktopThreadActions on AppController {
       return;
     }
     if (aiGatewayPendingSessionKeysInternal.contains(sessionKey)) {
-      await goTaskServiceClientInternal.cancelTask(
-        route: GoTaskServiceRoute.externalAcpSingle,
-        target: assistantExecutionTargetForSession(sessionKey),
-        sessionId: sessionKey,
-        threadId: sessionKey,
-      );
-      aiGatewayPendingSessionKeysInternal.remove(sessionKey);
-      clearAiGatewayStreamingTextInternal(sessionKey);
-      upsertTaskThreadInternal(
-        sessionKey,
-        lifecycleStatus: 'ready',
-        lastRunAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-        lastResultCode: 'aborted',
-        lastRemoteWorkingDirectory: '',
-        lastArtifactSyncAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-        lastArtifactSyncStatus: 'failed',
-        lastTaskArtifactRelativePaths: const <String>[],
-        updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-      );
-      recomputeTasksInternal();
-      notifyIfActiveInternal();
+      try {
+        await goTaskServiceClientInternal.cancelTask(
+          route: GoTaskServiceRoute.externalAcpSingle,
+          target: assistantExecutionTargetForSession(sessionKey),
+          sessionId: sessionKey,
+          threadId: sessionKey,
+        );
+      } catch (_) {
+        // Best effort cancellation only. Local state must still leave pending.
+      }
+      removeQueuedOpenClawGatewayTurnsForSessionInternal(sessionKey);
+      markOpenClawGatewayTurnAbortedInternal(sessionKey);
       return;
     }
   }
