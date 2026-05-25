@@ -78,47 +78,49 @@ class _MobileAssistantListPageState extends State<MobileAssistantListPage> {
           body: CustomScrollView(
             physics: const BouncingScrollPhysics(parent: AlwaysScrollableScrollPhysics()),
             slivers: [
-              CupertinoSliverNavigationBar(
-                backgroundColor: palette.canvas.withValues(alpha: 0.8),
-                largeTitle: const Text('XWorkmate'),
-                border: null,
-                leading: Builder(
-                  builder: (context) {
-                    return CupertinoButton(
-                      padding: EdgeInsets.zero,
-                      onPressed: () {
-                        Scaffold.of(context).openDrawer();
-                      },
-                      child: CircleAvatar(
-                        radius: 14,
-                        backgroundColor: palette.accent,
-                        child: const Text('X', style: TextStyle(color: Colors.white, fontSize: 12)),
-                      ),
-                    );
-                  }
+              SliverAppBar(
+                backgroundColor: palette.canvas,
+                surfaceTintColor: Colors.transparent,
+                pinned: true,
+                title: Text(
+                  'XWorkmate',
+                  style: TextStyle(color: palette.textPrimary, fontWeight: FontWeight.bold, fontSize: 20),
                 ),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    CupertinoButton(
-                      padding: EdgeInsets.zero,
-                      onPressed: () {
-                        setState(() {
-                          _isSearchVisible = !_isSearchVisible;
-                          if (!_isSearchVisible) {
-                            _searchController.clear();
-                            _searchQuery = '';
-                          }
-                        });
-                      },
-                      child: Icon(
-                        CupertinoIcons.search,
-                        color: palette.textPrimary,
-                        size: 24,
-                      ),
+                centerTitle: false,
+                actions: [
+                  IconButton(
+                    icon: Icon(
+                      CupertinoIcons.search,
+                      color: palette.textPrimary,
+                      size: 24,
                     ),
-                  ],
-                ),
+                    onPressed: () {
+                      setState(() {
+                        _isSearchVisible = !_isSearchVisible;
+                        if (!_isSearchVisible) {
+                          _searchController.clear();
+                          _searchQuery = '';
+                        }
+                      });
+                    },
+                  ),
+                  Builder(
+                    builder: (context) {
+                      return IconButton(
+                        padding: EdgeInsets.zero,
+                        onPressed: () {
+                          Scaffold.of(context).openDrawer();
+                        },
+                        icon: CircleAvatar(
+                          radius: 14,
+                          backgroundColor: palette.accent,
+                          child: const Text('X', style: TextStyle(color: Colors.white, fontSize: 12)),
+                        ),
+                      );
+                    }
+                  ),
+                  const SizedBox(width: 8),
+                ],
               ),
               if (_isSearchVisible)
                 SliverToBoxAdapter(
@@ -164,12 +166,10 @@ class _MobileAssistantListPageState extends State<MobileAssistantListPage> {
                     (context, index) {
                       final session = sessions[index];
                       final sessionKey = session.key.trim();
-                      final pending = widget.controller.assistantSessionHasPendingRun(sessionKey);
                       
                       final title = session.label.trim().isEmpty
                           ? appText('新对话', 'New conversation')
                           : session.label.trim();
-                      final preview = session.lastMessagePreview?.trim() ?? '';
                       
                       return Dismissible(
                         key: ValueKey(sessionKey),
@@ -186,41 +186,19 @@ class _MobileAssistantListPageState extends State<MobileAssistantListPage> {
                         child: InkWell(
                           onTap: () => widget.onSelectTask(sessionKey),
                           child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
+                            padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
                             child: Row(
                               children: [
-                                CircleAvatar(
-                                  backgroundColor: pending ? palette.accentMuted : palette.surfacePrimary,
-                                  child: Icon(
-                                    pending ? CupertinoIcons.bolt_fill : CupertinoIcons.chat_bubble_2,
-                                    color: pending ? palette.accent : palette.textSecondary,
-                                    size: 20,
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
                                 Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        title,
-                                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                          fontWeight: FontWeight.w600,
-                                          color: palette.textPrimary,
-                                        ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        preview.isEmpty ? appText('未开始', 'Not started') : preview,
-                                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                          color: palette.textSecondary,
-                                        ),
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ],
+                                  child: Text(
+                                    title,
+                                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                      fontWeight: FontWeight.w500,
+                                      fontSize: 16,
+                                      color: palette.textPrimary,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 ),
                               ],
@@ -292,10 +270,10 @@ class _MobileAssistantListPageState extends State<MobileAssistantListPage> {
           floatingActionButton: FloatingActionButton.extended(
             key: const Key('mobile-assistant-fab-create'),
             onPressed: _handleCreateTask,
-            backgroundColor: palette.accent,
-            foregroundColor: Colors.white,
+            backgroundColor: palette.textPrimary,
+            foregroundColor: palette.canvas,
             elevation: 4,
-            icon: const Icon(CupertinoIcons.add),
+            icon: const Icon(Icons.edit_square, size: 20),
             label: Text(
               appText('聊天', 'Chat'),
               style: const TextStyle(fontWeight: FontWeight.bold),
