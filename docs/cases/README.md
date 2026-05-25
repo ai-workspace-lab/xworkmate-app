@@ -6,6 +6,7 @@
 
 - [核心功能集成测试手动 Case](./core-integration-manual-cases.md)
 - [AI 安全演进内容生成场景测试用例](./ai-security-evolution-content-scenario/README.md)
+- [云原生 Service Mesh 网络科普视频调研场景测试用例](./service-mesh-evolution-video-scenario/README.md)
 
 ## 配套文档
 

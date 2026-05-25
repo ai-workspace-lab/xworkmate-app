@@ -323,6 +323,7 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
       key: contentKeyInternal,
       padding: const EdgeInsets.fromLTRB(10, 8, 10, 0),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         mainAxisAlignment: MainAxisAlignment.end,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

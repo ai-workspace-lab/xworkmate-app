@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../i18n/app_language.dart';
 import '../../runtime/runtime_models.dart';
 
-class SettingsAccountPanel extends StatelessWidget {
+class SettingsAccountPanel extends StatefulWidget {
   const SettingsAccountPanel({
     super.key,
     required this.settings,
@@ -49,72 +49,112 @@ class SettingsAccountPanel extends StatelessWidget {
   final Future<void> Function() onLogout;
 
   @override
+  State<SettingsAccountPanel> createState() => _SettingsAccountPanelState();
+}
+
+class _SettingsAccountPanelState extends State<SettingsAccountPanel>
+    with SingleTickerProviderStateMixin {
+  late final TabController _signedOutTabController;
+
+  @override
+  void initState() {
+    super.initState();
+    _signedOutTabController = TabController(
+      length: 2,
+      vsync: this,
+      initialIndex: _tabIndexFor(widget.settings),
+    );
+  }
+
+  @override
+  void didUpdateWidget(SettingsAccountPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.accountSignedIn != widget.accountSignedIn ||
+        oldWidget.accountMfaRequired != widget.accountMfaRequired) {
+      _signedOutTabController.index = _tabIndexFor(widget.settings);
+    }
+  }
+
+  @override
+  void dispose() {
+    _signedOutTabController.dispose();
+    super.dispose();
+  }
+
+  int _tabIndexFor(SettingsSnapshot settings) {
+    return settings.acpBridgeServerModeConfig.effective.source == 'bridge'
+        ? 1
+        : 0;
+  }
+
+  @override
   Widget build(BuildContext context) {
-    if (!accountSignedIn && !accountMfaRequired) {
-      return DefaultTabController(
-        length: 2,
-        initialIndex:
-            settings.acpBridgeServerModeConfig.effective.source == 'bridge'
-            ? 1
-            : 0,
-        child: Column(
-          children: [
-            TabBar(
-              tabs: [
-                Tab(text: appText('svc.plus 云端同步', 'svc.plus Cloud Sync')),
-                Tab(text: appText('手动 Bridge 配置', 'Manual Bridge Config')),
-              ],
-              onTap: (index) {
-                onSaveAccountProfile(isManualBridge: index == 1);
-              },
-            ),
-            const SizedBox(height: 24),
-            SizedBox(
-              height: 480,
-              child: TabBarView(
-                physics: const NeverScrollableScrollPhysics(),
-                children: [
-                  _SignedOutAccountPanel(
-                    accountBusy: accountBusy,
-                    accountBaseUrlController: accountBaseUrlController,
-                    accountIdentifierController: accountIdentifierController,
-                    accountPasswordController: accountPasswordController,
-                    onSaveAccountProfile: onSaveAccountProfile,
-                    onLogin: onLogin,
-                  ),
-                  _ManualBridgePanel(
-                    settings: settings,
-                    accountBusy: accountBusy,
-                    bridgeUrlController: bridgeUrlController,
-                    bridgeTokenController: bridgeTokenController,
-                    onSaveAccountProfile: onSaveAccountProfile,
-                  ),
+    if (!widget.accountSignedIn && !widget.accountMfaRequired) {
+      return AnimatedBuilder(
+        animation: _signedOutTabController,
+        builder: (context, _) {
+          return Column(
+            children: [
+              TabBar(
+                controller: _signedOutTabController,
+                tabs: [
+                  Tab(text: appText('svc.plus 云端同步', 'svc.plus Cloud Sync')),
+                  Tab(text: appText('手动 Bridge 配置', 'Manual Bridge Config')),
                 ],
+                onTap: (index) {
+                  widget.onSaveAccountProfile(isManualBridge: index == 1);
+                },
               ),
-            ),
-          ],
-        ),
+              const SizedBox(height: 24),
+              SizedBox(
+                height: 480,
+                child: IndexedStack(
+                  index: _signedOutTabController.index,
+                  children: [
+                    _SignedOutAccountPanel(
+                      accountBusy: widget.accountBusy,
+                      accountBaseUrlController: widget.accountBaseUrlController,
+                      accountIdentifierController:
+                          widget.accountIdentifierController,
+                      accountPasswordController:
+                          widget.accountPasswordController,
+                      onSaveAccountProfile: widget.onSaveAccountProfile,
+                      onLogin: widget.onLogin,
+                    ),
+                    _ManualBridgePanel(
+                      settings: widget.settings,
+                      accountBusy: widget.accountBusy,
+                      bridgeUrlController: widget.bridgeUrlController,
+                      bridgeTokenController: widget.bridgeTokenController,
+                      onSaveAccountProfile: widget.onSaveAccountProfile,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          );
+        },
       );
     }
-    if (accountMfaRequired) {
+    if (widget.accountMfaRequired) {
       return _PendingMfaAccountPanel(
-        accountBusy: accountBusy,
-        accountBaseUrlController: accountBaseUrlController,
-        accountIdentifierController: accountIdentifierController,
-        accountMfaCodeController: accountMfaCodeController,
-        onVerifyMfa: onVerifyMfa,
-        onCancelMfa: onCancelMfa,
+        accountBusy: widget.accountBusy,
+        accountBaseUrlController: widget.accountBaseUrlController,
+        accountIdentifierController: widget.accountIdentifierController,
+        accountMfaCodeController: widget.accountMfaCodeController,
+        onVerifyMfa: widget.onVerifyMfa,
+        onCancelMfa: widget.onCancelMfa,
       );
     }
     return _SignedInAccountPanel(
-      settings: settings,
-      accountSession: accountSession,
-      accountState: accountState,
-      accountBusy: accountBusy,
-      accountStatus: accountStatus,
-      onSaveAccountProfile: onSaveAccountProfile,
-      onSync: onSync,
-      onLogout: onLogout,
+      settings: widget.settings,
+      accountSession: widget.accountSession,
+      accountState: widget.accountState,
+      accountBusy: widget.accountBusy,
+      accountStatus: widget.accountStatus,
+      onSaveAccountProfile: widget.onSaveAccountProfile,
+      onSync: widget.onSync,
+      onLogout: widget.onLogout,
     );
   }
 }
