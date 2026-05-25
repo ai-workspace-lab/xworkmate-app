@@ -1,8 +1,6 @@
 // ignore_for_file: unused_import, unnecessary_import, invalid_use_of_protected_member
 
 import 'dart:async';
-import 'dart:convert';
-import 'dart:io';
 import 'dart:math' as math;
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
@@ -37,6 +35,7 @@ import 'assistant_page_task_models.dart';
 import 'assistant_page_composer_skill_models.dart';
 import 'assistant_page_composer_skill_picker.dart';
 import 'assistant_page_composer_clipboard.dart';
+import 'assistant_attachment_payloads.dart';
 import 'assistant_page_components_core.dart';
 
 extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
@@ -102,6 +101,20 @@ extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
       attachmentsInternal,
       growable: false,
     );
+    final List<GatewayChatAttachmentPayload> attachmentPayloads;
+    try {
+      attachmentPayloads = await buildAttachmentPayloadsInternal(
+        submittedAttachments,
+      );
+    } on AssistantAttachmentLimitException catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(attachmentLimitMessageInternal(error))),
+      );
+      return;
+    }
     final attachmentNames = submittedAttachments
         .map((item) => item.name)
         .toList(growable: false);
@@ -138,9 +151,6 @@ extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
     inputControllerInternal.clear();
 
     try {
-      final attachmentPayloads = await buildAttachmentPayloadsInternal(
-        submittedAttachments,
-      );
       await controller.sendChatMessage(
         prompt,
         thinking: thinkingLabelInternal,
@@ -178,25 +188,23 @@ extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
 
   Future<List<GatewayChatAttachmentPayload>> buildAttachmentPayloadsInternal(
     List<ComposerAttachmentInternal> attachments,
-  ) async {
-    final payloads = <GatewayChatAttachmentPayload>[];
-    for (final attachment in attachments) {
-      final file = File(attachment.path);
-      if (!await file.exists()) {
-        continue;
-      }
-      final bytes = await file.readAsBytes();
-      final mimeType = attachment.mimeType;
-      payloads.add(
-        GatewayChatAttachmentPayload(
-          type: mimeType.startsWith('image/') ? 'image' : 'file',
-          mimeType: mimeType,
-          fileName: attachment.name,
-          content: base64Encode(bytes),
-        ),
+  ) => buildAssistantAttachmentPayloadsInternal(attachments);
+
+  String attachmentLimitMessageInternal(
+    AssistantAttachmentLimitException error,
+  ) {
+    final size = formatAssistantAttachmentBytesInternal(error.sizeBytes);
+    final limit = formatAssistantAttachmentBytesInternal(error.limitBytes);
+    if (error.code == 'total') {
+      return appText(
+        '附件总大小 $size 超过单次提交上限 $limit，请移除部分文件后再提交。',
+        'Attachments total $size exceeds the per-message limit of $limit. Remove some files and try again.',
       );
     }
-    return payloads;
+    return appText(
+      '附件 ${error.fileName} 为 $size，超过单文件上限 $limit。',
+      'Attachment ${error.fileName} is $size, above the per-file limit of $limit.',
+    );
   }
 
   GatewayAgentSummary? pickAutoAgentInternal(
