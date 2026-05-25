@@ -102,6 +102,7 @@ class _MobileSettingsPageState extends State<MobileSettingsPage> {
   Future<void> persistAccountProfileSettings({
     required SettingsSnapshot settings,
     required bool isManualBridge,
+    bool refreshAfterSave = true,
   }) async {
     final bridgeConfig = settings.acpBridgeServerModeConfig;
     final nextBridgeConfig = bridgeConfig.copyWith(
@@ -127,7 +128,10 @@ class _MobileSettingsPageState extends State<MobileSettingsPage> {
         module: 'Manual',
       );
     }
-    await widget.controller.saveSettings(nextSettings);
+    await widget.controller.saveSettings(
+      nextSettings,
+      refreshAfterSave: refreshAfterSave,
+    );
     lastSavedAccountBaseUrl = nextSettings.accountBaseUrl;
     lastSavedAccountIdentifier = nextSettings.accountUsername;
     lastSavedBridgeUrl =
@@ -136,16 +140,22 @@ class _MobileSettingsPageState extends State<MobileSettingsPage> {
 
   Future<void> loginAccount(SettingsSnapshot settings) async {
     try {
-      await persistAccountProfileSettings(
-        settings: settings,
-        isManualBridge: false,
-      );
+      final baseUrl = accountBaseUrlController.text.trim();
+      final identifier = accountIdentifierController.text.trim();
       await widget.controller.settingsController.loginAccount(
-        baseUrl: accountBaseUrlController.text.trim(),
-        identifier: accountIdentifierController.text.trim(),
+        baseUrl: baseUrl,
+        identifier: identifier,
         password: accountPasswordController.text,
       );
-      await refreshBridgeCapabilities();
+      if (!widget.controller.settingsController.accountSignedIn) {
+        return;
+      }
+      await persistAccountProfileSettings(
+        settings: widget.controller.settings,
+        isManualBridge: false,
+        refreshAfterSave: false,
+      );
+      unawaited(refreshBridgeCapabilities());
     } finally {
       accountPasswordController.clear();
     }
@@ -155,11 +165,12 @@ class _MobileSettingsPageState extends State<MobileSettingsPage> {
     await persistAccountProfileSettings(
       settings: settings,
       isManualBridge: false,
+      refreshAfterSave: false,
     );
     await widget.controller.settingsController.syncAccountSettings(
       baseUrl: accountBaseUrlController.text.trim(),
     );
-    await refreshBridgeCapabilities();
+    unawaited(refreshBridgeCapabilities());
   }
 
   Future<void> verifyMfa(SettingsSnapshot settings) async {
@@ -167,12 +178,13 @@ class _MobileSettingsPageState extends State<MobileSettingsPage> {
       await persistAccountProfileSettings(
         settings: settings,
         isManualBridge: false,
+        refreshAfterSave: false,
       );
       await widget.controller.settingsController.verifyAccountMfa(
         baseUrl: accountBaseUrlController.text.trim(),
         code: accountMfaCodeController.text.trim(),
       );
-      await refreshBridgeCapabilities();
+      unawaited(refreshBridgeCapabilities());
     } finally {
       accountMfaCodeController.clear();
     }
@@ -451,6 +463,17 @@ class _AccountSection extends StatelessWidget {
             'Sign in to sync the managed Bridge for Assistant.',
           ),
           children: [
+            if (accountStatus.trim().isNotEmpty &&
+                accountStatus.trim() != 'Signed out') ...[
+              MobileSettingsMetaRowInternal(
+                icon: accountBusy
+                    ? Icons.sync_rounded
+                    : Icons.info_outline_rounded,
+                label: appText('登录状态', 'Sign-in Status'),
+                value: accountStatus.trim(),
+              ),
+              const SizedBox(height: 12),
+            ],
             MobileSettingsTextFieldInternal(
               key: const Key('mobile-settings-account-base-url-field'),
               controller: accountBaseUrlController,
