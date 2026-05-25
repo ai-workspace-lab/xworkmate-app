@@ -35,7 +35,7 @@ void main() {
           updatedAtMs: 1,
           executionTarget: AssistantExecutionTarget.gateway,
           isCurrent: false,
-          pending: false,
+          pending: true,
           lifecycleStatus: 'queued',
           lastResultCode: 'queued',
         ),
@@ -85,6 +85,33 @@ void main() {
       ],
     );
 
+    expect(
+      find.byKey(const Key('workspace-sidebar-task-status-chip')),
+      findsNothing,
+    );
+  });
+
+  testWidgets('sidebar does not show pending for stale queued lifecycle', (
+    tester,
+  ) async {
+    await _pumpSidebar(
+      tester,
+      items: const <SidebarTaskItem>[
+        SidebarTaskItem(
+          sessionKey: 'stale-queued-task',
+          title: '已停止任务',
+          preview: '不应继续 Pending',
+          updatedAtMs: 1,
+          executionTarget: AssistantExecutionTarget.gateway,
+          isCurrent: false,
+          pending: false,
+          lifecycleStatus: 'queued',
+          lastResultCode: 'queued',
+        ),
+      ],
+    );
+
+    expect(find.text('Pending'), findsNothing);
     expect(
       find.byKey(const Key('workspace-sidebar-task-status-chip')),
       findsNothing,
