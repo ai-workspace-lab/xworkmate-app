@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../app/app_controller.dart';
 import '../../app/workspace_page_registry.dart';
@@ -12,29 +14,33 @@ import '../../theme/app_palette.dart';
 import '../../theme/app_theme.dart';
 import 'mobile_assistant_page_composer.dart';
 import 'mobile_assistant_page_conversation.dart';
+import 'mobile_workspace_files_page.dart';
 
-class MobileAssistantPage extends StatefulWidget {
-  const MobileAssistantPage({
+class MobileAssistantDetailPage extends StatefulWidget {
+  const MobileAssistantDetailPage({
     super.key,
     required this.controller,
     required this.onOpenDetail,
+    required this.onBack,
     this.mobileActions = const MobileWorkspaceActions(),
   });
 
   final AppController controller;
   final ValueChanged<DetailPanelData> onOpenDetail;
+  final VoidCallback onBack;
   final MobileWorkspaceActions mobileActions;
 
   @override
-  State<MobileAssistantPage> createState() => _MobileAssistantPageState();
+  State<MobileAssistantDetailPage> createState() => _MobileAssistantDetailPageState();
 }
 
-class _MobileAssistantPageState extends State<MobileAssistantPage> {
+class _MobileAssistantDetailPageState extends State<MobileAssistantDetailPage> {
   late final TextEditingController inputController;
   late final ScrollController conversationController;
   late final FocusNode inputFocusNode;
   String thinking = 'medium';
   String lastScrollSignature = '';
+  int _segmentedIndex = 0;
 
   @override
   void initState() {
@@ -70,12 +76,14 @@ class _MobileAssistantPageState extends State<MobileAssistantPage> {
       return;
     }
     inputController.clear();
+    HapticFeedback.lightImpact();
     try {
       await widget.controller.sendChatMessage(text, thinking: thinking);
     } catch (error) {
       if (!mounted) {
         return;
       }
+      HapticFeedback.heavyImpact();
       ScaffoldMessenger.maybeOf(
         context,
       )?.showSnackBar(SnackBar(content: Text(error.toString())));
@@ -83,6 +91,7 @@ class _MobileAssistantPageState extends State<MobileAssistantPage> {
   }
 
   Future<void> setExecutionTarget(AssistantExecutionTarget target) async {
+    HapticFeedback.selectionClick();
     try {
       await widget.controller.ensureActiveAssistantThreadInternal();
       await widget.controller.setAssistantExecutionTarget(target);
@@ -97,6 +106,7 @@ class _MobileAssistantPageState extends State<MobileAssistantPage> {
   }
 
   Future<void> setProvider(SingleAgentProvider provider) async {
+    HapticFeedback.selectionClick();
     try {
       await widget.controller.ensureActiveAssistantThreadInternal();
       await widget.controller.setAssistantProvider(provider);
@@ -143,42 +153,79 @@ class _MobileAssistantPageState extends State<MobileAssistantPage> {
         final bottomPadding = math.max(mediaQuery.viewPadding.bottom, 10.0);
         final palette = context.palette;
 
-        return ColoredBox(
-          key: const Key('mobile-assistant-page'),
-          color: palette.canvas,
-          child: AnimatedPadding(
+        return Scaffold(
+          backgroundColor: palette.canvas,
+          appBar: CupertinoNavigationBar(
+            backgroundColor: palette.canvas.withValues(alpha: 0.9),
+            border: Border(bottom: BorderSide(color: palette.strokeSoft)),
+            leading: CupertinoButton(
+              padding: EdgeInsets.zero,
+              onPressed: widget.onBack,
+              child: const Icon(CupertinoIcons.back),
+            ),
+            middle: CupertinoSlidingSegmentedControl<int>(
+              groupValue: _segmentedIndex,
+              children: {
+                0: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Text(appText('会话', 'Chat')),
+                ),
+                1: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Text(appText('工作区', 'Workspace')),
+                ),
+              },
+              onValueChanged: (int? value) {
+                if (value != null) {
+                  HapticFeedback.selectionClick();
+                  setState(() {
+                    _segmentedIndex = value;
+                  });
+                }
+              },
+            ),
+          ),
+          body: AnimatedPadding(
             duration: const Duration(milliseconds: 180),
             curve: Curves.easeOutCubic,
             padding: EdgeInsets.only(bottom: bottomInset),
-            child: Column(
+            child: IndexedStack(
+              index: _segmentedIndex,
               children: [
-                MobileAssistantStatusBanner(
-                  controller: controller,
-                  onConnectBridge: widget.mobileActions.connectBridge,
+                Column(
+                  children: [
+                    MobileAssistantStatusBanner(
+                      controller: controller,
+                      onConnectBridge: widget.mobileActions.connectBridge,
+                    ),
+                    Expanded(
+                      child: MobileAssistantConversation(
+                        controller: controller,
+                        messages: messages,
+                        scrollController: conversationController,
+                        onConnectBridge: widget.mobileActions.connectBridge,
+                        onFocusComposer: () => inputFocusNode.requestFocus(),
+                      ),
+                    ),
+                    MobileAssistantComposer(
+                      controller: controller,
+                      inputController: inputController,
+                      focusNode: inputFocusNode,
+                      thinking: thinking,
+                      bottomPadding: bottomPadding,
+                      onThinkingChanged: (value) {
+                        setState(() {
+                          thinking = value;
+                        });
+                      },
+                      onSetExecutionTarget: setExecutionTarget,
+                      onSetProvider: setProvider,
+                      onSend: () => unawaited(sendCurrentPrompt()),
+                    ),
+                  ],
                 ),
-                Expanded(
-                  child: MobileAssistantConversation(
-                    controller: controller,
-                    messages: messages,
-                    scrollController: conversationController,
-                    onConnectBridge: widget.mobileActions.connectBridge,
-                    onFocusComposer: () => inputFocusNode.requestFocus(),
-                  ),
-                ),
-                MobileAssistantComposer(
+                MobileWorkspaceFilesPage(
                   controller: controller,
-                  inputController: inputController,
-                  focusNode: inputFocusNode,
-                  thinking: thinking,
-                  bottomPadding: bottomPadding,
-                  onThinkingChanged: (value) {
-                    setState(() {
-                      thinking = value;
-                    });
-                  },
-                  onSetExecutionTarget: setExecutionTarget,
-                  onSetProvider: setProvider,
-                  onSend: () => unawaited(sendCurrentPrompt()),
                 ),
               ],
             ),
