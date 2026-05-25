@@ -82,6 +82,21 @@ class _MobileAssistantListPageState extends State<MobileAssistantListPage> {
                 backgroundColor: palette.canvas.withValues(alpha: 0.8),
                 largeTitle: const Text('XWorkmate'),
                 border: null,
+                leading: Builder(
+                  builder: (context) {
+                    return CupertinoButton(
+                      padding: EdgeInsets.zero,
+                      onPressed: () {
+                        Scaffold.of(context).openDrawer();
+                      },
+                      child: CircleAvatar(
+                        radius: 14,
+                        backgroundColor: palette.accent,
+                        child: const Text('X', style: TextStyle(color: Colors.white, fontSize: 12)),
+                      ),
+                    );
+                  }
+                ),
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -100,18 +115,6 @@ class _MobileAssistantListPageState extends State<MobileAssistantListPage> {
                         CupertinoIcons.search,
                         color: palette.textPrimary,
                         size: 24,
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    CupertinoButton(
-                      padding: EdgeInsets.zero,
-                      onPressed: () {
-                        // TODO: Open settings or profile
-                      },
-                      child: CircleAvatar(
-                        radius: 14,
-                        backgroundColor: palette.accent,
-                        child: const Text('X', style: TextStyle(color: Colors.white, fontSize: 12)),
                       ),
                     ),
                   ],
@@ -230,6 +233,61 @@ class _MobileAssistantListPageState extends State<MobileAssistantListPage> {
                   ),
                 ),
             ],
+          ),
+          drawer: Drawer(
+            backgroundColor: palette.surfacePrimary,
+            child: SafeArea(
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 24,
+                          backgroundColor: palette.accent,
+                          child: const Text('X', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                        ),
+                        const SizedBox(width: 16),
+                        Text(
+                          'XWorkmate',
+                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: palette.textPrimary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Divider(),
+                  ListTile(
+                    leading: Icon(CupertinoIcons.settings, color: palette.textPrimary),
+                    title: Text(appText('设置', 'Settings'), style: TextStyle(color: palette.textPrimary)),
+                    onTap: () {
+                      Navigator.pop(context);
+                      // TODO: Navigate to settings
+                    },
+                  ),
+                  ListTile(
+                    leading: Icon(CupertinoIcons.person, color: palette.textPrimary),
+                    title: Text(appText('个人中心', 'Profile'), style: TextStyle(color: palette.textPrimary)),
+                    onTap: () {
+                      Navigator.pop(context);
+                      // TODO: Navigate to profile
+                    },
+                  ),
+                  const Spacer(),
+                  const Divider(),
+                  ListTile(
+                    leading: Icon(CupertinoIcons.info_circle, color: palette.textPrimary),
+                    title: Text(appText('关于', 'About'), style: TextStyle(color: palette.textPrimary)),
+                    onTap: () {
+                      Navigator.pop(context);
+                    },
+                  ),
+                ],
+              ),
+            ),
           ),
           floatingActionButton: FloatingActionButton.extended(
             key: const Key('mobile-assistant-fab-create'),
