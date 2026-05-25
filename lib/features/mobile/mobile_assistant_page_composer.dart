@@ -47,18 +47,32 @@ class MobileAssistantComposer extends StatelessWidget {
     final hasPendingRun =
         controller.hasAssistantPendingRun || controller.activeRunId != null;
 
-    return Padding(
-      key: const Key('mobile-assistant-composer'),
-      padding: EdgeInsets.fromLTRB(12, 8, 12, bottomPadding == 0 ? 12 : bottomPadding),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
+    void showConfigurationMenu() {
+      showModalBottomSheet(
+        context: context,
+        backgroundColor: palette.surfacePrimary,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        builder: (sheetContext) {
+          return SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    appText('会话配置', 'Configuration'),
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: palette.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 12,
                     children: [
                       MobileAssistantActionChip(
                         key: const Key('mobile-assistant-target-button'),
@@ -66,82 +80,112 @@ class MobileAssistantComposer extends StatelessWidget {
                             ? Icons.cloud_queue_rounded
                             : Icons.smart_toy_outlined,
                         label: target.compactLabel,
-                        onTap: () => showMobileAssistantTargetSheet(
-                          context,
-                          controller: controller,
-                          onSelected: onSetExecutionTarget,
-                        ),
+                        onTap: () {
+                          Navigator.pop(sheetContext);
+                          showMobileAssistantTargetSheet(
+                            context,
+                            controller: controller,
+                            onSelected: onSetExecutionTarget,
+                          );
+                        },
                       ),
-                      const SizedBox(width: 6),
                       MobileAssistantActionChip(
                         key: const Key('mobile-assistant-provider-button'),
                         icon: Icons.hub_outlined,
                         label: providerLabel,
-                        onTap: () => showMobileAssistantProviderSheet(
-                          context,
-                          controller: controller,
-                          target: target,
-                          selectedProvider: provider,
-                          onSelected: onSetProvider,
-                        ),
+                        onTap: () {
+                          Navigator.pop(sheetContext);
+                          showMobileAssistantProviderSheet(
+                            context,
+                            controller: controller,
+                            target: target,
+                            selectedProvider: provider,
+                            onSelected: onSetProvider,
+                          );
+                        },
                       ),
-                      const SizedBox(width: 6),
                       MobileAssistantActionChip(
                         key: const Key('mobile-assistant-permission-button'),
                         icon: mobilePermissionIcon(
                           controller.assistantPermissionLevel,
                         ),
                         label: controller.assistantPermissionLevel.label,
-                        onTap: () => showMobileAssistantPermissionSheet(
-                          context,
-                          controller: controller,
-                        ),
+                        onTap: () {
+                          Navigator.pop(sheetContext);
+                          showMobileAssistantPermissionSheet(
+                            context,
+                            controller: controller,
+                          );
+                        },
                       ),
-                      const SizedBox(width: 6),
                       MobileAssistantActionChip(
                         key: const Key('mobile-assistant-thinking-button'),
                         icon: Icons.psychology_alt_outlined,
                         label: mobileThinkingLabel(thinking),
-                        onTap: () => showMobileAssistantThinkingSheet(
-                          context,
-                          value: thinking,
-                          onSelected: onThinkingChanged,
-                        ),
+                        onTap: () {
+                          Navigator.pop(sheetContext);
+                          showMobileAssistantThinkingSheet(
+                            context,
+                            value: thinking,
+                            onSelected: onThinkingChanged,
+                          );
+                        },
                       ),
                     ],
                   ),
-                ),
+                ],
               ),
-              if (hasPendingRun) ...[
-                const SizedBox(width: 8),
-                IconButton.filledTonal(
+            ),
+          );
+        },
+      );
+    }
+
+    return Padding(
+      key: const Key('mobile-assistant-composer'),
+      padding: EdgeInsets.fromLTRB(12, 8, 12, bottomPadding == 0 ? 12 : bottomPadding),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (hasPendingRun)
+            Align(
+              alignment: Alignment.centerRight,
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 8.0),
+                child: IconButton.filledTonal(
                   key: const Key('mobile-assistant-stop-button'),
                   onPressed: () => unawaited(controller.abortRun()),
                   icon: const Icon(Icons.stop_rounded),
                   tooltip: appText('停止运行', 'Stop Run'),
                 ),
-              ],
-            ],
-          ),
-          const SizedBox(height: 12),
-          DecoratedBox(
-            decoration: BoxDecoration(
-              color: palette.surfaceSecondary,
-              borderRadius: BorderRadius.circular(26),
+              ),
             ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.only(left: 6, bottom: 4),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(right: 8, bottom: 4),
+                child: CircleAvatar(
+                  radius: 20,
+                  backgroundColor: palette.surfaceSecondary,
                   child: IconButton(
-                    icon: Icon(Icons.add, color: palette.textSecondary),
-                    onPressed: () {
-                      // 预留功能位
-                    },
+                    key: const Key('mobile-assistant-composer-add-button'),
+                    padding: EdgeInsets.zero,
+                    icon: Icon(Icons.add, color: palette.textPrimary, size: 24),
+                    onPressed: showConfigurationMenu,
                   ),
                 ),
-                Expanded(
+              ),
+              Expanded(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: palette.surfaceSecondary,
+                    borderRadius: BorderRadius.circular(26),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Expanded(
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(
                       minHeight: 46,
@@ -184,10 +228,13 @@ class MobileAssistantComposer extends StatelessWidget {
               ],
             ),
           ),
-        ],
-      ),
-    );
-  }
+        ),
+      ],
+    ),
+  ],
+),
+);
+}
 }
 
 class MobileAssistantActionChip extends StatelessWidget {
