@@ -474,6 +474,37 @@ void main() {
       expect(sendCount, 1);
     });
 
+    testWidgets('keeps bottom action row visible when pane height is reduced', (
+      tester,
+    ) async {
+      final controller = AppController(
+        environmentOverride: const <String, String>{},
+      );
+      addTearDown(controller.dispose);
+
+      await controller.sessionsController.switchSession('unit-fixture-task-a');
+
+      await tester.pumpWidget(
+        _buildTestApp(
+          height: 112,
+          child: _buildLowerPane(
+            controller: controller,
+            inputController: TextEditingController(text: 'hello'),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final paneBottom = tester
+          .getBottomLeft(find.byKey(const Key('assistant-lower-pane-host')))
+          .dy;
+      final sendButtonBottom = tester
+          .getBottomLeft(find.byKey(const Key('assistant-send-button')))
+          .dy;
+
+      expect(sendButtonBottom, lessThanOrEqualTo(paneBottom));
+    });
+
     testWidgets('groups all visible skills by source', (tester) async {
       final toggledKeys = <String>[];
       final searchController = TextEditingController();
@@ -583,11 +614,18 @@ void main() {
   });
 }
 
-Widget _buildTestApp({required Widget child}) {
+Widget _buildTestApp({required Widget child, double height = 360}) {
   return MaterialApp(
     theme: AppTheme.light(),
     home: Material(
-      child: Center(child: SizedBox(width: 1400, height: 360, child: child)),
+      child: Center(
+        child: SizedBox(
+          key: const Key('assistant-lower-pane-host'),
+          width: 1400,
+          height: height,
+          child: child,
+        ),
+      ),
     ),
   );
 }
