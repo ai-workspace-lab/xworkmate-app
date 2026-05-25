@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Keep release/profile uploads resilient by generating missing framework dSYMs
-# after embed phases. This is a no-op for debug builds.
+# Generate the dSYM that App Store validation expects for the vendored
+# objective_c native-asset framework after Xcode/CocoaPods embed it.
 if [[ "${CONFIGURATION:-}" != "Release" && "${CONFIGURATION:-}" != "Profile" ]]; then
   exit 0
 fi
@@ -29,12 +29,7 @@ for framework_path in "${frameworks_dir}"/*.framework; do
   binary_path="${framework_path}/${framework_name}"
   [[ -f "${binary_path}" ]] || continue
 
-  # Most Flutter and pod frameworks already produce dSYMs in normal archive
-  # flow. Keep this pass narrow to known stragglers observed in distribution.
-  case "${framework_name}" in
-    objective_c|App|A) ;;
-    *) continue ;;
-  esac
+  [[ "${framework_name}" == "objective_c" ]] || continue
 
   dsym_path="${DWARF_DSYM_FOLDER_PATH}/${framework_name}.framework.dSYM"
   if [[ -d "${dsym_path}" ]]; then

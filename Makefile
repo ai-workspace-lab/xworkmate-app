@@ -20,7 +20,7 @@ APP_DART_DEFINE_BUILD ?= --dart-define=XWORKMATE_BUILD_NUMBER=$(APP_BUILD_NUMBER
 APP_DART_DEFINE_BUILD_DATE ?= --dart-define=XWORKMATE_BUILD_DATE=$(APP_BUILD_DATE)
 APP_DART_DEFINE_BUILD_COMMIT ?= --dart-define=XWORKMATE_BUILD_COMMIT=$(APP_BUILD_COMMIT)
 
-.PHONY: help deps analyze test test-all test-flutter test-golden test-integration test-integration-macos test-patrol test-go test-ci check format run open-macos-xcode sync-version build-linux build-macos build-ios-sim package-deb package-rpm package-linux package-mac install-mac clean build-go-core render-release-docs docs-public-api check-export-compliance test-real-env-login-chain inspect-xworkmate-bridge-service test-api-contract test-api-scenario-contract check-api-external
+.PHONY: help deps analyze test test-all test-flutter test-golden test-integration test-integration-macos test-patrol test-go test-ci check format run open-macos-xcode sync-version build-linux build-macos build-ios-sim ios-pods ios-pods-check build-ios-release-no-codesign verify-ios-release package-deb package-rpm package-linux package-mac install-mac clean build-go-core render-release-docs docs-public-api check-export-compliance test-real-env-login-chain inspect-xworkmate-bridge-service test-api-contract test-api-scenario-contract check-api-external
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z0-9_.-]+:.*?## ' Makefile | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "%-18s %s\n", $$1, $$2}'
@@ -107,6 +107,17 @@ build-macos: ## Build the macOS app in release mode
 build-ios-sim: ## Build the iOS app for the simulator
 	$(FLUTTER) build ios --simulator $(APP_STORE_DART_DEFINE) --build-name=$(APP_VERSION) --build-number=$(APP_BUILD_NUMBER) $(APP_DART_DEFINE_VERSION) $(APP_DART_DEFINE_BUILD) $(APP_DART_DEFINE_BUILD_DATE) $(APP_DART_DEFINE_BUILD_COMMIT)
 	bash scripts/check-apple-export-compliance.sh build/ios/iphonesimulator/Runner.app
+
+ios-pods: ## Regenerate the iOS CocoaPods sandbox
+	cd ios && pod install
+
+ios-pods-check: ios-pods ## Verify Podfile.lock and Pods/Manifest.lock are in sync
+	cmp -s ios/Podfile.lock ios/Pods/Manifest.lock
+
+build-ios-release-no-codesign: ios-pods-check ## Build the iOS device app in release mode without codesigning
+	$(FLUTTER) build ios --release --no-codesign $(APP_STORE_DART_DEFINE) --build-name=$(APP_VERSION) --build-number=$(APP_BUILD_NUMBER) $(APP_DART_DEFINE_VERSION) $(APP_DART_DEFINE_BUILD) $(APP_DART_DEFINE_BUILD_DATE) $(APP_DART_DEFINE_BUILD_COMMIT)
+
+verify-ios-release: ios-pods-check build-ios-release-no-codesign analyze ## Regenerate pods, build iOS release without codesigning, and run static analysis
 
 build-go-core: ## Build the external ACP bridge helper from xworkmate-bridge
 	bash scripts/build-go-core.sh

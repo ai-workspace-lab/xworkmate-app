@@ -102,6 +102,29 @@
   - 产物路径
   - 截图点：artifact 列表与连续追问结果
 
+### `MANUAL-LOCAL-001A` AI 安全演进多平台内容生产
+
+- 前置条件
+  - 当前线程为空白或新建线程
+  - 当前 workspace 允许写入 Markdown 与 PPTX artifact
+- 操作步骤
+  1. 输入 `docs/cases/ai-security-evolution-content-scenario/README.md` 中的 App 手动测试提示词
+  2. 等待任务完成
+  3. 确认生成 X / XHS / 微信文章三份 Markdown 文件
+  4. 确认生成一份 PPTX 文件
+  5. 在同一线程继续追问“把 X 风格文案压缩到 280 字以内”
+- 期望结果
+  - 四个产物都写回当前线程 workspace
+  - artifact 区显示 3 个 `.md` 文件和 1 个 `.pptx` 文件
+  - 三份 Markdown 共享同一张安全演进对照表，但文体不同
+  - PPTX 至少包含封面、演进总览、当下判断和行动清单
+  - follow-up 基于同一线程上下文修改，不新建孤立线程
+- 建议记录项
+  - 线程 ID 或线程标题
+  - 输入提示词
+  - 四个产物路径
+  - artifact 区截图
+
 ### `MANUAL-LOCAL-002` `word-docx`
 
 - 前置条件
