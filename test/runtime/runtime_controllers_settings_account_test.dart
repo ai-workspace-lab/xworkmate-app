@@ -388,6 +388,16 @@ void main() {
           enableSecureStorage: false,
         );
         await store.initialize();
+        await store.saveAccountSessionToken('session-token');
+        await store.saveAccountSessionSummary(
+          const AccountSessionSummary(
+            userId: 'user-1',
+            email: 'review@svc.plus',
+            name: 'Review User',
+            role: 'reviewer',
+            mfaEnabled: true,
+          ),
+        );
         await store.saveAccountSyncState(
           AccountSyncState.defaults().copyWith(
             syncState: 'ready',

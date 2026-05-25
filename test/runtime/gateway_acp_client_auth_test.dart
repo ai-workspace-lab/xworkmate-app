@@ -1248,6 +1248,72 @@ void main() {
     );
 
     test(
+      'desktop bridge auth resolver prefers synced managed bridge token over stale environment token',
+      () async {
+        final storeRoot = await Directory.systemTemp.createTemp(
+          'xworkmate-acp-auth-managed-bridge-env-priority-',
+        );
+        addTearDown(() async {
+          if (await storeRoot.exists()) {
+            try {
+              await storeRoot.delete(recursive: true);
+            } on FileSystemException {
+              // Temp cleanup is best effort here. The controller may still be
+              // releasing files when teardown starts.
+            }
+          }
+        });
+
+        final store = SecureConfigStore(
+          secretRootPathResolver: () async => '${storeRoot.path}/secrets',
+          appDataRootPathResolver: () async => '${storeRoot.path}/app-data',
+          supportRootPathResolver: () async => '${storeRoot.path}/support',
+          enableSecureStorage: false,
+        );
+        await store.initialize();
+        await store.saveAccountSessionToken('session-token');
+        await store.saveAccountSessionSummary(
+          const AccountSessionSummary(
+            userId: 'user-1',
+            email: 'review@svc.plus',
+            name: 'Review User',
+            role: 'reviewer',
+            mfaEnabled: true,
+          ),
+        );
+        await store.saveAccountSyncState(
+          AccountSyncState.defaults().copyWith(
+            syncState: 'ready',
+            tokenConfigured: const AccountTokenConfigured(
+              bridge: true,
+              vault: false,
+            ),
+          ),
+        );
+        await store.saveAccountManagedSecret(
+          target: kAccountManagedSecretTargetBridgeAuthToken,
+          value: 'fresh-bridge-token',
+        );
+
+        final controller = AppController(
+          environmentOverride: const <String, String>{
+            'BRIDGE_AUTH_TOKEN': 'stale-env-token',
+          },
+          store: store,
+        );
+        addTearDown(controller.dispose);
+        await controller.settingsControllerInternal.initialize();
+
+        final header = await controller
+            .resolveGatewayAcpAuthorizationHeaderInternal(
+              Uri.parse('https://xworkmate-bridge.svc.plus/acp/rpc'),
+            );
+
+        expect(header, 'fresh-bridge-token');
+      },
+    );
+
+    test(
       'desktop bridge auth resolver does not fallback to the remote gateway token for bridge ACP',
       () async {
         final storeRoot = await Directory.systemTemp.createTemp(
