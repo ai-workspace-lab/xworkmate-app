@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../features/assistant/assistant_page.dart';
-import '../features/mobile/mobile_assistant_page.dart';
+import '../features/mobile/mobile_assistant_nav_page.dart';
 import '../features/mobile/mobile_settings_page.dart';
 import '../features/settings/settings_page.dart';
 import '../models/app_models.dart';
@@ -52,7 +52,7 @@ final Map<WorkspaceDestination, WorkspacePageSpec> workspacePageSpecsInternal =
           showStandaloneTaskRail: false,
         ),
         mobileBuilder: (controller, onOpenDetail, mobileActions) =>
-            MobileAssistantPage(
+            MobileAssistantNavPage(
               controller: controller,
               onOpenDetail: onOpenDetail,
               mobileActions: mobileActions,

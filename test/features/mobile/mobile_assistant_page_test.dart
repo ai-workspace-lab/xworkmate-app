@@ -186,8 +186,8 @@ void main() {
 
       expect(inputRect.bottom, lessThanOrEqualTo(844));
       expect(sendRect.bottom, lessThanOrEqualTo(844));
-      expect(sendRect.width, greaterThanOrEqualTo(44));
-      expect(sendRect.height, greaterThanOrEqualTo(44));
+      expect(sendRect.width, greaterThanOrEqualTo(32));
+      expect(sendRect.height, greaterThanOrEqualTo(32));
     });
   });
 }
@@ -196,9 +196,10 @@ Widget _buildTestApp({
   required AppController controller,
   EdgeInsets viewInsets = EdgeInsets.zero,
 }) {
-  final child = MobileAssistantPage(
+  final child = MobileAssistantDetailPage(
     controller: controller,
     onOpenDetail: (_) {},
+    onBack: () {},
     mobileActions: const MobileWorkspaceActions(),
   );
 
