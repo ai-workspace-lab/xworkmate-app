@@ -1133,6 +1133,46 @@ void main() {
     });
 
     test(
+      'sendChatMessage forwards inline attachment content and size',
+      () async {
+        final fakeGoTaskService = _RecordingGoTaskServiceClient();
+        final controller = _connectedController(fakeGoTaskService);
+        addTearDown(controller.dispose);
+
+        await controller.sessionsController.switchSession('attachment-task');
+        await controller.sendChatMessage(
+          'use attachment',
+          attachments: <GatewayChatAttachmentPayload>[
+            GatewayChatAttachmentPayload(
+              type: 'file',
+              mimeType: 'text/plain',
+              fileName: 'note.txt',
+              content: base64Encode(utf8.encode('note body')),
+            ),
+          ],
+        );
+
+        final request = fakeGoTaskService.requests.single;
+        expect(request.inlineAttachments, hasLength(1));
+        final params = request.toExternalAcpParams();
+        final inlineAttachments = params['inlineAttachments'] as List<dynamic>;
+        final inlineAttachment =
+            inlineAttachments.single as Map<String, dynamic>;
+        expect(inlineAttachment['name'], 'note.txt');
+        expect(inlineAttachment['mimeType'], 'text/plain');
+        expect(
+          inlineAttachment['content'],
+          base64Encode(utf8.encode('note body')),
+        );
+        expect(inlineAttachment['sizeBytes'], 9);
+        final attachments = params['attachments'] as List<dynamic>;
+        final attachment = attachments.single as Map<String, dynamic>;
+        expect(attachment['name'], 'note.txt');
+        expect(attachment['path'], isEmpty);
+      },
+    );
+
+    test(
       'sendChatMessage resumes existing task after response interruption',
       () async {
         final localWorkspace = await Directory.systemTemp.createTemp(
@@ -2390,7 +2430,16 @@ void main() {
         );
 
         await _selectGatewaySession(controller, 'queue-task-b');
-        final taskBFuture = controller.sendChatMessage('same prompt');
+        final queuedAttachment = GatewayChatAttachmentPayload(
+          type: 'file',
+          mimeType: 'text/plain',
+          fileName: 'queued.txt',
+          content: base64Encode(utf8.encode('queued content')),
+        );
+        final taskBFuture = controller.sendChatMessage(
+          'same prompt',
+          attachments: <GatewayChatAttachmentPayload>[queuedAttachment],
+        );
         await _selectGatewaySession(controller, 'queue-task-c');
         final taskCFuture = controller.sendChatMessage('different prompt');
         await _waitForThreadLifecycleStatus(
@@ -2473,6 +2522,12 @@ void main() {
         expect(taskBRequest.prompt, contains('- sessionKey: queue-task-b'));
         expect(taskBRequest.prompt, contains('User request:\nsame prompt'));
         expect(taskBRequest.resumeSession, isFalse);
+        expect(taskBRequest.inlineAttachments, hasLength(1));
+        expect(taskBRequest.inlineAttachments.single.fileName, 'queued.txt');
+        expect(
+          taskBRequest.inlineAttachments.single.content,
+          queuedAttachment.content,
+        );
         expect(taskBRequest.workingDirectory, endsWith('/queue-task-b'));
         expect(taskBRequest.prompt, contains(taskBRequest.workingDirectory));
         expect(
