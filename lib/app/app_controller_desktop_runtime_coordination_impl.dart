@@ -160,11 +160,24 @@ String? assistantWorkingDirectoryForSessionRuntimeInternal(
   AppController controller,
   String sessionKey,
 ) {
-  return resolveLocalAssistantWorkingDirectoryForSessionRuntimeInternal(
-    controller,
-    sessionKey,
-    requireLocalExistence: false,
-  );
+  final localWorkingDirectory =
+      resolveLocalAssistantWorkingDirectoryForSessionRuntimeInternal(
+        controller,
+        sessionKey,
+        requireLocalExistence: false,
+      );
+  if (localWorkingDirectory?.trim().isNotEmpty == true) {
+    return localWorkingDirectory;
+  }
+  final record = controller.taskThreadForSessionInternal(sessionKey);
+  if (record?.workspaceKind != WorkspaceKind.remoteFs) {
+    return null;
+  }
+  final remoteWorkingDirectory = record?.workspaceBinding.workspacePath.trim();
+  if (remoteWorkingDirectory?.isNotEmpty != true) {
+    return null;
+  }
+  return remoteWorkingDirectory;
 }
 
 String? assistantRemoteWorkingDirectoryHintForSessionRuntimeInternal(
