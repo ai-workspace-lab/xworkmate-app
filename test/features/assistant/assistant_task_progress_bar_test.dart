@@ -129,6 +129,30 @@ void main() {
     expect(indicator.value, 0.48);
   });
 
+  testWidgets('invokes continue action for a recoverable interrupted task', (
+    tester,
+  ) async {
+    var continued = false;
+    await tester.pumpWidget(
+      _buildTestApp(
+        assistantTaskProgressState(
+          pending: false,
+          lifecycleStatus: 'interrupted',
+          lastResultCode: 'ACP_HTTP_CONNECTION_CLOSED',
+          artifactSyncStatus: 'interrupted',
+        ),
+        onContinue: () {
+          continued = true;
+        },
+      ),
+    );
+
+    await tester.tap(
+      find.byKey(const Key('assistant-task-progress-continue-button')),
+    );
+    expect(continued, isTrue);
+  });
+
   testWidgets('shows continue action for a stopped task', (tester) async {
     var continued = false;
     await tester.pumpWidget(

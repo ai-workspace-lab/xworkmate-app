@@ -178,9 +178,13 @@ extension AssistantPageStateClosureInternal on AssistantPageStateInternal {
                       }
                     : null,
                 onContinue: progressState.recoverable
-                    ? AssistantPageStateActionsInternal(
-                        this,
-                      ).focusComposerInternal
+                    ? () {
+                        unawaited(
+                          AssistantPageStateActionsInternal(
+                            this,
+                          ).continueCurrentTaskInternal(activeSessionKey),
+                        );
+                      }
                     : null,
               ),
               ColoredBox(

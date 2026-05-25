@@ -249,11 +249,100 @@ extension AppControllerDesktopThreadActions on AppController {
         sessionsControllerInternal.currentSessionKey,
       );
     }
-    final currentTarget = assistantExecutionTargetForSession(sessionKey);
     final resumeSessionHint = shouldResumeGatewaySessionForNextSendInternal(
       sessionKey,
     );
-    var connectionState = assistantConnectionStateForSession(sessionKey);
+    await dispatchGatewayChatTurnInternal(
+      sessionKey: sessionKey,
+      message: message,
+      thinking: thinking,
+      attachments: attachments,
+      localAttachments: localAttachments,
+      selectedSkillLabels: selectedSkillLabels,
+      resumeSessionHint: resumeSessionHint,
+    );
+  }
+
+  Future<void> continueAssistantTaskInternal(String sessionKey) async {
+    final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
+      sessionKey.trim().isEmpty
+          ? sessionsControllerInternal.currentSessionKey
+          : sessionKey,
+    );
+    final thread = taskThreadForSessionInternal(normalizedSessionKey);
+    final lifecycleStatus = thread?.lifecycleState.status ?? '';
+    final lastResultCode = thread?.lifecycleState.lastResultCode ?? '';
+    final artifactSyncStatus = thread?.lastArtifactSyncStatus ?? '';
+    if (!isRecoverableAssistantTaskStateInternal(
+      lifecycleStatus: lifecycleStatus,
+      lastResultCode: lastResultCode,
+      artifactSyncStatus: artifactSyncStatus,
+    )) {
+      final error = StateError(
+        appText('当前任务状态不可继续执行。', 'The current task state cannot be continued.'),
+      );
+      appendAssistantThreadMessageInternal(
+        normalizedSessionKey,
+        assistantErrorMessageInternal(error.message),
+      );
+      await flushAssistantThreadPersistenceInternal();
+      recomputeTasksInternal();
+      notifyIfActiveInternal();
+      throw error;
+    }
+    final lastUserTurn = lastCommittedUserTurnForGatewaySessionInternal(
+      normalizedSessionKey,
+    );
+    final message = lastUserTurn?.text.trim() ?? '';
+    if (message.isEmpty) {
+      final error = StateError(
+        appText(
+          '当前任务没有可恢复的用户请求，请输入需求后重新提交。',
+          'This task has no recoverable user request. Enter a request and submit it again.',
+        ),
+      );
+      appendAssistantThreadMessageInternal(
+        normalizedSessionKey,
+        assistantErrorMessageInternal(error.message),
+      );
+      await flushAssistantThreadPersistenceInternal();
+      recomputeTasksInternal();
+      notifyIfActiveInternal();
+      throw error;
+    }
+    await dispatchGatewayChatTurnInternal(
+      sessionKey: normalizedSessionKey,
+      message: message,
+      thinking: 'off',
+      attachments: const <GatewayChatAttachmentPayload>[],
+      localAttachments: const <CollaborationAttachment>[],
+      selectedSkillLabels: const <String>[],
+      resumeSessionHint:
+          lastResultCode.trim().toUpperCase() != 'ABORTED' &&
+          shouldResumeGatewaySessionForNextSendInternal(normalizedSessionKey),
+      appendUserTurn: false,
+    );
+  }
+
+  Future<void> dispatchGatewayChatTurnInternal({
+    required String sessionKey,
+    required String message,
+    required String thinking,
+    required List<GatewayChatAttachmentPayload> attachments,
+    required List<CollaborationAttachment> localAttachments,
+    required List<String> selectedSkillLabels,
+    required bool resumeSessionHint,
+    bool appendUserTurn = true,
+  }) async {
+    final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
+      sessionKey,
+    );
+    final currentTarget = assistantExecutionTargetForSession(
+      normalizedSessionKey,
+    );
+    var connectionState = assistantConnectionStateForSession(
+      normalizedSessionKey,
+    );
     if (!connectionState.connected &&
         isBridgeAcpRuntimeConfiguredInternal() &&
         bridgeCapabilityRefreshNeededForAssistantTargetInternal(
@@ -261,7 +350,9 @@ extension AppControllerDesktopThreadActions on AppController {
         )) {
       try {
         await refreshAcpCapabilitiesInternal(forceRefresh: true);
-        connectionState = assistantConnectionStateForSession(sessionKey);
+        connectionState = assistantConnectionStateForSession(
+          normalizedSessionKey,
+        );
       } catch (_) {
         // Fallback to existing connection state if refresh fails.
       }
@@ -269,7 +360,7 @@ extension AppControllerDesktopThreadActions on AppController {
     if (!connectionState.connected) {
       final error = StateError(connectionState.detailLabel);
       appendAssistantThreadMessageInternal(
-        sessionKey,
+        normalizedSessionKey,
         assistantErrorMessageInternal(error.message),
       );
       await flushAssistantThreadPersistenceInternal();
@@ -278,14 +369,17 @@ extension AppControllerDesktopThreadActions on AppController {
       throw error;
     }
     await ensureDesktopTaskThreadBindingInternal(
-      sessionKey,
+      normalizedSessionKey,
       executionTarget: currentTarget,
     );
     final workingDirectory =
-        assistantWorkingDirectoryForSessionInternal(sessionKey)?.trim() ?? '';
+        assistantWorkingDirectoryForSessionInternal(
+          normalizedSessionKey,
+        )?.trim() ??
+        '';
     final remoteWorkingDirectoryHint =
         assistantRemoteWorkingDirectoryHintForSessionInternal(
-          sessionKey,
+          normalizedSessionKey,
         )?.trim() ??
         '';
     if (workingDirectory.isEmpty) {
@@ -296,7 +390,7 @@ extension AppControllerDesktopThreadActions on AppController {
         ),
       );
       appendAssistantThreadMessageInternal(
-        sessionKey,
+        normalizedSessionKey,
         assistantErrorMessageInternal(error.message),
       );
       await flushAssistantThreadPersistenceInternal();
@@ -311,7 +405,7 @@ extension AppControllerDesktopThreadActions on AppController {
       }
       if (providerCatalogForExecutionTarget(currentTarget).isEmpty) {
         upsertTaskThreadInternal(
-          sessionKey,
+          normalizedSessionKey,
           selectedProvider: SingleAgentProvider.unspecified,
           selectedProviderSource: ThreadSelectionSource.inherited,
           latestResolvedProviderId: '',
@@ -329,7 +423,7 @@ extension AppControllerDesktopThreadActions on AppController {
                 ),
         );
         appendAssistantThreadMessageInternal(
-          sessionKey,
+          normalizedSessionKey,
           assistantErrorMessageInternal(error.message),
         );
         await flushAssistantThreadPersistenceInternal();
@@ -338,11 +432,13 @@ extension AppControllerDesktopThreadActions on AppController {
         throw error;
       }
     }
-    final provider = assistantProviderForSession(sessionKey);
+    final provider = assistantProviderForSession(normalizedSessionKey);
     final model = currentTarget.isGateway
         ? ''
-        : assistantModelForSession(sessionKey);
-    final routing = buildExternalAcpRoutingForSessionInternal(sessionKey);
+        : assistantModelForSession(normalizedSessionKey);
+    final routing = buildExternalAcpRoutingForSessionInternal(
+      normalizedSessionKey,
+    );
     final dispatch = await codeAgentNodeOrchestratorInternal
         .buildGatewayDispatch(
           buildCodeAgentNodeStateInternal(executionTarget: currentTarget),
@@ -361,7 +457,7 @@ extension AppControllerDesktopThreadActions on AppController {
         OpenClawGatewayQueuedTurnInternal(
           queueId:
               'openclaw-${DateTime.now().microsecondsSinceEpoch}-$localMessageCounterInternal',
-          sessionKey: sessionKey,
+          sessionKey: normalizedSessionKey,
           target: currentTarget,
           provider: provider,
           message: message,
@@ -376,14 +472,15 @@ extension AppControllerDesktopThreadActions on AppController {
           agentId: dispatch.agentId ?? '',
           metadata: Map<String, dynamic>.unmodifiable(dispatch.metadata),
           resumeSessionHint: resumeSessionHint,
+          appendUserTurn: appendUserTurn,
         ),
       );
       return;
     }
     await enqueueThreadTurnInternal<void>(
-      sessionKey,
+      normalizedSessionKey,
       () => runGatewayChatTurnInternal(
-        sessionKey: sessionKey,
+        sessionKey: normalizedSessionKey,
         target: currentTarget,
         provider: provider,
         message: message,
@@ -398,6 +495,7 @@ extension AppControllerDesktopThreadActions on AppController {
         agentId: dispatch.agentId ?? '',
         metadata: Map<String, dynamic>.unmodifiable(dispatch.metadata),
         resumeSessionHint: resumeSessionHint,
+        appendUserTurn: appendUserTurn,
       ),
     );
     recomputeTasksInternal();
@@ -570,7 +668,9 @@ extension AppControllerDesktopThreadActions on AppController {
   Future<void> enqueueOpenClawGatewayTurnInternal(
     OpenClawGatewayQueuedTurnInternal turn,
   ) async {
-    appendGatewayUserTurnInternal(turn.sessionKey, turn.message);
+    if (turn.appendUserTurn) {
+      appendGatewayUserTurnInternal(turn.sessionKey, turn.message);
+    }
     if (openClawGatewayActiveTasksInternal >=
             openClawGatewayMaxActiveTasksInternal &&
         openClawGatewayQueuedTurnsInternal.length >=
@@ -972,6 +1072,42 @@ extension AppControllerDesktopThreadActions on AppController {
       final role = message.role.trim().toLowerCase();
       return role == 'user' && !message.pending;
     });
+  }
+
+  GatewayChatMessage? lastCommittedUserTurnForGatewaySessionInternal(
+    String sessionKey,
+  ) {
+    final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
+      sessionKey,
+    );
+    final messages = <GatewayChatMessage>[
+      ...?assistantThreadRecordsInternal[normalizedSessionKey]?.messages,
+      ...?assistantThreadMessagesInternal[normalizedSessionKey],
+      ...?localSessionMessagesInternal[normalizedSessionKey],
+    ];
+    for (final message in messages.reversed) {
+      final role = message.role.trim().toLowerCase();
+      if (role == 'user' && !message.pending) {
+        return message;
+      }
+    }
+    return null;
+  }
+
+  bool isRecoverableAssistantTaskStateInternal({
+    required String lifecycleStatus,
+    required String lastResultCode,
+    required String artifactSyncStatus,
+  }) {
+    final status = lifecycleStatus.trim().toLowerCase();
+    final syncStatus = artifactSyncStatus.trim().toLowerCase();
+    final result = lastResultCode.trim().toUpperCase();
+    return status == 'interrupted' ||
+        syncStatus == 'interrupted' ||
+        result == 'ABORTED' ||
+        result == 'ERROR' ||
+        result == 'ACP_HTTP_CONNECTION_CLOSED' ||
+        result == 'SESSION_CONTINUATION_UNAVAILABLE';
   }
 
   bool shouldResumeGatewaySessionForNextSendInternal(String sessionKey) {
