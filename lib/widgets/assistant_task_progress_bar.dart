@@ -8,6 +8,7 @@ enum AssistantTaskProgressPhase {
   running,
   syncingArtifacts,
   interrupted,
+  stopped,
 }
 
 class AssistantTaskProgressState {
@@ -31,6 +32,10 @@ class AssistantTaskProgressState {
 
   bool get visible => phase != AssistantTaskProgressPhase.idle;
   bool get interrupted => phase == AssistantTaskProgressPhase.interrupted;
+  bool get stopped => phase == AssistantTaskProgressPhase.stopped;
+  bool get recoverable =>
+      phase == AssistantTaskProgressPhase.interrupted ||
+      phase == AssistantTaskProgressPhase.stopped;
   bool get running =>
       phase == AssistantTaskProgressPhase.queued ||
       phase == AssistantTaskProgressPhase.running ||
@@ -38,10 +43,16 @@ class AssistantTaskProgressState {
 }
 
 class AssistantTaskProgressBar extends StatelessWidget {
-  const AssistantTaskProgressBar({super.key, required this.state, this.onStop});
+  const AssistantTaskProgressBar({
+    super.key,
+    required this.state,
+    this.onStop,
+    this.onContinue,
+  });
 
   final AssistantTaskProgressState state;
   final VoidCallback? onStop;
+  final VoidCallback? onContinue;
 
   @override
   Widget build(BuildContext context) {
@@ -51,6 +62,8 @@ class AssistantTaskProgressBar extends StatelessWidget {
     final theme = Theme.of(context);
     final color = state.interrupted
         ? theme.colorScheme.error
+        : state.stopped
+        ? theme.colorScheme.tertiary
         : theme.colorScheme.primary;
     return Container(
       key: const Key('assistant-task-progress-bar'),
@@ -59,6 +72,8 @@ class AssistantTaskProgressBar extends StatelessWidget {
       decoration: BoxDecoration(
         color: state.interrupted
             ? theme.colorScheme.errorContainer.withValues(alpha: 0.18)
+            : state.stopped
+            ? theme.colorScheme.tertiaryContainer.withValues(alpha: 0.22)
             : theme.colorScheme.primaryContainer.withValues(alpha: 0.18),
         border: Border(
           top: BorderSide(color: theme.dividerColor.withValues(alpha: 0.42)),
@@ -102,6 +117,16 @@ class AssistantTaskProgressBar extends StatelessWidget {
               label: appText('停止', 'Stop'),
               color: color,
               onPressed: onStop,
+            ),
+          ],
+          if (state.recoverable && onContinue != null) ...[
+            const SizedBox(width: 8),
+            _AssistantTaskProgressActionButton(
+              key: const Key('assistant-task-progress-continue-button'),
+              icon: Icons.play_arrow_rounded,
+              label: appText('继续', 'Continue'),
+              color: color,
+              onPressed: onContinue,
             ),
           ],
         ],
@@ -182,6 +207,16 @@ AssistantTaskProgressState assistantTaskProgressState({
       phase: AssistantTaskProgressPhase.interrupted,
       label: _interruptedTaskProgressLabel(result),
       value: 0.48,
+    );
+  }
+  if (result == 'ABORTED') {
+    return AssistantTaskProgressState(
+      phase: AssistantTaskProgressPhase.stopped,
+      label: appText(
+        '任务已停止，可继续补充需求恢复执行。',
+        'Task stopped. Continue by adding the next request.',
+      ),
+      value: 0,
     );
   }
   return const AssistantTaskProgressState.idle();

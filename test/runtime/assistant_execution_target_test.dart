@@ -2646,6 +2646,117 @@ void main() {
       },
     );
 
+    test(
+      'abortRun stops the current running OpenClaw task without clearing other queued tasks',
+      () async {
+        final fakeGoTaskService = _BlockingGoTaskServiceClient();
+        final controller = _connectedGatewayController(fakeGoTaskService);
+        addTearDown(() {
+          fakeGoTaskService.completeAll();
+          controller.dispose();
+        });
+
+        await _selectGatewaySession(controller, 'running-openclaw-stop-task');
+        final runningFuture = controller.sendChatMessage('running');
+        await fakeGoTaskService.waitForRequestCount(1);
+
+        await _selectGatewaySession(controller, 'queued-openclaw-after-stop');
+        final queuedFuture = controller.sendChatMessage('queued');
+        await _waitForThreadLifecycleStatus(
+          controller,
+          'queued-openclaw-after-stop',
+          'queued',
+        );
+
+        await _selectGatewaySession(controller, 'running-openclaw-stop-task');
+        await controller.abortRun();
+
+        expect(fakeGoTaskService.cancelledSessionIds, <String>[
+          'running-openclaw-stop-task',
+        ]);
+        expect(
+          controller.assistantSessionHasPendingRun(
+            'running-openclaw-stop-task',
+          ),
+          isFalse,
+        );
+        expect(
+          controller
+              .requireTaskThreadForSessionInternal('running-openclaw-stop-task')
+              .lifecycleState
+              .lastResultCode,
+          'aborted',
+        );
+        expect(
+          controller.assistantSessionHasPendingRun(
+            'queued-openclaw-after-stop',
+          ),
+          isTrue,
+        );
+
+        fakeGoTaskService.complete(
+          'running-openclaw-stop-task',
+          const GoTaskServiceResult(
+            success: true,
+            message: 'late stopped result',
+            turnId: 'turn-stopped',
+            raw: <String, dynamic>{},
+            errorMessage: '',
+            resolvedModel: '',
+            route: GoTaskServiceRoute.externalAcpSingle,
+          ),
+        );
+        await runningFuture;
+        await fakeGoTaskService.waitForRequestCount(2);
+        expect(
+          fakeGoTaskService.requests.last.sessionId,
+          'queued-openclaw-after-stop',
+        );
+
+        fakeGoTaskService.complete(
+          'queued-openclaw-after-stop',
+          const GoTaskServiceResult(
+            success: true,
+            message: 'queued done',
+            turnId: 'turn-queued',
+            raw: <String, dynamic>{},
+            errorMessage: '',
+            resolvedModel: '',
+            route: GoTaskServiceRoute.externalAcpSingle,
+          ),
+        );
+        await queuedFuture;
+        await _waitForThreadLifecycleStatus(
+          controller,
+          'queued-openclaw-after-stop',
+          'ready',
+        );
+        expect(fakeGoTaskService.requests, hasLength(2));
+      },
+    );
+
+    test(
+      'stale queued lifecycle without a real queue entry is not pending',
+      () {
+        final controller = _connectedGatewayController(
+          _BlockingGoTaskServiceClient(),
+        );
+        addTearDown(controller.dispose);
+
+        controller.upsertTaskThreadInternal(
+          'stale-queued-task',
+          lifecycleStatus: 'queued',
+          lastResultCode: 'queued',
+          updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+        );
+
+        expect(
+          controller.assistantSessionHasPendingRun('stale-queued-task'),
+          isFalse,
+        );
+      },
+    );
+
     test('OpenClaw queue overflow fails without artifact sync', () async {
       final fakeGoTaskService = _BlockingGoTaskServiceClient();
       final controller = _connectedGatewayController(fakeGoTaskService);

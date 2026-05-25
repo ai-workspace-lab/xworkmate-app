@@ -676,7 +676,8 @@ StatusInfo? _sidebarTaskStatusInfo(SidebarTaskItem item) {
   final lifecycleStatus = item.lifecycleStatus.trim().toLowerCase();
   final lastResultCode = item.lastResultCode.trim();
   final normalizedResultCode = lastResultCode.toLowerCase();
-  if (lifecycleStatus == 'queued' || normalizedResultCode == 'queued') {
+  if (item.pending &&
+      (lifecycleStatus == 'queued' || normalizedResultCode == 'queued')) {
     return StatusInfo(appText('Pending', 'Pending'), StatusTone.warning);
   }
   if (item.pending ||
