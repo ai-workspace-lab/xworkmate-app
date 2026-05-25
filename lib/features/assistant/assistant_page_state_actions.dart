@@ -355,6 +355,14 @@ extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
     widget.controller.openSettings(tab: SettingsTab.gateway);
   }
 
+  Future<void> continueCurrentTaskInternal(String sessionKey) async {
+    try {
+      await widget.controller.continueAssistantTaskInternal(sessionKey);
+    } catch (_) {
+      focusComposerInternal();
+    }
+  }
+
   void focusComposerInternal() {
     if (!mounted) {
       return;
