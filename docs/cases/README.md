@@ -5,6 +5,7 @@
 ## 当前入口
 
 - [核心功能集成测试手动 Case](./core-integration-manual-cases.md)
+- [AI 安全演进内容生成场景测试用例](./ai-security-evolution-content-scenario/README.md)
 
 ## 配套文档
 
