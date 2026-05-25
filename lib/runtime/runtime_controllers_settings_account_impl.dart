@@ -133,6 +133,8 @@ Future<void> completeAccountSignInSettingsInternal(
   }
   final user = _asMap(payload['user']);
   final sessionSummary = _accountSessionSummaryFromUserPayload(user);
+  controller.accountSessionTokenInternal = token;
+  controller.accountSessionInternal = sessionSummary;
   await controller.storeInternal.saveAccountSessionToken(token);
   await controller.storeInternal.saveAccountSessionExpiresAtMs(
     _parseExpiresAtMs(payload['expiresAt']),
