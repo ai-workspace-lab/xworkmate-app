@@ -177,6 +177,11 @@ extension AssistantPageStateClosureInternal on AssistantPageStateInternal {
                         unawaited(controller.abortRun());
                       }
                     : null,
+                onContinue: progressState.recoverable
+                    ? AssistantPageStateActionsInternal(
+                        this,
+                      ).focusComposerInternal
+                    : null,
               ),
               ColoredBox(
                 color: palette.canvas,
