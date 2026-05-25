@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../features/assistant/assistant_page.dart';
 import '../features/mobile/mobile_assistant_page.dart';
+import '../features/mobile/mobile_settings_page.dart';
 import '../features/settings/settings_page.dart';
 import '../models/app_models.dart';
 import 'app_controller.dart';
@@ -64,10 +65,7 @@ final Map<WorkspaceDestination, WorkspacePageSpec> workspacePageSpecsInternal =
           initialTab: controller.settingsTab,
         ),
         mobileBuilder: (controller, onOpenDetail, mobileActions) =>
-            SettingsPage(
-              controller: controller,
-              initialTab: controller.settingsTab,
-            ),
+            MobileSettingsPage(controller: controller),
       ),
     };
 
