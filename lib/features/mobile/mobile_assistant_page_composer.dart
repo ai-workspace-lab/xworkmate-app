@@ -185,52 +185,56 @@ class MobileAssistantComposer extends StatelessWidget {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      Expanded(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(
-                      minHeight: 46,
-                      maxHeight: 118,
-                    ),
-                    child: TextField(
-                      key: const Key('mobile-assistant-input'),
-                      controller: inputController,
-                      focusNode: focusNode,
-                      minLines: 1,
-                      maxLines: 4,
-                      textInputAction: TextInputAction.newline,
-                      decoration: InputDecoration(
-                        hintText: appText(
-                          '询问 XWorkmate...',
-                          'Ask XWorkmate...',
-                        ),
-                        hintStyle: TextStyle(color: palette.textMuted),
-                        border: InputBorder.none,
-                        enabledBorder: InputBorder.none,
-                        focusedBorder: InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(vertical: 14),
-                      ),
-                    ),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.only(right: 6, bottom: 6),
-                  child: CircleAvatar(
-                    radius: 18,
-                    backgroundColor: palette.accent,
-                    child: IconButton(
-                      key: const Key('mobile-assistant-send-button'),
-                      padding: EdgeInsets.zero,
-                      icon: const Icon(Icons.arrow_upward_rounded, color: Colors.white, size: 20),
-                      onPressed: onSend,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    ),
+                       Expanded(
+                         child: ConstrainedBox(
+                           constraints: const BoxConstraints(
+                             minHeight: 46,
+                             maxHeight: 118,
+                           ),
+                           child: TextField(
+                             key: const Key('mobile-assistant-input'),
+                             controller: inputController,
+                             focusNode: focusNode,
+                             minLines: 1,
+                             maxLines: 4,
+                             textInputAction: TextInputAction.newline,
+                             decoration: InputDecoration(
+                               hintText: appText(
+                                 '询问 XWorkmate...',
+                                 'Ask XWorkmate...',
+                               ),
+                               hintStyle: TextStyle(color: palette.textMuted),
+                               border: InputBorder.none,
+                               enabledBorder: InputBorder.none,
+                               focusedBorder: InputBorder.none,
+                               contentPadding: const EdgeInsets.only(left: 16, right: 8, top: 14, bottom: 14),
+                             ),
+                           ),
+                         ),
+                       ),
+                       Padding(
+                         padding: const EdgeInsets.only(right: 12, bottom: 12),
+                         child: Icon(Icons.mic_none, color: palette.textMuted, size: 24),
+                       ),
+                     ],
+                   ),
+                 ),
+               ),
+               Padding(
+                 padding: const EdgeInsets.only(left: 8, bottom: 4),
+                 child: CircleAvatar(
+                   radius: 20,
+                   backgroundColor: palette.textPrimary,
+                   child: IconButton(
+                     key: const Key('mobile-assistant-send-button'),
+                     padding: EdgeInsets.zero,
+                     icon: Icon(Icons.arrow_upward_rounded, color: palette.canvas, size: 20),
+                     onPressed: onSend,
+                   ),
+                 ),
+               ),
+             ],
+           ),
   ],
 ),
 );
