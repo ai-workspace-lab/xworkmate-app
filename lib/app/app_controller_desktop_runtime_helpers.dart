@@ -1075,15 +1075,8 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
         normalizedHost == bridgeHost &&
         (bridgePort <= 0 || endpoint.port == bridgePort);
     if (matchesBridgeEndpoint) {
-      final envToken = runtimeEnvironmentValueInternal('BRIDGE_AUTH_TOKEN');
-      if (envToken != null && envToken.isNotEmpty) {
-        return envToken;
-      }
-
-      final bridgeToken = (await storeInternal.loadAccountManagedSecret(
-        target: kAccountManagedSecretTargetBridgeAuthToken,
-      ))?.trim();
-      if (bridgeToken?.isNotEmpty == true) {
+      final bridgeToken = await _resolveManagedBridgeAuthTokenInternal();
+      if (bridgeToken != null && bridgeToken.isNotEmpty) {
         return bridgeToken;
       }
     }
@@ -1100,18 +1093,25 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
       return null;
     }
 
-    final envToken = runtimeEnvironmentValueInternal('BRIDGE_AUTH_TOKEN');
-    if (envToken != null && envToken.isNotEmpty) {
-      return _normalizeAuthorizationHeaderInternal(envToken);
-    }
-
-    final bridgeToken = (await storeInternal.loadAccountManagedSecret(
-      target: kAccountManagedSecretTargetBridgeAuthToken,
-    ))?.trim();
-    if (bridgeToken?.isNotEmpty == true) {
-      return _normalizeAuthorizationHeaderInternal(bridgeToken!);
+    final bridgeToken = await _resolveManagedBridgeAuthTokenInternal();
+    if (bridgeToken != null && bridgeToken.isNotEmpty) {
+      return _normalizeAuthorizationHeaderInternal(bridgeToken);
     }
     return null;
+  }
+
+  Future<String?> _resolveManagedBridgeAuthTokenInternal() async {
+    final accountSyncState = settingsControllerInternal.accountSyncState;
+    if (settingsControllerInternal.accountSignedIn &&
+        accountSyncState?.tokenConfigured.bridge == true) {
+      final bridgeToken = (await storeInternal.loadAccountManagedSecret(
+        target: kAccountManagedSecretTargetBridgeAuthToken,
+      ))?.trim();
+      return bridgeToken?.isNotEmpty == true ? bridgeToken : null;
+    }
+
+    final envToken = runtimeEnvironmentValueInternal('BRIDGE_AUTH_TOKEN');
+    return envToken?.isNotEmpty == true ? envToken : null;
   }
 
   int? gatewayProfileIndexMatchingEndpointInternal(Uri endpoint) {
