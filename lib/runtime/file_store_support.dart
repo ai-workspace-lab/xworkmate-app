@@ -145,7 +145,9 @@ class StoreLayoutResolver {
     if (supportRootPath == null) {
       // Fallback to a temporary directory instead of failing fast with an error.
       // This ensures the app remains usable in "memory-only" or "ephemeral" mode.
-      final tempDir = await Directory.systemTemp.createTemp('xworkmate-fallback-');
+      final tempDir = await Directory.systemTemp.createTemp(
+        'xworkmate-fallback-',
+      );
       final layout = StoreLayout(
         rootDirectory: tempDir,
         configDirectory: await ensureDirectory('${tempDir.path}/config'),
@@ -243,17 +245,22 @@ Future<Directory> ensureDirectory(String path) async {
 }
 
 Future<void> ensureOwnerOnlyDirectory(Directory directory) async {
-  if (Platform.isWindows) {
+  if (!shouldApplyUnixOwnerOnlyPermissionsInternal()) {
     return;
   }
   await _setUnixPermissions(directory.path, '700');
 }
 
 Future<void> ensureOwnerOnlyFile(File file) async {
-  if (Platform.isWindows) {
+  if (!shouldApplyUnixOwnerOnlyPermissionsInternal()) {
     return;
   }
   await _setUnixPermissions(file.path, '600');
+}
+
+bool shouldApplyUnixOwnerOnlyPermissionsInternal({String? operatingSystem}) {
+  final os = operatingSystem ?? Platform.operatingSystem;
+  return os == 'linux' || os == 'macos';
 }
 
 String encodeStableFileKey(String key) {
