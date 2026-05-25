@@ -203,12 +203,28 @@ extension AppControllerDesktopThreadBinding on AppController {
     required ThreadOwnerScope ownerScope,
     WorkspaceBinding? existingBinding,
   }) {
-    final localPath = localThreadWorkspacePathInternal(sessionKey);
-    final displayPath = localPath.isEmpty
-        ? ''
-        : localThreadWorkspaceDisplayPathInternal(sessionKey);
+    final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
+      sessionKey,
+    );
+    final localPath = localThreadWorkspacePathInternal(normalizedSessionKey);
+    if (localPath.isEmpty) {
+      final remotePath = remoteThreadWorkspacePathInternal(
+        normalizedSessionKey,
+        ownerScope,
+      );
+      return WorkspaceBinding(
+        workspaceId: normalizedSessionKey,
+        workspaceKind: WorkspaceKind.remoteFs,
+        workspacePath: remotePath,
+        displayPath: remotePath,
+        writable: existingBinding?.writable ?? true,
+      );
+    }
+    final displayPath = localThreadWorkspaceDisplayPathInternal(
+      normalizedSessionKey,
+    );
     return WorkspaceBinding(
-      workspaceId: normalizedAssistantSessionKeyInternal(sessionKey),
+      workspaceId: normalizedSessionKey,
       workspaceKind: WorkspaceKind.localFs,
       workspacePath: localPath,
       displayPath: displayPath,

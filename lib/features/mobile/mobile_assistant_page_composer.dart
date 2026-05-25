@@ -47,91 +47,100 @@ class MobileAssistantComposer extends StatelessWidget {
     final hasPendingRun =
         controller.hasAssistantPendingRun || controller.activeRunId != null;
 
-    return DecoratedBox(
+    return Padding(
       key: const Key('mobile-assistant-composer'),
-      decoration: BoxDecoration(
-        color: palette.surfacePrimary,
-        border: Border(top: BorderSide(color: palette.strokeSoft)),
-      ),
-      child: Padding(
-        padding: EdgeInsets.fromLTRB(10, 8, 10, bottomPadding),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        MobileAssistantActionChip(
-                          key: const Key('mobile-assistant-target-button'),
-                          icon: target.isGateway
-                              ? Icons.cloud_queue_rounded
-                              : Icons.smart_toy_outlined,
-                          label: target.compactLabel,
-                          onTap: () => showMobileAssistantTargetSheet(
-                            context,
-                            controller: controller,
-                            onSelected: onSetExecutionTarget,
-                          ),
+      padding: EdgeInsets.fromLTRB(12, 8, 12, bottomPadding == 0 ? 12 : bottomPadding),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      MobileAssistantActionChip(
+                        key: const Key('mobile-assistant-target-button'),
+                        icon: target.isGateway
+                            ? Icons.cloud_queue_rounded
+                            : Icons.smart_toy_outlined,
+                        label: target.compactLabel,
+                        onTap: () => showMobileAssistantTargetSheet(
+                          context,
+                          controller: controller,
+                          onSelected: onSetExecutionTarget,
                         ),
-                        const SizedBox(width: 6),
-                        MobileAssistantActionChip(
-                          key: const Key('mobile-assistant-provider-button'),
-                          icon: Icons.hub_outlined,
-                          label: providerLabel,
-                          onTap: () => showMobileAssistantProviderSheet(
-                            context,
-                            controller: controller,
-                            target: target,
-                            selectedProvider: provider,
-                            onSelected: onSetProvider,
-                          ),
+                      ),
+                      const SizedBox(width: 6),
+                      MobileAssistantActionChip(
+                        key: const Key('mobile-assistant-provider-button'),
+                        icon: Icons.hub_outlined,
+                        label: providerLabel,
+                        onTap: () => showMobileAssistantProviderSheet(
+                          context,
+                          controller: controller,
+                          target: target,
+                          selectedProvider: provider,
+                          onSelected: onSetProvider,
                         ),
-                        const SizedBox(width: 6),
-                        MobileAssistantActionChip(
-                          key: const Key('mobile-assistant-permission-button'),
-                          icon: mobilePermissionIcon(
-                            controller.assistantPermissionLevel,
-                          ),
-                          label: controller.assistantPermissionLevel.label,
-                          onTap: () => showMobileAssistantPermissionSheet(
-                            context,
-                            controller: controller,
-                          ),
+                      ),
+                      const SizedBox(width: 6),
+                      MobileAssistantActionChip(
+                        key: const Key('mobile-assistant-permission-button'),
+                        icon: mobilePermissionIcon(
+                          controller.assistantPermissionLevel,
                         ),
-                        const SizedBox(width: 6),
-                        MobileAssistantActionChip(
-                          key: const Key('mobile-assistant-thinking-button'),
-                          icon: Icons.psychology_alt_outlined,
-                          label: mobileThinkingLabel(thinking),
-                          onTap: () => showMobileAssistantThinkingSheet(
-                            context,
-                            value: thinking,
-                            onSelected: onThinkingChanged,
-                          ),
+                        label: controller.assistantPermissionLevel.label,
+                        onTap: () => showMobileAssistantPermissionSheet(
+                          context,
+                          controller: controller,
                         ),
-                      ],
-                    ),
+                      ),
+                      const SizedBox(width: 6),
+                      MobileAssistantActionChip(
+                        key: const Key('mobile-assistant-thinking-button'),
+                        icon: Icons.psychology_alt_outlined,
+                        label: mobileThinkingLabel(thinking),
+                        onTap: () => showMobileAssistantThinkingSheet(
+                          context,
+                          value: thinking,
+                          onSelected: onThinkingChanged,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                if (hasPendingRun) ...[
-                  const SizedBox(width: 8),
-                  IconButton.filledTonal(
-                    key: const Key('mobile-assistant-stop-button'),
-                    onPressed: () => unawaited(controller.abortRun()),
-                    icon: const Icon(Icons.stop_rounded),
-                    tooltip: appText('停止运行', 'Stop Run'),
-                  ),
-                ],
+              ),
+              if (hasPendingRun) ...[
+                const SizedBox(width: 8),
+                IconButton.filledTonal(
+                  key: const Key('mobile-assistant-stop-button'),
+                  onPressed: () => unawaited(controller.abortRun()),
+                  icon: const Icon(Icons.stop_rounded),
+                  tooltip: appText('停止运行', 'Stop Run'),
+                ),
               ],
+            ],
+          ),
+          const SizedBox(height: 12),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: palette.surfaceSecondary,
+              borderRadius: BorderRadius.circular(26),
             ),
-            const SizedBox(height: 8),
-            Row(
+            child: Row(
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
+                Padding(
+                  padding: const EdgeInsets.only(left: 6, bottom: 4),
+                  child: IconButton(
+                    icon: Icon(Icons.add, color: palette.textSecondary),
+                    onPressed: () {
+                      // 预留功能位
+                    },
+                  ),
+                ),
                 Expanded(
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(
@@ -146,52 +155,36 @@ class MobileAssistantComposer extends StatelessWidget {
                       maxLines: 4,
                       textInputAction: TextInputAction.newline,
                       decoration: InputDecoration(
-                        filled: true,
-                        fillColor: palette.surfaceSecondary,
                         hintText: appText(
-                          '输入任务或补充上下文',
-                          'Type a task or context',
+                          '询问 XWorkmate...',
+                          'Ask XWorkmate...',
                         ),
-                        contentPadding: const EdgeInsets.fromLTRB(
-                          12,
-                          10,
-                          12,
-                          10,
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(AppRadius.input),
-                          borderSide: BorderSide(color: palette.strokeSoft),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(AppRadius.input),
-                          borderSide: BorderSide(
-                            color: palette.accent.withValues(alpha: 0.32),
-                          ),
-                        ),
+                        hintStyle: TextStyle(color: palette.textMuted),
+                        border: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                        contentPadding: const EdgeInsets.symmetric(vertical: 14),
                       ),
                     ),
                   ),
                 ),
-                const SizedBox(width: 8),
-                SizedBox(
-                  width: 48,
-                  height: 48,
-                  child: FilledButton(
-                    key: const Key('mobile-assistant-send-button'),
-                    onPressed: onSend,
-                    style: FilledButton.styleFrom(
+                Padding(
+                  padding: const EdgeInsets.only(right: 6, bottom: 6),
+                  child: CircleAvatar(
+                    radius: 18,
+                    backgroundColor: palette.accent,
+                    child: IconButton(
+                      key: const Key('mobile-assistant-send-button'),
                       padding: EdgeInsets.zero,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(AppRadius.button),
-                      ),
+                      icon: const Icon(Icons.arrow_upward_rounded, color: Colors.white, size: 20),
+                      onPressed: onSend,
                     ),
-                    child: const Icon(Icons.arrow_upward_rounded),
                   ),
                 ),
               ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
