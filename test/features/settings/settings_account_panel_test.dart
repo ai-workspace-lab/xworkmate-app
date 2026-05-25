@@ -64,6 +64,56 @@ void main() {
       expect(loginCount, 1);
     });
 
+    testWidgets('accepts password input on the cloud sign-in form', (
+      tester,
+    ) async {
+      final controllers = _TestControllers();
+      addTearDown(controllers.dispose);
+
+      var submittedPassword = '';
+
+      await tester.pumpWidget(
+        _buildTestApp(
+          child: SettingsAccountPanel(
+            settings: SettingsSnapshot.defaults(),
+            accountSession: null,
+            accountState: null,
+            accountBusy: false,
+            accountSignedIn: false,
+            accountMfaRequired: false,
+            accountBaseUrlController: controllers.baseUrl,
+            accountIdentifierController: controllers.identifier,
+            accountPasswordController: controllers.password,
+            accountMfaCodeController: controllers.mfaCode,
+            bridgeUrlController: controllers.bridgeUrl,
+            bridgeTokenController: controllers.bridgeToken,
+            onSaveAccountProfile: ({required bool isManualBridge}) async {},
+            onLogin: () async {
+              submittedPassword = controllers.password.text;
+            },
+            onVerifyMfa: () async {},
+            onCancelMfa: () async {},
+            onSync: () async {},
+            onLogout: () async {},
+          ),
+        ),
+      );
+
+      final passwordField = find.byKey(
+        const ValueKey('settings-account-password-field'),
+      );
+
+      await tester.tap(passwordField);
+      await tester.enterText(passwordField, 'typed-password');
+      await tester.tap(
+        find.byKey(const ValueKey('settings-account-login-button')),
+      );
+      await tester.pump();
+
+      expect(controllers.password.text, 'typed-password');
+      expect(submittedPassword, 'typed-password');
+    });
+
     testWidgets(
       'shows account sync status, resync, and exit in signed-in mode',
       (tester) async {
