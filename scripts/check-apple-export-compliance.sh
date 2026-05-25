@@ -58,10 +58,10 @@ resolve_artifact_plist() {
     return 0
   fi
   if [[ -d "$input_path" && "$input_path" == *.xcarchive ]]; then
-    local plist_path=""
-    plist_path="$(find "$input_path/Products/Applications" -maxdepth 3 -name Info.plist | head -n 1)"
-    if [[ -n "$plist_path" ]]; then
-      printf '%s\n' "$plist_path"
+    local app_path=""
+    app_path="$(find "$input_path/Products/Applications" -maxdepth 1 -name '*.app' -type d | head -n 1)"
+    if [[ -n "$app_path" && -f "$app_path/Info.plist" ]]; then
+      printf '%s\n' "$app_path/Info.plist"
       return 0
     fi
   fi
