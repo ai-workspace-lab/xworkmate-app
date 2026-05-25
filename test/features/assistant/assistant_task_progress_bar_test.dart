@@ -129,6 +129,54 @@ void main() {
     expect(indicator.value, 0.48);
   });
 
+  testWidgets('shows continue action for a stopped task', (tester) async {
+    var continued = false;
+    await tester.pumpWidget(
+      _buildTestApp(
+        assistantTaskProgressState(
+          pending: false,
+          lifecycleStatus: 'ready',
+          lastResultCode: 'aborted',
+          artifactSyncStatus: 'failed',
+        ),
+        onContinue: () {
+          continued = true;
+        },
+      ),
+    );
+
+    expect(find.text('任务已停止，可继续补充需求恢复执行。'), findsOneWidget);
+    expect(
+      find.byKey(const Key('assistant-task-progress-stop-button')),
+      findsNothing,
+    );
+    await tester.tap(
+      find.byKey(const Key('assistant-task-progress-continue-button')),
+    );
+    expect(continued, isTrue);
+  });
+
+  testWidgets('hides continue action for a stopped task without handler', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _buildTestApp(
+        assistantTaskProgressState(
+          pending: false,
+          lifecycleStatus: 'ready',
+          lastResultCode: 'aborted',
+          artifactSyncStatus: 'failed',
+        ),
+      ),
+    );
+
+    expect(find.text('任务已停止，可继续补充需求恢复执行。'), findsOneWidget);
+    expect(
+      find.byKey(const Key('assistant-task-progress-continue-button')),
+      findsNothing,
+    );
+  });
+
   testWidgets('hides idle progress state', (tester) async {
     await tester.pumpWidget(
       _buildTestApp(const AssistantTaskProgressState.idle()),
@@ -182,13 +230,21 @@ void main() {
   });
 }
 
-Widget _buildTestApp(AssistantTaskProgressState state, {VoidCallback? onStop}) {
+Widget _buildTestApp(
+  AssistantTaskProgressState state, {
+  VoidCallback? onStop,
+  VoidCallback? onContinue,
+}) {
   return MaterialApp(
     theme: AppTheme.light(),
     home: Material(
       child: SizedBox(
         width: 420,
-        child: AssistantTaskProgressBar(state: state, onStop: onStop),
+        child: AssistantTaskProgressBar(
+          state: state,
+          onStop: onStop,
+          onContinue: onContinue,
+        ),
       ),
     ),
   );
