@@ -2791,6 +2791,142 @@ void main() {
     );
 
     test(
+      'continueAssistantTaskInternal requeues a stopped OpenClaw task without clearing queued work',
+      () async {
+        final fakeGoTaskService = _BlockingGoTaskServiceClient();
+        final controller = _connectedGatewayController(fakeGoTaskService);
+        addTearDown(() {
+          fakeGoTaskService.completeAll();
+          controller.dispose();
+        });
+
+        await _selectGatewaySession(controller, 'continue-active-openclaw');
+        await controller.sendChatMessage('active task');
+        await fakeGoTaskService.waitForRequestCount(1);
+
+        await _selectGatewaySession(controller, 'continue-queued-openclaw');
+        await controller.sendChatMessage('queued before continue');
+        await _waitForThreadLifecycleStatus(
+          controller,
+          'continue-queued-openclaw',
+          'queued',
+        );
+
+        await _selectGatewaySession(controller, 'continue-stopped-openclaw');
+        controller.appendLocalSessionMessageInternal(
+          'continue-stopped-openclaw',
+          GatewayChatMessage(
+            id: 'user-continue-stopped-openclaw',
+            role: 'user',
+            text: 'resume stopped openclaw task',
+            timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+            toolCallId: null,
+            toolName: null,
+            stopReason: null,
+            pending: false,
+            error: false,
+          ),
+          persistInThreadContext: true,
+        );
+        controller.upsertTaskThreadInternal(
+          'continue-stopped-openclaw',
+          executionTarget: AssistantExecutionTarget.gateway,
+          selectedProvider: SingleAgentProvider.openclaw,
+          selectedProviderSource: ThreadSelectionSource.explicit,
+          lifecycleStatus: 'ready',
+          lastResultCode: 'aborted',
+        );
+
+        await controller.continueAssistantTaskInternal(
+          'continue-stopped-openclaw',
+        );
+
+        await _waitForThreadLifecycleStatus(
+          controller,
+          'continue-stopped-openclaw',
+          'queued',
+        );
+        expect(fakeGoTaskService.requests, hasLength(1));
+        expect(
+          controller.assistantSessionHasPendingRun('continue-queued-openclaw'),
+          isTrue,
+        );
+        expect(
+          controller.assistantSessionHasPendingRun('continue-stopped-openclaw'),
+          isTrue,
+        );
+        expect(
+          controller.localSessionMessagesInternal['continue-stopped-openclaw']!
+              .where(
+                (message) =>
+                    message.role == 'user' &&
+                    message.text == 'resume stopped openclaw task',
+              )
+              .length,
+          1,
+        );
+
+        fakeGoTaskService.complete(
+          'continue-active-openclaw',
+          const GoTaskServiceResult(
+            success: true,
+            message: 'active done',
+            turnId: 'turn-active',
+            raw: <String, dynamic>{},
+            errorMessage: '',
+            resolvedModel: '',
+            route: GoTaskServiceRoute.externalAcpSingle,
+          ),
+        );
+        await fakeGoTaskService.waitForRequestCount(2);
+        expect(
+          fakeGoTaskService.requests.last.sessionId,
+          'continue-queued-openclaw',
+        );
+
+        fakeGoTaskService.complete(
+          'continue-queued-openclaw',
+          const GoTaskServiceResult(
+            success: true,
+            message: 'queued done',
+            turnId: 'turn-queued',
+            raw: <String, dynamic>{},
+            errorMessage: '',
+            resolvedModel: '',
+            route: GoTaskServiceRoute.externalAcpSingle,
+          ),
+        );
+        await fakeGoTaskService.waitForRequestCount(3);
+
+        final continuedRequest = fakeGoTaskService.requests.last;
+        expect(continuedRequest.sessionId, 'continue-stopped-openclaw');
+        expect(continuedRequest.resumeSession, isFalse);
+        expect(
+          continuedRequest.prompt,
+          contains('User request:\nresume stopped openclaw task'),
+        );
+
+        fakeGoTaskService.complete(
+          'continue-stopped-openclaw',
+          const GoTaskServiceResult(
+            success: true,
+            message: 'continued stopped',
+            turnId: 'turn-continued-stopped',
+            raw: <String, dynamic>{},
+            errorMessage: '',
+            resolvedModel: '',
+            route: GoTaskServiceRoute.externalAcpSingle,
+          ),
+        );
+        await _waitForThreadLifecycleStatus(
+          controller,
+          'continue-stopped-openclaw',
+          'ready',
+        );
+      },
+    );
+
+    test(
       'stale queued lifecycle without a real queue entry is not pending',
       () {
         final controller = _connectedGatewayController(
@@ -3042,6 +3178,108 @@ void main() {
           ),
         );
         await retryFuture;
+      },
+    );
+
+    test(
+      'continueAssistantTaskInternal resumes interrupted task without duplicating user turn',
+      () async {
+        final fakeGoTaskService = _BlockingGoTaskServiceClient();
+        final controller = _connectedController(fakeGoTaskService);
+        addTearDown(() {
+          fakeGoTaskService.completeAll();
+          controller.dispose();
+        });
+
+        await controller.switchSession('continue-interrupted-task');
+        controller.appendLocalSessionMessageInternal(
+          'continue-interrupted-task',
+          GatewayChatMessage(
+            id: 'user-continue-interrupted',
+            role: 'user',
+            text: 'previous interrupted request',
+            timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+            toolCallId: null,
+            toolName: null,
+            stopReason: null,
+            pending: false,
+            error: false,
+          ),
+          persistInThreadContext: true,
+        );
+        controller.upsertTaskThreadInternal(
+          'continue-interrupted-task',
+          lifecycleStatus: 'interrupted',
+          lastResultCode: 'ACP_HTTP_CONNECTION_CLOSED',
+          lastArtifactSyncStatus: 'interrupted',
+        );
+
+        final continueFuture = controller.continueAssistantTaskInternal(
+          'continue-interrupted-task',
+        );
+        await fakeGoTaskService.waitForRequestCount(1);
+
+        final request = fakeGoTaskService.requests.single;
+        expect(request.sessionId, 'continue-interrupted-task');
+        expect(request.resumeSession, isTrue);
+        expect(
+          request.prompt,
+          contains('User request:\nprevious interrupted request'),
+        );
+        expect(
+          controller.localSessionMessagesInternal['continue-interrupted-task']!
+              .where(
+                (message) =>
+                    message.role == 'user' &&
+                    message.text == 'previous interrupted request',
+              )
+              .length,
+          1,
+        );
+
+        fakeGoTaskService.complete(
+          'continue-interrupted-task',
+          const GoTaskServiceResult(
+            success: true,
+            message: 'continued interrupted',
+            turnId: 'turn-continued-interrupted',
+            raw: <String, dynamic>{},
+            errorMessage: '',
+            resolvedModel: '',
+            route: GoTaskServiceRoute.externalAcpSingle,
+          ),
+        );
+        await continueFuture;
+      },
+    );
+
+    test(
+      'continueAssistantTaskInternal fails locally without a committed user turn',
+      () async {
+        final fakeGoTaskService = _RecordingGoTaskServiceClient();
+        final controller = _connectedController(fakeGoTaskService);
+        addTearDown(controller.dispose);
+
+        await controller.switchSession('continue-empty-task');
+        controller.upsertTaskThreadInternal(
+          'continue-empty-task',
+          lifecycleStatus: 'ready',
+          lastResultCode: 'aborted',
+        );
+
+        await expectLater(
+          controller.continueAssistantTaskInternal('continue-empty-task'),
+          throwsA(isA<StateError>()),
+        );
+
+        expect(fakeGoTaskService.requests, isEmpty);
+        expect(
+          controller
+              .assistantThreadMessagesInternal['continue-empty-task']!
+              .last
+              .text,
+          contains('没有可恢复的用户请求'),
+        );
       },
     );
 

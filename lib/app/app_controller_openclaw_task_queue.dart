@@ -22,6 +22,7 @@ class OpenClawGatewayQueuedTurnInternal {
     required this.agentId,
     required this.metadata,
     required this.resumeSessionHint,
+    this.appendUserTurn = true,
   });
 
   final String queueId;
@@ -40,6 +41,7 @@ class OpenClawGatewayQueuedTurnInternal {
   final String agentId;
   final Map<String, dynamic> metadata;
   final bool resumeSessionHint;
+  final bool appendUserTurn;
 
   bool cancelled = false;
 }
