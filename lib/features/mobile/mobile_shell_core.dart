@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../app/app_controller.dart';
-import '../../app/ui_feature_manifest.dart';
 import '../../app/workspace_page_registry.dart';
 import '../../i18n/app_language.dart';
 import '../../models/app_models.dart';
@@ -197,9 +196,6 @@ class MobileShellStateInternal extends State<MobileShell> {
     return AnimatedBuilder(
       animation: widget.controller,
       builder: (context, _) {
-        final features = widget.controller.featuresFor(
-          UiFeaturePlatform.mobile,
-        );
         final destinationKey = ValueKey<String>(
           'mobile-shell-${widget.controller.destination.name}',
         );
