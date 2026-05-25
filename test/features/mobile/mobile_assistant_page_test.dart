@@ -75,6 +75,10 @@ void main() {
       await tester.pumpAndSettle();
 
       await tester.tap(
+        find.byKey(const Key('mobile-assistant-composer-add-button')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
         find.byKey(const Key('mobile-assistant-provider-button')),
       );
       await tester.pumpAndSettle();
@@ -119,6 +123,10 @@ void main() {
       await tester.pumpAndSettle();
 
       await tester.tap(
+        find.byKey(const Key('mobile-assistant-composer-add-button')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
         find.byKey(const Key('mobile-assistant-provider-button')),
       );
       await tester.pumpAndSettle();
@@ -134,6 +142,11 @@ void main() {
 
       await tester.tap(find.byKey(const Key('mobile-assistant-sheet-close')));
       await tester.pumpAndSettle();
+
+      await tester.tap(
+        find.byKey(const Key('mobile-assistant-composer-add-button')),
+      );
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('mobile-assistant-target-button')));
       await tester.pumpAndSettle();
       await tester.tap(
@@ -141,6 +154,10 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      await tester.tap(
+        find.byKey(const Key('mobile-assistant-composer-add-button')),
+      );
+      await tester.pumpAndSettle();
       await tester.tap(
         find.byKey(const Key('mobile-assistant-provider-button')),
       );
