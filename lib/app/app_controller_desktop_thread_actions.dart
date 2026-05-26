@@ -452,6 +452,11 @@ extension AppControllerDesktopThreadActions on AppController {
     final capturedLocalAttachments = List<CollaborationAttachment>.unmodifiable(
       localAttachments,
     );
+    final executionWorkingDirectory = gatewayExecutionWorkingDirectoryInternal(
+      target: currentTarget,
+      workingDirectory: workingDirectory,
+      remoteWorkingDirectoryHint: remoteWorkingDirectoryHint,
+    );
     if (usesOpenClawGatewayQueueInternal(currentTarget, provider)) {
       await enqueueOpenClawGatewayTurnInternal(
         OpenClawGatewayQueuedTurnInternal(
@@ -465,7 +470,8 @@ extension AppControllerDesktopThreadActions on AppController {
           selectedSkillLabels: capturedSelectedSkillLabels,
           attachments: capturedAttachments,
           localAttachments: capturedLocalAttachments,
-          workingDirectory: workingDirectory,
+          workingDirectory: executionWorkingDirectory,
+          localWorkingDirectory: workingDirectory,
           remoteWorkingDirectoryHint: remoteWorkingDirectoryHint,
           model: model,
           routing: routing,
@@ -489,6 +495,8 @@ extension AppControllerDesktopThreadActions on AppController {
         attachments: capturedAttachments,
         localAttachments: capturedLocalAttachments,
         workingDirectory: workingDirectory,
+        localWorkingDirectory: workingDirectory,
+        executionWorkingDirectory: executionWorkingDirectory,
         remoteWorkingDirectoryHint: remoteWorkingDirectoryHint,
         model: model,
         routing: routing,
@@ -511,6 +519,8 @@ extension AppControllerDesktopThreadActions on AppController {
     required List<GatewayChatAttachmentPayload> attachments,
     required List<CollaborationAttachment> localAttachments,
     required String workingDirectory,
+    String? localWorkingDirectory,
+    String? executionWorkingDirectory,
     required String remoteWorkingDirectoryHint,
     required String model,
     required ExternalCodeAgentAcpRoutingConfig routing,
@@ -530,7 +540,8 @@ extension AppControllerDesktopThreadActions on AppController {
     final taskPrompt = taskWorkspaceContextPromptInternal(
       sessionKey: sessionKey,
       userPrompt: messageWithSkills,
-      workingDirectory: workingDirectory,
+      workingDirectory: localWorkingDirectory ?? workingDirectory,
+      executionWorkingDirectory: executionWorkingDirectory ?? workingDirectory,
       remoteWorkingDirectoryHint: remoteWorkingDirectoryHint,
     );
     if (appendUserTurn) {
@@ -545,7 +556,7 @@ extension AppControllerDesktopThreadActions on AppController {
           target: target,
           provider: provider,
           prompt: taskPrompt,
-          workingDirectory: workingDirectory,
+          workingDirectory: executionWorkingDirectory ?? workingDirectory,
           remoteWorkingDirectoryHint: remoteWorkingDirectoryHint,
           model: model,
           thinking: thinking,
@@ -614,6 +625,7 @@ extension AppControllerDesktopThreadActions on AppController {
     required String sessionKey,
     required String userPrompt,
     required String workingDirectory,
+    String? executionWorkingDirectory,
     required String remoteWorkingDirectoryHint,
   }) {
     final requestText = userPrompt.trim().isEmpty
@@ -624,12 +636,14 @@ extension AppControllerDesktopThreadActions on AppController {
       ..writeln('- sessionKey: $sessionKey')
       ..writeln('- localWorkspace: ${workingDirectory.trim()}');
     final remoteHint = remoteWorkingDirectoryHint.trim();
+    final executionWorkspace =
+        executionWorkingDirectory?.trim().isNotEmpty == true
+        ? executionWorkingDirectory!.trim()
+        : (remoteHint.isNotEmpty ? remoteHint : workingDirectory.trim());
     if (remoteHint.isNotEmpty) {
       buffer.writeln('- remoteWorkspaceHint: $remoteHint');
     }
-    buffer.writeln(
-      '- currentTaskWorkspace: ${remoteHint.isNotEmpty ? remoteHint : workingDirectory.trim()}',
-    );
+    buffer.writeln('- currentTaskWorkspace: $executionWorkspace');
     buffer
       ..writeln()
       ..writeln('Workspace isolation rules:')
@@ -663,6 +677,18 @@ extension AppControllerDesktopThreadActions on AppController {
   ) {
     return target.isGateway &&
         provider.providerId == kCanonicalGatewayProviderId;
+  }
+
+  String gatewayExecutionWorkingDirectoryInternal({
+    required AssistantExecutionTarget target,
+    required String workingDirectory,
+    required String remoteWorkingDirectoryHint,
+  }) {
+    final remoteHint = remoteWorkingDirectoryHint.trim();
+    if (target.isGateway && remoteHint.isNotEmpty) {
+      return remoteHint;
+    }
+    return workingDirectory.trim();
   }
 
   Future<void> enqueueOpenClawGatewayTurnInternal(
@@ -830,6 +856,8 @@ extension AppControllerDesktopThreadActions on AppController {
           attachments: turn.attachments,
           localAttachments: turn.localAttachments,
           workingDirectory: turn.workingDirectory,
+          localWorkingDirectory: turn.localWorkingDirectory,
+          executionWorkingDirectory: turn.workingDirectory,
           remoteWorkingDirectoryHint: turn.remoteWorkingDirectoryHint,
           model: turn.model,
           routing: turn.routing,
