@@ -164,14 +164,18 @@ class MobileAssistantComposer extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Padding(
-                padding: const EdgeInsets.only(right: 8, bottom: 5),
-                child: CircleAvatar(
-                  radius: 18,
-                  backgroundColor: palette.surfaceSecondary,
+                padding: const EdgeInsets.only(right: 8, bottom: 7),
+                child: Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).brightness == Brightness.light ? const Color(0xFFF4F6F8) : palette.surfaceSecondary,
+                    shape: BoxShape.circle,
+                  ),
                   child: IconButton(
                     key: const Key('mobile-assistant-composer-add-button'),
                     padding: EdgeInsets.zero,
-                    icon: Icon(Icons.add, color: palette.textPrimary, size: 22),
+                    icon: Icon(Icons.add, color: palette.textPrimary, size: 20),
                     onPressed: showConfigurationMenu,
                   ),
                 ),
@@ -179,7 +183,7 @@ class MobileAssistantComposer extends StatelessWidget {
               Expanded(
                 child: DecoratedBox(
                   decoration: BoxDecoration(
-                    color: palette.surfaceSecondary,
+                    color: Theme.of(context).brightness == Brightness.light ? const Color(0xFFF4F6F8) : palette.surfaceSecondary,
                     borderRadius: BorderRadius.circular(26),
                   ),
                   child: Row(
@@ -214,21 +218,32 @@ class MobileAssistantComposer extends StatelessWidget {
                        ),
                        Padding(
                          padding: const EdgeInsets.only(right: 12, bottom: 12),
-                         child: Icon(Icons.mic_none, color: palette.textMuted, size: 24),
+                         child: Icon(Icons.mic_none, color: Theme.of(context).brightness == Brightness.light ? const Color(0xFF9CA3AF) : palette.textMuted, size: 22),
                        ),
                      ],
                    ),
                  ),
                ),
                Padding(
-                 padding: const EdgeInsets.only(left: 8, bottom: 5),
-                 child: CircleAvatar(
-                   radius: 18,
-                   backgroundColor: palette.accent,
+                 padding: const EdgeInsets.only(left: 8, bottom: 7),
+                 child: Container(
+                   width: 32,
+                   height: 32,
+                   decoration: BoxDecoration(
+                     color: Theme.of(context).brightness == Brightness.light ? const Color(0xFF6EA8FF) : palette.accent,
+                     shape: BoxShape.circle,
+                     boxShadow: Theme.of(context).brightness == Brightness.light ? [
+                       BoxShadow(
+                         color: const Color(0xFF6EA8FF).withValues(alpha: 0.15),
+                         blurRadius: 4,
+                         offset: const Offset(0, 2),
+                       )
+                     ] : null,
+                   ),
                    child: IconButton(
                      key: const Key('mobile-assistant-send-button'),
                      padding: EdgeInsets.zero,
-                     icon: const Icon(Icons.arrow_upward_rounded, color: Colors.white, size: 24),
+                     icon: const Icon(Icons.arrow_upward_rounded, color: Colors.white, size: 20),
                      onPressed: onSend,
                    ),
                  ),
