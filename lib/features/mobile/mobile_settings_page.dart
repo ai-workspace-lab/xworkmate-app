@@ -244,9 +244,27 @@ class _MobileSettingsPageState extends State<MobileSettingsPage> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      GestureDetector(
+                        onTap: () => controller.navigateTo(WorkspaceDestination.assistant),
+                        behavior: HitTestBehavior.opaque,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.arrow_back_ios_new_rounded, size: 16, color: palette.textSecondary),
+                            const SizedBox(width: 6),
+                            Text(
+                              appText('返回对话主页', 'Back to Chat'),
+                              style: TextStyle(color: palette.textSecondary, fontSize: 16),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 24),
                       Text(
                         appText('设置', 'Settings'),
-                        style: Theme.of(context).textTheme.headlineSmall,
+                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       const SizedBox(height: 12),
                       if (availableTabs.length > 1) ...[
