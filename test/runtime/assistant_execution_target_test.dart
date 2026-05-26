@@ -1133,6 +1133,31 @@ void main() {
     });
 
     test(
+      'sendChatMessage runs Gateway task with remote workspace when local workspace is unavailable',
+      () async {
+        final fakeGoTaskService = _RecordingGoTaskServiceClient();
+        final controller = _connectedGatewayController(fakeGoTaskService);
+        addTearDown(controller.dispose);
+        controller.resolvedUserHomeDirectoryInternal = '';
+
+        await controller.ensureActiveAssistantThreadInternal();
+        await controller.setAssistantExecutionTarget(
+          AssistantExecutionTarget.gateway,
+        );
+        await controller.sendChatMessage('mobile gateway task');
+
+        expect(fakeGoTaskService.requests, hasLength(1));
+        final request = fakeGoTaskService.requests.single;
+        expect(request.target, AssistantExecutionTarget.gateway);
+        expect(request.provider.providerId, 'openclaw');
+        expect(request.workingDirectory, startsWith('/owners/'));
+        expect(request.workingDirectory, contains('/threads/'));
+        expect(request.remoteWorkingDirectoryHint, request.workingDirectory);
+        expect(request.prompt, contains(request.workingDirectory));
+      },
+    );
+
+    test(
       'sendChatMessage forwards inline attachment content and size',
       () async {
         final fakeGoTaskService = _RecordingGoTaskServiceClient();
