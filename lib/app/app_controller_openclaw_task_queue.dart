@@ -16,6 +16,7 @@ class OpenClawGatewayQueuedTurnInternal {
     required this.attachments,
     required this.localAttachments,
     required this.workingDirectory,
+    required this.localWorkingDirectory,
     required this.remoteWorkingDirectoryHint,
     required this.model,
     required this.routing,
@@ -35,6 +36,7 @@ class OpenClawGatewayQueuedTurnInternal {
   final List<GatewayChatAttachmentPayload> attachments;
   final List<CollaborationAttachment> localAttachments;
   final String workingDirectory;
+  final String localWorkingDirectory;
   final String remoteWorkingDirectoryHint;
   final String model;
   final ExternalCodeAgentAcpRoutingConfig routing;

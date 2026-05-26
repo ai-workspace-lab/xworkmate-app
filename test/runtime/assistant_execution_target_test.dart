@@ -1158,6 +1158,49 @@ void main() {
     );
 
     test(
+      'sendChatMessage sends remote Gateway cwd while keeping local workspace context',
+      () async {
+        final fakeGoTaskService = _RecordingGoTaskServiceClient();
+        final controller = _connectedGatewayController(fakeGoTaskService);
+        addTearDown(controller.dispose);
+
+        await controller.ensureActiveAssistantThreadInternal();
+        await controller.setAssistantExecutionTarget(
+          AssistantExecutionTarget.gateway,
+        );
+        await controller.sendChatMessage(
+          'gateway task with inline attachment',
+          attachments: <GatewayChatAttachmentPayload>[
+            GatewayChatAttachmentPayload(
+              type: 'file',
+              mimeType: 'text/plain',
+              fileName: 'note.txt',
+              content: base64Encode(utf8.encode('note body')),
+            ),
+          ],
+        );
+
+        expect(fakeGoTaskService.requests, hasLength(1));
+        final request = fakeGoTaskService.requests.single;
+        final localWorkspace = controller.assistantWorkspacePathForSession(
+          request.sessionId,
+        );
+        expect(localWorkspace, isNotEmpty);
+        expect(request.target, AssistantExecutionTarget.gateway);
+        expect(request.provider.providerId, 'openclaw');
+        expect(request.workingDirectory, startsWith('/owners/'));
+        expect(request.workingDirectory, isNot(localWorkspace));
+        expect(request.remoteWorkingDirectoryHint, request.workingDirectory);
+        expect(request.prompt, contains('- localWorkspace: $localWorkspace'));
+        expect(
+          request.prompt,
+          contains('- currentTaskWorkspace: ${request.workingDirectory}'),
+        );
+        expect(request.inlineAttachments, hasLength(1));
+      },
+    );
+
+    test(
       'sendChatMessage forwards inline attachment content and size',
       () async {
         final fakeGoTaskService = _RecordingGoTaskServiceClient();
@@ -2997,6 +3040,7 @@ void main() {
           attachments: const <GatewayChatAttachmentPayload>[],
           localAttachments: const <CollaborationAttachment>[],
           workingDirectory: '/tmp/$sessionKey',
+          localWorkingDirectory: '/tmp/$sessionKey-local',
           remoteWorkingDirectoryHint: '/threads/$sessionKey',
           model: '',
           routing: const ExternalCodeAgentAcpRoutingConfig.auto(
