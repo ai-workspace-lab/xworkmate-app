@@ -31,8 +31,8 @@
   │                       │ (SSE/HTTP) │        │ successfully via /acp/rpc         │
   │ /acp-server/opencode/ │ JSON-RPC   │ PASS   │ acp.capabilities returned         │
   │                       │ (SSE/HTTP) │        │ successfully via /acp/rpc         │
-  │ /gateway/openclaw/    │ WSS / RPC  │ PASS   │ WebSocket handshake successful at │
-  │                       │            │        │ /acp; received connect.challenge
+  │ /acp/rpc openclaw    │ JSON-RPC   │ PASS   │ OpenClaw routing is expressed via │
+  │ routing              │            │        │ routing metadata on /acp/rpc      │
 
 
 ### 2. Assistant 线程体验
