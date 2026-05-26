@@ -543,6 +543,7 @@ extension AppControllerDesktopThreadActions on AppController {
       workingDirectory: localWorkingDirectory ?? workingDirectory,
       executionWorkingDirectory: executionWorkingDirectory ?? workingDirectory,
       remoteWorkingDirectoryHint: remoteWorkingDirectoryHint,
+      target: target,
     );
     if (appendUserTurn) {
       appendGatewayUserTurnInternal(sessionKey, message);
@@ -627,6 +628,7 @@ extension AppControllerDesktopThreadActions on AppController {
     required String workingDirectory,
     String? executionWorkingDirectory,
     required String remoteWorkingDirectoryHint,
+    required AssistantExecutionTarget target,
   }) {
     final requestText = userPrompt.trim().isEmpty
         ? 'See attached.'
@@ -643,7 +645,12 @@ extension AppControllerDesktopThreadActions on AppController {
     if (remoteHint.isNotEmpty) {
       buffer.writeln('- remoteWorkspaceHint: $remoteHint');
     }
-    buffer.writeln('- currentTaskWorkspace: $executionWorkspace');
+    final resolvedWorkspace = executionWorkspace.isNotEmpty
+        ? executionWorkspace
+        : target.isGateway
+        ? '(Use the runtime-provided default workspace)'
+        : workingDirectory.trim();
+    buffer.writeln('- currentTaskWorkspace: $resolvedWorkspace');
     buffer
       ..writeln()
       ..writeln('Workspace isolation rules:')
