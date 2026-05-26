@@ -28,8 +28,13 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('助手'), findsOneWidget);
-      expect(find.text('设置'), findsOneWidget);
+      expect(find.byKey(const Key('mobile-assistant-page')), findsOneWidget);
+      expect(find.byKey(const Key('mobile-settings-page')), findsNothing);
+
+      controller.openSettings();
+      await tester.pump();
+
+      expect(find.byKey(const Key('mobile-settings-page')), findsOneWidget);
       expect(find.text('Mobile-safe'), findsNothing);
       expect(find.text('安全审批'), findsNothing);
       expect(find.byKey(const Key('mobile-safe-strip')), findsNothing);

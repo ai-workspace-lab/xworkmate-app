@@ -17,7 +17,7 @@ The core ownership split is:
 ```mermaid
 flowchart LR
   U["User input / follow-up"] --> APP["xworkmate-app<br/>TaskThread + UI state"]
-  APP -->|session.start / session.message| BR["xworkmate-bridge<br/>/acp/rpc or /gateway/openclaw"]
+  APP -->|session.start / session.message| BR["xworkmate-bridge<br/>/acp/rpc"]
   BR -->|xworkmate.routing.resolve| ROUTE{"Execution target"}
   ROUTE -->|single-agent| AG["codex / opencode / gemini / hermes"]
   ROUTE -->|gateway=openclaw| OC["OpenClaw Gateway Runtime"]
@@ -108,7 +108,7 @@ flowchart TD
 
   E --> G["drain queue"]
   G --> C
-  C --> H["Bridge /gateway/openclaw"]
+  C --> H["Bridge /acp/rpc<br/>routing=gateway/openclaw"]
   H --> I["OpenClaw execution"]
   I --> J{"Result"}
   J -->|success + output/files| K["APP ready<br/>lastResultCode=success<br/>sync artifacts"]
@@ -118,13 +118,12 @@ flowchart TD
 
 ## Bridge Session And Routing Workflow
 
-The bridge exposes one public session contract while keeping provider-specific behavior behind compatibility layers. `/gateway/openclaw` is a narrow OpenClaw task-submit lane, not a general ACP base endpoint.
+The bridge exposes one public session contract while keeping provider-specific behavior behind bridge-owned routing. OpenClaw task submit uses `/acp/rpc` with explicit gateway routing metadata, not a separate app-facing path.
 
 ```mermaid
 flowchart TD
   REQ["APP request"] --> EP{"HTTP / WS entry"}
   EP -->|/acp or /acp/rpc| RPC["General JSON-RPC"]
-  EP -->|/gateway/openclaw| GW["OpenClaw task-submit endpoint"]
 
   RPC --> METHOD{"method"}
   METHOD -->|acp.capabilities| CAP["Return agent providers + gatewayProviders=openclaw"]
@@ -132,11 +131,6 @@ flowchart TD
   METHOD -->|session.start| START["Create / start session turn"]
   METHOD -->|session.message| MSG["Continue existing session"]
   METHOD -->|session.cancel / session.close| CTRL["Cancel / close session"]
-
-  GW --> GUARD{"method is session.start / session.message ?"}
-  GUARD -->|no| REJECT["Reject: not a global ACP base"]
-  GUARD -->|yes| FORCE["Force routing=gateway/openclaw<br/>Reject multiAgent"]
-  FORCE --> START
 
   START --> ORCH["session_orchestrator"]
   MSG --> ORCH
@@ -190,7 +184,7 @@ flowchart LR
 ## Boundary Rules
 
 - The app does not store OpenClaw URLs. It only consumes bridge capabilities where `gatewayProviders` includes `openclaw`.
-- `/gateway/openclaw` is only for OpenClaw `session.start` and `session.message`; it is not a global ACP endpoint.
+- OpenClaw `session.start` and `session.message` use `/acp/rpc` with explicit OpenClaw gateway routing metadata; `/gateway/openclaw` is not an app-facing endpoint.
 - Follow-up conversation uses the same `sessionKey` / `threadId`. Bridge `session.message` must continue the provider session state or return a structured continuation error.
 - Artifact ownership is enforced by `openclaw-multi-session-plugins` with `tasks/<session>/<run>` scope. The app syncs only the current run's artifacts into the local thread workspace.
 - Upgrade/install flows must preserve real local history. Cleanup must only remove explicitly known test-pollution session keys.

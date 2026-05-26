@@ -1311,14 +1311,6 @@ class GatewayAcpClient {
 
   Uri? _resolveHttpRpcEndpoint([Uri? endpointOverride, String method = '']) {
     final endpoint = endpointOverride ?? endpointResolver();
-    if (_isOpenClawTaskSubmitEndpoint(endpoint) &&
-        _isOpenClawTaskSubmitMethod(method)) {
-      return endpoint?.replace(
-        path: '/gateway/openclaw',
-        query: null,
-        fragment: null,
-      );
-    }
     return resolveAcpHttpRpcEndpoint(endpoint);
   }
 
@@ -1470,15 +1462,6 @@ bool _isOpenClawTaskSubmitMethod(String method) {
   return normalized == 'session.start' || normalized == 'session.message';
 }
 
-bool _isOpenClawTaskSubmitEndpoint(Uri? endpoint) {
-  var path = endpoint?.path.trim() ?? '';
-  if (!path.startsWith('/')) {
-    path = '/$path';
-  }
-  path = path.replaceFirst(RegExp(r'/+$'), '');
-  return path == '/gateway/openclaw';
-}
-
 Duration gatewayAcpHttpResponseTimeoutFor(
   Uri endpoint,
   String method, [
@@ -1486,15 +1469,6 @@ Duration gatewayAcpHttpResponseTimeoutFor(
 ]) {
   if (!_isOpenClawTaskSubmitMethod(method)) {
     return const Duration(seconds: 120);
-  }
-  if (_isOpenClawTaskSubmitEndpoint(endpoint)) {
-    return Duration(
-      minutes: gatewayAcpTaskRuntimeBudgetMinutesForParams({
-        'requestedExecutionTarget':
-            AssistantExecutionTarget.gateway.promptValue,
-        ...params,
-      }),
-    );
   }
   return Duration(minutes: gatewayAcpTaskRuntimeBudgetMinutesForParams(params));
 }

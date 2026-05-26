@@ -40,7 +40,7 @@ Last Updated: 2026-04-22
 - 安全边界确认：
   - `BRIDGE_AUTH_TOKEN` 是否只作为 Bearer token 使用
   - `BRIDGE_SERVER_URL` 是否仅作为元数据
-  - 会话接口是否按当前 bridge contract 选择 `/acp/rpc` 或 OpenClaw task submit 专用入口 `/gateway/openclaw`
+  - 会话接口是否按当前 bridge contract 统一选择 `/acp/rpc`，并用 routing metadata 表达 OpenClaw gateway 目标
 
 ## 2. 统一测试前提
 
@@ -76,8 +76,7 @@ Last Updated: 2026-04-22
 | accounts | `/api/auth/login` | `POST` | 无 | 登录并拿 session token | Apple 审核只读账号使用 |
 | accounts | `/api/auth/session` | `GET` | `Authorization: Bearer <session token>` | 获取当前会话和用户信息 | APP 端登录态校验 |
 | accounts | `/api/auth/xworkmate/profile/sync` | `GET` | `Authorization: Bearer <session token>` | 拉取 bridge 同步元数据 | 返回 `BRIDGE_SERVER_URL` / `BRIDGE_AUTH_TOKEN` |
-| bridge | `/acp/rpc` | `POST` | `Authorization: Bearer <BRIDGE_AUTH_TOKEN>` | bridge JSON-RPC 主入口 | capabilities、routing、agent / multi-agent 任务、cancel、close |
-| bridge | `/gateway/openclaw` | `POST` | `Authorization: Bearer <BRIDGE_AUTH_TOKEN>` | OpenClaw task submit 专用入口 | 仅 OpenClaw `session.start` / `session.message`，不是全局 ACP base endpoint |
+| bridge | `/acp/rpc` | `POST` | `Authorization: Bearer <BRIDGE_AUTH_TOKEN>` | bridge JSON-RPC 主入口 | capabilities、routing、agent / multi-agent 任务、OpenClaw gateway 任务、cancel、close |
 | bridge | `acp.capabilities` | JSON-RPC method | 同上 | 拉取 provider catalog / target catalog | capability 只读快照 |
 | bridge | `xworkmate.routing.resolve` | JSON-RPC method | 同上 | 解析 provider / gateway / skills 路由 | 返回 resolved / unavailable 信息 |
 | bridge | `session.start` | JSON-RPC method | 同上 | 开启新会话 | session 生命周期起点 |
@@ -581,10 +580,9 @@ Last Updated: 2026-04-22
 ### 8.3 建议断言
 
 - `Authorization` 必须是 `Bearer <token>`
-- capability、routing、agent / multi-agent 任务、`session.cancel`、`session.close` 请求路径必须是 `/acp/rpc`
-- OpenClaw gateway `session.start` / `session.message` 请求路径必须是 `/gateway/openclaw`
+- capability、routing、agent / multi-agent 任务、OpenClaw gateway `session.start` / `session.message`、`session.cancel`、`session.close` 请求路径必须是 `/acp/rpc`
 - 不允许出现 `/acp-server/` 直连请求
-- `/gateway/openclaw` 不得用于 capabilities、routing、gateway control-plane、cancel、close，且不得作为全局 ACP base endpoint
+- 不允许出现 `/gateway/openclaw` app-facing 请求；OpenClaw gateway 目标必须通过 routing metadata 表达
 - `session.cancel` / `session.close` 必须接受 `sessionId` + `threadId`
 - `BRIDGE_SERVER_URL` 不可参与运行时路径拼接
 
@@ -612,7 +610,7 @@ Last Updated: 2026-04-22
 
 - 账户侧负责登录与同步元数据
 - bridge 侧负责 capability、路由解析和会话生命周期
-- capability、routing、agent / multi-agent 任务、cancel、close 经过 `/acp/rpc`
-- OpenClaw `session.start` / `session.message` 经过 `/gateway/openclaw`
+- capability、routing、agent / multi-agent 任务、OpenClaw gateway 任务、cancel、close 经过 `/acp/rpc`
+- OpenClaw `session.start` / `session.message` 通过 `/acp/rpc` routing metadata 表达 gateway/openclaw 目标
 - `session.cancel` / `session.close` 的协议入口已验证可用
 - 当前剩余风险集中在桥接后端下游 provider 连接，而不是 APP 侧接口拼接
