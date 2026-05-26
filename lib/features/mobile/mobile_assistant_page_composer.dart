@@ -222,15 +222,11 @@ class MobileAssistantComposer extends StatelessWidget {
                ),
                Padding(
                  padding: const EdgeInsets.only(left: 8, bottom: 5),
-                 child: CircleAvatar(
-                   radius: 18,
-                   backgroundColor: palette.textPrimary,
-                   child: IconButton(
-                     key: const Key('mobile-assistant-send-button'),
-                     padding: EdgeInsets.zero,
-                     icon: Icon(Icons.arrow_upward_rounded, color: palette.canvas, size: 20),
-                     onPressed: onSend,
-                   ),
+                 child: IconButton(
+                   key: const Key('mobile-assistant-send-button'),
+                   padding: EdgeInsets.zero,
+                   icon: Icon(Icons.send_rounded, color: palette.textPrimary, size: 28),
+                   onPressed: onSend,
                  ),
                ),
              ],
