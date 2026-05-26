@@ -2,7 +2,7 @@
 
 ## 1. 架构概览 (Unified Routing Architecture)
 
-当前系统采用 `xworkmate-bridge.svc.plus` 作为统一入口。App 侧通过 managed bridge ACP 主入口处理能力发现、路由解析、agent / multi-agent 任务和会话控制；OpenClaw `session.start` / `session.message` 使用 bridge 暴露的 `/gateway/openclaw` task submit 专用入口。Provider runtime 地址仍由 bridge 后端内部拥有，不暴露为 App-facing public mapping。
+当前系统采用 `xworkmate-bridge.svc.plus` 作为统一入口。App 侧通过 managed bridge ACP 主入口 `/acp/rpc` 处理能力发现、路由解析、agent / multi-agent 任务、OpenClaw gateway 任务和会话控制。Provider runtime 与 gateway runtime 地址仍由 bridge 后端内部拥有，不暴露为 App-facing public mapping。
 
 ```mermaid
 graph TD
@@ -16,7 +16,6 @@ graph TD
 
     subgraph "Bridge-owned Routing"
         ManagedBridge["Managed Bridge ACP<br/>/acp/rpc"]
-        OpenClawSubmit["OpenClaw task submit<br/>/gateway/openclaw"]
         CodexProvider["Codex internal runtime"]
         OpenCodeProvider["OpenCode internal runtime"]
         GeminiAdapter["Gemini internal runtime"]
@@ -27,11 +26,10 @@ graph TD
     Client -->|HTTPS/WSS| Bridge_Domain
 
     Bridge_Domain -->|/acp/rpc| ManagedBridge
-    Bridge_Domain -->|/gateway/openclaw| OpenClawSubmit
     ManagedBridge -->|provider routing| CodexProvider
     ManagedBridge -->|provider routing| OpenCodeProvider
     ManagedBridge -->|provider routing| GeminiAdapter
-    OpenClawSubmit -->|forced openclaw routing| OpenClawGateway
+    ManagedBridge -->|gateway routing| OpenClawGateway
 
     %% Service Connections
     ManagedBridge -.->|Capabilities Discovery| Client
@@ -41,15 +39,14 @@ graph TD
 
 | Bridge-owned mapping | App 侧行为 | 备注 |
 | :--- | :--- | :--- |
-| `/acp/rpc` | 直接调用 | 能力发现、路由解析、agent / multi-agent 任务、cancel、close |
-| `/gateway/openclaw` | 仅 OpenClaw task submit | 只用于 OpenClaw `session.start` / `session.message`，不是 ACP base endpoint |
+| `/acp/rpc` | 直接调用 | 能力发现、路由解析、agent / multi-agent 任务、OpenClaw gateway 任务、cancel、close |
 | provider runtime | 不直连 | Bridge 后端内部解析 provider |
 | gateway runtime | 不直连 | Bridge 后端内部解析 gateway provider |
 
 ## 3. 运维配置优化
 
 ### 3.1 统一鉴权
-App 发往 `xworkmate-bridge.svc.plus/acp/rpc` 和 `xworkmate-bridge.svc.plus/gateway/openclaw` 的请求必须携带：
+App 发往 `xworkmate-bridge.svc.plus/acp/rpc` 的请求必须携带：
 - **Header**: `Authorization: Bearer <bridge-auth-token>`
 - **未授权响应**: `401 Unauthorized`
 
@@ -66,5 +63,5 @@ App 发往 `xworkmate-bridge.svc.plus/acp/rpc` 和 `xworkmate-bridge.svc.plus/ga
 
 - App 不写入或拼接本地 provider endpoint。
 - App 不直接调用 `/acp-server/*`。
-- App 仅可在 OpenClaw `session.start` / `session.message` task submit 中调用 `/gateway/openclaw`，不得把它作为全局 ACP base endpoint。
+- App 不调用 `/gateway/openclaw`；OpenClaw `session.start` / `session.message` task submit 通过 `/acp/rpc` 的 routing metadata 表达。
 - `acp.capabilities` 是 provider catalog、gateway catalog、available execution targets 的唯一来源。

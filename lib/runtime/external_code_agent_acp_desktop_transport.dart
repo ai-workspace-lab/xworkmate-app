@@ -276,16 +276,6 @@ class ExternalCodeAgentAcpDesktopTransport
     if (controlEndpoint != null) {
       return controlEndpoint;
     }
-    final taskPath = taskEndpoint?.path.trim() ?? '';
-    if (taskEndpoint != null &&
-        (taskPath == '/gateway/openclaw' ||
-            taskPath.endsWith('/gateway/openclaw'))) {
-      return taskEndpoint.replace(
-        path: '/acp/rpc',
-        query: null,
-        fragment: null,
-      );
-    }
     return resolveAcpHttpRpcEndpoint(taskEndpoint);
   }
 
