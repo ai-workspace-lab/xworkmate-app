@@ -388,6 +388,50 @@ void main() {
     );
   });
 
+  test(
+    'mobile target selection keeps a complete remote workspace when local home is unavailable',
+    () async {
+      final controller = AppController(
+        environmentOverride: const <String, String>{},
+        initialGatewayProviderCatalog: <SingleAgentProvider>[
+          SingleAgentProvider.openclaw.copyWith(
+            supportedTargets: const <AssistantExecutionTarget>[
+              AssistantExecutionTarget.gateway,
+            ],
+          ),
+        ],
+        initialAvailableExecutionTargets: const <AssistantExecutionTarget>[
+          AssistantExecutionTarget.agent,
+          AssistantExecutionTarget.gateway,
+        ],
+      );
+      addTearDown(controller.dispose);
+      controller.resolvedUserHomeDirectoryInternal = '';
+
+      await controller.ensureActiveAssistantThreadInternal();
+      await controller.setAssistantExecutionTarget(
+        AssistantExecutionTarget.gateway,
+      );
+
+      final record = controller.taskThreadForSessionInternal(
+        controller.currentSessionKey,
+      );
+      expect(controller.currentAssistantExecutionTarget.isGateway, isTrue);
+      expect(record?.workspaceBinding.isComplete, isTrue);
+      expect(record?.workspaceBinding.workspaceKind, WorkspaceKind.remoteFs);
+      expect(
+        record?.workspaceBinding.workspacePath,
+        contains('/threads/${controller.currentSessionKey}'),
+      );
+      expect(
+        controller.assistantWorkingDirectoryForSessionInternal(
+          controller.currentSessionKey,
+        ),
+        record?.workspaceBinding.workspacePath,
+      );
+    },
+  );
+
   test('writes inline ACP artifacts into the local thread workspace', () async {
     final controller = AppController(
       environmentOverride: const <String, String>{},
