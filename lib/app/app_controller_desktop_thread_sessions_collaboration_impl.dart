@@ -164,6 +164,7 @@ Future<void> runMultiAgentCollaborationThreadSessionInternal(
         userPrompt: composedPrompt,
         workingDirectory: workingDirectory,
         remoteWorkingDirectoryHint: remoteWorkingDirectoryHint?.trim() ?? '',
+        target: controller.assistantExecutionTargetForSession(sessionKey),
       );
       final result = await controller.goTaskServiceClientInternal.executeTask(
         GoTaskServiceRequest(
