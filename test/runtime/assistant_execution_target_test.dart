@@ -7,6 +7,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:xworkmate/app/app_controller.dart';
 import 'package:xworkmate/app/app_controller_desktop_external_acp_routing.dart';
 import 'package:xworkmate/app/app_controller_openclaw_task_queue.dart';
+import 'package:xworkmate/app/ui_feature_manifest.dart';
 import 'package:xworkmate/features/assistant/assistant_page_composer_skill_models.dart';
 import 'package:xworkmate/runtime/gateway_acp_client.dart';
 import 'package:xworkmate/runtime/go_task_service_client.dart';
@@ -63,6 +64,7 @@ void main() {
       () async {
         final controller = AppController(
           environmentOverride: const <String, String>{},
+          uiFeatureManifest: _manifestWithDesktopMultiAgentEnabled(),
           initialBridgeProviderCatalog: const <SingleAgentProvider>[
             SingleAgentProvider.codex,
             SingleAgentProvider.openclaw,
@@ -108,6 +110,7 @@ void main() {
       () async {
         final controller = AppController(
           environmentOverride: const <String, String>{},
+          uiFeatureManifest: _manifestWithDesktopMultiAgentEnabled(),
           initialBridgeProviderCatalog: const <SingleAgentProvider>[
             SingleAgentProvider.codex,
             SingleAgentProvider.opencode,
@@ -157,7 +160,7 @@ void main() {
     );
 
     test(
-      'new task sessions do not inherit execution target from main',
+      'new task sessions use the feature-visible default instead of main',
       () async {
         final localHome = await Directory.systemTemp.createTemp(
           'xworkmate-no-main-target-inheritance-',
@@ -195,7 +198,7 @@ void main() {
 
         expect(
           controller.assistantExecutionTargetForSession('draft:fresh-task'),
-          AssistantExecutionTarget.agent,
+          AssistantExecutionTarget.gateway,
         );
 
         await controller.switchSession('draft:fresh-task');
@@ -205,7 +208,7 @@ void main() {
         );
         expect(
           freshThread.executionBinding.executionMode,
-          ThreadExecutionMode.agent,
+          ThreadExecutionMode.gateway,
         );
         expect(
           freshThread.workspaceBinding.workspacePath,
@@ -3537,9 +3540,26 @@ List<Map<String, dynamic>> _generatedArtifactPayloads() {
   ];
 }
 
+UiFeatureManifest _manifestWithDesktopMultiAgentEnabled() {
+  return UiFeatureManifest.fromYamlString(
+    File(UiFeatureManifest.assetPath).readAsStringSync(),
+  ).copyWithFeature(
+    platform: UiFeaturePlatform.desktop,
+    module: 'assistant',
+    feature: 'multi_agent',
+    enabled: true,
+    buildModes: const <UiFeatureBuildMode>{
+      UiFeatureBuildMode.debug,
+      UiFeatureBuildMode.profile,
+      UiFeatureBuildMode.release,
+    },
+  );
+}
+
 AppController _connectedController(GoTaskServiceClient client) {
   return AppController(
     goTaskServiceClient: client,
+    uiFeatureManifest: _manifestWithDesktopMultiAgentEnabled(),
     environmentOverride: const <String, String>{
       'BRIDGE_AUTH_TOKEN': 'bridge-token',
     },
@@ -3555,6 +3575,7 @@ AppController _connectedController(GoTaskServiceClient client) {
 AppController _connectedGatewayController(GoTaskServiceClient client) {
   return AppController(
     goTaskServiceClient: client,
+    uiFeatureManifest: _manifestWithDesktopMultiAgentEnabled(),
     environmentOverride: const <String, String>{
       'BRIDGE_AUTH_TOKEN': 'bridge-token',
     },

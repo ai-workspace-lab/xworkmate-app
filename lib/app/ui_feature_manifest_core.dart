@@ -451,19 +451,21 @@ class UiFeatureAccess {
   }
 
   List<AssistantExecutionTarget> get availableExecutionTargets {
-    return const <AssistantExecutionTarget>[
-      AssistantExecutionTarget.agent,
-      AssistantExecutionTarget.gateway,
-    ];
+    if (supportsMultiAgent) {
+      return const <AssistantExecutionTarget>[
+        AssistantExecutionTarget.agent,
+        AssistantExecutionTarget.gateway,
+      ];
+    }
+    return const <AssistantExecutionTarget>[AssistantExecutionTarget.gateway];
   }
 
   AssistantExecutionTarget sanitizeExecutionTarget(
     AssistantExecutionTarget? target,
   ) {
-    final resolved = target ?? AssistantExecutionTarget.agent;
-    return availableExecutionTargets.contains(resolved)
-        ? resolved
-        : AssistantExecutionTarget.agent;
+    final available = availableExecutionTargets;
+    final resolved = target ?? available.first;
+    return available.contains(resolved) ? resolved : available.first;
   }
 }
 
