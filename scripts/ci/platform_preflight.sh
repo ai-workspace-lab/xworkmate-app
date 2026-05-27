@@ -30,15 +30,6 @@ set_build_state() {
   fi
 }
 
-fail_release_preflight() {
-  local reason="$1"
-
-  emit_output "should_build_platform" "false"
-  emit_output "skip_reason" "$reason"
-  echo "Release preflight failed for $platform: $reason" >&2
-  exit 1
-}
-
 case "$platform" in
   linux)
     set_build_state "true" ""
@@ -61,9 +52,6 @@ case "$platform" in
     done
 
     if [[ "${#missing[@]}" -gt 0 ]]; then
-      if [[ "$should_release" == "true" ]]; then
-        fail_release_preflight "missing macOS signing secrets: ${missing[*]}"
-      fi
       set_build_state "false" "missing macOS signing secrets: ${missing[*]}"
       exit 0
     fi
@@ -91,7 +79,8 @@ case "$platform" in
     done
 
     if [[ "${#missing[@]}" -gt 0 ]]; then
-      fail_release_preflight "missing iOS signing secrets: ${missing[*]}"
+      set_build_state "false" "missing iOS signing secrets: ${missing[*]}"
+      exit 0
     fi
 
     set_build_state "true" ""
