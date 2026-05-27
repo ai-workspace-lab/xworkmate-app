@@ -642,12 +642,7 @@ extension AppControllerDesktopThreadSessions on AppController {
       byKey[currentKey] = assistantSessionSummaryForInternal(currentKey);
     }
 
-    final items = byKey.values.toList(growable: true)
-      ..sort(
-        (left, right) =>
-            (right.updatedAtMs ?? 0).compareTo(left.updatedAtMs ?? 0),
-      );
-    return items;
+    return byKey.values.toList(growable: false);
   }
 
   List<GatewaySessionSummary> archivedAssistantSessionsInternal() {
