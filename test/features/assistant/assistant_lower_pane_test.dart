@@ -1,6 +1,9 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xworkmate/app/app_controller.dart';
+import 'package:xworkmate/app/ui_feature_manifest.dart';
 import 'package:xworkmate/features/assistant/assistant_page_composer_clipboard.dart';
 import 'package:xworkmate/features/assistant/assistant_page_composer_skill_models.dart';
 import 'package:xworkmate/features/assistant/assistant_page_composer_skill_picker.dart';
@@ -62,6 +65,7 @@ void main() {
     testWidgets('shows mode-specific provider catalogs', (tester) async {
       final controller = AppController(
         environmentOverride: const <String, String>{},
+        uiFeatureManifest: _manifestWithDesktopMultiAgentEnabled(),
         initialBridgeProviderCatalog: const <SingleAgentProvider>[
           SingleAgentProvider.codex,
           SingleAgentProvider.opencode,
@@ -211,6 +215,7 @@ void main() {
     ) async {
       final controller = AppController(
         environmentOverride: const <String, String>{},
+        uiFeatureManifest: _manifestWithDesktopMultiAgentEnabled(),
         initialBridgeProviderCatalog: const <SingleAgentProvider>[
           SingleAgentProvider.codex,
           SingleAgentProvider.opencode,
@@ -260,6 +265,7 @@ void main() {
     ) async {
       final controller = AppController(
         environmentOverride: const <String, String>{},
+        uiFeatureManifest: _manifestWithDesktopMultiAgentEnabled(),
         initialBridgeProviderCatalog: const <SingleAgentProvider>[
           SingleAgentProvider.codex,
           SingleAgentProvider.opencode,
@@ -372,6 +378,7 @@ void main() {
       (tester) async {
         final controller = AppController(
           environmentOverride: const <String, String>{},
+          uiFeatureManifest: _manifestWithDesktopMultiAgentEnabled(),
           initialBridgeProviderCatalog: const <SingleAgentProvider>[
             SingleAgentProvider.codex,
             SingleAgentProvider.opencode,
@@ -612,6 +619,22 @@ void main() {
       expect(find.text('Agent Skills'), findsNothing);
     });
   });
+}
+
+UiFeatureManifest _manifestWithDesktopMultiAgentEnabled() {
+  return UiFeatureManifest.fromYamlString(
+    File(UiFeatureManifest.assetPath).readAsStringSync(),
+  ).copyWithFeature(
+    platform: UiFeaturePlatform.desktop,
+    module: 'assistant',
+    feature: 'multi_agent',
+    enabled: true,
+    buildModes: const <UiFeatureBuildMode>{
+      UiFeatureBuildMode.debug,
+      UiFeatureBuildMode.profile,
+      UiFeatureBuildMode.release,
+    },
+  );
 }
 
 Widget _buildTestApp({required Widget child, double height = 360}) {

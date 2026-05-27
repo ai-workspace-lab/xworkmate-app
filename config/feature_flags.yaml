@@ -138,10 +138,10 @@ desktop:
       description: Desktop file attachment action in assistant composer
       ui_surface: assistant_page
     multi_agent:
-      enabled: true
+      enabled: false
       release_tier: beta
-      build_modes: [debug, profile, release]
-      description: Desktop multi-agent assistant controls
+      build_modes: []
+      description: Desktop multi-agent assistant controls hidden by default
       ui_surface: assistant_page
     local_runtime:
       enabled: true
