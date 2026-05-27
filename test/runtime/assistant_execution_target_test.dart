@@ -349,7 +349,7 @@ void main() {
     });
 
     test(
-      'switching sessions does not refresh task ordering timestamp',
+      'assistant task list keeps repository order when tasks update',
       () async {
         final localHome = await Directory.systemTemp.createTemp(
           'xworkmate-stable-task-selection-home-',
@@ -365,33 +365,41 @@ void main() {
         addTearDown(controller.dispose);
         controller.resolvedUserHomeDirectoryInternal = localHome.path;
 
-        const newerTask = 'draft:newer-task';
-        const olderTask = 'draft:older-task';
-        const newerUpdatedAtMs = 2000.0;
-        const olderUpdatedAtMs = 1000.0;
+        const firstTask = 'draft:first-task';
+        const secondTask = 'draft:second-task';
+        const firstUpdatedAtMs = 1000.0;
+        const secondUpdatedAtMs = 2000.0;
         controller.upsertTaskThreadInternal(
-          newerTask,
+          firstTask,
           executionTarget: AssistantExecutionTarget.gateway,
           messageViewMode: AssistantMessageViewMode.rendered,
-          updatedAtMs: newerUpdatedAtMs,
+          updatedAtMs: firstUpdatedAtMs,
         );
         controller.upsertTaskThreadInternal(
-          olderTask,
+          secondTask,
           executionTarget: AssistantExecutionTarget.gateway,
           messageViewMode: AssistantMessageViewMode.rendered,
-          updatedAtMs: olderUpdatedAtMs,
+          updatedAtMs: secondUpdatedAtMs,
         );
 
-        await controller.switchSession(olderTask);
+        await controller.switchSession(secondTask);
+        controller.upsertTaskThreadInternal(
+          secondTask,
+          executionTarget: AssistantExecutionTarget.gateway,
+          messageViewMode: AssistantMessageViewMode.rendered,
+          updatedAtMs: 3000,
+        );
 
-        expect(controller.currentSessionKey, olderTask);
+        expect(controller.currentSessionKey, secondTask);
         expect(
-          controller.requireTaskThreadForSessionInternal(olderTask).updatedAtMs,
-          olderUpdatedAtMs,
+          controller
+              .requireTaskThreadForSessionInternal(secondTask)
+              .updatedAtMs,
+          3000,
         );
         expect(
           controller.assistantSessions.map((item) => item.key).take(2),
-          <String>[newerTask, olderTask],
+          <String>[firstTask, secondTask],
         );
       },
     );

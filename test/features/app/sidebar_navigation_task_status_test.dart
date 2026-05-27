@@ -117,7 +117,60 @@ void main() {
       findsNothing,
     );
   });
+
+  testWidgets('sidebar keeps the supplied task order when selection changes', (
+    tester,
+  ) async {
+    const firstTitle = '先显示任务';
+    const selectedTitle = '当前选择任务';
+    const lastTitle = '后显示任务';
+
+    await _pumpSidebar(
+      tester,
+      items: const <SidebarTaskItem>[
+        SidebarTaskItem(
+          sessionKey: 'first-task',
+          title: firstTitle,
+          preview: '第一项',
+          updatedAtMs: 1000,
+          executionTarget: AssistantExecutionTarget.gateway,
+          isCurrent: false,
+          pending: false,
+        ),
+        SidebarTaskItem(
+          sessionKey: 'selected-task',
+          title: selectedTitle,
+          preview: '被选中的第二项',
+          updatedAtMs: 3000,
+          executionTarget: AssistantExecutionTarget.gateway,
+          isCurrent: true,
+          pending: false,
+        ),
+        SidebarTaskItem(
+          sessionKey: 'last-task',
+          title: lastTitle,
+          preview: '第三项',
+          updatedAtMs: 2000,
+          executionTarget: AssistantExecutionTarget.gateway,
+          isCurrent: false,
+          pending: false,
+        ),
+      ],
+    );
+
+    expect(
+      _textTop(tester, firstTitle),
+      lessThan(_textTop(tester, selectedTitle)),
+    );
+    expect(
+      _textTop(tester, selectedTitle),
+      lessThan(_textTop(tester, lastTitle)),
+    );
+  });
 }
+
+double _textTop(WidgetTester tester, String text) =>
+    tester.getTopLeft(find.text(text)).dy;
 
 Future<void> _pumpSidebar(
   WidgetTester tester, {
