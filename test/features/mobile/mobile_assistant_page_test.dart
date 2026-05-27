@@ -1,7 +1,10 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xworkmate/app/app_controller.dart';
 import 'package:xworkmate/app/app_shell_desktop.dart';
+import 'package:xworkmate/app/ui_feature_manifest.dart';
 import 'package:xworkmate/app/workspace_page_registry.dart';
 import 'package:xworkmate/features/mobile/mobile_assistant_page.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
@@ -102,6 +105,7 @@ void main() {
     ) async {
       final controller = AppController(
         environmentOverride: const <String, String>{},
+        uiFeatureManifest: _manifestWithDesktopMultiAgentEnabled(),
         initialBridgeProviderCatalog: const <SingleAgentProvider>[
           SingleAgentProvider.codex,
         ],
@@ -226,5 +230,21 @@ Widget _buildTestApp({
       data: MediaQueryData(size: const Size(430, 932), viewInsets: viewInsets),
       child: Scaffold(body: child),
     ),
+  );
+}
+
+UiFeatureManifest _manifestWithDesktopMultiAgentEnabled() {
+  return UiFeatureManifest.fromYamlString(
+    File(UiFeatureManifest.assetPath).readAsStringSync(),
+  ).copyWithFeature(
+    platform: UiFeaturePlatform.desktop,
+    module: 'assistant',
+    feature: 'multi_agent',
+    enabled: true,
+    buildModes: const <UiFeatureBuildMode>{
+      UiFeatureBuildMode.debug,
+      UiFeatureBuildMode.profile,
+      UiFeatureBuildMode.release,
+    },
   );
 }
