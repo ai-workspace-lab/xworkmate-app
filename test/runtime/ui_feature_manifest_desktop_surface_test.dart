@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xworkmate/app/ui_feature_manifest.dart';
 import 'package:xworkmate/models/app_models.dart';
+import 'package:xworkmate/runtime/runtime_models.dart';
 
 void main() {
   group('Desktop feature manifest cleanup', () {
@@ -14,12 +15,17 @@ void main() {
         buildMode: UiFeatureBuildMode.debug,
       );
 
+      expect(desktop.allowedDestinations, <WorkspaceDestination>{
+        WorkspaceDestination.assistant,
+        WorkspaceDestination.settings,
+      });
       expect(
-        desktop.allowedDestinations,
-        <WorkspaceDestination>{
-          WorkspaceDestination.assistant,
-          WorkspaceDestination.settings,
-        },
+        desktop.availableExecutionTargets,
+        const <AssistantExecutionTarget>[AssistantExecutionTarget.gateway],
+      );
+      expect(
+        desktop.sanitizeExecutionTarget(AssistantExecutionTarget.agent),
+        AssistantExecutionTarget.gateway,
       );
     });
   });
