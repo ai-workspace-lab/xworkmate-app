@@ -386,9 +386,6 @@ extension AppControllerDesktopThreadStorage on AppController {
       items.add(assistantSessionSummaryForInternal(currentSessionKey));
     }
 
-    items.sort((left, right) {
-      return (right.updatedAtMs ?? 0).compareTo(left.updatedAtMs ?? 0);
-    });
     return items;
   }
 
