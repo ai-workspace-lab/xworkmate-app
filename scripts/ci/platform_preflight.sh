@@ -4,6 +4,10 @@ set -euo pipefail
 platform="${1:?platform is required}"
 should_release="${2:-false}"
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+strict_signed_release="false"
+if [[ "${GITHUB_REF:-}" == refs/tags/v* ]]; then
+  strict_signed_release="true"
+fi
 
 emit_output() {
   local key="$1"
@@ -61,7 +65,7 @@ case "$platform" in
     done
 
     if [[ "${#missing[@]}" -gt 0 ]]; then
-      if [[ "$should_release" == "true" ]]; then
+      if [[ "$strict_signed_release" == "true" ]]; then
         fail_release_preflight "missing macOS signing secrets: ${missing[*]}"
       fi
       set_build_state "false" "missing macOS signing secrets: ${missing[*]}"
@@ -91,7 +95,11 @@ case "$platform" in
     done
 
     if [[ "${#missing[@]}" -gt 0 ]]; then
-      fail_release_preflight "missing iOS signing secrets: ${missing[*]}"
+      if [[ "$strict_signed_release" == "true" ]]; then
+        fail_release_preflight "missing iOS signing secrets: ${missing[*]}"
+      fi
+      set_build_state "false" "missing iOS signing secrets: ${missing[*]}"
+      exit 0
     fi
 
     set_build_state "true" ""
