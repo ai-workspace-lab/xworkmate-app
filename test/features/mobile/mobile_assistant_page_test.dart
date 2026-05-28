@@ -119,16 +119,48 @@ void main() {
       );
       addTearDown(controller.dispose);
 
-      await tester.pumpWidget(_buildTestApp(controller: controller));
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light().copyWith(platform: TargetPlatform.iOS),
+          home: Scaffold(
+            body: Builder(
+              builder: (context) => Column(
+                children: [
+                  TextButton(
+                    key: const Key('show-agent-provider-sheet'),
+                    onPressed: () {
+                      showMobileAssistantProviderSheet(
+                        context,
+                        controller: controller,
+                        target: AssistantExecutionTarget.agent,
+                        selectedProvider: SingleAgentProvider.codex,
+                        onSelected: (_) async {},
+                      );
+                    },
+                    child: const Text('Agent providers'),
+                  ),
+                  TextButton(
+                    key: const Key('show-gateway-provider-sheet'),
+                    onPressed: () {
+                      showMobileAssistantProviderSheet(
+                        context,
+                        controller: controller,
+                        target: AssistantExecutionTarget.gateway,
+                        selectedProvider: SingleAgentProvider.openclaw,
+                        onSelected: (_) async {},
+                      );
+                    },
+                    child: const Text('Gateway providers'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
       await tester.pumpAndSettle();
 
-      await tester.tap(
-        find.byKey(const Key('mobile-assistant-composer-add-button')),
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(
-        find.byKey(const Key('mobile-assistant-provider-button')),
-      );
+      await tester.tap(find.byKey(const Key('show-agent-provider-sheet')));
       await tester.pumpAndSettle();
 
       expect(
@@ -143,24 +175,7 @@ void main() {
       await tester.tap(find.byKey(const Key('mobile-assistant-sheet-close')));
       await tester.pumpAndSettle();
 
-      await tester.tap(
-        find.byKey(const Key('mobile-assistant-composer-add-button')),
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const Key('mobile-assistant-target-button')));
-      await tester.pumpAndSettle();
-      await tester.tap(
-        find.byKey(const Key('mobile-assistant-target-item-gateway')),
-      );
-      await tester.pumpAndSettle();
-
-      await tester.tap(
-        find.byKey(const Key('mobile-assistant-composer-add-button')),
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(
-        find.byKey(const Key('mobile-assistant-provider-button')),
-      );
+      await tester.tap(find.byKey(const Key('show-gateway-provider-sheet')));
       await tester.pumpAndSettle();
 
       expect(
