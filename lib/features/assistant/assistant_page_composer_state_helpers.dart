@@ -94,7 +94,7 @@ Widget buildSkillPickerOverlayForInternal(
           searchFocusNode: state.skillPickerSearchFocusNodeInternal,
           selectedSkillKeys: state.widget.selectedSkillKeys,
           filteredSkills: state.filteredSkillOptionsInternal(),
-          isLoading: false,
+          isLoading: state.widget.controller.skillsController.loading,
           hasQuery: state.skillPickerQueryInternal.trim().isNotEmpty,
           onQueryChanged: state.setSkillPickerQueryInternal,
           onToggleSkill: (skillKey) => state.widget.onToggleSkill(skillKey),
