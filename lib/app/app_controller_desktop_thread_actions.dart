@@ -3,7 +3,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'app_metadata.dart';
 import 'app_capabilities.dart';
@@ -704,7 +703,7 @@ extension AppControllerDesktopThreadActions on AppController {
     if (turn.appendUserTurn) {
       appendGatewayUserTurnInternal(turn.sessionKey, turn.message);
     }
-    if (openClawGatewayActiveTasksInternal >=
+    if (openClawGatewayActiveTurnsInternal.length >=
             openClawGatewayMaxActiveTasksInternal &&
         openClawGatewayQueuedTurnsInternal.length >=
             openClawGatewayMaxQueuedTasksInternal) {
@@ -800,6 +799,24 @@ extension AppControllerDesktopThreadActions on AppController {
     return true;
   }
 
+  bool removeActiveOpenClawGatewayTurnsForSessionInternal(String sessionKey) {
+    final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
+      sessionKey,
+    );
+    var removed = false;
+    openClawGatewayActiveTurnsInternal.removeWhere((_, turn) {
+      final matches =
+          normalizedAssistantSessionKeyInternal(turn.sessionKey) ==
+          normalizedSessionKey;
+      if (matches) {
+        turn.cancelled = true;
+        removed = true;
+      }
+      return matches;
+    });
+    return removed;
+  }
+
   void markOpenClawGatewayTurnAbortedInternal(String sessionKey) {
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey,
@@ -834,7 +851,7 @@ extension AppControllerDesktopThreadActions on AppController {
   }
 
   void drainOpenClawGatewayQueueInternal() {
-    while (openClawGatewayActiveTasksInternal <
+    while (openClawGatewayActiveTurnsInternal.length <
             openClawGatewayMaxActiveTasksInternal &&
         openClawGatewayQueuedTurnsInternal.isNotEmpty) {
       final turn = openClawGatewayQueuedTurnsInternal.removeAt(0);
@@ -842,9 +859,27 @@ extension AppControllerDesktopThreadActions on AppController {
       if (turn.cancelled) {
         continue;
       }
-      openClawGatewayActiveTasksInternal += 1;
+      openClawGatewayActiveTurnsInternal[turn.queueId] = turn;
+      markOpenClawGatewayRunningTurnInternal(turn.sessionKey);
       unawaited(runOpenClawGatewayQueuedTurnInternal(turn));
     }
+  }
+
+  void markOpenClawGatewayRunningTurnInternal(String sessionKey) {
+    final startedAtMs = DateTime.now().millisecondsSinceEpoch.toDouble();
+    aiGatewayPendingSessionKeysInternal.add(sessionKey);
+    upsertTaskThreadInternal(
+      sessionKey,
+      lifecycleStatus: 'running',
+      lastRunAtMs: startedAtMs,
+      lastResultCode: 'running',
+      lastArtifactSyncAtMs: startedAtMs,
+      lastArtifactSyncStatus: 'running',
+      lastTaskArtifactRelativePaths: const <String>[],
+      updatedAtMs: startedAtMs,
+    );
+    recomputeTasksInternal();
+    notifyIfActiveInternal();
   }
 
   Future<void> runOpenClawGatewayQueuedTurnInternal(
@@ -883,10 +918,7 @@ extension AppControllerDesktopThreadActions on AppController {
         );
       }
     } finally {
-      openClawGatewayActiveTasksInternal = math.max(
-        0,
-        openClawGatewayActiveTasksInternal - 1,
-      );
+      openClawGatewayActiveTurnsInternal.remove(turn.queueId);
       if (!disposedInternal) {
         drainOpenClawGatewayQueueInternal();
         recomputeTasksInternal();
@@ -1227,7 +1259,9 @@ extension AppControllerDesktopThreadActions on AppController {
         // Best effort cancellation only. Local state must still leave pending.
       }
       removeQueuedOpenClawGatewayTurnsForSessionInternal(sessionKey);
+      removeActiveOpenClawGatewayTurnsForSessionInternal(sessionKey);
       markOpenClawGatewayTurnAbortedInternal(sessionKey);
+      drainOpenClawGatewayQueueInternal();
       return;
     }
   }

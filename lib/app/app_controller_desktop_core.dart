@@ -203,8 +203,12 @@ class AppController extends ChangeNotifier {
     for (final turn in openClawGatewayQueuedTurnsInternal) {
       turn.cancelled = true;
     }
+    for (final turn in openClawGatewayActiveTurnsInternal.values) {
+      turn.cancelled = true;
+    }
     openClawGatewayQueuedTurnsInternal.clear();
     openClawGatewayQueuedTurnsBySessionInternal.clear();
+    openClawGatewayActiveTurnsInternal.clear();
     runtimeEventsSubscriptionInternal?.cancel();
     detachChildListenersInternal();
     runtimeCoordinatorInternal.dispose();
@@ -282,7 +286,11 @@ class AppController extends ChangeNotifier {
   final Map<String, List<OpenClawGatewayQueuedTurnInternal>>
   openClawGatewayQueuedTurnsBySessionInternal =
       <String, List<OpenClawGatewayQueuedTurnInternal>>{};
-  int openClawGatewayActiveTasksInternal = 0;
+  final Map<String, OpenClawGatewayQueuedTurnInternal>
+  openClawGatewayActiveTurnsInternal =
+      <String, OpenClawGatewayQueuedTurnInternal>{};
+  int get openClawGatewayActiveTasksInternal =>
+      openClawGatewayActiveTurnsInternal.length;
   bool multiAgentRunPendingInternal = false;
   int localMessageCounterInternal = 0;
   int assistantDraftSessionCounterInternal = 0;

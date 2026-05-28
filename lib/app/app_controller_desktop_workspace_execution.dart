@@ -502,6 +502,15 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
           normalizedAssistantSessionKeyInternal(turn.sessionKey) ==
           normalizedSessionKey,
     );
+    openClawGatewayActiveTurnsInternal.removeWhere((_, turn) {
+      final matches =
+          normalizedAssistantSessionKeyInternal(turn.sessionKey) ==
+          normalizedSessionKey;
+      if (matches) {
+        turn.cancelled = true;
+      }
+      return matches;
+    });
     recomputeTasksInternal();
     if (wasCurrent) {
       await ensureActiveAssistantThreadInternal();
