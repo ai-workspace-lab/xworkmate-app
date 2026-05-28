@@ -2519,13 +2519,13 @@ void main() {
           'same prompt',
           attachments: <GatewayChatAttachmentPayload>[queuedAttachment],
         );
-        await _selectGatewaySession(controller, 'queue-task-c');
-        final taskCFuture = controller.sendChatMessage('different prompt');
         await _waitForThreadLifecycleStatus(
           controller,
           'queue-task-b',
           'queued',
         );
+        await _selectGatewaySession(controller, 'queue-task-c');
+        final taskCFuture = controller.sendChatMessage('different prompt');
         await _waitForThreadLifecycleStatus(
           controller,
           'queue-task-c',
