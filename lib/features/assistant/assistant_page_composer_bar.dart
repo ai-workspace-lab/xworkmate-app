@@ -179,12 +179,26 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
     }
     setState(resetSkillPickerSearchInternal);
     skillPickerPortalControllerInternal.show();
+    refreshSkillsForPickerInternal();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !skillPickerPortalControllerInternal.isShowing) {
         return;
       }
       skillPickerSearchFocusNodeInternal.requestFocus();
     });
+  }
+
+  void refreshSkillsForPickerInternal() {
+    final skillsController = widget.controller.skillsController;
+    if (widget.controller.skills.isNotEmpty || skillsController.loading) {
+      return;
+    }
+    final selectedAgentId = widget.controller.selectedAgentId.trim();
+    unawaited(
+      skillsController.refresh(
+        agentId: selectedAgentId.isEmpty ? null : selectedAgentId,
+      ),
+    );
   }
 
   @override
