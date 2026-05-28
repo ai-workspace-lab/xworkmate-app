@@ -481,6 +481,85 @@ void main() {
       expect(sendCount, 1);
     });
 
+    testWidgets('skill picker shows loading state while skills refresh', (
+      tester,
+    ) async {
+      final controller = AppController(
+        environmentOverride: const <String, String>{},
+      );
+      addTearDown(controller.dispose);
+      controller.skillsController.loadingInternal = true;
+
+      await controller.sessionsController.switchSession('unit-fixture-task-a');
+
+      await tester.pumpWidget(
+        _buildTestApp(child: _buildLowerPane(controller: controller)),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('assistant-skill-picker-button')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(find.text('正在加载技能…'), findsOneWidget);
+      expect(find.text('当前没有已加载技能。'), findsNothing);
+    });
+
+    testWidgets('skill picker displays refreshed skills and filters them', (
+      tester,
+    ) async {
+      final controller = AppController(
+        environmentOverride: const <String, String>{},
+      );
+      addTearDown(controller.dispose);
+
+      await controller.sessionsController.switchSession('unit-fixture-task-a');
+
+      await tester.pumpWidget(
+        _buildTestApp(
+          child: _buildLowerPane(
+            controller: controller,
+            availableSkills: const <ComposerSkillOptionInternal>[
+              ComposerSkillOptionInternal(
+                key: 'browser-automation',
+                label: 'Browser Automation',
+                description: 'Automate browsers',
+                sourceLabel: 'agents-skills-personal',
+                groupLabel: 'Agent Skills',
+                groupSortOrder: 1,
+                icon: Icons.key_rounded,
+              ),
+              ComposerSkillOptionInternal(
+                key: 'pdf',
+                label: 'PDF Writer',
+                description: 'Create PDF files',
+                sourceLabel: 'openclaw-workspace',
+                groupLabel: 'Workspace Skills',
+                groupSortOrder: 0,
+                icon: Icons.key_rounded,
+              ),
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('assistant-skill-picker-button')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Browser Automation'), findsOneWidget);
+      expect(find.text('PDF Writer'), findsOneWidget);
+
+      await tester.enterText(
+        find.byKey(const Key('assistant-skill-picker-search')),
+        'browser',
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Browser Automation'), findsOneWidget);
+      expect(find.text('PDF Writer'), findsNothing);
+    });
+
     testWidgets('keeps bottom action row visible when pane height is reduced', (
       tester,
     ) async {
@@ -657,6 +736,8 @@ Widget _buildLowerPane({
   required AppController controller,
   TextEditingController? inputController,
   Future<void> Function()? onSend,
+  List<ComposerSkillOptionInternal> availableSkills =
+      const <ComposerSkillOptionInternal>[],
 }) {
   final composerController = inputController ?? TextEditingController();
   return SurfaceCard(
@@ -670,7 +751,7 @@ Widget _buildLowerPane({
       modelLabel: 'gpt-5.4',
       modelOptions: const <String>[],
       attachments: const <ComposerAttachmentInternal>[],
-      availableSkills: const <ComposerSkillOptionInternal>[],
+      availableSkills: availableSkills,
       selectedSkillKeys: const <String>[],
       onRemoveAttachment: (_) {},
       onToggleSkill: (_) {},
