@@ -4,7 +4,7 @@ import '../../i18n/app_language.dart';
 import '../../runtime/runtime_models.dart';
 import '../../theme/app_palette.dart';
 
-class SettingsArchivedTasksPanel extends StatelessWidget {
+class SettingsArchivedTasksPanel extends StatefulWidget {
   const SettingsArchivedTasksPanel({
     super.key,
     required this.sessions,
@@ -15,6 +15,84 @@ class SettingsArchivedTasksPanel extends StatelessWidget {
   final List<GatewaySessionSummary> sessions;
   final Future<void> Function(String sessionKey) onRestore;
   final Future<void> Function(String sessionKey) onDelete;
+
+  @override
+  State<SettingsArchivedTasksPanel> createState() =>
+      _SettingsArchivedTasksPanelState();
+}
+
+class _SettingsArchivedTasksPanelState
+    extends State<SettingsArchivedTasksPanel> {
+  final Set<String> _selectedSessionKeys = <String>{};
+
+  List<GatewaySessionSummary> get _selectedSessions => widget.sessions
+      .where((session) => _selectedSessionKeys.contains(session.key))
+      .toList(growable: false);
+
+  bool get _hasSelection => _selectedSessionKeys.isNotEmpty;
+
+  bool get _allSelected =>
+      widget.sessions.isNotEmpty &&
+      _selectedSessionKeys.length == widget.sessions.length;
+
+  @override
+  void didUpdateWidget(covariant SettingsArchivedTasksPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final availableKeys = widget.sessions.map((session) => session.key).toSet();
+    _selectedSessionKeys.removeWhere((key) => !availableKeys.contains(key));
+  }
+
+  void _toggleSessionSelection(String sessionKey, bool selected) {
+    setState(() {
+      if (selected) {
+        _selectedSessionKeys.add(sessionKey);
+      } else {
+        _selectedSessionKeys.remove(sessionKey);
+      }
+    });
+  }
+
+  void _toggleAllSelection() {
+    setState(() {
+      if (_allSelected) {
+        _selectedSessionKeys.clear();
+      } else {
+        _selectedSessionKeys
+          ..clear()
+          ..addAll(widget.sessions.map((session) => session.key));
+      }
+    });
+  }
+
+  Future<void> _restoreSelectedSessions() async {
+    final selected = _selectedSessions;
+    if (selected.isEmpty) {
+      return;
+    }
+    for (final session in selected) {
+      await widget.onRestore(session.key);
+    }
+    if (mounted) {
+      setState(_selectedSessionKeys.clear);
+    }
+  }
+
+  Future<void> _deleteSelectedSessions(BuildContext context) async {
+    final selected = _selectedSessions;
+    if (selected.isEmpty) {
+      return;
+    }
+    final confirmed = await _confirmBulkDelete(context, selected.length);
+    if (!confirmed) {
+      return;
+    }
+    for (final session in selected) {
+      await widget.onDelete(session.key);
+    }
+    if (mounted) {
+      setState(_selectedSessionKeys.clear);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -37,7 +115,10 @@ class SettingsArchivedTasksPanel extends StatelessWidget {
               ),
             ),
             Text(
-              appText('${sessions.length} 条', '${sessions.length} items'),
+              appText(
+                '${widget.sessions.length} 条',
+                '${widget.sessions.length} items',
+              ),
               style: theme.textTheme.bodySmall?.copyWith(
                 color: palette.textMuted,
                 fontWeight: FontWeight.w600,
@@ -46,23 +127,39 @@ class SettingsArchivedTasksPanel extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 12),
-        if (sessions.isEmpty)
+        if (widget.sessions.isEmpty)
           _ArchivedTasksEmptyState()
         else
           Column(
             children: [
-              for (final session in sessions) ...[
+              _ArchivedTasksBulkToolbar(
+                allSelected: _allSelected,
+                selectedCount: _selectedSessionKeys.length,
+                totalCount: widget.sessions.length,
+                onToggleAll: _toggleAllSelection,
+                onRestoreSelected: _hasSelection
+                    ? () => _restoreSelectedSessions()
+                    : null,
+                onDeleteSelected: _hasSelection
+                    ? () => _deleteSelectedSessions(context)
+                    : null,
+              ),
+              const SizedBox(height: 8),
+              for (final session in widget.sessions) ...[
                 _ArchivedTaskTile(
                   session: session,
-                  onRestore: () => onRestore(session.key),
+                  selected: _selectedSessionKeys.contains(session.key),
+                  onSelectionChanged: (selected) =>
+                      _toggleSessionSelection(session.key, selected),
+                  onRestore: () => widget.onRestore(session.key),
                   onDelete: () async {
                     final confirmed = await _confirmDelete(context, session);
                     if (confirmed) {
-                      await onDelete(session.key);
+                      await widget.onDelete(session.key);
                     }
                   },
                 ),
-                if (session != sessions.last)
+                if (session != widget.sessions.last)
                   Divider(height: 1, color: palette.strokeSoft),
               ],
             ],
@@ -117,20 +214,154 @@ class SettingsArchivedTasksPanel extends StatelessWidget {
     final palette = context.palette;
     final result = await showDialog<bool>(
       context: context,
-      builder: (context) =>
-          _DeleteYesConfirmationDialog(session: session, palette: palette),
+      builder: (context) => _DeleteYesConfirmationDialog(
+        message: appText(
+          '此操作会删除「${session.label}」的归档记录和任务目录。请输入 Yes 继续。',
+          'This deletes "${session.label}" archived records and task directory. Type Yes to continue.',
+        ),
+        palette: palette,
+      ),
     );
     return result ?? false;
+  }
+
+  Future<bool> _confirmBulkDelete(
+    BuildContext context,
+    int selectedCount,
+  ) async {
+    final palette = context.palette;
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(appText('批量彻底删除归档记录', 'Delete archived records')),
+        content: Text(
+          appText(
+            '将从 XWorkmate 中删除已选择的 $selectedCount 条归档任务记录、消息状态和本地线程工作目录。此操作不可撤销。',
+            'This removes $selectedCount selected archived tasks from XWorkmate task records, message state, and local thread workspaces. This cannot be undone.',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(appText('取消', 'Cancel')),
+          ),
+          FilledButton.icon(
+            key: const ValueKey('settings-archived-task-confirm-bulk-delete'),
+            onPressed: () => Navigator.of(context).pop(true),
+            style: FilledButton.styleFrom(
+              backgroundColor: palette.danger,
+              foregroundColor: Colors.white,
+            ),
+            icon: const Icon(Icons.delete_sweep_outlined),
+            label: Text(appText('批量删除', 'Delete selected')),
+          ),
+        ],
+      ),
+    );
+    if (result != true || !context.mounted) {
+      return false;
+    }
+    final yesResult = await showDialog<bool>(
+      context: context,
+      builder: (context) => _DeleteYesConfirmationDialog(
+        message: appText(
+          '此操作会删除已选择的 $selectedCount 条归档记录和任务目录。请输入 Yes 继续。',
+          'This deletes $selectedCount selected archived records and task directories. Type Yes to continue.',
+        ),
+        palette: palette,
+      ),
+    );
+    return yesResult ?? false;
+  }
+}
+
+class _ArchivedTasksBulkToolbar extends StatelessWidget {
+  const _ArchivedTasksBulkToolbar({
+    required this.allSelected,
+    required this.selectedCount,
+    required this.totalCount,
+    required this.onToggleAll,
+    required this.onRestoreSelected,
+    required this.onDeleteSelected,
+  });
+
+  final bool allSelected;
+  final int selectedCount;
+  final int totalCount;
+  final VoidCallback onToggleAll;
+  final Future<void> Function()? onRestoreSelected;
+  final Future<void> Function()? onDeleteSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: palette.surfaceSecondary,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: palette.strokeSoft),
+      ),
+      child: Row(
+        children: [
+          Checkbox(
+            key: const ValueKey('settings-archived-tasks-select-all'),
+            value: allSelected,
+            onChanged: (_) => onToggleAll(),
+          ),
+          TextButton(
+            key: const ValueKey('settings-archived-tasks-select-all-button'),
+            onPressed: onToggleAll,
+            child: Text(appText('全选', 'Select all')),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              appText(
+                selectedCount == 0
+                    ? '共 $totalCount 条归档任务'
+                    : '已选择 $selectedCount / $totalCount 条',
+                selectedCount == 0
+                    ? '$totalCount archived tasks'
+                    : '$selectedCount / $totalCount selected',
+              ),
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: palette.textMuted,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          FilledButton.tonalIcon(
+            key: const ValueKey('settings-archived-tasks-bulk-restore'),
+            onPressed: onRestoreSelected,
+            icon: const Icon(Icons.unarchive_outlined),
+            label: Text(appText('批量解除归档', 'Restore selected')),
+          ),
+          const SizedBox(width: 8),
+          IconButton(
+            key: const ValueKey('settings-archived-tasks-bulk-delete'),
+            tooltip: appText('批量彻底删除归档记录', 'Delete selected records'),
+            onPressed: onDeleteSelected == null
+                ? null
+                : () async => onDeleteSelected!(),
+            icon: const Icon(Icons.delete_sweep_outlined),
+          ),
+        ],
+      ),
+    );
   }
 }
 
 class _DeleteYesConfirmationDialog extends StatefulWidget {
   const _DeleteYesConfirmationDialog({
-    required this.session,
+    required this.message,
     required this.palette,
   });
 
-  final GatewaySessionSummary session;
+  final String message;
   final AppPalette palette;
 
   @override
@@ -158,12 +389,7 @@ class _DeleteYesConfirmationDialogState
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(
-            appText(
-              '此操作会删除「${widget.session.label}」的归档记录和任务目录。请输入 Yes 继续。',
-              'This deletes "${widget.session.label}" archived records and task directory. Type Yes to continue.',
-            ),
-          ),
+          Text(widget.message),
           const SizedBox(height: 14),
           TextField(
             key: const ValueKey('settings-archived-task-delete-yes-input'),
@@ -231,11 +457,15 @@ class _ArchivedTasksEmptyState extends StatelessWidget {
 class _ArchivedTaskTile extends StatelessWidget {
   const _ArchivedTaskTile({
     required this.session,
+    required this.selected,
+    required this.onSelectionChanged,
     required this.onRestore,
     required this.onDelete,
   });
 
   final GatewaySessionSummary session;
+  final bool selected;
+  final ValueChanged<bool> onSelectionChanged;
   final Future<void> Function() onRestore;
   final Future<void> Function() onDelete;
 
@@ -249,6 +479,14 @@ class _ArchivedTaskTile extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Checkbox(
+            key: ValueKey<String>(
+              'settings-archived-task-select-${session.key}',
+            ),
+            value: selected,
+            onChanged: (value) => onSelectionChanged(value ?? false),
+          ),
+          const SizedBox(width: 8),
           Container(
             width: 34,
             height: 34,
