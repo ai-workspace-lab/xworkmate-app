@@ -2500,88 +2500,78 @@ void main() {
           controller.dispose();
         });
 
-        await _selectGatewaySession(controller, 'queue-task-a');
-        final taskAFuture = controller.sendChatMessage('same prompt');
-        await fakeGoTaskService.waitForRequestCount(1);
-        await expectLater(
-          taskAFuture.timeout(const Duration(milliseconds: 250)),
-          completes,
-        );
-
-        await _selectGatewaySession(controller, 'queue-task-b');
         final queuedAttachment = GatewayChatAttachmentPayload(
           type: 'file',
           mimeType: 'text/plain',
           fileName: 'queued.txt',
           content: base64Encode(utf8.encode('queued content')),
         );
-        final taskBFuture = controller.sendChatMessage(
-          'same prompt',
-          attachments: <GatewayChatAttachmentPayload>[queuedAttachment],
-        );
-        await _waitForThreadLifecycleStatus(
-          controller,
-          'queue-task-b',
-          'queued',
-        );
-        await _selectGatewaySession(controller, 'queue-task-c');
-        final taskCFuture = controller.sendChatMessage('different prompt');
-        await _waitForThreadLifecycleStatus(
-          controller,
-          'queue-task-c',
-          'queued',
-        );
-        await expectLater(
-          taskBFuture.timeout(const Duration(milliseconds: 250)),
-          completes,
-        );
-        await expectLater(
-          taskCFuture.timeout(const Duration(milliseconds: 250)),
-          completes,
-        );
+        for (
+          var index = 0;
+          index < openClawGatewayMaxActiveTasksInternal;
+          index += 1
+        ) {
+          final sessionKey = 'queue-task-$index';
+          await _selectGatewaySession(controller, sessionKey);
+          await expectLater(
+            controller
+                .sendChatMessage('active prompt $index')
+                .timeout(const Duration(milliseconds: 250)),
+            completes,
+          );
+          await fakeGoTaskService.waitForRequestCount(index + 1);
+          expect(
+            controller
+                .requireTaskThreadForSessionInternal(sessionKey)
+                .lifecycleState
+                .status,
+            'running',
+          );
+        }
 
-        expect(fakeGoTaskService.requests, hasLength(1));
+        await _selectGatewaySession(controller, 'queue-task-waiting');
+        await expectLater(
+          controller
+              .sendChatMessage(
+                'queued prompt',
+                attachments: <GatewayChatAttachmentPayload>[queuedAttachment],
+              )
+              .timeout(const Duration(milliseconds: 250)),
+          completes,
+        );
+        await _waitForThreadLifecycleStatus(
+          controller,
+          'queue-task-waiting',
+          'queued',
+        );
+        expect(
+          fakeGoTaskService.requests,
+          hasLength(openClawGatewayMaxActiveTasksInternal),
+        );
         expect(
           controller
-              .requireTaskThreadForSessionInternal('queue-task-b')
+              .requireTaskThreadForSessionInternal('queue-task-waiting')
               .lifecycleState
               .status,
           'queued',
         );
         expect(
-          controller
-              .requireTaskThreadForSessionInternal('queue-task-c')
-              .lifecycleState
-              .status,
-          'queued',
-        );
-        expect(
-          controller.assistantSessionHasPendingRun('queue-task-b'),
+          controller.assistantSessionHasPendingRun('queue-task-waiting'),
           isTrue,
         );
         expect(
-          controller.assistantSessionHasPendingRun('queue-task-c'),
-          isTrue,
-        );
-        expect(
-          controller.localSessionMessagesInternal['queue-task-b']!.map(
+          controller.localSessionMessagesInternal['queue-task-waiting']!.map(
             (message) => message.text,
           ),
-          contains('same prompt'),
-        );
-        expect(
-          controller.localSessionMessagesInternal['queue-task-c']!.map(
-            (message) => message.text,
-          ),
-          contains('different prompt'),
+          contains('queued prompt'),
         );
 
         fakeGoTaskService.complete(
-          'queue-task-a',
+          'queue-task-0',
           const GoTaskServiceResult(
             success: true,
-            message: 'result A',
-            turnId: 'turn-a',
+            message: 'result 0',
+            turnId: 'turn-0',
             raw: <String, dynamic>{},
             errorMessage: '',
             resolvedModel: '',
@@ -2590,36 +2580,41 @@ void main() {
         );
         await _waitForThreadLifecycleStatus(
           controller,
-          'queue-task-a',
+          'queue-task-0',
           'ready',
         );
-        await fakeGoTaskService.waitForRequestCount(2);
+        await fakeGoTaskService.waitForRequestCount(
+          openClawGatewayMaxActiveTasksInternal + 1,
+        );
 
-        final taskBRequest = fakeGoTaskService.requests[1];
-        expect(taskBRequest.sessionId, 'queue-task-b');
-        expect(taskBRequest.prompt, contains('TaskThread workspace context:'));
-        expect(taskBRequest.prompt, contains('- sessionKey: queue-task-b'));
-        expect(taskBRequest.prompt, contains('User request:\nsame prompt'));
-        expect(taskBRequest.resumeSession, isFalse);
-        expect(taskBRequest.inlineAttachments, hasLength(1));
-        expect(taskBRequest.inlineAttachments.single.fileName, 'queued.txt');
+        final queuedRequest = fakeGoTaskService.requests.last;
+        expect(queuedRequest.sessionId, 'queue-task-waiting');
+        expect(queuedRequest.prompt, contains('TaskThread workspace context:'));
         expect(
-          taskBRequest.inlineAttachments.single.content,
+          queuedRequest.prompt,
+          contains('- sessionKey: queue-task-waiting'),
+        );
+        expect(queuedRequest.prompt, contains('User request:\nqueued prompt'));
+        expect(queuedRequest.resumeSession, isFalse);
+        expect(queuedRequest.inlineAttachments, hasLength(1));
+        expect(queuedRequest.inlineAttachments.single.fileName, 'queued.txt');
+        expect(
+          queuedRequest.inlineAttachments.single.content,
           queuedAttachment.content,
         );
-        expect(taskBRequest.workingDirectory, endsWith('/queue-task-b'));
-        expect(taskBRequest.prompt, contains(taskBRequest.workingDirectory));
+        expect(queuedRequest.workingDirectory, endsWith('/queue-task-waiting'));
+        expect(queuedRequest.prompt, contains(queuedRequest.workingDirectory));
         expect(
-          taskBRequest.remoteWorkingDirectoryHint,
-          endsWith('/threads/queue-task-b'),
+          queuedRequest.remoteWorkingDirectoryHint,
+          endsWith('/threads/queue-task-waiting'),
         );
 
         fakeGoTaskService.complete(
-          'queue-task-b',
+          'queue-task-waiting',
           const GoTaskServiceResult(
             success: true,
-            message: 'result B',
-            turnId: 'turn-b',
+            message: 'queued done',
+            turnId: 'turn-waiting',
             raw: <String, dynamic>{},
             errorMessage: '',
             resolvedModel: '',
@@ -2628,44 +2623,17 @@ void main() {
         );
         await _waitForThreadLifecycleStatus(
           controller,
-          'queue-task-b',
+          'queue-task-waiting',
           'ready',
         );
         expect(
-          controller.localSessionMessagesInternal['queue-task-b']!
+          controller.localSessionMessagesInternal['queue-task-waiting']!
               .where(
                 (message) =>
-                    message.role == 'user' && message.text == 'same prompt',
+                    message.role == 'user' && message.text == 'queued prompt',
               )
               .length,
           1,
-        );
-        await fakeGoTaskService.waitForRequestCount(3);
-
-        final taskCRequest = fakeGoTaskService.requests[2];
-        expect(taskCRequest.sessionId, 'queue-task-c');
-        expect(
-          taskCRequest.prompt,
-          contains('User request:\ndifferent prompt'),
-        );
-        expect(taskCRequest.workingDirectory, endsWith('/queue-task-c'));
-        expect(taskCRequest.prompt, contains(taskCRequest.workingDirectory));
-        fakeGoTaskService.complete(
-          'queue-task-c',
-          const GoTaskServiceResult(
-            success: true,
-            message: 'result C',
-            turnId: 'turn-c',
-            raw: <String, dynamic>{},
-            errorMessage: '',
-            resolvedModel: '',
-            route: GoTaskServiceRoute.externalAcpSingle,
-          ),
-        );
-        await _waitForThreadLifecycleStatus(
-          controller,
-          'queue-task-c',
-          'ready',
         );
       },
     );
@@ -2732,9 +2700,11 @@ void main() {
           controller.dispose();
         });
 
-        await _selectGatewaySession(controller, 'running-openclaw-task');
-        final runningFuture = controller.sendChatMessage('running');
-        await fakeGoTaskService.waitForRequestCount(1);
+        final activeSessionKeys = await _startOpenClawActiveTasks(
+          controller,
+          fakeGoTaskService,
+          prefix: 'running-openclaw-task',
+        );
 
         await _selectGatewaySession(controller, 'queued-openclaw-task');
         final queuedFuture = controller.sendChatMessage('queued');
@@ -2743,7 +2713,10 @@ void main() {
           'queued-openclaw-task',
           'queued',
         );
-        expect(fakeGoTaskService.requests, hasLength(1));
+        expect(
+          fakeGoTaskService.requests,
+          hasLength(openClawGatewayMaxActiveTasksInternal),
+        );
 
         await controller.abortRun();
 
@@ -2758,7 +2731,7 @@ void main() {
         await queuedFuture;
 
         fakeGoTaskService.complete(
-          'running-openclaw-task',
+          activeSessionKeys.first,
           const GoTaskServiceResult(
             success: true,
             message: 'running done',
@@ -2769,14 +2742,16 @@ void main() {
             route: GoTaskServiceRoute.externalAcpSingle,
           ),
         );
-        await runningFuture;
         await _waitForThreadLifecycleStatus(
           controller,
-          'running-openclaw-task',
+          activeSessionKeys.first,
           'ready',
         );
         await Future<void>.delayed(const Duration(milliseconds: 50));
-        expect(fakeGoTaskService.requests, hasLength(1));
+        expect(
+          fakeGoTaskService.requests,
+          hasLength(openClawGatewayMaxActiveTasksInternal),
+        );
       },
     );
 
@@ -2790,9 +2765,12 @@ void main() {
           controller.dispose();
         });
 
-        await _selectGatewaySession(controller, 'running-openclaw-stop-task');
-        final runningFuture = controller.sendChatMessage('running');
-        await fakeGoTaskService.waitForRequestCount(1);
+        final activeSessionKeys = await _startOpenClawActiveTasks(
+          controller,
+          fakeGoTaskService,
+          prefix: 'running-openclaw-stop-task',
+        );
+        final runningSessionKey = activeSessionKeys.first;
 
         await _selectGatewaySession(controller, 'queued-openclaw-after-stop');
         final queuedFuture = controller.sendChatMessage('queued');
@@ -2802,24 +2780,29 @@ void main() {
           'queued',
         );
 
-        await _selectGatewaySession(controller, 'running-openclaw-stop-task');
+        await _selectGatewaySession(controller, runningSessionKey);
         await controller.abortRun();
 
         expect(fakeGoTaskService.cancelledSessionIds, <String>[
-          'running-openclaw-stop-task',
+          runningSessionKey,
         ]);
         expect(
-          controller.assistantSessionHasPendingRun(
-            'running-openclaw-stop-task',
-          ),
+          controller.assistantSessionHasPendingRun(runningSessionKey),
           isFalse,
         );
         expect(
           controller
-              .requireTaskThreadForSessionInternal('running-openclaw-stop-task')
+              .requireTaskThreadForSessionInternal(runningSessionKey)
               .lifecycleState
               .lastResultCode,
           'aborted',
+        );
+        await fakeGoTaskService.waitForRequestCount(
+          openClawGatewayMaxActiveTasksInternal + 1,
+        );
+        expect(
+          fakeGoTaskService.requests.last.sessionId,
+          'queued-openclaw-after-stop',
         );
         expect(
           controller.assistantSessionHasPendingRun(
@@ -2829,7 +2812,7 @@ void main() {
         );
 
         fakeGoTaskService.complete(
-          'running-openclaw-stop-task',
+          runningSessionKey,
           const GoTaskServiceResult(
             success: true,
             message: 'late stopped result',
@@ -2839,12 +2822,6 @@ void main() {
             resolvedModel: '',
             route: GoTaskServiceRoute.externalAcpSingle,
           ),
-        );
-        await runningFuture;
-        await fakeGoTaskService.waitForRequestCount(2);
-        expect(
-          fakeGoTaskService.requests.last.sessionId,
-          'queued-openclaw-after-stop',
         );
 
         fakeGoTaskService.complete(
@@ -2865,7 +2842,10 @@ void main() {
           'queued-openclaw-after-stop',
           'ready',
         );
-        expect(fakeGoTaskService.requests, hasLength(2));
+        expect(
+          fakeGoTaskService.requests,
+          hasLength(openClawGatewayMaxActiveTasksInternal + 1),
+        );
       },
     );
 
@@ -2879,9 +2859,11 @@ void main() {
           controller.dispose();
         });
 
-        await _selectGatewaySession(controller, 'continue-active-openclaw');
-        await controller.sendChatMessage('active task');
-        await fakeGoTaskService.waitForRequestCount(1);
+        final activeSessionKeys = await _startOpenClawActiveTasks(
+          controller,
+          fakeGoTaskService,
+          prefix: 'continue-active-openclaw',
+        );
 
         await _selectGatewaySession(controller, 'continue-queued-openclaw');
         await controller.sendChatMessage('queued before continue');
@@ -2925,7 +2907,10 @@ void main() {
           'continue-stopped-openclaw',
           'queued',
         );
-        expect(fakeGoTaskService.requests, hasLength(1));
+        expect(
+          fakeGoTaskService.requests,
+          hasLength(openClawGatewayMaxActiveTasksInternal),
+        );
         expect(
           controller.assistantSessionHasPendingRun('continue-queued-openclaw'),
           isTrue,
@@ -2946,7 +2931,7 @@ void main() {
         );
 
         fakeGoTaskService.complete(
-          'continue-active-openclaw',
+          activeSessionKeys.first,
           const GoTaskServiceResult(
             success: true,
             message: 'active done',
@@ -2957,7 +2942,9 @@ void main() {
             route: GoTaskServiceRoute.externalAcpSingle,
           ),
         );
-        await fakeGoTaskService.waitForRequestCount(2);
+        await fakeGoTaskService.waitForRequestCount(
+          openClawGatewayMaxActiveTasksInternal + 1,
+        );
         expect(
           fakeGoTaskService.requests.last.sessionId,
           'continue-queued-openclaw',
@@ -2975,7 +2962,21 @@ void main() {
             route: GoTaskServiceRoute.externalAcpSingle,
           ),
         );
-        await fakeGoTaskService.waitForRequestCount(3);
+        fakeGoTaskService.complete(
+          activeSessionKeys[1],
+          const GoTaskServiceResult(
+            success: true,
+            message: 'second active done',
+            turnId: 'turn-second-active',
+            raw: <String, dynamic>{},
+            errorMessage: '',
+            resolvedModel: '',
+            route: GoTaskServiceRoute.externalAcpSingle,
+          ),
+        );
+        await fakeGoTaskService.waitForRequestCount(
+          openClawGatewayMaxActiveTasksInternal + 2,
+        );
 
         final continuedRequest = fakeGoTaskService.requests.last;
         expect(continuedRequest.sessionId, 'continue-stopped-openclaw');
@@ -3027,13 +3028,93 @@ void main() {
       },
     );
 
+    test(
+      'OpenClaw drain starts queued work when no active turns remain',
+      () async {
+        final fakeGoTaskService = _BlockingGoTaskServiceClient();
+        final controller = _connectedGatewayController(fakeGoTaskService);
+        addTearDown(() {
+          fakeGoTaskService.completeAll();
+          controller.dispose();
+        });
+
+        const sessionKey = 'stale-slot-queued-task';
+        await _selectGatewaySession(controller, sessionKey);
+        final turn = OpenClawGatewayQueuedTurnInternal(
+          queueId: 'stale-slot-queued-turn',
+          sessionKey: sessionKey,
+          target: AssistantExecutionTarget.gateway,
+          provider: SingleAgentProvider.openclaw,
+          message: 'recover queued work',
+          thinking: 'off',
+          selectedSkillLabels: const <String>[],
+          attachments: const <GatewayChatAttachmentPayload>[],
+          localAttachments: const <CollaborationAttachment>[],
+          workingDirectory: '/tmp/$sessionKey',
+          localWorkingDirectory: '/tmp/$sessionKey-local',
+          remoteWorkingDirectoryHint: '/threads/$sessionKey',
+          model: '',
+          routing: const ExternalCodeAgentAcpRoutingConfig.auto(
+            preferredGatewayTarget: kCanonicalGatewayProviderId,
+          ),
+          agentId: '',
+          metadata: const <String, dynamic>{},
+          resumeSessionHint: false,
+        );
+        controller.openClawGatewayQueuedTurnsInternal.add(turn);
+        controller.openClawGatewayQueuedTurnsBySessionInternal[sessionKey] =
+            <OpenClawGatewayQueuedTurnInternal>[turn];
+        controller.markOpenClawGatewayQueuedTurnInternal(sessionKey);
+
+        controller.drainOpenClawGatewayQueueInternal();
+
+        await fakeGoTaskService.waitForRequestCount(1);
+        expect(fakeGoTaskService.requests.single.sessionId, sessionKey);
+        expect(
+          controller
+              .requireTaskThreadForSessionInternal(sessionKey)
+              .lifecycleState
+              .status,
+          'running',
+        );
+        expect(controller.openClawGatewayActiveTasksInternal, 1);
+      },
+    );
+
     test('OpenClaw queue overflow fails without artifact sync', () async {
       final fakeGoTaskService = _BlockingGoTaskServiceClient();
       final controller = _connectedGatewayController(fakeGoTaskService);
       addTearDown(controller.dispose);
 
-      controller.openClawGatewayActiveTasksInternal =
-          openClawGatewayMaxActiveTasksInternal;
+      for (
+        var index = 0;
+        index < openClawGatewayMaxActiveTasksInternal;
+        index += 1
+      ) {
+        final sessionKey = 'queue-full-active-$index';
+        final turn = OpenClawGatewayQueuedTurnInternal(
+          queueId: 'queue-full-active-$index',
+          sessionKey: sessionKey,
+          target: AssistantExecutionTarget.gateway,
+          provider: SingleAgentProvider.openclaw,
+          message: 'active $index',
+          thinking: 'off',
+          selectedSkillLabels: const <String>[],
+          attachments: const <GatewayChatAttachmentPayload>[],
+          localAttachments: const <CollaborationAttachment>[],
+          workingDirectory: '/tmp/$sessionKey',
+          localWorkingDirectory: '/tmp/$sessionKey-local',
+          remoteWorkingDirectoryHint: '/threads/$sessionKey',
+          model: '',
+          routing: const ExternalCodeAgentAcpRoutingConfig.auto(
+            preferredGatewayTarget: kCanonicalGatewayProviderId,
+          ),
+          agentId: '',
+          metadata: const <String, dynamic>{},
+          resumeSessionHint: false,
+        );
+        controller.openClawGatewayActiveTurnsInternal[turn.queueId] = turn;
+      }
       for (
         var index = 0;
         index < openClawGatewayMaxQueuedTasksInternal;
@@ -3607,6 +3688,38 @@ Future<void> _selectGatewaySession(
     selectedProvider: SingleAgentProvider.openclaw,
     selectedProviderSource: ThreadSelectionSource.explicit,
   );
+}
+
+Future<List<String>> _startOpenClawActiveTasks(
+  AppController controller,
+  _BlockingGoTaskServiceClient fakeGoTaskService, {
+  required String prefix,
+}) async {
+  final sessionKeys = <String>[];
+  for (
+    var index = 0;
+    index < openClawGatewayMaxActiveTasksInternal;
+    index += 1
+  ) {
+    final sessionKey = '$prefix-$index';
+    sessionKeys.add(sessionKey);
+    await _selectGatewaySession(controller, sessionKey);
+    await expectLater(
+      controller
+          .sendChatMessage('active task $index')
+          .timeout(const Duration(milliseconds: 250)),
+      completes,
+    );
+    await fakeGoTaskService.waitForRequestCount(index + 1);
+    expect(
+      controller
+          .requireTaskThreadForSessionInternal(sessionKey)
+          .lifecycleState
+          .status,
+      'running',
+    );
+  }
+  return sessionKeys;
 }
 
 Future<void> _waitForThreadLifecycleStatus(

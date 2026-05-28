@@ -1,7 +1,7 @@
 import '../runtime/go_task_service_client.dart';
 import '../runtime/runtime_models.dart';
 
-const int openClawGatewayMaxActiveTasksInternal = 1;
+const int openClawGatewayMaxActiveTasksInternal = 5;
 const int openClawGatewayMaxQueuedTasksInternal = 20;
 
 class OpenClawGatewayQueuedTurnInternal {

@@ -298,9 +298,12 @@ extension AppControllerDesktopSettings on AppController {
     for (final turn in openClawGatewayQueuedTurnsInternal) {
       turn.cancelled = true;
     }
+    for (final turn in openClawGatewayActiveTurnsInternal.values) {
+      turn.cancelled = true;
+    }
     openClawGatewayQueuedTurnsInternal.clear();
     openClawGatewayQueuedTurnsBySessionInternal.clear();
-    openClawGatewayActiveTasksInternal = 0;
+    openClawGatewayActiveTurnsInternal.clear();
     multiAgentRunPendingInternal = false;
     final sessionKey = createAssistantDraftSessionKeyInternal();
     initializeAssistantThreadContext(
