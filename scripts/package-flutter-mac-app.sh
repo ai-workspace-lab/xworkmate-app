@@ -104,18 +104,6 @@ if [[ ! -d "$BUILD_APP_PATH" ]]; then
   exit 1
 fi
 
-# Embed xworkmate-go-core for local/non-App-Store builds if available
-if [[ "${XWORKMATE_APP_STORE:-}" != "true" ]]; then
-  SOURCE_GO_CORE="$ROOT_DIR/build/bin/xworkmate-go-core"
-  # lib/runtime/go_core.dart expects it under build/bin relative to one of the roots
-  TARGET_GO_CORE="$BUILD_APP_PATH/Contents/MacOS/build/bin/xworkmate-go-core"
-  if [[ -f "$SOURCE_GO_CORE" ]]; then
-    echo "Embedding xworkmate-go-core into app bundle..."
-    mkdir -p "$(dirname "$TARGET_GO_CORE")"
-    cp "$SOURCE_GO_CORE" "$TARGET_GO_CORE"
-  fi
-fi
-
 verify_bundle_signature() {
   local app_path="$1"
   echo "Verifying code signature: $app_path"
@@ -147,17 +135,11 @@ find "$DIST_APP_PATH/Contents/Frameworks" -name "*.framework" -type d | while re
   codesign --force --sign "${SIGN_IDENTITY:--}" --timestamp=none "$framework"
 done
 
-# 2. Sign our manually added binaries if any
-if [[ -f "$DIST_APP_PATH/Contents/MacOS/build/bin/xworkmate-go-core" ]]; then
-  echo "Signing embedded helper: xworkmate-go-core"
-  codesign --force --sign "${SIGN_IDENTITY:--}" --timestamp=none "$DIST_APP_PATH/Contents/MacOS/build/bin/xworkmate-go-core"
-fi
-
-# 3. Sign the main executable
+# 2. Sign the main executable
 echo "Signing main executable..."
 codesign --force --sign "${SIGN_IDENTITY:--}" --timestamp=none "$DIST_APP_PATH/Contents/MacOS/$APP_NAME"
 
-# 4. Finally sign the app bundle itself
+# 3. Finally sign the app bundle itself
 echo "Signing app bundle..."
 codesign --force --sign "${SIGN_IDENTITY:--}" --timestamp=none "$DIST_APP_PATH"
 

@@ -41,13 +41,13 @@ Last Updated: 2026-04-13
 
 ## Build Contract
 
-`xworkmate-app` 仍然消费名为 `xworkmate-go-core` 的 helper artifact。
+`xworkmate-app` 不再构建、嵌入或启动本地 ACP bridge helper。
 
 这表示：
 
-- helper 从 `xworkmate-bridge` 构建
-- app 负责定位与调用 helper
-- helper 内部的 bridge/runtime 行为以 bridge repo 为准，不再在 app repo 内保留并列设计文档
+- macOS 打包不再从 `xworkmate-bridge` sibling repo 构建 `xworkmate-go-core`
+- app bundle 不再携带 `xworkmate-go-core` 或本地 ACP bridge 启动脚本
+- app 端只消费托管 `xworkmate-bridge` capability、routing、gateway runtime 合同
 
 ## Operational Note
 
