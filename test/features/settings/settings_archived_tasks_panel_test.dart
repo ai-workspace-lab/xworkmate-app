@@ -114,7 +114,154 @@ void main() {
 
     expect(calls, contains('delete:draft:archived-task'));
   });
+
+  testWidgets('selects all archived tasks and restores selected records', (
+    tester,
+  ) async {
+    final calls = <String>[];
+    await tester.pumpWidget(
+      _buildTestApp(
+        child: SettingsArchivedTasksPanel(
+          sessions: const <GatewaySessionSummary>[
+            _firstArchivedTask,
+            _secondArchivedTask,
+          ],
+          onRestore: (sessionKey) async {
+            calls.add('restore:$sessionKey');
+          },
+          onDelete: (sessionKey) async {
+            calls.add('delete:$sessionKey');
+          },
+        ),
+      ),
+    );
+
+    expect(find.text('共 2 条归档任务'), findsOneWidget);
+
+    await tester.tap(
+      find.byKey(const ValueKey('settings-archived-tasks-select-all')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('已选择 2 / 2 条'), findsOneWidget);
+
+    await tester.tap(
+      find.byKey(const ValueKey('settings-archived-tasks-bulk-restore')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(calls, <String>[
+      'restore:draft:archived-task',
+      'restore:draft:second-archived-task',
+    ]);
+    expect(find.text('共 2 条归档任务'), findsOneWidget);
+  });
+
+  testWidgets('deletes selected archived tasks after bulk confirmation', (
+    tester,
+  ) async {
+    final calls = <String>[];
+    await tester.pumpWidget(
+      _buildTestApp(
+        child: SettingsArchivedTasksPanel(
+          sessions: const <GatewaySessionSummary>[
+            _firstArchivedTask,
+            _secondArchivedTask,
+          ],
+          onRestore: (sessionKey) async {
+            calls.add('restore:$sessionKey');
+          },
+          onDelete: (sessionKey) async {
+            calls.add('delete:$sessionKey');
+          },
+        ),
+      ),
+    );
+
+    await tester.tap(
+      find.byKey(
+        const ValueKey(
+          'settings-archived-task-select-draft:second-archived-task',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('已选择 1 / 2 条'), findsOneWidget);
+
+    await tester.tap(
+      find.byKey(const ValueKey('settings-archived-tasks-bulk-delete')),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('批量彻底删除归档记录'), findsOneWidget);
+
+    await tester.tap(
+      find.byKey(const ValueKey('settings-archived-task-confirm-bulk-delete')),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('确认彻底删除'), findsOneWidget);
+    expect(calls, isEmpty);
+
+    await tester.enterText(
+      find.byKey(const ValueKey('settings-archived-task-delete-yes-input')),
+      'Yes',
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('settings-archived-task-confirm-delete-yes')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(calls, <String>['delete:draft:second-archived-task']);
+    expect(find.text('共 2 条归档任务'), findsOneWidget);
+  });
 }
+
+const _firstArchivedTask = GatewaySessionSummary(
+  key: 'draft:archived-task',
+  kind: 'assistant',
+  displayName: '导出 PDF',
+  surface: 'Assistant',
+  subject: null,
+  room: null,
+  space: null,
+  updatedAtMs: 1779178980000,
+  sessionId: 'draft:archived-task',
+  systemSent: false,
+  abortedLastRun: false,
+  thinkingLevel: null,
+  verboseLevel: null,
+  inputTokens: null,
+  outputTokens: null,
+  totalTokens: null,
+  model: null,
+  contextTokens: null,
+  derivedTitle: '导出 PDF',
+  lastMessagePreview: '输出为PDF文件',
+);
+
+const _secondArchivedTask = GatewaySessionSummary(
+  key: 'draft:second-archived-task',
+  kind: 'assistant',
+  displayName: '整理会议纪要',
+  surface: 'Assistant',
+  subject: null,
+  room: null,
+  space: null,
+  updatedAtMs: 1779179000000,
+  sessionId: 'draft:second-archived-task',
+  systemSent: false,
+  abortedLastRun: false,
+  thinkingLevel: null,
+  verboseLevel: null,
+  inputTokens: null,
+  outputTokens: null,
+  totalTokens: null,
+  model: null,
+  contextTokens: null,
+  derivedTitle: '整理会议纪要',
+  lastMessagePreview: '会议纪要已保存',
+);
 
 Widget _buildTestApp({required Widget child}) {
   return MaterialApp(
