@@ -20,7 +20,7 @@ APP_DART_DEFINE_BUILD ?= --dart-define=XWORKMATE_BUILD_NUMBER=$(APP_BUILD_NUMBER
 APP_DART_DEFINE_BUILD_DATE ?= --dart-define=XWORKMATE_BUILD_DATE=$(APP_BUILD_DATE)
 APP_DART_DEFINE_BUILD_COMMIT ?= --dart-define=XWORKMATE_BUILD_COMMIT=$(APP_BUILD_COMMIT)
 
-.PHONY: help deps analyze test test-all test-flutter test-golden test-integration test-integration-macos test-patrol test-go test-ci check format run open-macos-xcode sync-version build-linux build-macos build-ios-sim ios-pods ios-pods-check build-ios-release-no-codesign verify-ios-release package-deb package-rpm package-linux package-mac install-mac clean build-go-core render-release-docs docs-public-api check-export-compliance test-real-env-login-chain inspect-xworkmate-bridge-service test-api-contract test-api-scenario-contract check-api-external
+.PHONY: help deps analyze test test-all test-flutter test-golden test-integration test-integration-macos test-patrol test-go test-ci check format run open-macos-xcode sync-version build-linux build-macos build-ios-sim ios-pods ios-pods-check build-ios-release-no-codesign verify-ios-release package-deb package-rpm package-linux package-mac install-mac clean render-release-docs docs-public-api check-export-compliance test-real-env-login-chain inspect-xworkmate-bridge-service test-api-contract test-api-scenario-contract check-api-external
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z0-9_.-]+:.*?## ' Makefile | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "%-18s %s\n", $$1, $$2}'
@@ -119,9 +119,6 @@ build-ios-release-no-codesign: ios-pods-check ## Build the iOS device app in rel
 
 verify-ios-release: ios-pods-check build-ios-release-no-codesign analyze ## Regenerate pods, build iOS release without codesigning, and run static analysis
 
-build-go-core: ## Build the external ACP bridge helper from xworkmate-bridge
-	bash scripts/build-go-core.sh
-
 package-deb: ## Create the Linux .deb package
 	bash scripts/package-linux-deb.sh
 
@@ -131,7 +128,7 @@ package-rpm: ## Create the Linux .rpm package
 package-linux: ## Create both Linux packages
 	bash scripts/package-linux.sh
 
-package-mac: build-go-core ## Create the macOS .app and DMG
+package-mac: ## Create the macOS .app and DMG
 	XWORKMATE_APP_STORE=true bash scripts/package-flutter-mac-app.sh
 
 install-mac: package-mac ## Package and install the macOS app into /Applications

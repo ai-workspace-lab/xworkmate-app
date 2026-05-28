@@ -548,9 +548,9 @@ class GatewayRuntime extends ChangeNotifier with GatewayRuntimeHelpersInternal {
     await connectProfile(
       GatewayConnectionProfile.defaultsGateway().copyWith(
         mode: RuntimeConnectionMode.remote,
-        host: '127.0.0.1',
-        port: 18789,
-        tls: false,
+        host: Uri.parse(kManagedBridgeServerUrl).host,
+        port: 443,
+        tls: true,
         selectedAgentId: selectedAgentId,
       ),
     );
