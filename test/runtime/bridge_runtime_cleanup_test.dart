@@ -1,7 +1,11 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xworkmate/app/app_controller.dart';
+import 'package:xworkmate/runtime/device_identity_store.dart';
+import 'package:xworkmate/runtime/gateway_runtime.dart';
+import 'package:xworkmate/runtime/gateway_runtime_session_client.dart';
 import 'package:xworkmate/runtime/mode_switcher.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
 import 'package:xworkmate/runtime/secure_config_store.dart';
@@ -178,5 +182,95 @@ void main() {
         );
       },
     );
+
+    test(
+      'session client bootstrap uses the managed bridge instead of local ACP',
+      () async {
+        final storeRoot = await Directory.systemTemp.createTemp(
+          'xworkmate-bridge-session-bootstrap-',
+        );
+        addTearDown(() async {
+          if (await storeRoot.exists()) {
+            try {
+              await storeRoot.delete(recursive: true);
+            } on FileSystemException {
+              // Temp cleanup is best effort while Flutter test teardown releases IO.
+            }
+          }
+        });
+
+        final store = SecureConfigStore(
+          secretRootPathResolver: () async => '${storeRoot.path}/secrets',
+          appDataRootPathResolver: () async => '${storeRoot.path}/app-data',
+          supportRootPathResolver: () async => '${storeRoot.path}/support',
+          enableSecureStorage: false,
+        );
+        await store.initialize();
+        final sessionClient = _CapturingGatewayRuntimeSessionClient();
+        final runtime = GatewayRuntime(
+          store: store,
+          identityStore: DeviceIdentityStore(store),
+          sessionClient: sessionClient,
+          runtimeId: 'runtime-session-bootstrap-test',
+        );
+        addTearDown(runtime.dispose);
+        await runtime.initialize();
+
+        await runtime.ensureBridgeSessionConnected(selectedAgentId: 'codex');
+
+        final request = sessionClient.lastConnectRequest;
+        expect(request, isNotNull);
+        expect(request!.mode, RuntimeConnectionMode.remote);
+        expect(request.host, Uri.parse(kManagedBridgeServerUrl).host);
+        expect(request.port, 443);
+        expect(request.tls, isTrue);
+        expect(request.host, isNot(anyOf('127.0.0.1', 'localhost')));
+      },
+    );
   });
+}
+
+class _CapturingGatewayRuntimeSessionClient
+    implements GatewayRuntimeSessionClient {
+  final StreamController<GatewayRuntimeSessionUpdate> _updates =
+      StreamController<GatewayRuntimeSessionUpdate>.broadcast();
+
+  GatewayRuntimeSessionConnectRequest? lastConnectRequest;
+
+  @override
+  Stream<GatewayRuntimeSessionUpdate> get updates => _updates.stream;
+
+  @override
+  Future<GatewayRuntimeSessionConnectResult> connect(
+    GatewayRuntimeSessionConnectRequest request,
+  ) async {
+    lastConnectRequest = request;
+    return GatewayRuntimeSessionConnectResult(
+      snapshot: GatewayConnectionSnapshot.initial(mode: request.mode).copyWith(
+        status: RuntimeConnectionStatus.connected,
+        statusText: 'Connected',
+        remoteAddress: '${request.host}:${request.port}',
+        deviceId: request.identity.deviceId,
+      ),
+      auth: const <String, dynamic>{'role': 'operator'},
+      returnedDeviceToken: '',
+      raw: const <String, dynamic>{},
+    );
+  }
+
+  @override
+  Future<void> disconnect({required String runtimeId}) async {}
+
+  @override
+  Future<dynamic> request({
+    required String runtimeId,
+    required String method,
+    Map<String, dynamic>? params,
+    Duration timeout = const Duration(seconds: 15),
+  }) {
+    throw UnimplementedError('request is not used by this cleanup test');
+  }
+
+  @override
+  Future<void> dispose() => _updates.close();
 }
