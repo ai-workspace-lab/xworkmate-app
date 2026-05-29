@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xworkmate/app/app_controller.dart';
 import 'package:xworkmate/features/assistant/assistant_page_main.dart';
+import 'package:xworkmate/features/assistant/assistant_page_state_actions.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
 import 'package:xworkmate/theme/app_theme.dart';
 
@@ -110,6 +113,58 @@ void main() {
 
     state.syncComposerDraftForActiveSessionInternal('draft-session-b');
     expect(state.inputControllerInternal.text, 'draft prompt B');
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(milliseconds: 100));
+  });
+
+  testWidgets('keeps follow-up submit bound to the running task', (
+    tester,
+  ) async {
+    final controller = AppController(
+      environmentOverride: const <String, String>{},
+    );
+    addTearDown(controller.dispose);
+    final pageKey = GlobalKey<AssistantPageStateInternal>();
+
+    const sessionKey = 'running-task';
+    await controller.sessionsController.switchSession(sessionKey);
+    controller.aiGatewayPendingSessionKeysInternal.add(sessionKey);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(),
+        home: Material(
+          child: SizedBox(
+            width: 1280,
+            height: 760,
+            child: AssistantPage(
+              key: pageKey,
+              controller: controller,
+              showStandaloneTaskRail: false,
+              onOpenDetail: (_) {},
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 100));
+
+    final state = pageKey.currentState!;
+    state.inputControllerInternal.text = 'continue current task';
+
+    unawaited(
+      state.submitPromptInternal().catchError((_) {
+        return null;
+      }),
+    );
+    await tester.pump();
+
+    expect(controller.currentSessionKey, sessionKey);
+    expect(
+      controller.assistantSessions.map((session) => session.key),
+      isNot(contains(startsWith('draft:'))),
+    );
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(milliseconds: 100));
