@@ -20,10 +20,13 @@
 
 ## 5 个提示词
 
+以下提示词按原始 E2E 输入记录，作为长期回归 case 的 canonical prompt。
+
 ### `OPENCLAW-E2E-001` 连续出图
 
 ```text
-从单机权限 → 网络边界 → Web安全 → 云身份 → Zero Trust → AI Agent 身份 → AI模型与知识保护 演进 制作 使用codex 制作连续制作 7张的一些列图片
+从单机权限 → 网络边界 → Web安全 → 云身份 → Zero Trust → AI Agent 身份 → AI模型与知识保护 演进
+制作 使用codex 制作连续制作 7张的一些列图片
 ```
 
 期望结果：
@@ -35,7 +38,9 @@
 ### `OPENCLAW-E2E-002` 模板出图
 
 ```text
-参考附件模版制作 ,围绕 从单机权限 → 网络边界 → Web安全 → 云身份 → Zero Trust → AI Agent 身份 → AI模型与知识保护 演进 连续制作 7张的一些列图片
+参考附件模版制作 ,围绕
+从单机权限 → 网络边界 → Web安全 → 云身份 → Zero Trust → AI Agent 身份 → AI模型与知识保护 演进
+连续制作 7张的一些列图片
 ```
 
 期望结果：
@@ -48,18 +53,23 @@
 
 ```text
 拆章节 -> 每章调用 Codex -> 每章 GPT images2 生成图 -> 汇总排版 -> 输出 PDF
+
+右侧 artifact栏 显示的陈旧文件
 ```
 
 期望结果：
 
 - 每章图片素材和最终 PDF 归属当前 task scope。
 - PDF 或相关素材出现在当前任务 artifact 区。
+- 回归缺陷点：右侧 artifact 栏不能显示其他 run 或历史 workspace 的陈旧文件。
 - 如果 OpenClaw 没有实际导出文件，App 显示 no exported artifacts，而不是旧文件。
 
 ### `OPENCLAW-E2E-004` 视频
 
 ```text
-围绕 从单机权限 → 网络边界 → Web安全 → 云身份 → Zero Trust → AI Agent 身份 → AI模型与知识保护 演进 右侧是当下 测试制作视频
+围绕
+从单机权限 → 网络边界 → Web安全 → 云身份 → Zero Trust → AI Agent 身份 → AI模型与知识保护 演进 右侧是当下
+测试制作视频
 ```
 
 期望结果：
@@ -71,7 +81,11 @@
 ### `OPENCLAW-E2E-005` 视频流水线
 
 ```text
-从单机权限 → 网络边界 → Web安全 → 云身份 → Zero Trust → AI Agent 身份 → AI模型与知识保护 演进 拆章节 -> 每章调用 Codex -> 每章 GPT images2 生成图 -> 汇总排版 -> 制作视频
+围绕
+
+从单机权限 → 网络边界 → Web安全 → 云身份 → Zero Trust → AI Agent 身份 → AI模型与知识保护 演进
+
+拆章节 -> 每章调用 Codex -> 每章 GPT images2 生成图 -> 汇总排版 -> 制作视频
 ```
 
 期望结果：
@@ -124,4 +138,3 @@ flutter test test/runtime/gateway_acp_client_auth_test.dart
 flutter test test/runtime/desktop_thread_artifact_service_test.dart
 flutter test
 ```
-
