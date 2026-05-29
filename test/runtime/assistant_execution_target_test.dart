@@ -2263,9 +2263,10 @@ void main() {
         );
         expect(taskBSnapshot.fileEntries, isEmpty);
         expect(
-          taskBSnapshot.filesMessage,
-          'No files found in the recorded working directory.',
+          taskBSnapshot.resultMessage,
+          'No task artifacts recorded for this run.',
         );
+        expect(taskBSnapshot.filesMessage, isEmpty);
       },
     );
 
@@ -2404,9 +2405,10 @@ void main() {
           sessionKey: 'terminal-failure-task',
         );
         expect(snapshot.resultEntries, isEmpty);
+        expect(snapshot.fileEntries, isEmpty);
         expect(
-          snapshot.fileEntries.map((entry) => entry.relativePath),
-          contains('first.md'),
+          snapshot.resultMessage,
+          'No task artifacts recorded for this run.',
         );
       },
     );
@@ -2706,6 +2708,57 @@ void main() {
               .length,
           1,
         );
+      },
+    );
+
+    test(
+      'OpenClaw gateway admits five representative E2E tasks without queueing',
+      () async {
+        final fakeGoTaskService = _BlockingGoTaskServiceClient();
+        final controller = _connectedGatewayController(fakeGoTaskService);
+        addTearDown(() {
+          fakeGoTaskService.completeAll();
+          controller.dispose();
+        });
+
+        const prompts = <String>[
+          '从单机权限 → 网络边界 → Web安全 → 云身份 → Zero Trust → AI Agent 身份 → AI模型与知识保护 演进 制作 使用codex 制作连续制作 7张的一些列图片',
+          '参考附件模版制作 ,围绕 从单机权限 → 网络边界 → Web安全 → 云身份 → Zero Trust → AI Agent 身份 → AI模型与知识保护 演进 连续制作 7张的一些列图片',
+          '拆章节 -> 每章调用 Codex -> 每章 GPT images2 生成图 -> 汇总排版 -> 输出 PDF',
+          '围绕 从单机权限 → 网络边界 → Web安全 → 云身份 → Zero Trust → AI Agent 身份 → AI模型与知识保护 演进 右侧是当下 测试制作视频',
+          '从单机权限 → 网络边界 → Web安全 → 云身份 → Zero Trust → AI Agent 身份 → AI模型与知识保护 演进 拆章节 -> 每章调用 Codex -> 每章 GPT images2 生成图 -> 汇总排版 -> 制作视频',
+        ];
+
+        for (var index = 0; index < prompts.length; index += 1) {
+          final sessionKey = 'openclaw-e2e-$index';
+          await _selectGatewaySession(controller, sessionKey);
+          await expectLater(
+            controller
+                .sendChatMessage(prompts[index])
+                .timeout(const Duration(seconds: 2)),
+            completes,
+          );
+        }
+
+        await fakeGoTaskService.waitForRequestCount(prompts.length);
+        expect(fakeGoTaskService.requests, hasLength(prompts.length));
+        expect(controller.openClawGatewayActiveTasksInternal, prompts.length);
+        expect(controller.openClawGatewayQueuedTurnsInternal, isEmpty);
+        for (var index = 0; index < prompts.length; index += 1) {
+          final sessionKey = 'openclaw-e2e-$index';
+          expect(
+            controller
+                .requireTaskThreadForSessionInternal(sessionKey)
+                .lifecycleState
+                .status,
+            'running',
+          );
+          expect(fakeGoTaskService.requests[index].sessionId, sessionKey);
+          expect(
+            fakeGoTaskService.requests[index].prompt,
+            contains(prompts[index]),
+          );
+        }
       },
     );
 

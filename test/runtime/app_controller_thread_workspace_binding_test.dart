@@ -1310,10 +1310,8 @@ void main() {
       sessionKey: 'unit-fixture-task-a',
     );
     expect(snapshot.resultEntries, isEmpty);
-    expect(
-      snapshot.fileEntries.map((entry) => entry.relativePath),
-      contains('old-task-report.md'),
-    );
+    expect(snapshot.fileEntries, isEmpty);
+    expect(snapshot.resultMessage, 'No task artifacts recorded for this run.');
   });
 
   test('skips download URL artifacts outside the bridge host', () async {
