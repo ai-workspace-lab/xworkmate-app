@@ -1144,6 +1144,86 @@ void main() {
     });
 
     test(
+      'sendChatMessage classifies complex artifact chains for Gateway',
+      () async {
+        final fakeGoTaskService = _RecordingGoTaskServiceClient();
+        final controller = _connectedGatewayController(fakeGoTaskService);
+        addTearDown(controller.dispose);
+
+        await controller.ensureActiveAssistantThreadInternal();
+        await controller.setAssistantExecutionTarget(
+          AssistantExecutionTarget.gateway,
+        );
+        await controller.sendChatMessage(
+          '围绕\n\n'
+          '从单机权限 → 网络边界 → Web安全 → 云身份 → Zero Trust → AI Agent 身份 → AI模型与知识保护 演进\n\n'
+          '拆章节 -> 每章调用 Codex -> 每章 GPT images2 生成图 -> 汇总排版 -> 制作视频',
+        );
+
+        expect(fakeGoTaskService.requests, hasLength(1));
+        final request = fakeGoTaskService.requests.single;
+        expect(request.metadata['taskLoadClass'], 'complex_long_chain_task');
+        expect(request.prompt, contains('Task load classification:'));
+        expect(request.prompt, contains('- class: complex_long_chain_task'));
+        expect(
+          request.prompt,
+          contains(
+            'Gateway owns execution decomposition, scheduling, retries, and resumability for this class.',
+          ),
+        );
+        expect(
+          request.prompt,
+          isNot(contains('First write the chapter breakdown')),
+        );
+        expect(
+          request.prompt,
+          isNot(contains('Run heavyweight stages in order')),
+        );
+        expect(
+          request.prompt,
+          contains('User request:\n围绕\n\n从单机权限 → 网络边界 → Web安全'),
+        );
+      },
+    );
+
+    test(
+      'sendChatMessage classifies simple Gateway prompts as short tasks',
+      () async {
+        final fakeGoTaskService = _RecordingGoTaskServiceClient();
+        final controller = _connectedGatewayController(fakeGoTaskService);
+        addTearDown(controller.dispose);
+
+        await controller.ensureActiveAssistantThreadInternal();
+        await controller.setAssistantExecutionTarget(
+          AssistantExecutionTarget.gateway,
+        );
+        await controller.sendChatMessage('写一段普通说明');
+
+        expect(fakeGoTaskService.requests, hasLength(1));
+        final request = fakeGoTaskService.requests.single;
+        expect(request.metadata['taskLoadClass'], 'short_task');
+        expect(request.prompt, contains('- class: short_task'));
+      },
+    );
+
+    test('sendChatMessage classifies artifact output as a long task', () async {
+      final fakeGoTaskService = _RecordingGoTaskServiceClient();
+      final controller = _connectedGatewayController(fakeGoTaskService);
+      addTearDown(controller.dispose);
+
+      await controller.ensureActiveAssistantThreadInternal();
+      await controller.setAssistantExecutionTarget(
+        AssistantExecutionTarget.gateway,
+      );
+      await controller.sendChatMessage('生成 Markdown 和 PNG 产物');
+
+      expect(fakeGoTaskService.requests, hasLength(1));
+      final request = fakeGoTaskService.requests.single;
+      expect(request.metadata['taskLoadClass'], 'long_task');
+      expect(request.prompt, contains('- class: long_task'));
+    });
+
+    test(
       'sendChatMessage runs Gateway task with remote workspace when local workspace is unavailable',
       () async {
         final fakeGoTaskService = _RecordingGoTaskServiceClient();
