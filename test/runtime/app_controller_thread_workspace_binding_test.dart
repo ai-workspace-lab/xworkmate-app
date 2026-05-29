@@ -589,6 +589,88 @@ void main() {
     },
   );
 
+  test('syncs existing workspace directory artifacts recursively', () async {
+    final controller = AppController(
+      environmentOverride: const <String, String>{},
+    );
+    addTearDown(controller.dispose);
+
+    final localWorkspace = await Directory.systemTemp.createTemp(
+      'xworkmate-recursive-artifact-workspace-',
+    );
+    addTearDown(() async {
+      if (await localWorkspace.exists()) {
+        await localWorkspace.delete(recursive: true);
+      }
+    });
+    await Directory(
+      '${localWorkspace.path}/assets/images/chapters',
+    ).create(recursive: true);
+    await File(
+      '${localWorkspace.path}/assets/images/cover.png',
+    ).writeAsBytes(<int>[1, 2, 3]);
+    await File(
+      '${localWorkspace.path}/assets/images/chapters/chapter-1.png',
+    ).writeAsBytes(<int>[4, 5, 6]);
+    await File(
+      '${localWorkspace.path}/chapters/codex-chapter-breakdown.md',
+    ).create(recursive: true);
+
+    controller.upsertTaskThreadInternal(
+      'unit-fixture-task-a',
+      workspaceBinding: WorkspaceBinding(
+        workspaceId: 'unit-fixture-task-a',
+        workspaceKind: WorkspaceKind.localFs,
+        workspacePath: localWorkspace.path,
+        displayPath: localWorkspace.path,
+        writable: true,
+      ),
+    );
+
+    final result = GoTaskServiceResult(
+      success: true,
+      message: 'generated files',
+      turnId: 'turn-recursive',
+      raw: <String, dynamic>{
+        'artifacts': <Map<String, dynamic>>[
+          <String, dynamic>{'relativePath': 'assets/images/'},
+          <String, dynamic>{
+            'relativePath': 'chapters/codex-chapter-breakdown.md',
+          },
+        ],
+      },
+      errorMessage: '',
+      resolvedModel: '',
+      route: GoTaskServiceRoute.externalAcpSingle,
+    );
+
+    await controller.persistGoTaskArtifactsForSessionInternal(
+      'unit-fixture-task-a',
+      result,
+    );
+
+    final thread = controller.requireTaskThreadForSessionInternal(
+      'unit-fixture-task-a',
+    );
+    expect(thread.lastArtifactSyncStatus, 'synced');
+    expect(thread.lastTaskArtifactRelativePaths, <String>[
+      'assets/images/chapters/chapter-1.png',
+      'assets/images/cover.png',
+      'chapters/codex-chapter-breakdown.md',
+    ]);
+    final snapshot = await controller.loadAssistantArtifactSnapshot(
+      sessionKey: 'unit-fixture-task-a',
+    );
+    expect(
+      snapshot.resultEntries.map((entry) => entry.relativePath),
+      containsAll(<String>[
+        'assets/images/chapters/chapter-1.png',
+        'assets/images/cover.png',
+        'chapters/codex-chapter-breakdown.md',
+      ]),
+    );
+  });
+
   test(
     'downloads bridge URL artifacts into the local thread workspace',
     () async {
