@@ -129,10 +129,10 @@ extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
           autoAgent?.name ?? conversationOwnerLabelInternal(controller);
       attachmentsInternal = const <ComposerAttachmentInternal>[];
       touchTaskSeedInternal(
-        sessionKey: controller.currentSessionKey,
+        sessionKey: submittedSessionKey,
         title:
-            taskSeedsInternal[controller.currentSessionKey]?.title ??
-            fallbackSessionTitleInternal(controller.currentSessionKey),
+            taskSeedsInternal[submittedSessionKey]?.title ??
+            fallbackSessionTitleInternal(submittedSessionKey),
         preview: rawPrompt,
         status: controller.hasAssistantPendingRun || connectionState.connected
             ? 'running'
@@ -140,7 +140,7 @@ extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
         owner: autoAgent?.name ?? conversationOwnerLabelInternal(controller),
         surface: 'Assistant',
         executionTarget: executionTarget,
-        draft: controller.currentSessionKey.trim().startsWith('draft:'),
+        draft: submittedSessionKey.trim().startsWith('draft:'),
       );
     });
     inputControllerInternal.clear();
@@ -148,6 +148,7 @@ extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
     try {
       await controller.sendChatMessage(
         prompt,
+        sessionKey: submittedSessionKey,
         thinking: thinkingLabelInternal,
         attachments: attachmentPayloads,
         localAttachments: submittedAttachments
@@ -166,7 +167,12 @@ extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
       if (!mounted) {
         rethrow;
       }
-      if (inputControllerInternal.text.trim().isEmpty) {
+      if (!sessionKeysMatchInternal(
+        widget.controller.currentSessionKey,
+        submittedSessionKey,
+      )) {
+        composerDraftBySessionKeyInternal[submittedSessionKey] = rawPrompt;
+      } else if (inputControllerInternal.text.trim().isEmpty) {
         inputControllerInternal.value = TextEditingValue(
           text: rawPrompt,
           selection: TextSelection.collapsed(offset: rawPrompt.length),
