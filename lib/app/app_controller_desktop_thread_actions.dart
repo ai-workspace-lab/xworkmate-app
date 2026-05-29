@@ -232,6 +232,7 @@ extension AppControllerDesktopThreadActions on AppController {
 
   Future<void> sendChatMessage(
     String message, {
+    String? sessionKey,
     String thinking = 'off',
     List<GatewayChatAttachmentPayload> attachments =
         const <GatewayChatAttachmentPayload>[],
@@ -239,20 +240,28 @@ extension AppControllerDesktopThreadActions on AppController {
         const <CollaborationAttachment>[],
     List<String> selectedSkillLabels = const <String>[],
   }) async {
-    var sessionKey = normalizedAssistantSessionKeyInternal(
-      sessionsControllerInternal.currentSessionKey,
+    var targetSessionKey = normalizedAssistantSessionKeyInternal(
+      sessionKey ?? sessionsControllerInternal.currentSessionKey,
     );
-    if (!isAppOwnedAssistantSessionKeyInternal(sessionKey)) {
+    if (!isAppOwnedAssistantSessionKeyInternal(targetSessionKey)) {
+      if (sessionKey != null && sessionKey.trim().isNotEmpty) {
+        throw StateError(
+          appText(
+            '提交目标会话无效，请重新选择任务后提交。',
+            'The submit target session is invalid. Select the task again before submitting.',
+          ),
+        );
+      }
       await ensureActiveAssistantThreadInternal();
-      sessionKey = normalizedAssistantSessionKeyInternal(
+      targetSessionKey = normalizedAssistantSessionKeyInternal(
         sessionsControllerInternal.currentSessionKey,
       );
     }
     final resumeSessionHint = shouldResumeGatewaySessionForNextSendInternal(
-      sessionKey,
+      targetSessionKey,
     );
     await dispatchGatewayChatTurnInternal(
-      sessionKey: sessionKey,
+      sessionKey: targetSessionKey,
       message: message,
       thinking: thinking,
       attachments: attachments,
