@@ -1812,6 +1812,54 @@ void main() {
       );
     });
 
+    test('sendChatMessage can pin submit to the captured session', () async {
+      final fakeGoTaskService = _BlockingGoTaskServiceClient();
+      final controller = _connectedController(fakeGoTaskService);
+      addTearDown(controller.dispose);
+
+      await controller.switchSession('same-prompt-old-task');
+      await controller.switchSession('same-prompt-new-task');
+      final taskFuture = controller.sendChatMessage(
+        '连续制作7张图片',
+        sessionKey: 'same-prompt-new-task',
+      );
+      await fakeGoTaskService.waitForRequestCount(1);
+
+      final request = fakeGoTaskService.requests.single;
+      expect(request.sessionId, 'same-prompt-new-task');
+      expect(request.threadId, 'same-prompt-new-task');
+      expect(request.workingDirectory, endsWith('/same-prompt-new-task'));
+      expect(
+        request.remoteWorkingDirectoryHint,
+        endsWith('/threads/same-prompt-new-task'),
+      );
+
+      fakeGoTaskService.complete(
+        'same-prompt-new-task',
+        const GoTaskServiceResult(
+          success: true,
+          message: 'new task result',
+          turnId: 'turn-new',
+          raw: <String, dynamic>{},
+          errorMessage: '',
+          resolvedModel: '',
+          route: GoTaskServiceRoute.externalAcpSingle,
+        ),
+      );
+      await taskFuture;
+
+      expect(
+        controller.localSessionMessagesInternal['same-prompt-new-task']!.map(
+          (message) => message.text,
+        ),
+        contains('new task result'),
+      );
+      expect(
+        controller.localSessionMessagesInternal['same-prompt-old-task'],
+        isNot(contains('new task result')),
+      );
+    });
+
     test(
       'sendChatMessage queues follow-up turns on the same session',
       () async {
