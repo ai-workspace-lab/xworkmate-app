@@ -792,7 +792,17 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
       }
       final bytes = bytesResult.bytes;
       if (bytes == null) {
-        skippedArtifact = true;
+        final existingArtifactPaths =
+            await _existingWorkspaceArtifactPathsInternal(root, relativePath);
+        if (existingArtifactPaths.isEmpty) {
+          skippedArtifact = true;
+          continue;
+        }
+        wroteArtifact = true;
+        _appendArtifactRelativePathsInternal(
+          currentTaskArtifactRelativePaths,
+          existingArtifactPaths,
+        );
         continue;
       }
       final target = await _nextArtifactTargetFileInternal(root, relativePath);
@@ -813,7 +823,10 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
             target.path,
           );
       if (writtenRelativePath != null && writtenRelativePath.isNotEmpty) {
-        currentTaskArtifactRelativePaths.add(writtenRelativePath);
+        _appendArtifactRelativePathsInternal(
+          currentTaskArtifactRelativePaths,
+          <String>[writtenRelativePath],
+        );
       }
     }
 
@@ -1143,6 +1156,57 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
   int gatewayProfileIndexForExecutionTargetInternal(
     AssistantExecutionTarget target,
   ) => kGatewayRemoteProfileIndex;
+}
+
+void _appendArtifactRelativePathsInternal(
+  List<String> target,
+  List<String> paths,
+) {
+  for (final path in paths) {
+    if (!target.contains(path)) {
+      target.add(path);
+    }
+  }
+}
+
+Future<List<String>> _existingWorkspaceArtifactPathsInternal(
+  Directory root,
+  String relativePath,
+) async {
+  final targetPath = DesktopThreadArtifactService.resolveAbsolutePathInternal(
+    root.path,
+    relativePath,
+  );
+  final targetType = await FileSystemEntity.type(
+    targetPath,
+    followLinks: false,
+  );
+  if (targetType == FileSystemEntityType.file) {
+    final resolvedRelativePath =
+        DesktopThreadArtifactService.relativePathInternal(
+          root.path,
+          targetPath,
+        );
+    return resolvedRelativePath == null || resolvedRelativePath.isEmpty
+        ? const <String>[]
+        : <String>[resolvedRelativePath];
+  }
+  if (targetType != FileSystemEntityType.directory) {
+    return const <String>[];
+  }
+  final files = await DesktopThreadArtifactService().collectFilesInternal(
+    Directory(targetPath),
+  );
+  final paths = <String>[];
+  for (final file in files) {
+    final resolvedRelativePath =
+        DesktopThreadArtifactService.relativePathInternal(root.path, file.path);
+    if (resolvedRelativePath != null && resolvedRelativePath.isNotEmpty) {
+      paths.add(resolvedRelativePath);
+    }
+  }
+  paths.sort();
+  return paths;
 }
 
 String _normalizeAuthorizationHeaderInternal(String raw) {
