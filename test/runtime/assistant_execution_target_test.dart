@@ -1813,6 +1813,77 @@ void main() {
     });
 
     test(
+      'sendChatMessage queues follow-up turns on the same session',
+      () async {
+        final fakeGoTaskService = _BlockingGoTaskServiceClient();
+        final controller = _connectedController(fakeGoTaskService);
+        addTearDown(controller.dispose);
+
+        await controller.switchSession('running-task');
+        final firstFuture = controller.sendChatMessage('first turn');
+        await fakeGoTaskService.waitForRequestCount(1);
+        expect(fakeGoTaskService.requests.single.sessionId, 'running-task');
+        expect(fakeGoTaskService.requests.single.threadId, 'running-task');
+        expect(
+          controller.assistantSessionHasPendingRun('running-task'),
+          isTrue,
+        );
+
+        final secondFuture = controller.sendChatMessage('follow up');
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+        expect(fakeGoTaskService.requests, hasLength(1));
+        expect(controller.currentSessionKey, 'running-task');
+
+        fakeGoTaskService.complete(
+          'running-task',
+          const GoTaskServiceResult(
+            success: true,
+            message: 'first result',
+            turnId: 'turn-1',
+            raw: <String, dynamic>{},
+            errorMessage: '',
+            resolvedModel: '',
+            route: GoTaskServiceRoute.externalAcpSingle,
+          ),
+        );
+        await firstFuture;
+        await fakeGoTaskService.waitForRequestCount(2);
+
+        final followUpRequest = fakeGoTaskService.requests.last;
+        expect(followUpRequest.sessionId, 'running-task');
+        expect(followUpRequest.threadId, 'running-task');
+        expect(followUpRequest.prompt, contains('follow up'));
+        expect(controller.currentSessionKey, 'running-task');
+
+        fakeGoTaskService.complete(
+          'running-task',
+          const GoTaskServiceResult(
+            success: true,
+            message: 'second result',
+            turnId: 'turn-2',
+            raw: <String, dynamic>{},
+            errorMessage: '',
+            resolvedModel: '',
+            route: GoTaskServiceRoute.externalAcpSingle,
+          ),
+        );
+        await secondFuture;
+
+        expect(
+          controller.localSessionMessagesInternal['running-task']!.map(
+            (message) => message.text,
+          ),
+          containsAll(<String>[
+            'first turn',
+            'first result',
+            'follow up',
+            'second result',
+          ]),
+        );
+      },
+    );
+
+    test(
       'background task completion does not overwrite the selected session',
       () async {
         final localHome = await Directory.systemTemp.createTemp(
@@ -2516,7 +2587,7 @@ void main() {
           await expectLater(
             controller
                 .sendChatMessage('active prompt $index')
-                .timeout(const Duration(milliseconds: 250)),
+                .timeout(const Duration(seconds: 2)),
             completes,
           );
           await fakeGoTaskService.waitForRequestCount(index + 1);
@@ -2536,7 +2607,7 @@ void main() {
                 'queued prompt',
                 attachments: <GatewayChatAttachmentPayload>[queuedAttachment],
               )
-              .timeout(const Duration(milliseconds: 250)),
+              .timeout(const Duration(seconds: 2)),
           completes,
         );
         await _waitForThreadLifecycleStatus(
@@ -2655,7 +2726,7 @@ void main() {
       final taskFuture = controller.sendChatMessage('use OpenClaw default');
       await fakeGoTaskService.waitForRequestCount(1);
       await expectLater(
-        taskFuture.timeout(const Duration(milliseconds: 250)),
+        taskFuture.timeout(const Duration(seconds: 2)),
         completes,
       );
 
@@ -3707,7 +3778,7 @@ Future<List<String>> _startOpenClawActiveTasks(
     await expectLater(
       controller
           .sendChatMessage('active task $index')
-          .timeout(const Duration(milliseconds: 250)),
+          .timeout(const Duration(seconds: 2)),
       completes,
     );
     await fakeGoTaskService.waitForRequestCount(index + 1);

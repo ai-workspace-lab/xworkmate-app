@@ -85,11 +85,6 @@ extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
     if (rawPrompt.isEmpty) {
       return;
     }
-    if (controller.assistantSessionHasPendingRun(
-      controller.currentSessionKey,
-    )) {
-      await createNewThreadInternal();
-    }
     final submittedSessionKey = controller.currentSessionKey;
 
     final autoAgent = pickAutoAgentInternal(controller, rawPrompt);
