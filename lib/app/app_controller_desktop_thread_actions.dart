@@ -451,6 +451,11 @@ extension AppControllerDesktopThreadActions on AppController {
     final capturedLocalAttachments = List<CollaborationAttachment>.unmodifiable(
       localAttachments,
     );
+    final taskLoadClass = classifyGatewayTaskLoadInternal(message);
+    final taskMetadata = Map<String, dynamic>.unmodifiable(<String, dynamic>{
+      ...dispatch.metadata,
+      'taskLoadClass': taskLoadClass,
+    });
     final executionWorkingDirectory = gatewayExecutionWorkingDirectoryInternal(
       target: currentTarget,
       workingDirectory: workingDirectory,
@@ -475,7 +480,7 @@ extension AppControllerDesktopThreadActions on AppController {
           model: model,
           routing: routing,
           agentId: dispatch.agentId ?? '',
-          metadata: Map<String, dynamic>.unmodifiable(dispatch.metadata),
+          metadata: taskMetadata,
           resumeSessionHint: resumeSessionHint,
           appendUserTurn: appendUserTurn,
         ),
@@ -500,7 +505,7 @@ extension AppControllerDesktopThreadActions on AppController {
         model: model,
         routing: routing,
         agentId: dispatch.agentId ?? '',
-        metadata: Map<String, dynamic>.unmodifiable(dispatch.metadata),
+        metadata: taskMetadata,
         resumeSessionHint: resumeSessionHint,
         appendUserTurn: appendUserTurn,
       ),
@@ -672,9 +677,82 @@ extension AppControllerDesktopThreadActions on AppController {
         '6. The app syncs final artifacts from currentTaskWorkspace back into localWorkspace.',
       )
       ..writeln()
+      ..writeln('Task load classification:')
+      ..writeln('- class: ${classifyGatewayTaskLoadInternal(requestText)}')
+      ..writeln(
+        '- Gateway owns execution decomposition, scheduling, retries, and resumability for this class.',
+      )
+      ..writeln()
+      ..writeln(
+        'Available classes: short_task, long_task, complex_long_chain_task.',
+      )
+      ..writeln();
+    buffer
       ..writeln('User request:')
       ..write(requestText);
     return buffer.toString();
+  }
+
+  String classifyGatewayTaskLoadInternal(String requestText) {
+    final normalized = requestText.trim().toLowerCase();
+    if (normalized.isEmpty) {
+      return 'short_task';
+    }
+    final hasChapterSplit =
+        normalized.contains('拆章节') ||
+        normalized.contains('chapter') ||
+        normalized.contains('章节');
+    final hasAgentStage =
+        normalized.contains('codex') ||
+        normalized.contains('agent') ||
+        normalized.contains('调用');
+    final hasImageStage =
+        normalized.contains('gpt images') ||
+        normalized.contains('images2') ||
+        normalized.contains('生成图') ||
+        normalized.contains('图片');
+    final hasPackagingStage =
+        normalized.contains('汇总排版') ||
+        normalized.contains('排版') ||
+        normalized.contains('制作视频') ||
+        normalized.contains('视频') ||
+        normalized.contains('mp4');
+    final hasChainArrows =
+        normalized.contains('->') || normalized.contains('→');
+    if (hasChapterSplit &&
+        hasAgentStage &&
+        hasImageStage &&
+        hasPackagingStage &&
+        hasChainArrows) {
+      return 'complex_long_chain_task';
+    }
+    const longTaskMarkers = <String>[
+      '生成文件',
+      '产物',
+      '附件',
+      '图片提示词',
+      '完整调研ppt',
+      'markdown格式',
+      '输出markdown',
+      'ppt',
+      'pptx',
+      'powerpoint',
+      'word',
+      'docx',
+      'png',
+      'mp4',
+      'jpg',
+      'markdown',
+      '.md',
+      'image prompt',
+      'artifacts',
+      'downloadurl',
+    ];
+    if (requestText.length >= 1200 ||
+        longTaskMarkers.any(normalized.contains)) {
+      return 'long_task';
+    }
+    return 'short_task';
   }
 
   bool usesOpenClawGatewayQueueInternal(
