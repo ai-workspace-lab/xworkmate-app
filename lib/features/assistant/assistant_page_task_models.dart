@@ -43,6 +43,7 @@ enum TimelineItemKindInternal { user, assistant, agent, toolCall }
 
 class TimelineItemInternal {
   const TimelineItemInternal._({
+    required this.key,
     required this.kind,
     this.label,
     this.text,
@@ -52,12 +53,14 @@ class TimelineItemInternal {
   });
 
   const TimelineItemInternal.message({
+    required String key,
     required TimelineItemKindInternal kind,
     required String label,
     required String text,
     required bool pending,
     required bool error,
   }) : this._(
+         key: key,
          kind: kind,
          label: label,
          text: text,
@@ -66,11 +69,13 @@ class TimelineItemInternal {
        );
 
   const TimelineItemInternal.toolCall({
+    required String key,
     required String toolName,
     required String summary,
     required bool pending,
     required bool error,
   }) : this._(
+         key: key,
          kind: TimelineItemKindInternal.toolCall,
          title: toolName,
          text: summary,
@@ -78,6 +83,7 @@ class TimelineItemInternal {
          error: error,
        );
 
+  final String key;
   final TimelineItemKindInternal kind;
   final String? label;
   final String? text;
