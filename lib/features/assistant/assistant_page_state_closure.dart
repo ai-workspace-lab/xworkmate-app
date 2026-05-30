@@ -465,6 +465,7 @@ extension AssistantPageStateClosureInternal on AssistantPageStateInternal {
       if ((message.toolName ?? '').trim().isNotEmpty) {
         items.add(
           TimelineItemInternal.toolCall(
+            key: timelineItemKeyInternal(message),
             toolName: message.toolName!,
             summary: message.text,
             pending: message.pending,
@@ -478,6 +479,7 @@ extension AssistantPageStateClosureInternal on AssistantPageStateInternal {
       if (role == 'user') {
         items.add(
           TimelineItemInternal.message(
+            key: timelineItemKeyInternal(message),
             kind: TimelineItemKindInternal.user,
             label: appText('你', 'You'),
             text: message.text,
@@ -488,6 +490,7 @@ extension AssistantPageStateClosureInternal on AssistantPageStateInternal {
       } else if (role == 'assistant') {
         items.add(
           TimelineItemInternal.message(
+            key: timelineItemKeyInternal(message),
             kind: TimelineItemKindInternal.assistant,
             label: kProductBrandName,
             text: message.text,
@@ -498,6 +501,7 @@ extension AssistantPageStateClosureInternal on AssistantPageStateInternal {
       } else {
         items.add(
           TimelineItemInternal.message(
+            key: timelineItemKeyInternal(message),
             kind: TimelineItemKindInternal.agent,
             label: lastAutoAgentLabelInternal ?? ownerLabel,
             text: message.text,
@@ -509,5 +513,13 @@ extension AssistantPageStateClosureInternal on AssistantPageStateInternal {
     }
 
     return items;
+  }
+
+  String timelineItemKeyInternal(GatewayChatMessage message) {
+    final id = message.id.trim();
+    if (id.isNotEmpty) {
+      return id;
+    }
+    return '${message.role}:${message.timestampMs}:${message.text.hashCode}';
   }
 }

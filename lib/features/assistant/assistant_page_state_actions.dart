@@ -491,29 +491,22 @@ extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
             .map((item) => item.sessionKey),
       );
     synchronizeTaskSeedsInternal(controller);
-    final entries =
-        taskSeedsInternal.values
-            .where((item) => !isArchivedTaskInternal(item.sessionKey))
-            .map((item) {
-              final isCurrent = sessionKeysMatchInternal(
-                item.sessionKey,
-                controller.currentSessionKey,
-              );
-              final entry = item.toEntry(isCurrent: isCurrent);
-              if (!isCurrent) {
-                return entry;
-              }
-              return entry.copyWith(
-                owner: conversationOwnerLabelInternal(controller),
-              );
-            })
-            .toList(growable: true)
-          ..sort((left, right) {
-            if (left.isCurrent != right.isCurrent) {
-              return left.isCurrent ? -1 : 1;
-            }
-            return (right.updatedAtMs ?? 0).compareTo(left.updatedAtMs ?? 0);
-          });
+    final entries = taskSeedsInternal.values
+        .where((item) => !isArchivedTaskInternal(item.sessionKey))
+        .map((item) {
+          final isCurrent = sessionKeysMatchInternal(
+            item.sessionKey,
+            controller.currentSessionKey,
+          );
+          final entry = item.toEntry(isCurrent: isCurrent);
+          if (!isCurrent) {
+            return entry;
+          }
+          return entry.copyWith(
+            owner: conversationOwnerLabelInternal(controller),
+          );
+        })
+        .toList(growable: false);
     return entries;
   }
 
@@ -547,7 +540,12 @@ extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
       title: resolvedTaskTitleInternal(widget.controller, sessionKey),
       preview: '',
       status: 'queued',
-      updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+      updatedAtMs:
+          taskSeedsInternal[sessionKey]?.updatedAtMs ??
+          widget.controller
+              .taskThreadForSessionInternal(sessionKey)
+              ?.updatedAtMs ??
+          DateTime.now().millisecondsSinceEpoch.toDouble(),
       owner: conversationOwnerLabelInternal(widget.controller),
       surface: 'Assistant',
       executionTarget: resolvedVisibleExecutionTargetInternal(
@@ -597,6 +595,10 @@ extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
     }
 
     final currentSeed = taskSeedsInternal[controller.currentSessionKey];
+    final currentSession = sessionByKeyInternal(
+      controller,
+      controller.currentSessionKey,
+    );
     final currentPreview = currentTaskPreviewInternal(controller.chatMessages);
     final currentStatus = currentTaskStatusInternal(
       controller.chatMessages,
@@ -621,7 +623,10 @@ extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
             'Waiting for the first message of this task',
           ),
       status: currentStatus ?? currentSeed?.status ?? 'queued',
-      updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+      updatedAtMs:
+          currentSession?.updatedAtMs ??
+          currentSeed?.updatedAtMs ??
+          DateTime.now().millisecondsSinceEpoch.toDouble(),
       owner: conversationOwnerLabelInternal(controller),
       surface: currentSeed?.surface ?? 'Assistant',
       executionTarget: controller.assistantExecutionTargetForSession(

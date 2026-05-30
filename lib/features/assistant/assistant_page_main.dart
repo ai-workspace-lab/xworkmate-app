@@ -179,7 +179,7 @@ class AssistantPageStateInternal extends State<AssistantPage> {
         );
         final scrollSignature = messages.isEmpty
             ? controller.currentSessionKey
-            : '${controller.currentSessionKey}:${messages.length}:${messages.last.id}:${messages.last.pending}:${messages.last.error}';
+            : '${controller.currentSessionKey}:${messages.length}:${messages.last.id}';
 
         if (scrollSignature != lastConversationScrollSignatureInternal) {
           lastConversationScrollSignatureInternal = scrollSignature;
@@ -751,59 +751,66 @@ class ConversationAreaInternal extends StatelessWidget {
                     separatorBuilder: (_, _) => const SizedBox(height: 6),
                     itemBuilder: (context, index) {
                       final item = items[index];
-                      return switch (item.kind) {
-                        TimelineItemKindInternal.user => MessageBubbleInternal(
-                          label: item.label!,
-                          text: item.text!,
-                          alignRight: true,
-                          tone: BubbleToneInternal.user,
-                          messageViewMode: messageViewMode,
+                      return KeyedSubtree(
+                        key: ValueKey<String>(
+                          'assistant-timeline-item-${item.key}',
                         ),
-                        TimelineItemKindInternal.assistant =>
-                          MessageBubbleInternal(
-                            label: item.label!,
-                            text: item.text!,
-                            alignRight: false,
-                            tone: BubbleToneInternal.assistant,
-                            messageViewMode: messageViewMode,
-                          ),
-                        TimelineItemKindInternal.agent => MessageBubbleInternal(
-                          label: item.label!,
-                          text: item.text!,
-                          alignRight: false,
-                          tone: BubbleToneInternal.agent,
-                          messageViewMode: messageViewMode,
-                        ),
-                        TimelineItemKindInternal.toolCall =>
-                          ToolCallTileInternal(
-                            toolName: item.title!,
-                            summary: item.text!,
-                            pending: item.pending,
-                            error: item.error,
-                            onOpenDetail: () => onOpenDetail(
-                              DetailPanelData(
-                                title: item.title!,
-                                subtitle: appText('工具调用', 'Tool Call'),
-                                icon: Icons.build_circle_outlined,
-                                status: StatusInfo(
-                                  item.pending
-                                      ? appText('运行中', 'Running')
-                                      : appText('已完成', 'Completed'),
-                                  item.error
-                                      ? StatusTone.danger
-                                      : StatusTone.accent,
+                        child: switch (item.kind) {
+                          TimelineItemKindInternal.user =>
+                            MessageBubbleInternal(
+                              label: item.label!,
+                              text: item.text!,
+                              alignRight: true,
+                              tone: BubbleToneInternal.user,
+                              messageViewMode: messageViewMode,
+                            ),
+                          TimelineItemKindInternal.assistant =>
+                            MessageBubbleInternal(
+                              label: item.label!,
+                              text: item.text!,
+                              alignRight: false,
+                              tone: BubbleToneInternal.assistant,
+                              messageViewMode: messageViewMode,
+                            ),
+                          TimelineItemKindInternal.agent =>
+                            MessageBubbleInternal(
+                              label: item.label!,
+                              text: item.text!,
+                              alignRight: false,
+                              tone: BubbleToneInternal.agent,
+                              messageViewMode: messageViewMode,
+                            ),
+                          TimelineItemKindInternal.toolCall =>
+                            ToolCallTileInternal(
+                              toolName: item.title!,
+                              summary: item.text!,
+                              pending: item.pending,
+                              error: item.error,
+                              onOpenDetail: () => onOpenDetail(
+                                DetailPanelData(
+                                  title: item.title!,
+                                  subtitle: appText('工具调用', 'Tool Call'),
+                                  icon: Icons.build_circle_outlined,
+                                  status: StatusInfo(
+                                    item.pending
+                                        ? appText('运行中', 'Running')
+                                        : appText('已完成', 'Completed'),
+                                    item.error
+                                        ? StatusTone.danger
+                                        : StatusTone.accent,
+                                  ),
+                                  description: item.text ?? '',
+                                  meta: [
+                                    controller.currentSessionKey,
+                                    controller.activeAgentName,
+                                  ],
+                                  actions: [appText('复制', 'Copy')],
+                                  sections: const [],
                                 ),
-                                description: item.text ?? '',
-                                meta: [
-                                  controller.currentSessionKey,
-                                  controller.activeAgentName,
-                                ],
-                                actions: [appText('复制', 'Copy')],
-                                sections: const [],
                               ),
                             ),
-                          ),
-                      };
+                        },
+                      );
                     },
                   ),
           ),
