@@ -777,7 +777,6 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     var wroteArtifact = false;
     var failedArtifact = false;
     var skippedArtifact = false;
-    final currentTaskArtifactRelativePaths = <String>[];
     for (final artifact in artifacts) {
       final relativePath = _sanitizeArtifactRelativePathInternal(
         artifact.relativePath,
@@ -799,10 +798,6 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
           continue;
         }
         wroteArtifact = true;
-        _appendArtifactRelativePathsInternal(
-          currentTaskArtifactRelativePaths,
-          existingArtifactPaths,
-        );
         continue;
       }
       final target = await _nextArtifactTargetFileInternal(root, relativePath);
@@ -817,17 +812,6 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
         continue;
       }
       wroteArtifact = true;
-      final writtenRelativePath =
-          DesktopThreadArtifactService.relativePathInternal(
-            root.path,
-            target.path,
-          );
-      if (writtenRelativePath != null && writtenRelativePath.isNotEmpty) {
-        _appendArtifactRelativePathsInternal(
-          currentTaskArtifactRelativePaths,
-          <String>[writtenRelativePath],
-        );
-      }
     }
 
     final syncStatus = wroteArtifact
@@ -835,6 +819,9 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
         : failedArtifact
         ? 'download-failed'
         : 'no-artifacts';
+    final currentTaskArtifactRelativePaths = wroteArtifact
+        ? await _collectWorkspaceArtifactRelativePathsInternal(root)
+        : const <String>[];
     upsertTaskThreadInternal(
       normalizedSessionKey,
       lastArtifactSyncAtMs: syncedAtMs,
@@ -1158,17 +1145,6 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
   ) => kGatewayRemoteProfileIndex;
 }
 
-void _appendArtifactRelativePathsInternal(
-  List<String> target,
-  List<String> paths,
-) {
-  for (final path in paths) {
-    if (!target.contains(path)) {
-      target.add(path);
-    }
-  }
-}
-
 Future<List<String>> _existingWorkspaceArtifactPathsInternal(
   Directory root,
   String relativePath,
@@ -1197,6 +1173,22 @@ Future<List<String>> _existingWorkspaceArtifactPathsInternal(
   final files = await DesktopThreadArtifactService().collectFilesInternal(
     Directory(targetPath),
   );
+  final paths = <String>[];
+  for (final file in files) {
+    final resolvedRelativePath =
+        DesktopThreadArtifactService.relativePathInternal(root.path, file.path);
+    if (resolvedRelativePath != null && resolvedRelativePath.isNotEmpty) {
+      paths.add(resolvedRelativePath);
+    }
+  }
+  paths.sort();
+  return paths;
+}
+
+Future<List<String>> _collectWorkspaceArtifactRelativePathsInternal(
+  Directory root,
+) async {
+  final files = await DesktopThreadArtifactService().collectFilesInternal(root);
   final paths = <String>[];
   for (final file in files) {
     final resolvedRelativePath =
