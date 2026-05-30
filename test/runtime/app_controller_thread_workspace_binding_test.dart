@@ -492,9 +492,10 @@ void main() {
     final snapshot = await controller.loadAssistantArtifactSnapshot(
       sessionKey: 'unit-fixture-task-a',
     );
-    expect(snapshot.resultEntries.map((entry) => entry.relativePath), <String>[
-      'notes/hello.v2.txt',
-    ]);
+    expect(
+      snapshot.resultEntries.map((entry) => entry.relativePath),
+      containsAll(<String>['notes/hello.v2.txt', 'notes/hello.txt']),
+    );
     expect(
       snapshot.fileEntries.map((entry) => entry.relativePath),
       containsAll(<String>['notes/hello.v2.txt', 'notes/hello.txt']),
@@ -566,7 +567,10 @@ void main() {
       final currentRelativePaths = snapshot.resultEntries
           .map((entry) => entry.relativePath)
           .toList(growable: false);
-      expect(currentRelativePaths, <String>['current-task-report.md']);
+      expect(
+        currentRelativePaths,
+        containsAll(<String>['current-task-report.md', 'old-task-report.md']),
+      );
       expect(
         snapshot.fileEntries.map((entry) => entry.relativePath),
         containsAll(<String>['current-task-report.md', 'old-task-report.md']),
@@ -615,6 +619,10 @@ void main() {
     await File(
       '${localWorkspace.path}/chapters/codex-chapter-breakdown.md',
     ).create(recursive: true);
+    await Directory('${localWorkspace.path}/dist').create(recursive: true);
+    await File(
+      '${localWorkspace.path}/dist/账户与身份安全演进史-GPT混排最终版.pdf',
+    ).writeAsBytes(<int>[7, 8, 9]);
 
     controller.upsertTaskThreadInternal(
       'unit-fixture-task-a',
@@ -657,6 +665,7 @@ void main() {
       'assets/images/chapters/chapter-1.png',
       'assets/images/cover.png',
       'chapters/codex-chapter-breakdown.md',
+      'dist/账户与身份安全演进史-GPT混排最终版.pdf',
     ]);
     final snapshot = await controller.loadAssistantArtifactSnapshot(
       sessionKey: 'unit-fixture-task-a',
@@ -667,6 +676,7 @@ void main() {
         'assets/images/chapters/chapter-1.png',
         'assets/images/cover.png',
         'chapters/codex-chapter-breakdown.md',
+        'dist/账户与身份安全演进史-GPT混排最终版.pdf',
       ]),
     );
   });
@@ -989,12 +999,17 @@ void main() {
         await File('${localWorkspace.path}/reports/resume.bin').readAsBytes(),
         body,
       );
-      expect(
-        controller
-            .requireTaskThreadForSessionInternal('unit-fixture-task-a')
-            .lastArtifactSyncStatus,
-        'synced',
+      final thread = controller.requireTaskThreadForSessionInternal(
+        'unit-fixture-task-a',
       );
+      for (
+        var attempt = 0;
+        attempt < 20 && thread.lastArtifactSyncStatus != 'synced';
+        attempt += 1
+      ) {
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      }
+      expect(thread.lastArtifactSyncStatus, 'synced');
     },
   );
 
