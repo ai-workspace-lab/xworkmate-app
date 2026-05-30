@@ -62,6 +62,7 @@ class SidebarTaskSection extends StatefulWidget {
 
 class _SidebarTaskSectionState extends State<SidebarTaskSection> {
   final TextEditingController _searchController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
   final Set<AssistantExecutionTarget> _expandedTargets =
       <AssistantExecutionTarget>{};
   String _query = '';
@@ -83,6 +84,7 @@ class _SidebarTaskSectionState extends State<SidebarTaskSection> {
   @override
   void dispose() {
     _searchController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -196,70 +198,94 @@ class _SidebarTaskSectionState extends State<SidebarTaskSection> {
         Expanded(
           child: Scrollbar(
             child: ListView(
+              key: const PageStorageKey<String>('workspace-sidebar-task-list'),
+              controller: _scrollController,
               padding: const EdgeInsets.fromLTRB(0, 0, 0, 4),
               children: [
-                for (final group in groups) ...[
-                  _SidebarTaskGroupHeader(
-                    executionTarget: group.executionTarget,
-                    count: group.items.length,
-                    expanded: _expandedTargets.contains(group.executionTarget),
-                    onTap: () {
-                      setState(() {
-                        if (_expandedTargets.contains(group.executionTarget)) {
-                          _expandedTargets.remove(group.executionTarget);
-                        } else {
-                          _expandedTargets.add(group.executionTarget);
-                        }
-                      });
-                    },
-                  ),
-                  if (_expandedTargets.contains(group.executionTarget)) ...[
-                    if (group.items.isEmpty)
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(28, 0, 8, 6),
-                        child: Text(
-                          appText('当前分组没有任务。', 'No tasks in this group.'),
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: palette.textMuted,
+                for (final group in groups)
+                  KeyedSubtree(
+                    key: ValueKey<String>(
+                      'workspace-sidebar-task-group-block-${group.executionTarget.name}',
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _SidebarTaskGroupHeader(
+                          executionTarget: group.executionTarget,
+                          count: group.items.length,
+                          expanded: _expandedTargets.contains(
+                            group.executionTarget,
                           ),
+                          onTap: () {
+                            setState(() {
+                              if (_expandedTargets.contains(
+                                group.executionTarget,
+                              )) {
+                                _expandedTargets.remove(group.executionTarget);
+                              } else {
+                                _expandedTargets.add(group.executionTarget);
+                              }
+                            });
+                          },
                         ),
-                      ),
-                    for (final item in group.items)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 4),
-                        child: _SidebarTaskTile(
-                          item: item,
-                          onTap: widget.onSelectTask == null
-                              ? null
-                              : () async {
-                                  await widget.onSelectTask!(item.sessionKey);
-                                },
-                          onArchive:
-                              widget.onArchiveTask == null || item.pending
-                              ? null
-                              : () async {
-                                  await widget.onArchiveTask!(item.sessionKey);
-                                },
-                          onRename: widget.onRenameTask == null
-                              ? null
-                              : () async {
-                                  final renamed = await _promptRenameTask(
-                                    context,
-                                    item.title,
-                                  );
-                                  if (!mounted || renamed == null) {
-                                    return;
-                                  }
-                                  await widget.onRenameTask!(
-                                    item.sessionKey,
-                                    renamed,
-                                  );
-                                },
-                        ),
-                      ),
-                  ],
-                  const SizedBox(height: 4),
-                ],
+                        if (_expandedTargets.contains(
+                          group.executionTarget,
+                        )) ...[
+                          if (group.items.isEmpty)
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(28, 0, 8, 6),
+                              child: Text(
+                                appText('当前分组没有任务。', 'No tasks in this group.'),
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: palette.textMuted,
+                                ),
+                              ),
+                            ),
+                          for (final item in group.items)
+                            Padding(
+                              key: ValueKey<String>(
+                                'workspace-sidebar-task-row-${item.sessionKey}',
+                              ),
+                              padding: const EdgeInsets.only(bottom: 4),
+                              child: _SidebarTaskTile(
+                                item: item,
+                                onTap: widget.onSelectTask == null
+                                    ? null
+                                    : () async {
+                                        await widget.onSelectTask!(
+                                          item.sessionKey,
+                                        );
+                                      },
+                                onArchive:
+                                    widget.onArchiveTask == null || item.pending
+                                    ? null
+                                    : () async {
+                                        await widget.onArchiveTask!(
+                                          item.sessionKey,
+                                        );
+                                      },
+                                onRename: widget.onRenameTask == null
+                                    ? null
+                                    : () async {
+                                        final renamed = await _promptRenameTask(
+                                          context,
+                                          item.title,
+                                        );
+                                        if (!mounted || renamed == null) {
+                                          return;
+                                        }
+                                        await widget.onRenameTask!(
+                                          item.sessionKey,
+                                          renamed,
+                                        );
+                                      },
+                              ),
+                            ),
+                        ],
+                        const SizedBox(height: 4),
+                      ],
+                    ),
+                  ),
               ],
             ),
           ),

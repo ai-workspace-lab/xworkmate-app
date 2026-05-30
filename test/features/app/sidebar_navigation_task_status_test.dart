@@ -167,6 +167,41 @@ void main() {
       lessThan(_textTop(tester, lastTitle)),
     );
   });
+
+  testWidgets('sidebar keeps scroll position when task content refreshes', (
+    tester,
+  ) async {
+    var items = _manySidebarItems(
+      selectedSessionKey: 'task-10',
+      previewSuffix: 'before refresh',
+    );
+
+    Future<void> pump() async {
+      await _pumpSidebar(tester, items: items, height: 360);
+    }
+
+    await pump();
+    await tester.drag(
+      find.byKey(const PageStorageKey<String>('workspace-sidebar-task-list')),
+      const Offset(0, -420),
+    );
+    await tester.pump();
+
+    final anchorFinder = find.byKey(
+      const ValueKey<String>('workspace-sidebar-task-item-task-10'),
+    );
+    final anchorTopBefore = tester.getTopLeft(anchorFinder).dy;
+
+    items = _manySidebarItems(
+      selectedSessionKey: 'task-10',
+      previewSuffix: 'after refresh',
+    );
+    await pump();
+
+    expect(tester.getTopLeft(anchorFinder).dy, closeTo(anchorTopBefore, 0.1));
+    expect(_textTop(tester, '任务 09'), lessThan(_textTop(tester, '任务 10')));
+    expect(_textTop(tester, '任务 10'), lessThan(_textTop(tester, '任务 11')));
+  });
 }
 
 double _textTop(WidgetTester tester, String text) =>
@@ -175,6 +210,7 @@ double _textTop(WidgetTester tester, String text) =>
 Future<void> _pumpSidebar(
   WidgetTester tester, {
   required List<SidebarTaskItem> items,
+  double height = 720,
 }) async {
   await tester.pumpWidget(
     MaterialApp(
@@ -182,7 +218,7 @@ Future<void> _pumpSidebar(
       home: Material(
         child: SizedBox(
           width: 360,
-          height: 720,
+          height: height,
           child: SidebarNavigation(
             currentSection: WorkspaceDestination.assistant,
             sidebarState: AppSidebarState.expanded,
@@ -207,4 +243,22 @@ Future<void> _pumpSidebar(
     ),
   );
   await tester.pump();
+}
+
+List<SidebarTaskItem> _manySidebarItems({
+  required String selectedSessionKey,
+  required String previewSuffix,
+}) {
+  return List<SidebarTaskItem>.generate(18, (index) {
+    final sessionKey = 'task-${index.toString().padLeft(2, '0')}';
+    return SidebarTaskItem(
+      sessionKey: sessionKey,
+      title: '任务 ${index.toString().padLeft(2, '0')}',
+      preview: '刷新内容 $previewSuffix',
+      updatedAtMs: (1000 + index).toDouble(),
+      executionTarget: AssistantExecutionTarget.gateway,
+      isCurrent: sessionKey == selectedSessionKey,
+      pending: false,
+    );
+  }, growable: false);
 }
