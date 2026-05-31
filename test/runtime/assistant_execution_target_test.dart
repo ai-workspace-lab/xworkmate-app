@@ -1187,6 +1187,31 @@ void main() {
     );
 
     test(
+      'sendChatMessage declares expected artifacts for complex PDF chains',
+      () async {
+        final fakeGoTaskService = _RecordingGoTaskServiceClient();
+        final controller = _connectedGatewayController(fakeGoTaskService);
+        addTearDown(controller.dispose);
+
+        await controller.ensureActiveAssistantThreadInternal();
+        await controller.setAssistantExecutionTarget(
+          AssistantExecutionTarget.gateway,
+        );
+        await controller.sendChatMessage(
+          '围绕\n\n'
+          '从单机权限 → 网络边界 → Web安全 → 云身份 → Zero Trust → AI Agent 身份 → AI模型与知识保护 演进 800-1500字\n'
+          '拆章节 -> 每章调用 Codex -> 每章 GPT images2 生成图 -> 汇总排版 ->\n\n'
+          '最后 输出 PDF文件',
+        );
+
+        expect(fakeGoTaskService.requests, hasLength(1));
+        final request = fakeGoTaskService.requests.single;
+        expect(request.metadata['taskLoadClass'], 'complex_long_chain_task');
+        expect(request.metadata['expectedArtifactExtensions'], <String>['pdf']);
+      },
+    );
+
+    test(
       'sendChatMessage classifies simple Gateway prompts as short tasks',
       () async {
         final fakeGoTaskService = _RecordingGoTaskServiceClient();
