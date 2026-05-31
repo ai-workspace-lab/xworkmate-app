@@ -461,9 +461,13 @@ extension AppControllerDesktopThreadActions on AppController {
       localAttachments,
     );
     final taskLoadClass = classifyGatewayTaskLoadInternal(message);
+    final expectedArtifactExtensions =
+        expectedGatewayArtifactExtensionsInternal(message);
     final taskMetadata = Map<String, dynamic>.unmodifiable(<String, dynamic>{
       ...dispatch.metadata,
       'taskLoadClass': taskLoadClass,
+      if (expectedArtifactExtensions.isNotEmpty)
+        'expectedArtifactExtensions': expectedArtifactExtensions,
     });
     final executionWorkingDirectory = gatewayExecutionWorkingDirectoryInternal(
       target: currentTarget,
@@ -762,6 +766,42 @@ extension AppControllerDesktopThreadActions on AppController {
       return 'long_task';
     }
     return 'short_task';
+  }
+
+  List<String> expectedGatewayArtifactExtensionsInternal(String requestText) {
+    final normalized = requestText.trim().toLowerCase();
+    final result = <String>[];
+
+    void add(String value) {
+      final normalizedValue = value.trim().toLowerCase().replaceFirst(
+        RegExp(r'^\.'),
+        '',
+      );
+      if (normalizedValue.isEmpty || result.contains(normalizedValue)) {
+        return;
+      }
+      result.add(normalizedValue);
+    }
+
+    for (final match in RegExp(
+      r'\.([a-z0-9]{2,5})\b',
+      caseSensitive: false,
+    ).allMatches(normalized)) {
+      add(match.group(1) ?? '');
+    }
+    for (final match in RegExp(
+      r'\b([a-z0-9]{2,5})\s*(?:格式|文件|产物|artifact|file|output)',
+      caseSensitive: false,
+    ).allMatches(normalized)) {
+      add(match.group(1) ?? '');
+    }
+    for (final match in RegExp(
+      r'(?:输出|导出|生成|制作)\s*([a-z0-9]{2,5})',
+      caseSensitive: false,
+    ).allMatches(normalized)) {
+      add(match.group(1) ?? '');
+    }
+    return List<String>.unmodifiable(result);
   }
 
   bool usesOpenClawGatewayQueueInternal(
