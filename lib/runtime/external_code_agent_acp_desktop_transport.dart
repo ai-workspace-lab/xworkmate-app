@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 
@@ -15,7 +16,7 @@ class ExternalCodeAgentAcpDesktopTransport
     required Uri? Function(AssistantExecutionTarget target) endpointResolver,
     Uri? Function(GoTaskServiceRequest request)? taskEndpointResolver,
     Duration recoveryPollDelay = const Duration(seconds: 2),
-    int recoveryMaxAttempts = 300,
+    int? recoveryMaxAttempts,
   }) : _client = client,
        _endpointResolver = endpointResolver,
        _taskEndpointResolver = taskEndpointResolver,
@@ -26,7 +27,7 @@ class ExternalCodeAgentAcpDesktopTransport
   final Uri? Function(AssistantExecutionTarget target) _endpointResolver;
   final Uri? Function(GoTaskServiceRequest request)? _taskEndpointResolver;
   final Duration _recoveryPollDelay;
-  final int _recoveryMaxAttempts;
+  final int? _recoveryMaxAttempts;
 
   @visibleForTesting
   GatewayAcpClient get clientForTest => _client;
@@ -207,7 +208,7 @@ class ExternalCodeAgentAcpDesktopTransport
     if (endpoint == null) {
       return null;
     }
-    final attempts = _recoveryMaxAttempts <= 0 ? 1 : _recoveryMaxAttempts;
+    final attempts = _recoveryAttemptsForRequest(request);
     for (var attempt = 0; attempt < attempts; attempt += 1) {
       if (attempt > 0) {
         await Future<void>.delayed(_recoveryPollDelay);
@@ -271,6 +272,20 @@ class ExternalCodeAgentAcpDesktopTransport
       }
     }
     return null;
+  }
+
+  int _recoveryAttemptsForRequest(GoTaskServiceRequest request) {
+    final configured = _recoveryMaxAttempts;
+    if (configured != null) {
+      return configured <= 0 ? 1 : configured;
+    }
+    final pollMicros = math.max(1, _recoveryPollDelay.inMicroseconds);
+    final budgetMicros = Duration(
+      minutes: gatewayAcpTaskRuntimeBudgetMinutesForParams(
+        request.toExternalAcpParams(),
+      ),
+    ).inMicroseconds;
+    return math.max(1, (budgetMicros / pollMicros).ceil());
   }
 
   Uri? _sessionSnapshotEndpoint(Uri? taskEndpoint) {

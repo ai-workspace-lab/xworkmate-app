@@ -1081,6 +1081,96 @@ void main() {
     );
 
     test(
+      'uses long task budget for default OpenClaw SSE recovery polling',
+      () async {
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        addTearDown(() => server.close(force: true));
+        var snapshotPolls = 0;
+        server.listen((request) async {
+          final body = await utf8.decoder.bind(request).join();
+          final decoded = jsonDecode(body) as Map<String, dynamic>;
+          final method = decoded['method']?.toString() ?? '';
+          final id = decoded['id']?.toString() ?? 'request-id';
+          if (method == 'session.start') {
+            final event = jsonEncode(<String, dynamic>{
+              'jsonrpc': '2.0',
+              'method': 'xworkmate.bridge.accepted',
+              'params': <String, dynamic>{'sessionId': 'unit-fixture-task-d'},
+            });
+            request.response.headers.set(
+              HttpHeaders.contentTypeHeader,
+              'text/event-stream',
+            );
+            request.response.write('data: $event\n\n');
+            await request.response.close();
+            return;
+          }
+          if (method == 'xworkmate.sessions.get') {
+            snapshotPolls += 1;
+            final completed = snapshotPolls >= 301;
+            request.response.headers.contentType = ContentType.json;
+            request.response.write(
+              jsonEncode(<String, dynamic>{
+                'jsonrpc': '2.0',
+                'id': id,
+                'result': <String, dynamic>{
+                  'status': completed ? 'completed' : 'running',
+                  'sessionId': 'unit-fixture-task-d',
+                  'threadId': 'unit-fixture-task-d',
+                  'task': <String, dynamic>{
+                    'state': completed ? 'completed' : 'running',
+                    'turnId': 'turn-recovered-long',
+                  },
+                  if (completed)
+                    'result': <String, dynamic>{
+                      'success': true,
+                      'output': 'recovered after long polling window',
+                      'turnId': 'turn-recovered-long',
+                    },
+                },
+              }),
+            );
+            await request.response.close();
+            return;
+          }
+          request.response.statusCode = HttpStatus.badRequest;
+          await request.response.close();
+        });
+        final endpoint = Uri.parse('http://127.0.0.1:${server.port}');
+        final transport = ExternalCodeAgentAcpDesktopTransport(
+          client: GatewayAcpClient(endpointResolver: () => endpoint),
+          endpointResolver: (_) => endpoint,
+          taskEndpointResolver: (_) => endpoint,
+          recoveryPollDelay: const Duration(microseconds: 1),
+        );
+        addTearDown(transport.dispose);
+
+        final result = await transport.executeTask(
+          const GoTaskServiceRequest(
+            sessionId: 'unit-fixture-task-d',
+            threadId: 'unit-fixture-task-d',
+            target: AssistantExecutionTarget.gateway,
+            provider: SingleAgentProvider.openclaw,
+            prompt: '生成封面图 png 和短视频 mp4',
+            workingDirectory: '/tmp/workspace',
+            model: '',
+            thinking: 'off',
+            selectedSkills: <String>[],
+            inlineAttachments: <GatewayChatAttachmentPayload>[],
+            localAttachments: <CollaborationAttachment>[],
+            agentId: '',
+            metadata: <String, dynamic>{},
+          ),
+          onUpdate: (_) {},
+        );
+
+        expect(snapshotPolls, 301);
+        expect(result.success, isTrue);
+        expect(result.message, 'recovered after long polling window');
+      },
+    );
+
+    test(
       'recovers terminal failed OpenClaw snapshot without displayable result',
       () async {
         final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
