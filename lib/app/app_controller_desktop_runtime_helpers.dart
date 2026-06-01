@@ -760,6 +760,24 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     }
     final artifacts = result.artifacts;
     if (artifacts.isEmpty) {
+      final root = Directory(existingThread.workspaceBinding.workspacePath);
+      final currentTaskArtifactRelativePaths =
+          isOpenClawNoExportedArtifactsGuardResultInternal(result)
+          ? const <String>[]
+          : await _workspaceArtifactPathsModifiedSinceInternal(
+              root,
+              existingThread.lifecycleState.lastRunAtMs,
+            );
+      if (currentTaskArtifactRelativePaths.isNotEmpty) {
+        upsertTaskThreadInternal(
+          normalizedSessionKey,
+          lastArtifactSyncAtMs: syncedAtMs,
+          lastArtifactSyncStatus: 'synced',
+          lastTaskArtifactRelativePaths: currentTaskArtifactRelativePaths,
+          updatedAtMs: syncedAtMs,
+        );
+        return;
+      }
       upsertTaskThreadInternal(
         normalizedSessionKey,
         lastArtifactSyncAtMs: syncedAtMs,
@@ -1248,6 +1266,47 @@ Future<List<String>> _existingWorkspaceArtifactPathsInternal(
   }
   paths.sort();
   return paths;
+}
+
+Future<List<String>> _workspaceArtifactPathsModifiedSinceInternal(
+  Directory root,
+  double? sinceMs,
+) async {
+  final thresholdMs = sinceMs ?? 0;
+  if (thresholdMs <= 0 || !await root.exists()) {
+    return const <String>[];
+  }
+  final files = await DesktopThreadArtifactService().collectFilesInternal(root);
+  final paths = <String>[];
+  for (final file in files) {
+    try {
+      final stat = await file.stat();
+      if (stat.modified.millisecondsSinceEpoch.toDouble() < thresholdMs) {
+        continue;
+      }
+      final resolvedRelativePath =
+          DesktopThreadArtifactService.relativePathInternal(
+            root.path,
+            file.path,
+          );
+      if (resolvedRelativePath == null || resolvedRelativePath.isEmpty) {
+        continue;
+      }
+      if (_isWorkspaceArtifactNoisePathInternal(resolvedRelativePath)) {
+        continue;
+      }
+      paths.add(resolvedRelativePath);
+    } on FileSystemException {
+      continue;
+    }
+  }
+  paths.sort();
+  return paths;
+}
+
+bool _isWorkspaceArtifactNoisePathInternal(String relativePath) {
+  return DesktopThreadArtifactService.baseNameInternal(relativePath) ==
+      '.DS_Store';
 }
 
 String _normalizeAuthorizationHeaderInternal(String raw) {

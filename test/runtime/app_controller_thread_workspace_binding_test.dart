@@ -71,7 +71,10 @@ void main() {
           .map((thread) => thread.threadId)
           .toList(growable: false);
       expect(persistedThreadIds, <String>[realSessionKey]);
-      expect((await store.loadAppUiState()).assistantLastSessionKey, realSessionKey);
+      expect(
+        (await store.loadAppUiState()).assistantLastSessionKey,
+        realSessionKey,
+      );
     },
   );
 
@@ -1406,6 +1409,76 @@ void main() {
     expect(snapshot.fileEntries, isEmpty);
     expect(snapshot.resultMessage, 'No task artifacts recorded for this run.');
   });
+
+  test(
+    'records workspace files produced during an empty-artifact task run',
+    () async {
+      final controller = AppController(
+        environmentOverride: const <String, String>{},
+      );
+      addTearDown(controller.dispose);
+
+      final localWorkspace = await Directory.systemTemp.createTemp(
+        'xworkmate-empty-artifact-produced-files-',
+      );
+      addTearDown(() async {
+        if (await localWorkspace.exists()) {
+          await localWorkspace.delete(recursive: true);
+        }
+      });
+      await File(
+        '${localWorkspace.path}/old-task-report.md',
+      ).writeAsString('stale task output');
+      final startedAtMs = DateTime.now().millisecondsSinceEpoch.toDouble();
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      await Directory('${localWorkspace.path}/renders').create();
+      await Directory('${localWorkspace.path}/prompts').create();
+      await File(
+        '${localWorkspace.path}/renders/identity-security-evolution.mp4',
+      ).writeAsBytes(<int>[1, 2, 3]);
+      await File(
+        '${localWorkspace.path}/prompts/DELIVERY.md',
+      ).writeAsString('delivery notes');
+      controller.upsertTaskThreadInternal(
+        'unit-fixture-task-a',
+        workspaceBinding: WorkspaceBinding(
+          workspaceId: 'unit-fixture-task-a',
+          workspaceKind: WorkspaceKind.localFs,
+          workspacePath: localWorkspace.path,
+          displayPath: localWorkspace.path,
+          writable: true,
+        ),
+        lifecycleStatus: 'running',
+        lastRunAtMs: startedAtMs,
+        lastResultCode: 'running',
+      );
+
+      const result = GoTaskServiceResult(
+        success: true,
+        message:
+            'OpenClaw final artifacts were written to the current task artifact scope: mp4, png.',
+        turnId: 'turn-1',
+        raw: <String, dynamic>{},
+        errorMessage: '',
+        resolvedModel: '',
+        route: GoTaskServiceRoute.externalAcpSingle,
+      );
+
+      await controller.persistGoTaskArtifactsForSessionInternal(
+        'unit-fixture-task-a',
+        result,
+      );
+
+      final thread = controller.requireTaskThreadForSessionInternal(
+        'unit-fixture-task-a',
+      );
+      expect(thread.lastArtifactSyncStatus, 'synced');
+      expect(thread.lastTaskArtifactRelativePaths, <String>[
+        'prompts/DELIVERY.md',
+        'renders/identity-security-evolution.mp4',
+      ]);
+    },
+  );
 
   test('skips download URL artifacts outside the bridge host', () async {
     final controller = AppController(
