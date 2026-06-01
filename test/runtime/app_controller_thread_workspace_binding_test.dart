@@ -492,14 +492,12 @@ void main() {
     final snapshot = await controller.loadAssistantArtifactSnapshot(
       sessionKey: 'unit-fixture-task-a',
     );
-    expect(
-      snapshot.resultEntries.map((entry) => entry.relativePath),
-      containsAll(<String>['notes/hello.v2.txt', 'notes/hello.txt']),
-    );
-    expect(
-      snapshot.fileEntries.map((entry) => entry.relativePath),
-      containsAll(<String>['notes/hello.v2.txt', 'notes/hello.txt']),
-    );
+    expect(snapshot.resultEntries.map((entry) => entry.relativePath), <String>[
+      'notes/hello.v2.txt',
+    ]);
+    expect(snapshot.fileEntries.map((entry) => entry.relativePath), <String>[
+      'notes/hello.v2.txt',
+    ]);
     expect(
       controller
           .requireTaskThreadForSessionInternal('unit-fixture-task-a')
@@ -508,90 +506,83 @@ void main() {
     );
   });
 
-  test(
-    'keeps current task artifacts primary while exposing older workspace files',
-    () async {
-      final controller = AppController(
-        environmentOverride: const <String, String>{},
-      );
-      addTearDown(controller.dispose);
+  test('keeps task artifacts scoped to the current run', () async {
+    final controller = AppController(
+      environmentOverride: const <String, String>{},
+    );
+    addTearDown(controller.dispose);
 
-      final localWorkspace = await Directory.systemTemp.createTemp(
-        'xworkmate-isolated-artifact-workspace-',
-      );
-      addTearDown(() async {
-        if (await localWorkspace.exists()) {
-          await localWorkspace.delete(recursive: true);
-        }
-      });
-      final staleArtifact = File('${localWorkspace.path}/old-task-report.md');
-      await staleArtifact.writeAsString('stale task output');
+    final localWorkspace = await Directory.systemTemp.createTemp(
+      'xworkmate-isolated-artifact-workspace-',
+    );
+    addTearDown(() async {
+      if (await localWorkspace.exists()) {
+        await localWorkspace.delete(recursive: true);
+      }
+    });
+    final staleArtifact = File('${localWorkspace.path}/old-task-report.md');
+    await staleArtifact.writeAsString('stale task output');
 
-      controller.upsertTaskThreadInternal(
-        'unit-fixture-task-a',
-        workspaceBinding: WorkspaceBinding(
-          workspaceId: 'unit-fixture-task-a',
-          workspaceKind: WorkspaceKind.localFs,
-          workspacePath: localWorkspace.path,
-          displayPath: localWorkspace.path,
-          writable: true,
-        ),
-      );
+    controller.upsertTaskThreadInternal(
+      'unit-fixture-task-a',
+      workspaceBinding: WorkspaceBinding(
+        workspaceId: 'unit-fixture-task-a',
+        workspaceKind: WorkspaceKind.localFs,
+        workspacePath: localWorkspace.path,
+        displayPath: localWorkspace.path,
+        writable: true,
+      ),
+    );
 
-      final result = GoTaskServiceResult(
-        success: true,
-        message: 'hello',
-        turnId: 'turn-2',
-        raw: <String, dynamic>{
-          'artifacts': <Map<String, dynamic>>[
-            <String, dynamic>{
-              'relativePath': 'current-task-report.md',
-              'content': 'current task output',
-              'contentType': 'text/markdown',
-            },
-          ],
-        },
-        errorMessage: '',
-        resolvedModel: '',
-        route: GoTaskServiceRoute.externalAcpSingle,
-      );
+    final result = GoTaskServiceResult(
+      success: true,
+      message: 'hello',
+      turnId: 'turn-2',
+      raw: <String, dynamic>{
+        'artifacts': <Map<String, dynamic>>[
+          <String, dynamic>{
+            'relativePath': 'current-task-report.md',
+            'content': 'current task output',
+            'contentType': 'text/markdown',
+          },
+        ],
+      },
+      errorMessage: '',
+      resolvedModel: '',
+      route: GoTaskServiceRoute.externalAcpSingle,
+    );
 
-      await controller.persistGoTaskArtifactsForSessionInternal(
-        'unit-fixture-task-a',
-        result,
-      );
+    await controller.persistGoTaskArtifactsForSessionInternal(
+      'unit-fixture-task-a',
+      result,
+    );
 
-      final snapshot = await controller.loadAssistantArtifactSnapshot(
-        sessionKey: 'unit-fixture-task-a',
-      );
-      final currentRelativePaths = snapshot.resultEntries
-          .map((entry) => entry.relativePath)
-          .toList(growable: false);
-      expect(
-        currentRelativePaths,
-        containsAll(<String>['current-task-report.md', 'old-task-report.md']),
-      );
-      expect(
-        snapshot.fileEntries.map((entry) => entry.relativePath),
-        containsAll(<String>['current-task-report.md', 'old-task-report.md']),
-      );
+    final snapshot = await controller.loadAssistantArtifactSnapshot(
+      sessionKey: 'unit-fixture-task-a',
+    );
+    final currentRelativePaths = snapshot.resultEntries
+        .map((entry) => entry.relativePath)
+        .toList(growable: false);
+    expect(currentRelativePaths, <String>['current-task-report.md']);
+    expect(snapshot.fileEntries.map((entry) => entry.relativePath), <String>[
+      'current-task-report.md',
+    ]);
 
-      final stalePreview = await controller.loadAssistantArtifactPreview(
-        AssistantArtifactEntry(
-          id: '${localWorkspace.path}::old-task-report.md',
-          label: 'old-task-report.md',
-          relativePath: 'old-task-report.md',
-          kind: AssistantArtifactEntryKind.file,
-          mimeType: 'text/markdown',
-          previewable: true,
-          workspacePath: localWorkspace.path,
-        ),
-        sessionKey: 'unit-fixture-task-a',
-      );
-      expect(stalePreview.kind, AssistantArtifactPreviewKind.markdown);
-      expect(stalePreview.content, 'stale task output');
-    },
-  );
+    final stalePreview = await controller.loadAssistantArtifactPreview(
+      AssistantArtifactEntry(
+        id: '${localWorkspace.path}::old-task-report.md',
+        label: 'old-task-report.md',
+        relativePath: 'old-task-report.md',
+        kind: AssistantArtifactEntryKind.file,
+        mimeType: 'text/markdown',
+        previewable: true,
+        workspacePath: localWorkspace.path,
+      ),
+      sessionKey: 'unit-fixture-task-a',
+    );
+    expect(stalePreview.kind, AssistantArtifactPreviewKind.empty);
+    expect(stalePreview.content, isEmpty);
+  });
 
   test('syncs existing workspace directory artifacts recursively', () async {
     final controller = AppController(
@@ -665,7 +656,6 @@ void main() {
       'assets/images/chapters/chapter-1.png',
       'assets/images/cover.png',
       'chapters/codex-chapter-breakdown.md',
-      'dist/账户与身份安全演进史-GPT混排最终版.pdf',
     ]);
     final snapshot = await controller.loadAssistantArtifactSnapshot(
       sessionKey: 'unit-fixture-task-a',
@@ -676,7 +666,6 @@ void main() {
         'assets/images/chapters/chapter-1.png',
         'assets/images/cover.png',
         'chapters/codex-chapter-breakdown.md',
-        'dist/账户与身份安全演进史-GPT混排最终版.pdf',
       ]),
     );
   });
@@ -999,17 +988,23 @@ void main() {
         await File('${localWorkspace.path}/reports/resume.bin').readAsBytes(),
         body,
       );
-      final thread = controller.requireTaskThreadForSessionInternal(
-        'unit-fixture-task-a',
-      );
       for (
         var attempt = 0;
-        attempt < 20 && thread.lastArtifactSyncStatus != 'synced';
+        attempt < 20 &&
+            controller
+                    .requireTaskThreadForSessionInternal('unit-fixture-task-a')
+                    .lastArtifactSyncStatus !=
+                'synced';
         attempt += 1
       ) {
         await Future<void>.delayed(const Duration(milliseconds: 10));
       }
-      expect(thread.lastArtifactSyncStatus, 'synced');
+      expect(
+        controller
+            .requireTaskThreadForSessionInternal('unit-fixture-task-a')
+            .lastArtifactSyncStatus,
+        'synced',
+      );
     },
   );
 

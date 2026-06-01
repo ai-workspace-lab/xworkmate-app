@@ -235,6 +235,9 @@ extension AssistantPageStateClosureInternal on AssistantPageStateInternal {
                       attachmentsInternal = attachmentsInternal
                           .where((item) => item.path != attachment.path)
                           .toList(growable: false);
+                      saveComposerAttachmentsForSessionInternal(
+                        activeSessionKey,
+                      );
                     });
                   },
                   onToggleSkill: (key) {
@@ -265,6 +268,9 @@ extension AssistantPageStateClosureInternal on AssistantPageStateInternal {
                         ...attachmentsInternal,
                         attachment,
                       ];
+                      saveComposerAttachmentsForSessionInternal(
+                        activeSessionKey,
+                      );
                     });
                   },
                   onPasteImageAttachment:
