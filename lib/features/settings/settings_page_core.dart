@@ -220,33 +220,19 @@ class _SettingsPageState extends State<SettingsPage> {
     SettingsSnapshot settings, {
     required bool isManualBridge,
   }) async {
-    final bridgeConfig = settings.acpBridgeServerModeConfig;
-    var nextBridgeConfig = bridgeConfig.copyWith(
-      selfHosted: bridgeConfig.selfHosted.copyWith(
-        serverUrl: _bridgeUrlController.text.trim(),
-        username: isManualBridge ? 'admin' : bridgeConfig.selfHosted.username,
-      ),
+    final nextSettings = await widget.controller.settingsController
+        .buildSavedAccountProfileSettings(
+          settings: settings,
+          accountBaseUrl: _accountBaseUrlController.text,
+          accountIdentifier: _accountIdentifierController.text,
+          bridgeServerUrl: _bridgeUrlController.text,
+          bridgeToken: _bridgeTokenController.text,
+          isManualBridge: isManualBridge,
+        );
+    await widget.controller.saveSettings(
+      nextSettings,
+      refreshAfterSave: !isManualBridge,
     );
-
-    final nextEffective = widget.controller.settingsController
-        .resolveAcpBridgeServerEffectiveConfig(config: nextBridgeConfig);
-
-    final nextSettings = settings.copyWith(
-      accountBaseUrl: _accountBaseUrlController.text.trim(),
-      accountUsername: _accountIdentifierController.text.trim(),
-      acpBridgeServerModeConfig: nextBridgeConfig.copyWith(
-        effective: nextEffective,
-      ),
-    );
-    if (isManualBridge && _bridgeTokenController.text.isNotEmpty) {
-      await widget.controller.settingsController.saveSecretValueByRef(
-        nextSettings.acpBridgeServerModeConfig.selfHosted.passwordRef,
-        _bridgeTokenController.text,
-        provider: 'Bridge',
-        module: 'Manual',
-      );
-    }
-    await widget.controller.saveSettings(nextSettings);
 
     _lastSavedAccountBaseUrl = nextSettings.accountBaseUrl;
     _lastSavedAccountIdentifier = nextSettings.accountUsername;

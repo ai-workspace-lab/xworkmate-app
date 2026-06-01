@@ -120,6 +120,23 @@ extension SettingsControllerAccountExtension on SettingsController {
     required AcpBridgeServerModeConfig config,
   }) => resolveAcpBridgeServerEffectiveConfigInternal(this, config: config);
 
+  Future<SettingsSnapshot> buildSavedAccountProfileSettings({
+    required SettingsSnapshot settings,
+    required String accountBaseUrl,
+    required String accountIdentifier,
+    required String bridgeServerUrl,
+    required String bridgeToken,
+    required bool isManualBridge,
+  }) => buildSavedAccountProfileSettingsInternal(
+    this,
+    settings: settings,
+    accountBaseUrl: accountBaseUrl,
+    accountIdentifier: accountIdentifier,
+    bridgeServerUrl: bridgeServerUrl,
+    bridgeToken: bridgeToken,
+    isManualBridge: isManualBridge,
+  );
+
   List<SecretReferenceEntry> buildSecretReferences() {
     final entries = <SecretReferenceEntry>[
       ...secureRefsInternal.entries.map(

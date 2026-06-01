@@ -104,38 +104,27 @@ class _MobileSettingsPageState extends State<MobileSettingsPage> {
     required bool isManualBridge,
     bool refreshAfterSave = true,
   }) async {
-    final bridgeConfig = settings.acpBridgeServerModeConfig;
-    final nextBridgeConfig = bridgeConfig.copyWith(
-      selfHosted: bridgeConfig.selfHosted.copyWith(
-        serverUrl: bridgeUrlController.text.trim(),
-        username: isManualBridge ? 'admin' : bridgeConfig.selfHosted.username,
-      ),
-    );
-    final nextEffective = widget.controller.settingsController
-        .resolveAcpBridgeServerEffectiveConfig(config: nextBridgeConfig);
-    final nextSettings = settings.copyWith(
-      accountBaseUrl: accountBaseUrlController.text.trim(),
-      accountUsername: accountIdentifierController.text.trim(),
-      acpBridgeServerModeConfig: nextBridgeConfig.copyWith(
-        effective: nextEffective,
-      ),
-    );
-    if (isManualBridge && bridgeTokenController.text.isNotEmpty) {
-      await widget.controller.settingsController.saveSecretValueByRef(
-        nextSettings.acpBridgeServerModeConfig.selfHosted.passwordRef,
-        bridgeTokenController.text,
-        provider: 'Bridge',
-        module: 'Manual',
-      );
-    }
+    final nextSettings = await widget.controller.settingsController
+        .buildSavedAccountProfileSettings(
+          settings: settings,
+          accountBaseUrl: accountBaseUrlController.text,
+          accountIdentifier: accountIdentifierController.text,
+          bridgeServerUrl: bridgeUrlController.text,
+          bridgeToken: bridgeTokenController.text,
+          isManualBridge: isManualBridge,
+        );
     await widget.controller.saveSettings(
       nextSettings,
-      refreshAfterSave: refreshAfterSave,
+      refreshAfterSave: isManualBridge ? false : refreshAfterSave,
     );
     lastSavedAccountBaseUrl = nextSettings.accountBaseUrl;
     lastSavedAccountIdentifier = nextSettings.accountUsername;
     lastSavedBridgeUrl =
         nextSettings.acpBridgeServerModeConfig.selfHosted.serverUrl;
+    if (isManualBridge &&
+        nextSettings.acpBridgeServerModeConfig.selfHosted.isConfigured) {
+      unawaited(refreshBridgeCapabilities());
+    }
   }
 
   Future<void> loginAccount(SettingsSnapshot settings) async {
@@ -245,16 +234,25 @@ class _MobileSettingsPageState extends State<MobileSettingsPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       GestureDetector(
-                        onTap: () => controller.navigateTo(WorkspaceDestination.assistant),
+                        onTap: () => controller.navigateTo(
+                          WorkspaceDestination.assistant,
+                        ),
                         behavior: HitTestBehavior.opaque,
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.arrow_back_ios_new_rounded, size: 16, color: palette.textSecondary),
+                            Icon(
+                              Icons.arrow_back_ios_new_rounded,
+                              size: 16,
+                              color: palette.textSecondary,
+                            ),
                             const SizedBox(width: 6),
                             Text(
                               appText('返回对话主页', 'Back to Chat'),
-                              style: TextStyle(color: palette.textSecondary, fontSize: 16),
+                              style: TextStyle(
+                                color: palette.textSecondary,
+                                fontSize: 16,
+                              ),
                             ),
                           ],
                         ),
@@ -262,9 +260,8 @@ class _MobileSettingsPageState extends State<MobileSettingsPage> {
                       const SizedBox(height: 24),
                       Text(
                         appText('设置', 'Settings'),
-                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style: Theme.of(context).textTheme.headlineSmall
+                            ?.copyWith(fontWeight: FontWeight.bold),
                       ),
                       const SizedBox(height: 12),
                       if (availableTabs.length > 1) ...[
