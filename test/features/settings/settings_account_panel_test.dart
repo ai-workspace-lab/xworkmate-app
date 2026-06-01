@@ -114,6 +114,65 @@ void main() {
       expect(submittedPassword, 'typed-password');
     });
 
+    testWidgets('manual bridge save submits current field values', (
+      tester,
+    ) async {
+      final controllers = _TestControllers();
+      addTearDown(controllers.dispose);
+
+      var savedAsManualBridge = false;
+      var savedBridgeUrl = '';
+      var savedBridgeToken = '';
+
+      await tester.pumpWidget(
+        _buildTestApp(
+          child: SettingsAccountPanel(
+            settings: SettingsSnapshot.defaults(),
+            accountSession: null,
+            accountState: null,
+            accountBusy: false,
+            accountSignedIn: false,
+            accountMfaRequired: false,
+            accountBaseUrlController: controllers.baseUrl,
+            accountIdentifierController: controllers.identifier,
+            accountPasswordController: controllers.password,
+            accountMfaCodeController: controllers.mfaCode,
+            bridgeUrlController: controllers.bridgeUrl,
+            bridgeTokenController: controllers.bridgeToken,
+            onSaveAccountProfile: ({required bool isManualBridge}) async {
+              savedAsManualBridge = isManualBridge;
+              savedBridgeUrl = controllers.bridgeUrl.text;
+              savedBridgeToken = controllers.bridgeToken.text;
+            },
+            onLogin: () async {},
+            onVerifyMfa: () async {},
+            onCancelMfa: () async {},
+            onSync: () async {},
+            onLogout: () async {},
+          ),
+        ),
+      );
+
+      await tester.tap(find.text('手动 Bridge 配置'));
+      await tester.pump();
+      await tester.enterText(
+        find.byKey(const ValueKey('settings-manual-bridge-url-field')),
+        'https://cn-xworkmate-bridge.svc.plus',
+      );
+      await tester.enterText(
+        find.byKey(const ValueKey('settings-manual-bridge-token-field')),
+        'typed-manual-token',
+      );
+      await tester.tap(
+        find.byKey(const ValueKey('settings-manual-bridge-save-button')),
+      );
+      await tester.pump();
+
+      expect(savedAsManualBridge, isTrue);
+      expect(savedBridgeUrl, 'https://cn-xworkmate-bridge.svc.plus');
+      expect(savedBridgeToken, 'typed-manual-token');
+    });
+
     testWidgets(
       'shows account sync status, resync, and exit in signed-in mode',
       (tester) async {
