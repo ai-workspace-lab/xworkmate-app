@@ -777,6 +777,7 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     var wroteArtifact = false;
     var failedArtifact = false;
     var skippedArtifact = false;
+    final currentTaskArtifactPaths = <String>{};
     for (final artifact in artifacts) {
       final relativePath = _sanitizeArtifactRelativePathInternal(
         artifact.relativePath,
@@ -797,6 +798,7 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
           skippedArtifact = true;
           continue;
         }
+        currentTaskArtifactPaths.addAll(existingArtifactPaths);
         wroteArtifact = true;
         continue;
       }
@@ -811,6 +813,16 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
         failedArtifact = true;
         continue;
       }
+      final resolvedRelativePath =
+          DesktopThreadArtifactService.relativePathInternal(
+            root.path,
+            target.path,
+          );
+      if (resolvedRelativePath == null || resolvedRelativePath.isEmpty) {
+        failedArtifact = true;
+        continue;
+      }
+      currentTaskArtifactPaths.add(resolvedRelativePath);
       wroteArtifact = true;
     }
 
@@ -820,7 +832,7 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
         ? 'download-failed'
         : 'no-artifacts';
     final currentTaskArtifactRelativePaths = wroteArtifact
-        ? await _collectWorkspaceArtifactRelativePathsInternal(root)
+        ? (currentTaskArtifactPaths.toList(growable: false)..sort())
         : const <String>[];
     upsertTaskThreadInternal(
       normalizedSessionKey,
@@ -1226,22 +1238,6 @@ Future<List<String>> _existingWorkspaceArtifactPathsInternal(
   final files = await DesktopThreadArtifactService().collectFilesInternal(
     Directory(targetPath),
   );
-  final paths = <String>[];
-  for (final file in files) {
-    final resolvedRelativePath =
-        DesktopThreadArtifactService.relativePathInternal(root.path, file.path);
-    if (resolvedRelativePath != null && resolvedRelativePath.isNotEmpty) {
-      paths.add(resolvedRelativePath);
-    }
-  }
-  paths.sort();
-  return paths;
-}
-
-Future<List<String>> _collectWorkspaceArtifactRelativePathsInternal(
-  Directory root,
-) async {
-  final files = await DesktopThreadArtifactService().collectFilesInternal(root);
   final paths = <String>[];
   for (final file in files) {
     final resolvedRelativePath =
