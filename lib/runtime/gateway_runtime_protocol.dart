@@ -18,7 +18,7 @@ import 'gateway_runtime_errors.dart';
 import 'gateway_runtime_helpers.dart';
 import 'gateway_runtime_core.dart';
 
-const kGatewayProtocolVersion = 3;
+const kGatewayProtocolVersion = 4;
 const kDefaultOperatorConnectScopes = <String>[
   'operator.admin',
   'operator.read',
