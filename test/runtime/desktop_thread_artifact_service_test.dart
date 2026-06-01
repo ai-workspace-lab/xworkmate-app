@@ -36,7 +36,7 @@ void main() {
   );
 
   test(
-    'loadSnapshot keeps current task artifacts separate from all files',
+    'loadSnapshot keeps the file list scoped to current task artifacts',
     () async {
       final workspace = await Directory.systemTemp.createTemp(
         'xworkmate-artifact-snapshot-',
@@ -59,15 +59,14 @@ void main() {
         snapshot.resultEntries.map((entry) => entry.relativePath),
         <String>['current.md'],
       );
-      expect(
-        snapshot.fileEntries.map((entry) => entry.relativePath),
-        containsAll(<String>['current.md', 'historical.md']),
-      );
+      expect(snapshot.fileEntries.map((entry) => entry.relativePath), <String>[
+        'current.md',
+      ]);
     },
   );
 
   test(
-    'loadPreview allows user-selected historical files in the thread workspace',
+    'loadPreview rejects historical files outside current task artifacts',
     () async {
       final workspace = await Directory.systemTemp.createTemp(
         'xworkmate-artifact-preview-',
@@ -95,7 +94,8 @@ void main() {
         artifactRelativePaths: const <String>[],
       );
 
-      expect(preview.content, '# Old\n');
+      expect(preview.kind, AssistantArtifactPreviewKind.empty);
+      expect(preview.content, isEmpty);
     },
   );
 }

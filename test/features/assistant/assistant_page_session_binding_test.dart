@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xworkmate/app/app_controller.dart';
+import 'package:xworkmate/features/assistant/assistant_page_composer_clipboard.dart';
 import 'package:xworkmate/features/assistant/assistant_page_main.dart';
 import 'package:xworkmate/features/assistant/assistant_page_state_actions.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
@@ -113,6 +114,70 @@ void main() {
 
     state.syncComposerDraftForActiveSessionInternal('draft-session-b');
     expect(state.inputControllerInternal.text, 'draft prompt B');
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump(const Duration(milliseconds: 100));
+  });
+
+  testWidgets('preserves unsent composer attachments per assistant session', (
+    tester,
+  ) async {
+    final controller = AppController(
+      environmentOverride: const <String, String>{},
+    );
+    addTearDown(controller.dispose);
+    final pageKey = GlobalKey<AssistantPageStateInternal>();
+
+    await controller.sessionsController.switchSession('draft-session-a');
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light(),
+        home: Material(
+          child: SizedBox(
+            width: 1280,
+            height: 760,
+            child: AssistantPage(
+              key: pageKey,
+              controller: controller,
+              showStandaloneTaskRail: false,
+              onOpenDetail: (_) {},
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 100));
+
+    const attachmentA = ComposerAttachmentInternal(
+      name: 'task-a.png',
+      path: '/tmp/task-a.png',
+      icon: Icons.image_outlined,
+      mimeType: 'image/png',
+    );
+    const attachmentB = ComposerAttachmentInternal(
+      name: 'task-b.md',
+      path: '/tmp/task-b.md',
+      icon: Icons.description_outlined,
+      mimeType: 'text/markdown',
+    );
+    final state = pageKey.currentState!;
+    state.composerDraftSessionKeyInternal = 'draft-session-a';
+    state.attachmentsInternal = const <ComposerAttachmentInternal>[attachmentA];
+
+    state.syncComposerDraftForActiveSessionInternal('draft-session-b');
+    expect(state.attachmentsInternal, isEmpty);
+
+    state.attachmentsInternal = const <ComposerAttachmentInternal>[attachmentB];
+    state.syncComposerDraftForActiveSessionInternal('draft-session-a');
+    expect(state.attachmentsInternal, <ComposerAttachmentInternal>[
+      attachmentA,
+    ]);
+
+    state.syncComposerDraftForActiveSessionInternal('draft-session-b');
+    expect(state.attachmentsInternal, <ComposerAttachmentInternal>[
+      attachmentB,
+    ]);
 
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(milliseconds: 100));

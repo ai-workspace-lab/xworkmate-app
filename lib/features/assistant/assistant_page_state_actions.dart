@@ -68,6 +68,9 @@ extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
         ...attachmentsInternal,
         ...files.map(ComposerAttachmentInternal.fromXFile),
       ];
+      saveComposerAttachmentsForSessionInternal(
+        widget.controller.currentSessionKey,
+      );
     });
   }
 
@@ -128,6 +131,7 @@ extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
       lastAutoAgentLabelInternal =
           autoAgent?.name ?? conversationOwnerLabelInternal(controller);
       attachmentsInternal = const <ComposerAttachmentInternal>[];
+      clearComposerAttachmentsForSessionInternal(submittedSessionKey);
       touchTaskSeedInternal(
         sessionKey: submittedSessionKey,
         title:
@@ -167,20 +171,26 @@ extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
       if (!mounted) {
         rethrow;
       }
-      if (!sessionKeysMatchInternal(
+      final currentSessionMatchesSubmitted = sessionKeysMatchInternal(
         widget.controller.currentSessionKey,
         submittedSessionKey,
-      )) {
+      );
+      if (!currentSessionMatchesSubmitted) {
         composerDraftBySessionKeyInternal[submittedSessionKey] = rawPrompt;
+        composerAttachmentsBySessionKeyInternal[submittedSessionKey] =
+            submittedAttachments;
       } else if (inputControllerInternal.text.trim().isEmpty) {
         inputControllerInternal.value = TextEditingValue(
           text: rawPrompt,
           selection: TextSelection.collapsed(offset: rawPrompt.length),
         );
       }
-      if (attachmentsInternal.isEmpty && submittedAttachments.isNotEmpty) {
+      if (currentSessionMatchesSubmitted &&
+          attachmentsInternal.isEmpty &&
+          submittedAttachments.isNotEmpty) {
         setState(() {
           attachmentsInternal = submittedAttachments;
+          saveComposerAttachmentsForSessionInternal(submittedSessionKey);
         });
       }
       rethrow;
@@ -427,6 +437,9 @@ extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
 
   Future<void> switchSessionWithRetryInternal(String sessionKey) async {
     saveComposerDraftForSessionInternal(widget.controller.currentSessionKey);
+    saveComposerAttachmentsForSessionInternal(
+      widget.controller.currentSessionKey,
+    );
     final switched = await runTaskSessionActionWithRetryInternal(
       appText('切换会话', 'Switch session'),
       () => widget.controller.switchSession(sessionKey),
@@ -434,6 +447,9 @@ extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
     if (switched) {
       composerDraftSessionKeyInternal = widget.controller.currentSessionKey;
       restoreComposerDraftForSessionInternal(
+        widget.controller.currentSessionKey,
+      );
+      restoreComposerAttachmentsForSessionInternal(
         widget.controller.currentSessionKey,
       );
       focusComposerInternal();

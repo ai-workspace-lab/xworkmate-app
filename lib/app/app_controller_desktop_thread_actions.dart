@@ -460,15 +460,7 @@ extension AppControllerDesktopThreadActions on AppController {
     final capturedLocalAttachments = List<CollaborationAttachment>.unmodifiable(
       localAttachments,
     );
-    final taskLoadClass = classifyGatewayTaskLoadInternal(message);
-    final expectedArtifactExtensions =
-        expectedGatewayArtifactExtensionsInternal(message);
-    final taskMetadata = Map<String, dynamic>.unmodifiable(<String, dynamic>{
-      ...dispatch.metadata,
-      'taskLoadClass': taskLoadClass,
-      if (expectedArtifactExtensions.isNotEmpty)
-        'expectedArtifactExtensions': expectedArtifactExtensions,
-    });
+    final taskMetadata = Map<String, dynamic>.unmodifiable(dispatch.metadata);
     final executionWorkingDirectory = gatewayExecutionWorkingDirectoryInternal(
       target: currentTarget,
       workingDirectory: workingDirectory,
@@ -689,119 +681,11 @@ extension AppControllerDesktopThreadActions on AppController {
       ..writeln(
         '6. The app syncs final artifacts from currentTaskWorkspace back into localWorkspace.',
       )
-      ..writeln()
-      ..writeln('Task load classification:')
-      ..writeln('- class: ${classifyGatewayTaskLoadInternal(requestText)}')
-      ..writeln(
-        '- Gateway owns execution decomposition, scheduling, retries, and resumability for this class.',
-      )
-      ..writeln()
-      ..writeln(
-        'Available classes: short_task, long_task, complex_long_chain_task.',
-      )
       ..writeln();
     buffer
       ..writeln('User request:')
       ..write(requestText);
     return buffer.toString();
-  }
-
-  String classifyGatewayTaskLoadInternal(String requestText) {
-    final normalized = requestText.trim().toLowerCase();
-    if (normalized.isEmpty) {
-      return 'short_task';
-    }
-    final hasChapterSplit =
-        normalized.contains('拆章节') ||
-        normalized.contains('chapter') ||
-        normalized.contains('章节');
-    final hasAgentStage =
-        normalized.contains('codex') ||
-        normalized.contains('agent') ||
-        normalized.contains('调用');
-    final hasImageStage =
-        normalized.contains('gpt images') ||
-        normalized.contains('images2') ||
-        normalized.contains('生成图') ||
-        normalized.contains('图片');
-    final hasPackagingStage =
-        normalized.contains('汇总排版') ||
-        normalized.contains('排版') ||
-        normalized.contains('制作视频') ||
-        normalized.contains('视频') ||
-        normalized.contains('mp4');
-    final hasChainArrows =
-        normalized.contains('->') || normalized.contains('→');
-    if (hasChapterSplit &&
-        hasAgentStage &&
-        hasImageStage &&
-        hasPackagingStage &&
-        hasChainArrows) {
-      return 'complex_long_chain_task';
-    }
-    const longTaskMarkers = <String>[
-      '生成文件',
-      '产物',
-      '附件',
-      '图片提示词',
-      '完整调研ppt',
-      'markdown格式',
-      '输出markdown',
-      'ppt',
-      'pptx',
-      'powerpoint',
-      'word',
-      'docx',
-      'png',
-      'mp4',
-      'jpg',
-      'markdown',
-      '.md',
-      'image prompt',
-      'artifacts',
-      'downloadurl',
-    ];
-    if (requestText.length >= 1200 ||
-        longTaskMarkers.any(normalized.contains)) {
-      return 'long_task';
-    }
-    return 'short_task';
-  }
-
-  List<String> expectedGatewayArtifactExtensionsInternal(String requestText) {
-    final normalized = requestText.trim().toLowerCase();
-    final result = <String>[];
-
-    void add(String value) {
-      final normalizedValue = value.trim().toLowerCase().replaceFirst(
-        RegExp(r'^\.'),
-        '',
-      );
-      if (normalizedValue.isEmpty || result.contains(normalizedValue)) {
-        return;
-      }
-      result.add(normalizedValue);
-    }
-
-    for (final match in RegExp(
-      r'\.([a-z0-9]{2,5})\b',
-      caseSensitive: false,
-    ).allMatches(normalized)) {
-      add(match.group(1) ?? '');
-    }
-    for (final match in RegExp(
-      r'\b([a-z0-9]{2,5})\s*(?:格式|文件|产物|artifact|file|output)',
-      caseSensitive: false,
-    ).allMatches(normalized)) {
-      add(match.group(1) ?? '');
-    }
-    for (final match in RegExp(
-      r'(?:输出|导出|生成|制作)\s*([a-z0-9]{2,5})',
-      caseSensitive: false,
-    ).allMatches(normalized)) {
-      add(match.group(1) ?? '');
-    }
-    return List<String>.unmodifiable(result);
   }
 
   bool usesOpenClawGatewayQueueInternal(
@@ -1115,7 +999,7 @@ extension AppControllerDesktopThreadActions on AppController {
     final noDisplayableOutput =
         result.success && assistantText.isEmpty && !hasCurrentRunArtifacts;
     final terminalResultCode = noDisplayableOutput
-        ? 'failed'
+        ? 'OPENCLAW_NO_DISPLAYABLE_OUTPUT'
         : gatewayTerminalResultCodeInternal(result);
     final remoteWorkingDirectory = result.remoteWorkingDirectory.trim();
     clearAiGatewayStreamingTextInternal(sessionKey);
@@ -1208,41 +1092,17 @@ extension AppControllerDesktopThreadActions on AppController {
     required Object error,
   }) {
     clearAiGatewayStreamingTextInternal(sessionKey);
-    final unconfirmedConnectCode = unconfirmedAcpHttpConnectCodeInternal(error);
-    final interruptedTransportCode = interruptedAcpHttpTransportCodeInternal(
-      error,
-    );
-    if (unconfirmedConnectCode != null) {
-      upsertTaskThreadInternal(
-        sessionKey,
-        lifecycleStatus: 'ready',
-        lastRunAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-        lastResultCode: unconfirmedConnectCode,
-        lastRemoteWorkingDirectory: '',
-        lastArtifactSyncAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-        lastArtifactSyncStatus: 'failed',
-        lastTaskArtifactRelativePaths: const <String>[],
-        updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-      );
-      appendLocalSessionMessageInternal(
-        sessionKey,
-        assistantErrorMessageInternal(
-          gatewayExecutionErrorLabelInternal(error, target: target),
-        ),
-        persistInThreadContext: true,
-      );
-      return;
-    }
+    final completedAtMs = DateTime.now().millisecondsSinceEpoch.toDouble();
     upsertTaskThreadInternal(
       sessionKey,
       lifecycleStatus: 'ready',
-      lastRunAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-      lastResultCode: interruptedTransportCode ?? 'error',
+      lastRunAtMs: completedAtMs,
+      lastResultCode: gatewayFailureResultCodeInternal(error),
       lastRemoteWorkingDirectory: '',
-      lastArtifactSyncAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+      lastArtifactSyncAtMs: completedAtMs,
       lastArtifactSyncStatus: 'failed',
       lastTaskArtifactRelativePaths: const <String>[],
-      updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+      updatedAtMs: completedAtMs,
     );
     appendLocalSessionMessageInternal(
       sessionKey,
@@ -1314,12 +1174,7 @@ extension AppControllerDesktopThreadActions on AppController {
     final lastResultCode = taskThreadForSessionInternal(
       normalizedSessionKey,
     )?.lifecycleState.lastResultCode?.trim().toUpperCase();
-    return lastResultCode != 'RUNNING' &&
-        lastResultCode != 'QUEUED' &&
-        lastResultCode != 'ABORTED' &&
-        lastResultCode != gatewayAcpHttpConnectTimeoutCode &&
-        lastResultCode != gatewayAcpHttpConnectFailedCode &&
-        lastResultCode != gatewayAcpHttpHandshakeInterruptedCode;
+    return !gatewayResultCodeRequiresNewSessionInternal(lastResultCode ?? '');
   }
 
   String gatewayTerminalResultCodeInternal(GoTaskServiceResult result) {
@@ -1327,14 +1182,65 @@ extension AppControllerDesktopThreadActions on AppController {
       return 'success';
     }
     final status = result.status.trim();
-    if (status.isNotEmpty) {
+    final code = result.code.trim();
+    if (status.isNotEmpty && status.toLowerCase() != 'failed') {
       return status;
     }
-    final code = result.code.trim();
     if (code.isNotEmpty) {
       return code;
     }
+    if (status.isNotEmpty) {
+      return status;
+    }
     return 'error';
+  }
+
+  String gatewayFailureResultCodeInternal(Object error) {
+    final unconfirmedConnectCode = unconfirmedAcpHttpConnectCodeInternal(error);
+    if (unconfirmedConnectCode != null) {
+      return unconfirmedConnectCode;
+    }
+    final interruptedTransportCode = interruptedAcpHttpTransportCodeInternal(
+      error,
+    );
+    if (interruptedTransportCode != null) {
+      return interruptedTransportCode;
+    }
+    final primaryCode = gatewayExecutionPrimaryCodeInternal(error);
+    if (primaryCode != null && primaryCode.isNotEmpty) {
+      return primaryCode;
+    }
+    final detailCode = gatewayExecutionDetailCodeInternal(error);
+    if (detailCode != null && detailCode.isNotEmpty) {
+      return detailCode;
+    }
+    return 'error';
+  }
+
+  bool gatewayResultCodeRequiresNewSessionInternal(String code) {
+    final normalized = code.trim().toUpperCase();
+    if (normalized.isEmpty) {
+      return false;
+    }
+    if (normalized == 'RUNNING' ||
+        normalized == 'QUEUED' ||
+        normalized == 'ABORTED' ||
+        normalized == gatewayAcpHttpConnectTimeoutCode ||
+        normalized == gatewayAcpHttpConnectFailedCode ||
+        normalized == gatewayAcpHttpHandshakeInterruptedCode ||
+        normalized == 'BRIDGE_NOT_CONNECTED' ||
+        normalized == 'ACP_HTTP_401' ||
+        normalized == 'ACP_HTTP_403' ||
+        normalized == 'OPENCLAW_GATEWAY_QUEUE_FULL' ||
+        normalized == 'OPENCLAW_AGENT_FAILED_BEFORE_REPLY' ||
+        normalized == 'OPENCLAW_NO_DISPLAYABLE_OUTPUT' ||
+        normalized == 'OPENCLAW_REQUIRED_ARTIFACT_MISSING' ||
+        normalized == 'OPENCLAW_NO_EXPORTED_ARTIFACTS' ||
+        normalized == 'OPENCLAW_ARTIFACT_MISSING' ||
+        normalized == 'ARTIFACT_MISSING') {
+      return true;
+    }
+    return false;
   }
 
   Future<void> abortRun() async {
