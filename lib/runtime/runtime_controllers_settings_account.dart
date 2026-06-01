@@ -107,6 +107,10 @@ extension SettingsControllerAccountExtension on SettingsController {
   Future<AccountSyncResult> syncAccountManagedSecrets({String baseUrl = ''}) =>
       syncAccountSettings(baseUrl: baseUrl);
 
+  Future<AccountSyncResult> markAccountBridgeRuntimeUnavailable(
+    String message,
+  ) => markAccountBridgeRuntimeUnavailableInternal(this, message: message);
+
   Future<void> logoutAccount() => logoutAccountSettingsInternal(this);
 
   Future<void> cancelAccountMfaChallenge() =>
@@ -115,6 +119,23 @@ extension SettingsControllerAccountExtension on SettingsController {
   AcpBridgeServerEffectiveConfig resolveAcpBridgeServerEffectiveConfig({
     required AcpBridgeServerModeConfig config,
   }) => resolveAcpBridgeServerEffectiveConfigInternal(this, config: config);
+
+  Future<SettingsSnapshot> buildSavedAccountProfileSettings({
+    required SettingsSnapshot settings,
+    required String accountBaseUrl,
+    required String accountIdentifier,
+    required String bridgeServerUrl,
+    required String bridgeToken,
+    required bool isManualBridge,
+  }) => buildSavedAccountProfileSettingsInternal(
+    this,
+    settings: settings,
+    accountBaseUrl: accountBaseUrl,
+    accountIdentifier: accountIdentifier,
+    bridgeServerUrl: bridgeServerUrl,
+    bridgeToken: bridgeToken,
+    isManualBridge: isManualBridge,
+  );
 
   List<SecretReferenceEntry> buildSecretReferences() {
     final entries = <SecretReferenceEntry>[
