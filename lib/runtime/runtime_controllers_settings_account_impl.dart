@@ -423,6 +423,24 @@ Future<void> logoutAccountSettingsInternal(
   }
 }
 
+Future<AccountSyncResult> markAccountBridgeRuntimeUnavailableInternal(
+  SettingsController controller, {
+  required String message,
+}) async {
+  final current = controller.accountSyncStateInternal;
+  final nextState = (current ?? AccountSyncState.defaults()).copyWith(
+    syncState: 'blocked',
+    syncMessage: message,
+    lastSyncAtMs: DateTime.now().millisecondsSinceEpoch,
+    lastSyncError: message,
+    profileScope: 'bridge',
+  );
+  await _persistAccountSyncStateInternal(controller, nextState);
+  controller.accountStatusInternal = message;
+  controller.notifyListeners();
+  return AccountSyncResult(state: 'blocked', message: message);
+}
+
 Future<void> cancelAccountMfaChallengeSettingsInternal(
   SettingsController controller,
 ) async {
@@ -592,6 +610,47 @@ AcpBridgeServerEffectiveConfig resolveAcpBridgeServerEffectiveConfigInternal(
     source: 'default',
     reason: 'No active Bridge source is configured',
   );
+}
+
+Future<SettingsSnapshot> buildSavedAccountProfileSettingsInternal(
+  SettingsController controller, {
+  required SettingsSnapshot settings,
+  required String accountBaseUrl,
+  required String accountIdentifier,
+  required String bridgeServerUrl,
+  required String bridgeToken,
+  required bool isManualBridge,
+}) async {
+  final bridgeConfig = settings.acpBridgeServerModeConfig;
+  final nextBridgeConfig = bridgeConfig.copyWith(
+    selfHosted: isManualBridge
+        ? bridgeConfig.selfHosted.copyWith(
+            serverUrl: bridgeServerUrl.trim(),
+            username: 'admin',
+          )
+        : bridgeConfig.selfHosted,
+  );
+  final nextEffective = resolveAcpBridgeServerEffectiveConfigInternal(
+    controller,
+    config: nextBridgeConfig,
+  );
+  final nextSettings = settings.copyWith(
+    accountBaseUrl: accountBaseUrl.trim(),
+    accountUsername: accountIdentifier.trim(),
+    acpBridgeServerModeConfig: nextBridgeConfig.copyWith(
+      effective: nextEffective,
+    ),
+  );
+  final trimmedBridgeToken = bridgeToken.trim();
+  if (isManualBridge && trimmedBridgeToken.isNotEmpty) {
+    await controller.saveSecretValueByRef(
+      nextSettings.acpBridgeServerModeConfig.selfHosted.passwordRef,
+      trimmedBridgeToken,
+      provider: 'Bridge',
+      module: 'Manual',
+    );
+  }
+  return nextSettings;
 }
 
 int _parseExpiresAtMs(Object? value) {

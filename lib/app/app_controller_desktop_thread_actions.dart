@@ -232,6 +232,7 @@ extension AppControllerDesktopThreadActions on AppController {
 
   Future<void> sendChatMessage(
     String message, {
+    String? sessionKey,
     String thinking = 'off',
     List<GatewayChatAttachmentPayload> attachments =
         const <GatewayChatAttachmentPayload>[],
@@ -239,20 +240,28 @@ extension AppControllerDesktopThreadActions on AppController {
         const <CollaborationAttachment>[],
     List<String> selectedSkillLabels = const <String>[],
   }) async {
-    var sessionKey = normalizedAssistantSessionKeyInternal(
-      sessionsControllerInternal.currentSessionKey,
+    var targetSessionKey = normalizedAssistantSessionKeyInternal(
+      sessionKey ?? sessionsControllerInternal.currentSessionKey,
     );
-    if (!isAppOwnedAssistantSessionKeyInternal(sessionKey)) {
+    if (!isAppOwnedAssistantSessionKeyInternal(targetSessionKey)) {
+      if (sessionKey != null && sessionKey.trim().isNotEmpty) {
+        throw StateError(
+          appText(
+            '提交目标会话无效，请重新选择任务后提交。',
+            'The submit target session is invalid. Select the task again before submitting.',
+          ),
+        );
+      }
       await ensureActiveAssistantThreadInternal();
-      sessionKey = normalizedAssistantSessionKeyInternal(
+      targetSessionKey = normalizedAssistantSessionKeyInternal(
         sessionsControllerInternal.currentSessionKey,
       );
     }
     final resumeSessionHint = shouldResumeGatewaySessionForNextSendInternal(
-      sessionKey,
+      targetSessionKey,
     );
     await dispatchGatewayChatTurnInternal(
-      sessionKey: sessionKey,
+      sessionKey: targetSessionKey,
       message: message,
       thinking: thinking,
       attachments: attachments,
@@ -452,9 +461,13 @@ extension AppControllerDesktopThreadActions on AppController {
       localAttachments,
     );
     final taskLoadClass = classifyGatewayTaskLoadInternal(message);
+    final expectedArtifactExtensions =
+        expectedGatewayArtifactExtensionsInternal(message);
     final taskMetadata = Map<String, dynamic>.unmodifiable(<String, dynamic>{
       ...dispatch.metadata,
       'taskLoadClass': taskLoadClass,
+      if (expectedArtifactExtensions.isNotEmpty)
+        'expectedArtifactExtensions': expectedArtifactExtensions,
     });
     final executionWorkingDirectory = gatewayExecutionWorkingDirectoryInternal(
       target: currentTarget,
@@ -753,6 +766,42 @@ extension AppControllerDesktopThreadActions on AppController {
       return 'long_task';
     }
     return 'short_task';
+  }
+
+  List<String> expectedGatewayArtifactExtensionsInternal(String requestText) {
+    final normalized = requestText.trim().toLowerCase();
+    final result = <String>[];
+
+    void add(String value) {
+      final normalizedValue = value.trim().toLowerCase().replaceFirst(
+        RegExp(r'^\.'),
+        '',
+      );
+      if (normalizedValue.isEmpty || result.contains(normalizedValue)) {
+        return;
+      }
+      result.add(normalizedValue);
+    }
+
+    for (final match in RegExp(
+      r'\.([a-z0-9]{2,5})\b',
+      caseSensitive: false,
+    ).allMatches(normalized)) {
+      add(match.group(1) ?? '');
+    }
+    for (final match in RegExp(
+      r'\b([a-z0-9]{2,5})\s*(?:格式|文件|产物|artifact|file|output)',
+      caseSensitive: false,
+    ).allMatches(normalized)) {
+      add(match.group(1) ?? '');
+    }
+    for (final match in RegExp(
+      r'(?:输出|导出|生成|制作)\s*([a-z0-9]{2,5})',
+      caseSensitive: false,
+    ).allMatches(normalized)) {
+      add(match.group(1) ?? '');
+    }
+    return List<String>.unmodifiable(result);
   }
 
   bool usesOpenClawGatewayQueueInternal(
