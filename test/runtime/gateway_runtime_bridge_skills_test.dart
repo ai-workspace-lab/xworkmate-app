@@ -6,6 +6,7 @@ import 'package:xworkmate/runtime/device_identity_store.dart';
 import 'package:xworkmate/runtime/gateway_acp_client.dart';
 import 'package:xworkmate/runtime/gateway_runtime.dart';
 import 'package:xworkmate/runtime/runtime_controllers.dart';
+import 'package:xworkmate/runtime/runtime_models.dart';
 import 'package:xworkmate/runtime/secure_config_store.dart';
 
 void main() {
@@ -129,9 +130,10 @@ void main() {
         endpointResolver: () => Uri.parse('http://127.0.0.1:${server.port}'),
         authorizationResolver: (_) async => 'bridge-token',
       );
+      final identityStore = DeviceIdentityStore(store);
       final runtime = GatewayRuntime(
         store: store,
-        identityStore: DeviceIdentityStore(store),
+        identityStore: identityStore,
         sessionClient: GatewayAcpRuntimeSessionClient(client: acpClient),
       );
       await runtime.initialize();
@@ -141,6 +143,18 @@ void main() {
         await server.close(force: true);
         await tempDir.delete(recursive: true);
       });
+
+      final directConnectParams = await runtime.buildConnectParamsInternal(
+        runtime,
+        profile: GatewayConnectionProfile.defaults(),
+        identity: await identityStore.loadOrCreate(),
+        nonce: 'nonce',
+        authToken: 'bridge-token',
+        authDeviceToken: '',
+        authPassword: '',
+      );
+      expect(directConnectParams['minProtocol'], kGatewayProtocolVersion);
+      expect(directConnectParams['maxProtocol'], kGatewayProtocolVersion);
 
       final controller = SkillsController(runtime);
       await controller.refresh(agentId: 'main');
