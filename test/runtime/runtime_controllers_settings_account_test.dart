@@ -442,6 +442,144 @@ void main() {
     );
 
     test(
+      'blocked managed bridge sync does not configure runtime authorization',
+      () async {
+        final storeRoot = await Directory.systemTemp.createTemp(
+          'xworkmate-account-managed-bridge-blocked-runtime-',
+        );
+        addTearDown(() async {
+          if (await storeRoot.exists()) {
+            await storeRoot.delete(recursive: true);
+          }
+        });
+
+        final store = SecureConfigStore(
+          secretRootPathResolver: () async => '${storeRoot.path}/secrets',
+          appDataRootPathResolver: () async => '${storeRoot.path}/app-data',
+          supportRootPathResolver: () async => '${storeRoot.path}/support',
+          enableSecureStorage: false,
+        );
+        await store.initialize();
+        await store.saveAccountSessionToken('session-token');
+        await store.saveAccountSessionSummary(
+          const AccountSessionSummary(
+            userId: 'user-1',
+            email: 'review@svc.plus',
+            name: 'Review User',
+            role: 'reviewer',
+            mfaEnabled: true,
+          ),
+        );
+        await store.saveAccountSyncState(
+          AccountSyncState.defaults().copyWith(
+            syncState: 'ready',
+            tokenConfigured: const AccountTokenConfigured(
+              bridge: true,
+              vault: false,
+            ),
+          ),
+        );
+        await store.saveAccountManagedSecret(
+          target: kAccountManagedSecretTargetBridgeAuthToken,
+          value: 'bridge-token',
+        );
+
+        final controller = AppController(
+          environmentOverride: const <String, String>{
+            'BRIDGE_AUTH_TOKEN': 'env-token-must-not-recover-blocked-sync',
+          },
+          store: store,
+        );
+        addTearDown(controller.dispose);
+        await controller.settingsControllerInternal.initialize();
+
+        await controller.settingsControllerInternal
+            .markAccountBridgeRuntimeUnavailable(
+              'Bridge authorization rejected',
+            );
+
+        expect(controller.isBridgeAcpRuntimeConfiguredInternal(), isFalse);
+        expect(
+          await controller.resolveGatewayAcpAuthorizationHeaderInternal(
+            Uri.parse('$kManagedBridgeServerUrl/acp/rpc'),
+          ),
+          isNull,
+        );
+        expect(
+          await store.loadAccountManagedSecret(
+            target: kAccountManagedSecretTargetBridgeAuthToken,
+          ),
+          'bridge-token',
+        );
+      },
+    );
+
+    test('manual bridge config becomes the runtime ACP source', () async {
+      final storeRoot = await Directory.systemTemp.createTemp(
+        'xworkmate-manual-bridge-runtime-',
+      );
+      addTearDown(() async {
+        if (await storeRoot.exists()) {
+          try {
+            await storeRoot.delete(recursive: true);
+          } on FileSystemException {
+            // Temp cleanup is best effort here. The controller may still be
+            // releasing files when teardown starts.
+          }
+        }
+      });
+
+      final store = SecureConfigStore(
+        secretRootPathResolver: () async => '${storeRoot.path}/secrets',
+        appDataRootPathResolver: () async => '${storeRoot.path}/app-data',
+        supportRootPathResolver: () async => '${storeRoot.path}/support',
+        enableSecureStorage: false,
+      );
+      await store.initialize();
+      await store.saveSettingsSnapshot(
+        SettingsSnapshot.defaults().copyWith(
+          acpBridgeServerModeConfig: AcpBridgeServerModeConfig.defaults()
+              .copyWith(
+                selfHosted: AcpBridgeServerModeConfig.defaults().selfHosted
+                    .copyWith(
+                      serverUrl: 'https://private-bridge.svc.plus',
+                      username: 'admin',
+                    ),
+              ),
+        ),
+      );
+      await store.saveSecretValueByRef(
+        AcpBridgeServerSelfHostedConfig.defaults().passwordRef,
+        'manual-bridge-token',
+      );
+
+      final controller = AppController(
+        environmentOverride: const <String, String>{},
+        store: store,
+      );
+      addTearDown(controller.dispose);
+      await controller.settingsControllerInternal.initialize();
+
+      expect(
+        controller.resolveGatewayAcpEndpointInternal()?.toString(),
+        'https://private-bridge.svc.plus',
+      );
+      expect(controller.isBridgeAcpRuntimeConfiguredInternal(), isTrue);
+      expect(
+        await controller.resolveGatewayAcpAuthorizationHeaderInternal(
+          Uri.parse('https://private-bridge.svc.plus/acp/rpc'),
+        ),
+        'manual-bridge-token',
+      );
+      expect(
+        await controller.resolveGatewayAcpAuthorizationHeaderInternal(
+          Uri.parse('$kManagedBridgeServerUrl/acp/rpc'),
+        ),
+        isNull,
+      );
+    });
+
+    test(
       'syncAccountSettings succeeds when bridge url metadata is missing',
       () async {
         final storeRoot = await Directory.systemTemp.createTemp(

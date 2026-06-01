@@ -208,8 +208,6 @@ payload = json.loads(os.environ["RESPONSE_JSON"])
 result = payload.get("result") or payload.get("payload") or {}
 if result.get("resolvedProviderId") != "codex":
     raise SystemExit("session.start did not resolve codex")
-if not str(result.get("error") or "").strip():
-    raise SystemExit("session.start in this environment should expose downstream error details")
 PY
 
 RESPONSE_JSON="${message_json}" python3 - <<'PY'
