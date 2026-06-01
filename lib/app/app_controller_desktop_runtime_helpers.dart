@@ -1016,6 +1016,18 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
   }
 
   Uri? resolveBridgeAcpEndpointInternal() {
+    final selfHosted = settingsControllerInternal
+        .snapshot
+        .acpBridgeServerModeConfig
+        .selfHosted;
+    final selfHostedUrl = selfHosted.serverUrl.trim();
+    if (selfHosted.isConfigured && selfHostedUrl.isNotEmpty) {
+      final uri = Uri.tryParse(selfHostedUrl);
+      if (uri != null && uri.hasScheme && uri.host.trim().isNotEmpty) {
+        return uri.replace(query: null, fragment: null);
+      }
+    }
+
     final uri = Uri.parse(kManagedBridgeServerUrl);
     return uri.replace(query: null, fragment: null);
   }
@@ -1029,10 +1041,21 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     if (bridgeEndpoint == null) {
       return false;
     }
+    final selfHosted = settingsControllerInternal
+        .snapshot
+        .acpBridgeServerModeConfig
+        .selfHosted;
+    if (selfHosted.isConfigured) {
+      return true;
+    }
     final accountSyncState = settingsControllerInternal.accountSyncState;
     if (settingsControllerInternal.accountSignedIn &&
+        accountSyncState?.syncState.trim().toLowerCase() == 'ready' &&
         accountSyncState?.tokenConfigured.bridge == true) {
       return true;
+    }
+    if (settingsControllerInternal.accountSignedIn) {
+      return false;
     }
     final envToken = runtimeEnvironmentValueInternal('BRIDGE_AUTH_TOKEN');
     return envToken != null && envToken.isNotEmpty;
@@ -1072,6 +1095,10 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
         normalizedHost == bridgeHost &&
         (bridgePort <= 0 || endpoint.port == bridgePort);
     if (matchesBridgeEndpoint) {
+      final manualBridgeToken = await _resolveManualBridgeAuthTokenInternal();
+      if (manualBridgeToken != null && manualBridgeToken.isNotEmpty) {
+        return manualBridgeToken;
+      }
       final bridgeToken = await _resolveManagedBridgeAuthTokenInternal();
       if (bridgeToken != null && bridgeToken.isNotEmpty) {
         return bridgeToken;
@@ -1097,14 +1124,36 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     return null;
   }
 
+  Future<String?> _resolveManualBridgeAuthTokenInternal() async {
+    final selfHosted = settingsControllerInternal
+        .snapshot
+        .acpBridgeServerModeConfig
+        .selfHosted;
+    if (!selfHosted.isConfigured) {
+      return null;
+    }
+    final passwordRef = selfHosted.passwordRef.trim();
+    if (passwordRef.isEmpty) {
+      return null;
+    }
+    final token = (await storeInternal.loadSecretValueByRef(
+      passwordRef,
+    ))?.trim();
+    return token?.isNotEmpty == true ? token : null;
+  }
+
   Future<String?> _resolveManagedBridgeAuthTokenInternal() async {
     final accountSyncState = settingsControllerInternal.accountSyncState;
     if (settingsControllerInternal.accountSignedIn &&
+        accountSyncState?.syncState.trim().toLowerCase() == 'ready' &&
         accountSyncState?.tokenConfigured.bridge == true) {
       final bridgeToken = (await storeInternal.loadAccountManagedSecret(
         target: kAccountManagedSecretTargetBridgeAuthToken,
       ))?.trim();
       return bridgeToken?.isNotEmpty == true ? bridgeToken : null;
+    }
+    if (settingsControllerInternal.accountSignedIn) {
+      return null;
     }
 
     final envToken = runtimeEnvironmentValueInternal('BRIDGE_AUTH_TOKEN');
