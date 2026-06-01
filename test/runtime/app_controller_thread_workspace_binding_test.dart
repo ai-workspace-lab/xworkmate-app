@@ -64,14 +64,14 @@ void main() {
         allOf(contains(realSessionKey), isNot(contains(pollutedSessionKey))),
       );
       expect(controller.currentSessionKey, isNot(pollutedSessionKey));
-      expect(controller.appUiState.assistantLastSessionKey, isEmpty);
+      expect(controller.appUiState.assistantLastSessionKey, realSessionKey);
       expect(store.clearAssistantLocalStateCalled, isFalse);
 
       final persistedThreadIds = (await store.loadTaskThreads())
           .map((thread) => thread.threadId)
           .toList(growable: false);
       expect(persistedThreadIds, <String>[realSessionKey]);
-      expect((await store.loadAppUiState()).assistantLastSessionKey, isEmpty);
+      expect((await store.loadAppUiState()).assistantLastSessionKey, realSessionKey);
     },
   );
 
@@ -1129,6 +1129,7 @@ void main() {
       },
     );
     addTearDown(controller.dispose);
+    await _waitForControllerInitialization(controller);
 
     final localWorkspace = await Directory.systemTemp.createTemp(
       'xworkmate-partial-artifact-workspace-',
