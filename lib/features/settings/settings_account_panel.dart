@@ -101,9 +101,6 @@ class _SettingsAccountPanelState extends State<SettingsAccountPanel>
                   Tab(text: appText('svc.plus 云端同步', 'svc.plus Cloud Sync')),
                   Tab(text: appText('手动 Bridge 配置', 'Manual Bridge Config')),
                 ],
-                onTap: (index) {
-                  widget.onSaveAccountProfile(isManualBridge: index == 1);
-                },
               ),
               const SizedBox(height: 24),
               SizedBox(
