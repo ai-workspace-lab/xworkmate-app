@@ -80,6 +80,46 @@
   - 测试连接结果
   - 是否需要本机服务日志人工对照
 
+### `MANUAL-ACP-004` 账号同步返回 `bridge_auth_token_unavailable`
+
+- 前置条件
+  - 已登录 `svc.plus` 账号
+  - 账户侧能正常拉起 session
+  - 本地 App 可访问 `https://accounts.svc.plus`
+- 典型现象
+  - 设置页顶部与账号面板显示 `xworkmate-bridge 连接失败`
+  - 账号同步状态为 `失败`
+  - 同步说明显示 `bridge auth token is unavailable`
+  - 详情信息里可见 `bridge_auth_token_unavailable`
+- 排查步骤
+  1. 在 App 中触发账号同步或重新进入设置页
+  2. 直接请求 `GET /api/auth/xworkmate/profile/sync`
+  3. 确认是否返回 `409`
+  4. 检查本地 secure storage 中是否存在 `xworkmate.account.managed.bridge.auth_token`
+  5. 检查 `xworkmate-app` 的 `accountSyncState` 是否被写成 `blocked`
+  6. 回到 `accounts.svc.plus` 服务侧确认 shared bridge token 是否已注入 Vault 并可被读取
+- 期望结论
+  - 若接口返回 `409 bridge_auth_token_unavailable`，问题不在 App 的 bridge 连接逻辑
+  - 根因在 `accounts.svc.plus` 的 shared XWorkmate bridge token 供给链路
+  - `BRIDGE_AUTH_TOKEN` 需要由 accounts 服务通过 Vault 读取并下发
+- 关联同步规则
+  - 任务 workspace 需要递归同步全部子目录和文件
+  - `dist/账户与身份安全演进史-GPT混排最终版.pdf` 这类深层产物应能回传到当前线程 artifact
+  - 如 skill 或任务已有忽略清单，则中间产物可按清单排除同步，常见对象包括草稿、临时文件、版本号中间稿和可重复生成缓存
+  - 忽略清单建议以约定文件形式维护，例如 `.ignore.md`
+- 恢复条件
+  - `GET /api/auth/xworkmate/profile/sync` 返回 `200`
+  - 响应包含 `BRIDGE_SERVER_URL` 和 `BRIDGE_AUTH_TOKEN`
+  - App 重新同步后，`accountSyncState.syncState` 变为 `ready`
+  - 本地 managed secret `bridge.auth_token` 被写入
+- 建议记录项
+  - 登录账号
+  - `profile/sync` HTTP 状态码
+  - 响应错误码或成功字段
+  - 本地 `accountSyncState.syncState`
+  - `tokenConfigured.bridge` 是否为 `true`
+  - 是否已在 `accounts.svc.plus` 侧确认 Vault / bootstrap 配置
+
 ## 3. 本地执行型任务线程
 
 ### `MANUAL-LOCAL-001` `powerpoint-pptx`

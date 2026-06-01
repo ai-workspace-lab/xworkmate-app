@@ -108,7 +108,7 @@ void main() {
       expect(metadata['buildDate'], '');
     });
 
-    test('returns unavailable when authorized bridge ping fails', () async {
+    test('returns unauthorized when bridge rejects authorization', () async {
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
       addTearDown(() async {
         await server.close(force: true);
@@ -126,7 +126,8 @@ void main() {
         authorizationResolver: (_) async => 'bridge-token',
       );
 
-      expect(metadata['status'], 'unavailable');
+      expect(metadata['status'], 'unauthorized');
+      expect(metadata['message'], 'Bridge authorization rejected');
       expect(metadata['version'], '');
       expect(metadata['commit'], '');
       expect(metadata['image'], '');

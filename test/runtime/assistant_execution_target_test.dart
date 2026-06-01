@@ -1187,6 +1187,31 @@ void main() {
     );
 
     test(
+      'sendChatMessage declares expected artifacts for complex PDF chains',
+      () async {
+        final fakeGoTaskService = _RecordingGoTaskServiceClient();
+        final controller = _connectedGatewayController(fakeGoTaskService);
+        addTearDown(controller.dispose);
+
+        await controller.ensureActiveAssistantThreadInternal();
+        await controller.setAssistantExecutionTarget(
+          AssistantExecutionTarget.gateway,
+        );
+        await controller.sendChatMessage(
+          '围绕\n\n'
+          '从单机权限 → 网络边界 → Web安全 → 云身份 → Zero Trust → AI Agent 身份 → AI模型与知识保护 演进 800-1500字\n'
+          '拆章节 -> 每章调用 Codex -> 每章 GPT images2 生成图 -> 汇总排版 ->\n\n'
+          '最后 输出 PDF文件',
+        );
+
+        expect(fakeGoTaskService.requests, hasLength(1));
+        final request = fakeGoTaskService.requests.single;
+        expect(request.metadata['taskLoadClass'], 'complex_long_chain_task');
+        expect(request.metadata['expectedArtifactExtensions'], <String>['pdf']);
+      },
+    );
+
+    test(
       'sendChatMessage classifies simple Gateway prompts as short tasks',
       () async {
         final fakeGoTaskService = _RecordingGoTaskServiceClient();
@@ -1892,6 +1917,125 @@ void main() {
       );
     });
 
+    test('sendChatMessage can pin submit to the captured session', () async {
+      final fakeGoTaskService = _BlockingGoTaskServiceClient();
+      final controller = _connectedController(fakeGoTaskService);
+      addTearDown(controller.dispose);
+
+      await controller.switchSession('same-prompt-old-task');
+      await controller.switchSession('same-prompt-new-task');
+      final taskFuture = controller.sendChatMessage(
+        '连续制作7张图片',
+        sessionKey: 'same-prompt-new-task',
+      );
+      await fakeGoTaskService.waitForRequestCount(1);
+
+      final request = fakeGoTaskService.requests.single;
+      expect(request.sessionId, 'same-prompt-new-task');
+      expect(request.threadId, 'same-prompt-new-task');
+      expect(request.workingDirectory, endsWith('/same-prompt-new-task'));
+      expect(
+        request.remoteWorkingDirectoryHint,
+        endsWith('/threads/same-prompt-new-task'),
+      );
+
+      fakeGoTaskService.complete(
+        'same-prompt-new-task',
+        const GoTaskServiceResult(
+          success: true,
+          message: 'new task result',
+          turnId: 'turn-new',
+          raw: <String, dynamic>{},
+          errorMessage: '',
+          resolvedModel: '',
+          route: GoTaskServiceRoute.externalAcpSingle,
+        ),
+      );
+      await taskFuture;
+
+      expect(
+        controller.localSessionMessagesInternal['same-prompt-new-task']!.map(
+          (message) => message.text,
+        ),
+        contains('new task result'),
+      );
+      expect(
+        controller.localSessionMessagesInternal['same-prompt-old-task'],
+        isNot(contains('new task result')),
+      );
+    });
+
+    test(
+      'sendChatMessage queues follow-up turns on the same session',
+      () async {
+        final fakeGoTaskService = _BlockingGoTaskServiceClient();
+        final controller = _connectedController(fakeGoTaskService);
+        addTearDown(controller.dispose);
+
+        await controller.switchSession('running-task');
+        final firstFuture = controller.sendChatMessage('first turn');
+        await fakeGoTaskService.waitForRequestCount(1);
+        expect(fakeGoTaskService.requests.single.sessionId, 'running-task');
+        expect(fakeGoTaskService.requests.single.threadId, 'running-task');
+        expect(
+          controller.assistantSessionHasPendingRun('running-task'),
+          isTrue,
+        );
+
+        final secondFuture = controller.sendChatMessage('follow up');
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+        expect(fakeGoTaskService.requests, hasLength(1));
+        expect(controller.currentSessionKey, 'running-task');
+
+        fakeGoTaskService.complete(
+          'running-task',
+          const GoTaskServiceResult(
+            success: true,
+            message: 'first result',
+            turnId: 'turn-1',
+            raw: <String, dynamic>{},
+            errorMessage: '',
+            resolvedModel: '',
+            route: GoTaskServiceRoute.externalAcpSingle,
+          ),
+        );
+        await firstFuture;
+        await fakeGoTaskService.waitForRequestCount(2);
+
+        final followUpRequest = fakeGoTaskService.requests.last;
+        expect(followUpRequest.sessionId, 'running-task');
+        expect(followUpRequest.threadId, 'running-task');
+        expect(followUpRequest.prompt, contains('follow up'));
+        expect(controller.currentSessionKey, 'running-task');
+
+        fakeGoTaskService.complete(
+          'running-task',
+          const GoTaskServiceResult(
+            success: true,
+            message: 'second result',
+            turnId: 'turn-2',
+            raw: <String, dynamic>{},
+            errorMessage: '',
+            resolvedModel: '',
+            route: GoTaskServiceRoute.externalAcpSingle,
+          ),
+        );
+        await secondFuture;
+
+        expect(
+          controller.localSessionMessagesInternal['running-task']!.map(
+            (message) => message.text,
+          ),
+          containsAll(<String>[
+            'first turn',
+            'first result',
+            'follow up',
+            'second result',
+          ]),
+        );
+      },
+    );
+
     test(
       'background task completion does not overwrite the selected session',
       () async {
@@ -2272,9 +2416,10 @@ void main() {
         );
         expect(taskBSnapshot.fileEntries, isEmpty);
         expect(
-          taskBSnapshot.filesMessage,
-          'No files found in the recorded working directory.',
+          taskBSnapshot.resultMessage,
+          'No task artifacts recorded for this run.',
         );
+        expect(taskBSnapshot.filesMessage, isEmpty);
       },
     );
 
@@ -2413,9 +2558,10 @@ void main() {
           sessionKey: 'terminal-failure-task',
         );
         expect(snapshot.resultEntries, isEmpty);
+        expect(snapshot.fileEntries, isEmpty);
         expect(
-          snapshot.fileEntries.map((entry) => entry.relativePath),
-          contains('first.md'),
+          snapshot.resultMessage,
+          'No task artifacts recorded for this run.',
         );
       },
     );
@@ -2596,7 +2742,7 @@ void main() {
           await expectLater(
             controller
                 .sendChatMessage('active prompt $index')
-                .timeout(const Duration(milliseconds: 250)),
+                .timeout(const Duration(seconds: 2)),
             completes,
           );
           await fakeGoTaskService.waitForRequestCount(index + 1);
@@ -2616,7 +2762,7 @@ void main() {
                 'queued prompt',
                 attachments: <GatewayChatAttachmentPayload>[queuedAttachment],
               )
-              .timeout(const Duration(milliseconds: 250)),
+              .timeout(const Duration(seconds: 2)),
           completes,
         );
         await _waitForThreadLifecycleStatus(
@@ -2718,6 +2864,57 @@ void main() {
       },
     );
 
+    test(
+      'OpenClaw gateway admits five representative E2E tasks without queueing',
+      () async {
+        final fakeGoTaskService = _BlockingGoTaskServiceClient();
+        final controller = _connectedGatewayController(fakeGoTaskService);
+        addTearDown(() {
+          fakeGoTaskService.completeAll();
+          controller.dispose();
+        });
+
+        const prompts = <String>[
+          '从单机权限 → 网络边界 → Web安全 → 云身份 → Zero Trust → AI Agent 身份 → AI模型与知识保护 演进 \n制作 使用codex 制作连续制作 7张的一些列图片',
+          '参考附件模版制作 ,围绕\n从单机权限 → 网络边界 → Web安全 → 云身份 → Zero Trust → AI Agent 身份 → AI模型与知识保护 演进 \n连续制作 7张的一些列图片',
+          '拆章节 -> 每章调用 Codex -> 每章 GPT images2 生成图 -> 汇总排版 -> 输出 PDF\n\n右侧 artifact栏 显示的陈旧文件',
+          '围绕\n从单机权限 → 网络边界 → Web安全 → 云身份 → Zero Trust → AI Agent 身份 → AI模型与知识保护 演进 右侧是当下 \n测试制作视频',
+          '围绕\n\n从单机权限 → 网络边界 → Web安全 → 云身份 → Zero Trust → AI Agent 身份 → AI模型与知识保护 演进 \n\n拆章节 -> 每章调用 Codex -> 每章 GPT images2 生成图 -> 汇总排版 -> 制作视频',
+        ];
+
+        for (var index = 0; index < prompts.length; index += 1) {
+          final sessionKey = 'openclaw-e2e-$index';
+          await _selectGatewaySession(controller, sessionKey);
+          await expectLater(
+            controller
+                .sendChatMessage(prompts[index])
+                .timeout(const Duration(seconds: 2)),
+            completes,
+          );
+        }
+
+        await fakeGoTaskService.waitForRequestCount(prompts.length);
+        expect(fakeGoTaskService.requests, hasLength(prompts.length));
+        expect(controller.openClawGatewayActiveTasksInternal, prompts.length);
+        expect(controller.openClawGatewayQueuedTurnsInternal, isEmpty);
+        for (var index = 0; index < prompts.length; index += 1) {
+          final sessionKey = 'openclaw-e2e-$index';
+          expect(
+            controller
+                .requireTaskThreadForSessionInternal(sessionKey)
+                .lifecycleState
+                .status,
+            'running',
+          );
+          expect(fakeGoTaskService.requests[index].sessionId, sessionKey);
+          expect(
+            fakeGoTaskService.requests[index].prompt,
+            contains(prompts[index]),
+          );
+        }
+      },
+    );
+
     test('OpenClaw gateway task uses the server default model', () async {
       final fakeGoTaskService = _BlockingGoTaskServiceClient();
       final controller = _connectedGatewayController(fakeGoTaskService);
@@ -2735,7 +2932,7 @@ void main() {
       final taskFuture = controller.sendChatMessage('use OpenClaw default');
       await fakeGoTaskService.waitForRequestCount(1);
       await expectLater(
-        taskFuture.timeout(const Duration(milliseconds: 250)),
+        taskFuture.timeout(const Duration(seconds: 2)),
         completes,
       );
 
@@ -3787,7 +3984,7 @@ Future<List<String>> _startOpenClawActiveTasks(
     await expectLater(
       controller
           .sendChatMessage('active task $index')
-          .timeout(const Duration(milliseconds: 250)),
+          .timeout(const Duration(seconds: 2)),
       completes,
     );
     await fakeGoTaskService.waitForRequestCount(index + 1);

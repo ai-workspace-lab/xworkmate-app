@@ -777,7 +777,6 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     var wroteArtifact = false;
     var failedArtifact = false;
     var skippedArtifact = false;
-    final currentTaskArtifactRelativePaths = <String>[];
     for (final artifact in artifacts) {
       final relativePath = _sanitizeArtifactRelativePathInternal(
         artifact.relativePath,
@@ -792,7 +791,13 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
       }
       final bytes = bytesResult.bytes;
       if (bytes == null) {
-        skippedArtifact = true;
+        final existingArtifactPaths =
+            await _existingWorkspaceArtifactPathsInternal(root, relativePath);
+        if (existingArtifactPaths.isEmpty) {
+          skippedArtifact = true;
+          continue;
+        }
+        wroteArtifact = true;
         continue;
       }
       final target = await _nextArtifactTargetFileInternal(root, relativePath);
@@ -807,14 +812,6 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
         continue;
       }
       wroteArtifact = true;
-      final writtenRelativePath =
-          DesktopThreadArtifactService.relativePathInternal(
-            root.path,
-            target.path,
-          );
-      if (writtenRelativePath != null && writtenRelativePath.isNotEmpty) {
-        currentTaskArtifactRelativePaths.add(writtenRelativePath);
-      }
     }
 
     final syncStatus = wroteArtifact
@@ -822,6 +819,9 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
         : failedArtifact
         ? 'download-failed'
         : 'no-artifacts';
+    final currentTaskArtifactRelativePaths = wroteArtifact
+        ? await _collectWorkspaceArtifactRelativePathsInternal(root)
+        : const <String>[];
     upsertTaskThreadInternal(
       normalizedSessionKey,
       lastArtifactSyncAtMs: syncedAtMs,
@@ -1016,6 +1016,18 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
   }
 
   Uri? resolveBridgeAcpEndpointInternal() {
+    final selfHosted = settingsControllerInternal
+        .snapshot
+        .acpBridgeServerModeConfig
+        .selfHosted;
+    final selfHostedUrl = selfHosted.serverUrl.trim();
+    if (selfHosted.isConfigured && selfHostedUrl.isNotEmpty) {
+      final uri = Uri.tryParse(selfHostedUrl);
+      if (uri != null && uri.hasScheme && uri.host.trim().isNotEmpty) {
+        return uri.replace(query: null, fragment: null);
+      }
+    }
+
     final uri = Uri.parse(kManagedBridgeServerUrl);
     return uri.replace(query: null, fragment: null);
   }
@@ -1029,10 +1041,21 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     if (bridgeEndpoint == null) {
       return false;
     }
+    final selfHosted = settingsControllerInternal
+        .snapshot
+        .acpBridgeServerModeConfig
+        .selfHosted;
+    if (selfHosted.isConfigured) {
+      return true;
+    }
     final accountSyncState = settingsControllerInternal.accountSyncState;
     if (settingsControllerInternal.accountSignedIn &&
+        accountSyncState?.syncState.trim().toLowerCase() == 'ready' &&
         accountSyncState?.tokenConfigured.bridge == true) {
       return true;
+    }
+    if (settingsControllerInternal.accountSignedIn) {
+      return false;
     }
     final envToken = runtimeEnvironmentValueInternal('BRIDGE_AUTH_TOKEN');
     return envToken != null && envToken.isNotEmpty;
@@ -1072,6 +1095,10 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
         normalizedHost == bridgeHost &&
         (bridgePort <= 0 || endpoint.port == bridgePort);
     if (matchesBridgeEndpoint) {
+      final manualBridgeToken = await _resolveManualBridgeAuthTokenInternal();
+      if (manualBridgeToken != null && manualBridgeToken.isNotEmpty) {
+        return manualBridgeToken;
+      }
       final bridgeToken = await _resolveManagedBridgeAuthTokenInternal();
       if (bridgeToken != null && bridgeToken.isNotEmpty) {
         return bridgeToken;
@@ -1090,6 +1117,10 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
       return null;
     }
 
+    final manualBridgeToken = await _resolveManualBridgeAuthTokenInternal();
+    if (manualBridgeToken != null && manualBridgeToken.isNotEmpty) {
+      return _normalizeAuthorizationHeaderInternal(manualBridgeToken);
+    }
     final bridgeToken = await _resolveManagedBridgeAuthTokenInternal();
     if (bridgeToken != null && bridgeToken.isNotEmpty) {
       return _normalizeAuthorizationHeaderInternal(bridgeToken);
@@ -1097,14 +1128,36 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     return null;
   }
 
+  Future<String?> _resolveManualBridgeAuthTokenInternal() async {
+    final selfHosted = settingsControllerInternal
+        .snapshot
+        .acpBridgeServerModeConfig
+        .selfHosted;
+    if (!selfHosted.isConfigured) {
+      return null;
+    }
+    final passwordRef = selfHosted.passwordRef.trim();
+    if (passwordRef.isEmpty) {
+      return null;
+    }
+    final token = (await storeInternal.loadSecretValueByRef(
+      passwordRef,
+    ))?.trim();
+    return token?.isNotEmpty == true ? token : null;
+  }
+
   Future<String?> _resolveManagedBridgeAuthTokenInternal() async {
     final accountSyncState = settingsControllerInternal.accountSyncState;
     if (settingsControllerInternal.accountSignedIn &&
+        accountSyncState?.syncState.trim().toLowerCase() == 'ready' &&
         accountSyncState?.tokenConfigured.bridge == true) {
       final bridgeToken = (await storeInternal.loadAccountManagedSecret(
         target: kAccountManagedSecretTargetBridgeAuthToken,
       ))?.trim();
       return bridgeToken?.isNotEmpty == true ? bridgeToken : null;
+    }
+    if (settingsControllerInternal.accountSignedIn) {
+      return null;
     }
 
     final envToken = runtimeEnvironmentValueInternal('BRIDGE_AUTH_TOKEN');
@@ -1143,6 +1196,62 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
   int gatewayProfileIndexForExecutionTargetInternal(
     AssistantExecutionTarget target,
   ) => kGatewayRemoteProfileIndex;
+}
+
+Future<List<String>> _existingWorkspaceArtifactPathsInternal(
+  Directory root,
+  String relativePath,
+) async {
+  final targetPath = DesktopThreadArtifactService.resolveAbsolutePathInternal(
+    root.path,
+    relativePath,
+  );
+  final targetType = await FileSystemEntity.type(
+    targetPath,
+    followLinks: false,
+  );
+  if (targetType == FileSystemEntityType.file) {
+    final resolvedRelativePath =
+        DesktopThreadArtifactService.relativePathInternal(
+          root.path,
+          targetPath,
+        );
+    return resolvedRelativePath == null || resolvedRelativePath.isEmpty
+        ? const <String>[]
+        : <String>[resolvedRelativePath];
+  }
+  if (targetType != FileSystemEntityType.directory) {
+    return const <String>[];
+  }
+  final files = await DesktopThreadArtifactService().collectFilesInternal(
+    Directory(targetPath),
+  );
+  final paths = <String>[];
+  for (final file in files) {
+    final resolvedRelativePath =
+        DesktopThreadArtifactService.relativePathInternal(root.path, file.path);
+    if (resolvedRelativePath != null && resolvedRelativePath.isNotEmpty) {
+      paths.add(resolvedRelativePath);
+    }
+  }
+  paths.sort();
+  return paths;
+}
+
+Future<List<String>> _collectWorkspaceArtifactRelativePathsInternal(
+  Directory root,
+) async {
+  final files = await DesktopThreadArtifactService().collectFilesInternal(root);
+  final paths = <String>[];
+  for (final file in files) {
+    final resolvedRelativePath =
+        DesktopThreadArtifactService.relativePathInternal(root.path, file.path);
+    if (resolvedRelativePath != null && resolvedRelativePath.isNotEmpty) {
+      paths.add(resolvedRelativePath);
+    }
+  }
+  paths.sort();
+  return paths;
 }
 
 String _normalizeAuthorizationHeaderInternal(String raw) {
