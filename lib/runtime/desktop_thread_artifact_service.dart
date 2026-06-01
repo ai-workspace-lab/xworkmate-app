@@ -60,7 +60,9 @@ class DesktopThreadArtifactService {
     final taskArtifactPaths = normalizeTaskArtifactPathsInternal(
       artifactRelativePaths,
     );
-    final allFiles = await collectFilesInternal(root);
+    final allFiles = taskArtifactPaths.isEmpty
+        ? const <File>[]
+        : await collectFilesInternal(root);
     final fileEntries = await buildEntriesInternal(allFiles, normalizedRef);
     final taskFiles = taskArtifactPaths.isEmpty
         ? const <File>[]
@@ -91,7 +93,9 @@ class DesktopThreadArtifactService {
               ? 'No task artifacts recorded for this run.'
               : 'No current task artifacts found. Showing all files for this thread.'
         : '';
-    final filesMessage = fileEntries.isEmpty
+    final filesMessage = taskArtifactPaths.isEmpty
+        ? ''
+        : fileEntries.isEmpty
         ? 'No files found in the recorded working directory.'
         : '';
     final changesMessage = changes.isEmpty

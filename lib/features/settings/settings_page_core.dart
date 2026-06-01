@@ -58,6 +58,17 @@ Future<Map<String, dynamic>> loadBridgeMetadataForSettingsAbout({
         .decodeStream(response)
         .timeout(const Duration(seconds: 4));
     if (response.statusCode < 200 || response.statusCode >= 300) {
+      if (response.statusCode == HttpStatus.unauthorized ||
+          response.statusCode == HttpStatus.forbidden) {
+        return const <String, dynamic>{
+          'status': 'unauthorized',
+          'message': 'Bridge authorization rejected',
+          'version': '',
+          'commit': '',
+          'image': '',
+          'buildDate': '',
+        };
+      }
       return const <String, dynamic>{
         'status': 'unavailable',
         'version': '',
@@ -209,38 +220,29 @@ class _SettingsPageState extends State<SettingsPage> {
     SettingsSnapshot settings, {
     required bool isManualBridge,
   }) async {
-    final bridgeConfig = settings.acpBridgeServerModeConfig;
-    var nextBridgeConfig = bridgeConfig.copyWith(
-      selfHosted: bridgeConfig.selfHosted.copyWith(
-        serverUrl: _bridgeUrlController.text.trim(),
-        username: isManualBridge ? 'admin' : bridgeConfig.selfHosted.username,
-      ),
+    final nextSettings = await widget.controller.settingsController
+        .buildSavedAccountProfileSettings(
+          settings: settings,
+          accountBaseUrl: _accountBaseUrlController.text,
+          accountIdentifier: _accountIdentifierController.text,
+          bridgeServerUrl: _bridgeUrlController.text,
+          bridgeToken: _bridgeTokenController.text,
+          isManualBridge: isManualBridge,
+        );
+    await widget.controller.saveSettings(
+      nextSettings,
+      refreshAfterSave: !isManualBridge,
     );
-
-    final nextEffective = widget.controller.settingsController
-        .resolveAcpBridgeServerEffectiveConfig(config: nextBridgeConfig);
-
-    final nextSettings = settings.copyWith(
-      accountBaseUrl: _accountBaseUrlController.text.trim(),
-      accountUsername: _accountIdentifierController.text.trim(),
-      acpBridgeServerModeConfig: nextBridgeConfig.copyWith(
-        effective: nextEffective,
-      ),
-    );
-    if (isManualBridge && _bridgeTokenController.text.isNotEmpty) {
-      await widget.controller.settingsController.saveSecretValueByRef(
-        nextSettings.acpBridgeServerModeConfig.selfHosted.passwordRef,
-        _bridgeTokenController.text,
-        provider: 'Bridge',
-        module: 'Manual',
-      );
-    }
-    await widget.controller.saveSettings(nextSettings);
 
     _lastSavedAccountBaseUrl = nextSettings.accountBaseUrl;
     _lastSavedAccountIdentifier = nextSettings.accountUsername;
     _lastSavedBridgeUrl =
         nextSettings.acpBridgeServerModeConfig.selfHosted.serverUrl;
+    if (isManualBridge &&
+        nextSettings.acpBridgeServerModeConfig.selfHosted.isConfigured) {
+      unawaited(_refreshBridgeCapabilities());
+      await _refreshAboutSnapshot();
+    }
   }
 
   Future<void> _loginAccount(SettingsSnapshot settings) async {
@@ -254,6 +256,7 @@ class _SettingsPageState extends State<SettingsPage> {
         password: _accountPasswordController.text,
       );
       await _refreshBridgeCapabilities();
+      await _verifyAccountBridgeRuntimeAccess();
     } finally {
       _accountPasswordController.clear();
     }
@@ -261,11 +264,14 @@ class _SettingsPageState extends State<SettingsPage> {
 
   Future<void> _syncAccount(SettingsSnapshot settings) async {
     await _persistAccountProfileSettings(settings, isManualBridge: false);
-    await widget.controller.settingsController.syncAccountSettings(
-      baseUrl: _accountBaseUrlController.text.trim(),
-    );
+    final result = await widget.controller.settingsController
+        .syncAccountSettings(baseUrl: _accountBaseUrlController.text.trim());
     await _refreshBridgeCapabilities();
-    await _refreshAboutSnapshot();
+    if (result.state == 'ready') {
+      await _verifyAccountBridgeRuntimeAccess();
+    } else {
+      await _refreshAboutSnapshot();
+    }
   }
 
   Future<void> _verifyAccountMfa(SettingsSnapshot settings) async {
@@ -276,6 +282,7 @@ class _SettingsPageState extends State<SettingsPage> {
         code: _accountMfaCodeController.text.trim(),
       );
       await _refreshBridgeCapabilities();
+      await _verifyAccountBridgeRuntimeAccess();
     } finally {
       _accountMfaCodeController.clear();
     }
@@ -337,13 +344,16 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Future<SettingsAboutSnapshot> _loadAboutSnapshot() async {
-    final bridgeMetadata = await _loadBridgeMetadata();
+    final bridgeEndpoint =
+        widget.controller.resolveGatewayAcpEndpointInternal() ??
+        Uri.parse(kManagedBridgeServerUrl);
+    final bridgeMetadata = await _loadBridgeMetadata(bridgeEndpoint);
     return SettingsAboutSnapshot(
       appVersion: kAppVersion,
       appBuildNumber: kAppBuildNumber,
       appBuildDate: kAppBuildDate,
       appCommit: kAppBuildCommit,
-      bridgeEndpoint: kManagedBridgeServerUrl,
+      bridgeEndpoint: bridgeEndpoint.toString(),
       bridgeStatus: _stringValue(bridgeMetadata['status']),
       bridgeVersion: _resolveBridgeVersion(bridgeMetadata),
       bridgeBuildDate: _resolveBridgeBuildDate(bridgeMetadata),
@@ -352,11 +362,66 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
-  Future<Map<String, dynamic>> _loadBridgeMetadata() async {
+  Future<Map<String, dynamic>> _loadBridgeMetadata(Uri bridgeEndpoint) async {
     return loadBridgeMetadataForSettingsAbout(
-      bridgeEndpoint: Uri.parse(kManagedBridgeServerUrl),
+      bridgeEndpoint: bridgeEndpoint,
       authorizationResolver:
           widget.controller.resolveGatewayAcpAuthorizationHeaderInternal,
+    );
+  }
+
+  Future<void> _verifyAccountBridgeRuntimeAccess() async {
+    if (!widget.controller.settingsController.accountSignedIn) {
+      await _refreshAboutSnapshot();
+      return;
+    }
+    final bridgeEndpoint =
+        widget.controller.resolveGatewayAcpEndpointInternal() ??
+        Uri.parse(kManagedBridgeServerUrl);
+    final bridgeMetadata = await _loadBridgeMetadata(bridgeEndpoint);
+    final status = _stringValue(bridgeMetadata['status']).toLowerCase();
+    if (status == 'ok') {
+      if (mounted) {
+        setState(() {
+          _aboutSnapshot = _aboutSnapshotFromMetadata(
+            bridgeEndpoint,
+            bridgeMetadata,
+          );
+          _aboutBusy = false;
+        });
+      }
+      return;
+    }
+    if (status == 'unauthorized') {
+      await widget.controller.settingsController
+          .markAccountBridgeRuntimeUnavailable('Bridge authorization rejected');
+    }
+    if (mounted) {
+      setState(() {
+        _aboutSnapshot = _aboutSnapshotFromMetadata(
+          bridgeEndpoint,
+          bridgeMetadata,
+        );
+        _aboutBusy = false;
+      });
+    }
+  }
+
+  SettingsAboutSnapshot _aboutSnapshotFromMetadata(
+    Uri bridgeEndpoint,
+    Map<String, dynamic> bridgeMetadata,
+  ) {
+    return SettingsAboutSnapshot(
+      appVersion: kAppVersion,
+      appBuildNumber: kAppBuildNumber,
+      appBuildDate: kAppBuildDate,
+      appCommit: kAppBuildCommit,
+      bridgeEndpoint: bridgeEndpoint.toString(),
+      bridgeStatus: _stringValue(bridgeMetadata['status']),
+      bridgeVersion: _resolveBridgeVersion(bridgeMetadata),
+      bridgeBuildDate: _resolveBridgeBuildDate(bridgeMetadata),
+      bridgeCommit: _stringValue(bridgeMetadata['commit']),
+      bridgeImage: _stringValue(bridgeMetadata['image']),
     );
   }
 

@@ -604,12 +604,14 @@ class AppController extends ChangeNotifier {
 
   Future<void> sendChatMessage(
     String message, {
+    String? sessionKey,
     String thinking = 'off',
     List<GatewayChatAttachmentPayload> attachments = const [],
     List<CollaborationAttachment> localAttachments = const [],
     List<String> selectedSkillLabels = const [],
   }) => AppControllerDesktopThreadActions(this).sendChatMessage(
     message,
+    sessionKey: sessionKey,
     thinking: thinking,
     attachments: attachments,
     localAttachments: localAttachments,
