@@ -145,19 +145,6 @@ class ExternalCodeAgentAcpDesktopTransport
         completedMessage: completedMessage,
       );
     } on GatewayAcpException catch (error) {
-      if (_isRecoverableTaskStreamClosure(error) &&
-          completedResultSnapshot != null) {
-        return goTaskServiceResultFromAcpResponse(
-          <String, dynamic>{
-            'jsonrpc': '2.0',
-            'id': 'recovered-from-completed-session-update',
-            'result': completedResultSnapshot,
-          },
-          route: request.route,
-          streamedText: streamedText,
-          completedMessage: completedMessage,
-        );
-      }
       if (_isRecoverableTaskStreamClosure(error)) {
         final recovered = await _recoverTaskResultAfterStreamClosure(
           request,
@@ -166,9 +153,22 @@ class ExternalCodeAgentAcpDesktopTransport
               : _taskEndpointResolver.call(request),
           streamedText: streamedText,
           completedMessage: completedMessage,
+          fallbackAvailable: completedResultSnapshot != null,
         );
         if (recovered != null) {
           return recovered;
+        }
+        if (completedResultSnapshot != null) {
+          return goTaskServiceResultFromAcpResponse(
+            <String, dynamic>{
+              'jsonrpc': '2.0',
+              'id': 'recovered-from-completed-session-update',
+              'result': completedResultSnapshot,
+            },
+            route: request.route,
+            streamedText: streamedText,
+            completedMessage: completedMessage,
+          );
         }
       }
       rethrow;
@@ -201,6 +201,7 @@ class ExternalCodeAgentAcpDesktopTransport
     required Uri? taskEndpoint,
     required String streamedText,
     required String? completedMessage,
+    bool fallbackAvailable = false,
   }) async {
     final endpoint = _sessionSnapshotEndpoint(taskEndpoint);
     if (endpoint == null) {
@@ -222,6 +223,9 @@ class ExternalCodeAgentAcpDesktopTransport
           endpointOverride: endpoint,
         );
       } on GatewayAcpException {
+        if (fallbackAvailable) {
+          return null;
+        }
         continue;
       } on SocketException {
         continue;

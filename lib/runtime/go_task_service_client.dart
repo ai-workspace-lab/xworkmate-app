@@ -770,10 +770,10 @@ GoTaskServiceResult goTaskServiceResultFromAcpResponse(
   }();
   final responseText = _extractGoTaskDisplayText(result);
   final primaryText =
-      (completedMessage?.trim().isNotEmpty == true
-              ? completedMessage!.trim()
-              : responseText.isNotEmpty
+      (responseText.isNotEmpty
               ? responseText
+              : completedMessage?.trim().isNotEmpty == true
+              ? completedMessage!.trim()
               : fallbackFailureText.isNotEmpty
               ? fallbackFailureText
               : streamedText.trim().isNotEmpty
