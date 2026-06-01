@@ -5,6 +5,7 @@ ACCOUNTS_BASE_URL="${REVIEW_ACCOUNT_BASE_URL:-https://accounts.svc.plus}"
 REVIEW_ACCOUNT_LOGIN_NAME="${REVIEW_ACCOUNT_LOGIN_NAME:-review@svc.plus}"
 REVIEW_ACCOUNT_LOGIN_PASSWORD="${REVIEW_ACCOUNT_LOGIN_PASSWORD:-}"
 BRIDGE_SERVER_URL="${BRIDGE_SERVER_URL:-}"
+BRIDGE_SERVER_URLS="${BRIDGE_SERVER_URLS:-}"
 BRIDGE_AUTH_TOKEN="${BRIDGE_AUTH_TOKEN:-}"
 HTTP_TIMEOUT_SECONDS="${HTTP_TIMEOUT_SECONDS:-30}"
 
@@ -181,10 +182,8 @@ if not bridge_token:
     raise SystemExit("sync response did not include BRIDGE_AUTH_TOKEN")
 PY
 
-bridge_server_url="${BRIDGE_SERVER_URL}"
-if [[ -z "${bridge_server_url}" ]]; then
-  bridge_server_url="$(
-    RESPONSE_JSON="${sync_json}" python3 - <<'PY'
+synced_bridge_server_url="$(
+  RESPONSE_JSON="${sync_json}" python3 - <<'PY'
 import json
 import os
 
@@ -194,9 +193,18 @@ if not bridge_url:
     raise SystemExit("sync response did not include BRIDGE_SERVER_URL")
 print(bridge_url.rstrip("/"))
 PY
-  )"
+)"
+
+bridge_server_urls=()
+if [[ -n "${BRIDGE_SERVER_URLS}" ]]; then
+  while IFS= read -r candidate; do
+    [[ -n "${candidate}" ]] && bridge_server_urls+=("$(normalize_url "${candidate}")")
+  done < <(printf '%s\n' "${BRIDGE_SERVER_URLS}" | tr ',' '\n' | tr '[:space:]' '\n' | sed '/^$/d')
+elif [[ -n "${BRIDGE_SERVER_URL}" ]]; then
+  bridge_server_urls+=("$(normalize_url "${BRIDGE_SERVER_URL}")")
+else
+  bridge_server_urls+=("$(normalize_url "${synced_bridge_server_url}")")
 fi
-bridge_server_url="$(normalize_url "${bridge_server_url}")"
 
 bridge_auth_token="${BRIDGE_AUTH_TOKEN}"
 if [[ -z "${bridge_auth_token}" ]]; then
@@ -214,13 +222,29 @@ PY
   )"
 fi
 
-capabilities_json="$(
-  json_post \
-    "${bridge_server_url}/acp/rpc" \
-    '{"jsonrpc":"2.0","id":"capabilities","method":"acp.capabilities","params":{}}' \
-    -H "Authorization: Bearer ${bridge_auth_token}"
-)"
-RESPONSE_JSON="${capabilities_json}" python3 - <<'PY'
+verified_urls=()
+for bridge_server_url in "${bridge_server_urls[@]}"; do
+  ping_json="$(
+    json_get \
+      "${bridge_server_url}/api/ping" \
+      -H "Authorization: Bearer ${bridge_auth_token}"
+  )"
+  RESPONSE_JSON="${ping_json}" python3 - <<'PY'
+import json
+import os
+
+payload = json.loads(os.environ["RESPONSE_JSON"])
+if payload.get("status") != "ok":
+    raise SystemExit("bridge ping status is not ok")
+PY
+
+  capabilities_json="$(
+    json_post \
+      "${bridge_server_url}/acp/rpc" \
+      '{"jsonrpc":"2.0","id":"capabilities","method":"acp.capabilities","params":{}}' \
+      -H "Authorization: Bearer ${bridge_auth_token}"
+  )"
+  RESPONSE_JSON="${capabilities_json}" python3 - <<'PY'
 import json
 import os
 
@@ -232,10 +256,10 @@ if result.get("availableExecutionTargets") != ["agent", "gateway"]:
     raise SystemExit("unexpected availableExecutionTargets")
 PY
 
-routing_json="$(
-  json_post \
-    "${bridge_server_url}/acp/rpc" \
-    '{
+  routing_json="$(
+    json_post \
+      "${bridge_server_url}/acp/rpc" \
+      '{
       "jsonrpc":"2.0",
       "id":"routing",
       "method":"xworkmate.routing.resolve",
@@ -254,9 +278,9 @@ routing_json="$(
         }
       }
     }' \
-    -H "Authorization: Bearer ${bridge_auth_token}"
-)"
-RESPONSE_JSON="${routing_json}" python3 - <<'PY'
+      -H "Authorization: Bearer ${bridge_auth_token}"
+  )"
+  RESPONSE_JSON="${routing_json}" python3 - <<'PY'
 import json
 import os
 
@@ -267,5 +291,7 @@ if not isinstance(result, dict):
 if result.get("resolvedProviderId") != "codex":
     raise SystemExit("unexpected resolvedProviderId")
 PY
+  verified_urls+=("${bridge_server_url}")
+done
 
-printf 'API interface contract verified via %s\n' "${bridge_server_url}"
+printf 'API interface contract verified via %s\n' "${verified_urls[*]}"

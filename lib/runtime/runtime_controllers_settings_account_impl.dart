@@ -423,6 +423,24 @@ Future<void> logoutAccountSettingsInternal(
   }
 }
 
+Future<AccountSyncResult> markAccountBridgeRuntimeUnavailableInternal(
+  SettingsController controller, {
+  required String message,
+}) async {
+  final current = controller.accountSyncStateInternal;
+  final nextState = (current ?? AccountSyncState.defaults()).copyWith(
+    syncState: 'blocked',
+    syncMessage: message,
+    lastSyncAtMs: DateTime.now().millisecondsSinceEpoch,
+    lastSyncError: message,
+    profileScope: 'bridge',
+  );
+  await _persistAccountSyncStateInternal(controller, nextState);
+  controller.accountStatusInternal = message;
+  controller.notifyListeners();
+  return AccountSyncResult(state: 'blocked', message: message);
+}
+
 Future<void> cancelAccountMfaChallengeSettingsInternal(
   SettingsController controller,
 ) async {

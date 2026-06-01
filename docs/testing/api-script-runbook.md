@@ -29,8 +29,9 @@ Last Updated: 2026-04-22
 两份脚本都依赖以下环境变量：
 
 - `REVIEW_ACCOUNT_LOGIN_PASSWORD`
-- `BRIDGE_AUTH_TOKEN`
+- 可选 `BRIDGE_AUTH_TOKEN`，未提供时使用 profile sync 返回的 token
 - 可选 `BRIDGE_SERVER_URL`
+- 可选 `BRIDGE_SERVER_URLS`，用于接口脚本同时验证多个 bridge host
 - 可选 `REVIEW_ACCOUNT_BASE_URL`
 
 推荐直接在命令前临时注入：
@@ -39,6 +40,14 @@ Last Updated: 2026-04-22
 REVIEW_ACCOUNT_LOGIN_PASSWORD='***REMOVED-CREDENTIAL***' \
 BRIDGE_AUTH_TOKEN='<bridge token>' \
 BRIDGE_SERVER_URL='https://xworkmate-bridge.svc.plus' \
+bash scripts/ci/verify_api_interface_contract.sh
+```
+
+双入口验证示例：
+
+```bash
+REVIEW_ACCOUNT_LOGIN_PASSWORD='***REMOVED-CREDENTIAL***' \
+BRIDGE_SERVER_URLS='https://xworkmate-bridge.svc.plus,https://cn-xworkmate-bridge.svc.plus' \
 bash scripts/ci/verify_api_interface_contract.sh
 ```
 
@@ -64,6 +73,7 @@ make check-api-external
 - `POST /api/auth/login`
 - `GET /api/auth/session`
 - `GET /api/auth/xworkmate/profile/sync`
+- `GET /api/ping`
 - `POST /acp/rpc` with `acp.capabilities`
 - `POST /acp/rpc` with `xworkmate.routing.resolve`
 
