@@ -74,17 +74,23 @@ Future<void> refreshAcpCapabilitiesRuntimeInternal(
         .trim();
   }
   if (persistMountTargets && !controller.disposedInternal) {
-    final currentConfig = controller.settings.multiAgent;
-    final nextConfig = await controller.multiAgentMountManagerInternal
-        .reconcile(
-          config: currentConfig,
-          aiGatewayUrl: controller.aiGatewayUrl,
+    try {
+      final currentConfig = controller.settings.multiAgent;
+      final nextConfig = await controller.multiAgentMountManagerInternal
+          .reconcile(
+            config: currentConfig,
+            aiGatewayUrl: controller.aiGatewayUrl,
+          );
+      if (jsonEncode(nextConfig.toJson()) !=
+          jsonEncode(currentConfig.toJson())) {
+        await controller.settingsControllerInternal.saveSnapshot(
+          controller.settings.copyWith(multiAgent: nextConfig),
         );
-    if (jsonEncode(nextConfig.toJson()) != jsonEncode(currentConfig.toJson())) {
-      await controller.settingsControllerInternal.saveSnapshot(
-        controller.settings.copyWith(multiAgent: nextConfig),
-      );
-      controller.multiAgentOrchestratorInternal.updateConfig(nextConfig);
+        controller.multiAgentOrchestratorInternal.updateConfig(nextConfig);
+      }
+    } catch (_) {
+      // Mount reconciliation is an optional bridge capability. A missing or
+      // older remote method must not block assistant startup or task execution.
     }
   }
   if (!controller.disposedInternal) {

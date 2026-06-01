@@ -781,6 +781,121 @@ void main() {
     );
 
     test(
+      'prefers final OpenClaw snapshot over early completed SSE update after connection close',
+      () async {
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        addTearDown(() => server.close(force: true));
+        final requestMethods = <String>[];
+        server.listen((request) async {
+          final body = await utf8.decoder.bind(request).join();
+          final decoded = jsonDecode(body) as Map<String, dynamic>;
+          final method = decoded['method']?.toString() ?? '';
+          final id = decoded['id']?.toString() ?? 'request-id';
+          requestMethods.add(method);
+          if (method == 'session.start') {
+            final event = jsonEncode(<String, dynamic>{
+              'jsonrpc': '2.0',
+              'method': 'session.update',
+              'params': <String, dynamic>{
+                'sessionId': 'unit-fixture-task-final',
+                'threadId': 'unit-fixture-task-final',
+                'turnId': 'turn-final',
+                'type': 'status',
+                'event': 'completed',
+                'message': 'early completed output without artifacts',
+                'success': true,
+              },
+            });
+            final eventBytes = utf8.encode('data: $event\n\n');
+            request.response.headers.set(
+              HttpHeaders.contentTypeHeader,
+              'text/event-stream',
+            );
+            request.response.contentLength = eventBytes.length + 128;
+            final socket = await request.response.detachSocket();
+            socket.add(eventBytes);
+            await socket.flush();
+            socket.destroy();
+            return;
+          }
+          if (method == 'xworkmate.sessions.get') {
+            request.response.headers.contentType = ContentType.json;
+            request.response.write(
+              jsonEncode(<String, dynamic>{
+                'jsonrpc': '2.0',
+                'id': id,
+                'result': <String, dynamic>{
+                  'status': 'completed',
+                  'sessionId': 'unit-fixture-task-final',
+                  'threadId': 'unit-fixture-task-final',
+                  'task': <String, dynamic>{
+                    'state': 'completed',
+                    'turnId': 'turn-final',
+                  },
+                  'result': <String, dynamic>{
+                    'success': true,
+                    'output': 'final snapshot output with artifacts',
+                    'turnId': 'turn-final',
+                  },
+                  'artifacts': <String, dynamic>{
+                    'items': <Map<String, dynamic>>[
+                      <String, dynamic>{
+                        'relativePath': 'reports/final.md',
+                        'downloadUrl':
+                            'https://xworkmate-bridge.svc.plus/artifacts/openclaw/download'
+                            '?sessionKey=unit-fixture-task-final&runId=turn-final&relativePath=reports%2Ffinal.md',
+                        'contentType': 'text/markdown',
+                        'sizeBytes': 64,
+                      },
+                    ],
+                  },
+                },
+              }),
+            );
+            await request.response.close();
+            return;
+          }
+          request.response.statusCode = HttpStatus.badRequest;
+          await request.response.close();
+        });
+        final endpoint = Uri.parse('http://127.0.0.1:${server.port}');
+        final transport = ExternalCodeAgentAcpDesktopTransport(
+          client: GatewayAcpClient(endpointResolver: () => endpoint),
+          endpointResolver: (_) => endpoint,
+          taskEndpointResolver: (_) => endpoint,
+        );
+        addTearDown(transport.dispose);
+
+        final result = await transport.executeTask(
+          const GoTaskServiceRequest(
+            sessionId: 'unit-fixture-task-final',
+            threadId: 'unit-fixture-task-final',
+            target: AssistantExecutionTarget.gateway,
+            provider: SingleAgentProvider.openclaw,
+            prompt: 'create files',
+            workingDirectory: '/tmp/workspace',
+            model: '',
+            thinking: 'off',
+            selectedSkills: <String>[],
+            inlineAttachments: <GatewayChatAttachmentPayload>[],
+            localAttachments: <CollaborationAttachment>[],
+            agentId: '',
+            metadata: <String, dynamic>{},
+          ),
+          onUpdate: (_) {},
+        );
+
+        expect(result.success, isTrue);
+        expect(result.message, 'final snapshot output with artifacts');
+        expect(result.artifacts.single.relativePath, 'reports/final.md');
+        expect(requestMethods, <String>[
+          'session.start',
+          'xworkmate.sessions.get',
+        ]);
+      },
+    );
+
+    test(
       'recovers OpenClaw follow-up from bridge session snapshot after SSE ends without final envelope',
       () async {
         final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
