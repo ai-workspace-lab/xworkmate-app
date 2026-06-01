@@ -1117,6 +1117,10 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
       return null;
     }
 
+    final manualBridgeToken = await _resolveManualBridgeAuthTokenInternal();
+    if (manualBridgeToken != null && manualBridgeToken.isNotEmpty) {
+      return _normalizeAuthorizationHeaderInternal(manualBridgeToken);
+    }
     final bridgeToken = await _resolveManagedBridgeAuthTokenInternal();
     if (bridgeToken != null && bridgeToken.isNotEmpty) {
       return _normalizeAuthorizationHeaderInternal(bridgeToken);
