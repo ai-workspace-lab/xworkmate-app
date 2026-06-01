@@ -1144,7 +1144,7 @@ void main() {
     });
 
     test(
-      'sendChatMessage classifies complex artifact chains for Gateway',
+      'sendChatMessage leaves Gateway task classification to the remote runtime',
       () async {
         final fakeGoTaskService = _RecordingGoTaskServiceClient();
         final controller = _connectedGatewayController(fakeGoTaskService);
@@ -1162,15 +1162,9 @@ void main() {
 
         expect(fakeGoTaskService.requests, hasLength(1));
         final request = fakeGoTaskService.requests.single;
-        expect(request.metadata['taskLoadClass'], 'complex_long_chain_task');
-        expect(request.prompt, contains('Task load classification:'));
-        expect(request.prompt, contains('- class: complex_long_chain_task'));
-        expect(
-          request.prompt,
-          contains(
-            'Gateway owns execution decomposition, scheduling, retries, and resumability for this class.',
-          ),
-        );
+        expect(request.metadata, isNot(contains('taskLoadClass')));
+        expect(request.metadata, isNot(contains('expectedArtifactExtensions')));
+        expect(request.prompt, isNot(contains('Task load classification:')));
         expect(
           request.prompt,
           isNot(contains('First write the chapter breakdown')),
@@ -1187,7 +1181,7 @@ void main() {
     );
 
     test(
-      'sendChatMessage declares expected artifacts for complex PDF chains',
+      'sendChatMessage leaves artifact expectations to the remote runtime',
       () async {
         final fakeGoTaskService = _RecordingGoTaskServiceClient();
         final controller = _connectedGatewayController(fakeGoTaskService);
@@ -1206,13 +1200,15 @@ void main() {
 
         expect(fakeGoTaskService.requests, hasLength(1));
         final request = fakeGoTaskService.requests.single;
-        expect(request.metadata['taskLoadClass'], 'complex_long_chain_task');
-        expect(request.metadata['expectedArtifactExtensions'], <String>['pdf']);
+        expect(request.metadata, isNot(contains('taskLoadClass')));
+        expect(request.metadata, isNot(contains('expectedArtifactExtensions')));
+        expect(request.prompt, isNot(contains('Required final artifact')));
+        expect(request.prompt, contains('最后 输出 PDF文件'));
       },
     );
 
     test(
-      'sendChatMessage classifies simple Gateway prompts as short tasks',
+      'sendChatMessage sends simple Gateway prompts without local classification',
       () async {
         final fakeGoTaskService = _RecordingGoTaskServiceClient();
         final controller = _connectedGatewayController(fakeGoTaskService);
@@ -1226,27 +1222,33 @@ void main() {
 
         expect(fakeGoTaskService.requests, hasLength(1));
         final request = fakeGoTaskService.requests.single;
-        expect(request.metadata['taskLoadClass'], 'short_task');
-        expect(request.prompt, contains('- class: short_task'));
+        expect(request.metadata, isNot(contains('taskLoadClass')));
+        expect(request.prompt, isNot(contains('- class: short_task')));
+        expect(request.prompt, contains('User request:\n写一段普通说明'));
       },
     );
 
-    test('sendChatMessage classifies artifact output as a long task', () async {
-      final fakeGoTaskService = _RecordingGoTaskServiceClient();
-      final controller = _connectedGatewayController(fakeGoTaskService);
-      addTearDown(controller.dispose);
+    test(
+      'sendChatMessage sends artifact output without local class metadata',
+      () async {
+        final fakeGoTaskService = _RecordingGoTaskServiceClient();
+        final controller = _connectedGatewayController(fakeGoTaskService);
+        addTearDown(controller.dispose);
 
-      await controller.ensureActiveAssistantThreadInternal();
-      await controller.setAssistantExecutionTarget(
-        AssistantExecutionTarget.gateway,
-      );
-      await controller.sendChatMessage('生成 Markdown 和 PNG 产物');
+        await controller.ensureActiveAssistantThreadInternal();
+        await controller.setAssistantExecutionTarget(
+          AssistantExecutionTarget.gateway,
+        );
+        await controller.sendChatMessage('生成 Markdown 和 PNG 产物');
 
-      expect(fakeGoTaskService.requests, hasLength(1));
-      final request = fakeGoTaskService.requests.single;
-      expect(request.metadata['taskLoadClass'], 'long_task');
-      expect(request.prompt, contains('- class: long_task'));
-    });
+        expect(fakeGoTaskService.requests, hasLength(1));
+        final request = fakeGoTaskService.requests.single;
+        expect(request.metadata, isNot(contains('taskLoadClass')));
+        expect(request.metadata, isNot(contains('expectedArtifactExtensions')));
+        expect(request.prompt, isNot(contains('- class: long_task')));
+        expect(request.prompt, contains('User request:\n生成 Markdown 和 PNG 产物'));
+      },
+    );
 
     test(
       'sendChatMessage runs Gateway task with remote workspace when local workspace is unavailable',
@@ -1531,6 +1533,56 @@ void main() {
     );
 
     test(
+      'sendChatMessage starts a new session after ACP HTTP authorization failure',
+      () async {
+        final fakeGoTaskService = _RecordingGoTaskServiceClient()
+          ..outcomes.add(
+            const GatewayAcpException(
+              'ACP HTTP request failed (401) · missing bearer authorization',
+              code: 'ACP_HTTP_401',
+            ),
+          )
+          ..outcomes.add(
+            const GoTaskServiceResult(
+              success: true,
+              message: 'retried with bridge authorization',
+              turnId: 'turn-2',
+              raw: <String, dynamic>{},
+              errorMessage: '',
+              resolvedModel: '',
+              route: GoTaskServiceRoute.externalAcpSingle,
+            ),
+          );
+        final controller = _connectedController(fakeGoTaskService);
+        addTearDown(controller.dispose);
+
+        await controller.sessionsController.switchSession(
+          'unit-fixture-task-a',
+        );
+
+        await controller.sendChatMessage('first turn');
+
+        expect(fakeGoTaskService.requests, hasLength(1));
+        expect(fakeGoTaskService.requests.single.resumeSession, isFalse);
+        final failedThread = controller.taskThreadForSessionInternal(
+          'unit-fixture-task-a',
+        );
+        expect(failedThread?.lifecycleState.status, 'ready');
+        expect(failedThread?.lifecycleState.lastResultCode, 'ACP_HTTP_401');
+        expect(failedThread?.lastArtifactSyncStatus, 'failed');
+
+        await controller.sendChatMessage('retry after auth recovery');
+
+        expect(fakeGoTaskService.requests, hasLength(2));
+        expect(fakeGoTaskService.requests.last.resumeSession, isFalse);
+        await _waitForLastChatMessageText(
+          controller,
+          'retried with bridge authorization',
+        );
+      },
+    );
+
+    test(
       'sendChatMessage restarts before handling OpenClaw artifact guard results',
       () async {
         final localWorkspace = await Directory.systemTemp.createTemp(
@@ -1606,6 +1658,67 @@ void main() {
         expect(thread?.lifecycleState.status, 'ready');
         expect(thread?.lastArtifactSyncStatus, 'no-exported-artifacts');
         expect(thread?.lastArtifactSyncAtMs, greaterThan(0));
+      },
+    );
+
+    test(
+      'sendChatMessage starts a new session after OpenClaw terminal artifact failure',
+      () async {
+        final fakeGoTaskService = _RecordingGoTaskServiceClient()
+          ..outcomes.add(
+            const GoTaskServiceResult(
+              success: false,
+              message: 'OpenClaw completed without required final artifacts.',
+              turnId: 'turn-1',
+              raw: <String, dynamic>{
+                'status': 'failed',
+                'code': 'OPENCLAW_REQUIRED_ARTIFACT_MISSING',
+              },
+              errorMessage:
+                  'openclaw returned partial artifacts without required final deliverables',
+              resolvedModel: '',
+              route: GoTaskServiceRoute.externalAcpSingle,
+            ),
+          )
+          ..outcomes.add(
+            const GoTaskServiceResult(
+              success: true,
+              message: 'final artifact delivered',
+              turnId: 'turn-2',
+              raw: <String, dynamic>{},
+              errorMessage: '',
+              resolvedModel: '',
+              route: GoTaskServiceRoute.externalAcpSingle,
+            ),
+          );
+        final controller = _connectedController(fakeGoTaskService);
+        addTearDown(controller.dispose);
+
+        await controller.sessionsController.switchSession(
+          'unit-fixture-task-a',
+        );
+
+        await controller.sendChatMessage('first turn');
+
+        expect(fakeGoTaskService.requests, hasLength(1));
+        expect(fakeGoTaskService.requests.single.resumeSession, isFalse);
+        final failedThread = controller.taskThreadForSessionInternal(
+          'unit-fixture-task-a',
+        );
+        expect(
+          failedThread?.lifecycleState.lastResultCode,
+          'OPENCLAW_REQUIRED_ARTIFACT_MISSING',
+        );
+        expect(failedThread?.lastArtifactSyncStatus, 'failed');
+
+        await controller.sendChatMessage('retry final artifact');
+
+        expect(fakeGoTaskService.requests, hasLength(2));
+        expect(fakeGoTaskService.requests.last.resumeSession, isFalse);
+        await _waitForLastChatMessageText(
+          controller,
+          'final artifact delivered',
+        );
       },
     );
 
@@ -2626,7 +2739,10 @@ void main() {
         final thread = controller.requireTaskThreadForSessionInternal(
           'empty-output-task',
         );
-        expect(thread.lifecycleState.lastResultCode, 'failed');
+        expect(
+          thread.lifecycleState.lastResultCode,
+          'OPENCLAW_NO_DISPLAYABLE_OUTPUT',
+        );
         expect(thread.lastArtifactSyncStatus, 'failed');
         expect(thread.lastTaskArtifactRelativePaths, isEmpty);
         final snapshot = await controller.loadAssistantArtifactSnapshot(

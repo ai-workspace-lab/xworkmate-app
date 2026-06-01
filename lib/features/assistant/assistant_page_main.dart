@@ -100,6 +100,9 @@ class AssistantPageStateInternal extends State<AssistantPage> {
       <String, AssistantTaskSeedInternal>{};
   final Map<String, String> composerDraftBySessionKeyInternal =
       <String, String>{};
+  final Map<String, List<ComposerAttachmentInternal>>
+  composerAttachmentsBySessionKeyInternal =
+      <String, List<ComposerAttachmentInternal>>{};
   final Set<String> archivedTaskKeysInternal = <String>{};
   List<ComposerAttachmentInternal> attachmentsInternal =
       const <ComposerAttachmentInternal>[];
@@ -312,6 +315,39 @@ class AssistantPageStateInternal extends State<AssistantPage> {
     composerDraftBySessionKeyInternal.remove(normalizedSessionKey);
   }
 
+  void saveComposerAttachmentsForSessionInternal(String sessionKey) {
+    final normalizedSessionKey = sessionKey.trim();
+    if (normalizedSessionKey.isEmpty) {
+      return;
+    }
+    if (attachmentsInternal.isEmpty) {
+      composerAttachmentsBySessionKeyInternal.remove(normalizedSessionKey);
+      return;
+    }
+    composerAttachmentsBySessionKeyInternal[normalizedSessionKey] =
+        List<ComposerAttachmentInternal>.from(
+          attachmentsInternal,
+          growable: false,
+        );
+  }
+
+  void restoreComposerAttachmentsForSessionInternal(String sessionKey) {
+    final normalizedSessionKey = sessionKey.trim();
+    attachmentsInternal = List<ComposerAttachmentInternal>.from(
+      composerAttachmentsBySessionKeyInternal[normalizedSessionKey] ??
+          const <ComposerAttachmentInternal>[],
+      growable: false,
+    );
+  }
+
+  void clearComposerAttachmentsForSessionInternal(String sessionKey) {
+    final normalizedSessionKey = sessionKey.trim();
+    if (normalizedSessionKey.isEmpty) {
+      return;
+    }
+    composerAttachmentsBySessionKeyInternal.remove(normalizedSessionKey);
+  }
+
   void syncComposerDraftForActiveSessionInternal(String sessionKey) {
     final normalizedSessionKey = sessionKey.trim();
     if (normalizedSessionKey.isEmpty ||
@@ -319,8 +355,10 @@ class AssistantPageStateInternal extends State<AssistantPage> {
       return;
     }
     saveComposerDraftForSessionInternal(composerDraftSessionKeyInternal);
+    saveComposerAttachmentsForSessionInternal(composerDraftSessionKeyInternal);
     composerDraftSessionKeyInternal = normalizedSessionKey;
     restoreComposerDraftForSessionInternal(normalizedSessionKey);
+    restoreComposerAttachmentsForSessionInternal(normalizedSessionKey);
   }
 }
 
