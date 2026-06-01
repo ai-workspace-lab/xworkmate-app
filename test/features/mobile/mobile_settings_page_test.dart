@@ -5,6 +5,8 @@ import 'package:xworkmate/app/app_shell_desktop.dart';
 import 'package:xworkmate/features/mobile/mobile_settings_page.dart';
 import 'package:xworkmate/runtime/account_runtime_client.dart';
 import 'package:xworkmate/runtime/runtime_controllers.dart';
+import 'package:xworkmate/runtime/runtime_models.dart';
+import 'package:xworkmate/runtime/secure_config_store.dart';
 import 'package:xworkmate/theme/app_theme.dart';
 
 void main() {
@@ -239,6 +241,78 @@ void main() {
       );
       expect(find.text('mobile@svc.plus'), findsOneWidget);
     });
+
+    testWidgets('manual bridge save updates mobile runtime configuration', (
+      tester,
+    ) async {
+      final store = _MemorySecureConfigStore();
+      final controller = _NoopRefreshAppController(store: store);
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light().copyWith(platform: TargetPlatform.iOS),
+          home: MediaQuery(
+            data: const MediaQueryData(size: Size(390, 844)),
+            child: Scaffold(body: MobileSettingsPage(controller: controller)),
+          ),
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 250));
+
+      final urlField = find.byKey(
+        const Key('mobile-settings-manual-bridge-url-field'),
+      );
+      await tester.ensureVisible(urlField);
+      await tester.enterText(
+        find.descendant(of: urlField, matching: find.byType(TextFormField)),
+        'http://127.0.0.1:1',
+      );
+      final tokenField = find.byKey(
+        const Key('mobile-settings-manual-bridge-token-field'),
+      );
+      await tester.enterText(
+        find.descendant(of: tokenField, matching: find.byType(TextFormField)),
+        'mobile-manual-token',
+      );
+      final saveButton = find.byKey(
+        const Key('mobile-settings-manual-bridge-save-button'),
+      );
+      await tester.ensureVisible(saveButton);
+      tester.widget<FilledButton>(saveButton).onPressed!();
+
+      for (
+        var attempt = 0;
+        attempt < 20 &&
+            controller
+                    .settings
+                    .acpBridgeServerModeConfig
+                    .selfHosted
+                    .serverUrl !=
+                'http://127.0.0.1:1';
+        attempt += 1
+      ) {
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+
+      final bridgeConfig = controller.settings.acpBridgeServerModeConfig;
+      expect(bridgeConfig.selfHosted.serverUrl, 'http://127.0.0.1:1');
+      expect(bridgeConfig.effective.source, 'bridge');
+      expect(
+        await store.loadSecretValueByRef(bridgeConfig.selfHosted.passwordRef),
+        'mobile-manual-token',
+      );
+      expect(
+        controller.resolveGatewayAcpEndpointInternal()?.toString(),
+        'http://127.0.0.1:1',
+      );
+      expect(
+        await controller.resolveGatewayAcpAuthorizationHeaderInternal(
+          Uri.parse('http://127.0.0.1:1/acp/rpc'),
+        ),
+        'mobile-manual-token',
+      );
+    });
   });
 }
 
@@ -277,4 +351,64 @@ class _MobileFakeAccountRuntimeClient extends AccountRuntimeClient {
   }) async {
     return syncPayload;
   }
+}
+
+class _NoopRefreshAppController extends AppController {
+  _NoopRefreshAppController({required SecureConfigStore store})
+    : super(environmentOverride: const <String, String>{}, store: store);
+
+  Future<void> refreshAcpCapabilitiesInternal({
+    bool forceRefresh = false,
+    bool persistMountTargets = false,
+  }) async {}
+
+  Future<void> refreshSingleAgentCapabilitiesInternal({
+    bool forceRefresh = false,
+  }) async {}
+}
+
+class _MemorySecureConfigStore extends SecureConfigStore {
+  _MemorySecureConfigStore() : super(enableSecureStorage: false);
+
+  SettingsSnapshot _settings = SettingsSnapshot.defaults();
+  final Map<String, String> _secrets = <String, String>{};
+
+  @override
+  Future<void> initialize() async {}
+
+  @override
+  Future<SettingsSnapshot> loadSettingsSnapshot() async => _settings;
+
+  @override
+  Future<void> saveSettingsSnapshot(SettingsSnapshot snapshot) async {
+    _settings = snapshot;
+  }
+
+  @override
+  Future<Map<String, String>> loadSecureRefs() async => _secrets;
+
+  @override
+  Future<List<SecretAuditEntry>> loadAuditTrail() async =>
+      const <SecretAuditEntry>[];
+
+  @override
+  Future<void> appendAudit(SecretAuditEntry entry) async {}
+
+  @override
+  Future<String?> loadSecretValueByRef(String refName) async =>
+      _secrets[refName];
+
+  @override
+  Future<void> saveSecretValueByRef(String refName, String value) async {
+    _secrets[refName] = value;
+  }
+
+  @override
+  Future<String?> loadAccountSessionToken() async => null;
+
+  @override
+  Future<AccountSessionSummary?> loadAccountSessionSummary() async => null;
+
+  @override
+  Future<AccountSyncState?> loadAccountSyncState() async => null;
 }
