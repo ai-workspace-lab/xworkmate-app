@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:crypto/crypto.dart' as crypto;
@@ -1353,6 +1354,195 @@ void main() {
       expect(thread.lastArtifactSyncAtMs, greaterThan(0));
     },
   );
+
+  test('rejects artifacts matched by artifact-ignore policy', () async {
+    final controller = AppController(
+      environmentOverride: const <String, String>{},
+    );
+    addTearDown(controller.dispose);
+
+    final localWorkspace = await Directory.systemTemp.createTemp(
+      'xworkmate-openclaw-placeholder-pdf-',
+    );
+    addTearDown(() async {
+      if (await localWorkspace.exists()) {
+        await localWorkspace.delete(recursive: true);
+      }
+    });
+    controller.upsertTaskThreadInternal(
+      'unit-fixture-task-a',
+      workspaceBinding: WorkspaceBinding(
+        workspaceId: 'unit-fixture-task-a',
+        workspaceKind: WorkspaceKind.localFs,
+        workspacePath: localWorkspace.path,
+        displayPath: localWorkspace.path,
+        writable: true,
+      ),
+    );
+    await File('${localWorkspace.path}/artifact-ignore.md').writeAsString(
+      '```artifact-reject\n'
+      'path=exports/final.pdf\n'
+      'contentType=application/pdf\n'
+      'contains=XWorkmate Task Artifact\n'
+      'contains=Required extensions: pdf\n'
+      'contains=TaskThread workspace context:\n'
+      'contains=Workspace isolation rules:\n'
+      '```\n',
+    );
+
+    final placeholderBytes = utf8.encode(
+      '%PDF-1.3\n'
+      'BT /F1 14 Tf (XWorkmate Task Artifact) Tj '
+      '(Required extensions: pdf) Tj '
+      '(TaskThread workspace context:) Tj '
+      '(Workspace isolation rules:) Tj ET',
+    );
+    final result = GoTaskServiceResult(
+      success: true,
+      message:
+          'OpenClaw final artifacts were written to the current task artifact scope: pdf.',
+      turnId: 'turn-1',
+      raw: <String, dynamic>{
+        'artifactWarnings': <String>['agent.wait request timeout'],
+        'artifacts': <Map<String, dynamic>>[
+          <String, dynamic>{
+            'relativePath': 'exports/final.pdf',
+            'contentType': 'application/pdf',
+            'encoding': 'base64',
+            'content': base64Encode(placeholderBytes),
+            'sizeBytes': placeholderBytes.length,
+            'sha256': crypto.sha256.convert(placeholderBytes).toString(),
+          },
+        ],
+      },
+      errorMessage: '',
+      resolvedModel: '',
+      route: GoTaskServiceRoute.externalAcpSingle,
+    );
+
+    await controller.persistGoTaskArtifactsForSessionInternal(
+      'unit-fixture-task-a',
+      result,
+    );
+
+    expect(
+      await File('${localWorkspace.path}/exports/final.pdf').exists(),
+      isFalse,
+    );
+    final thread = controller.requireTaskThreadForSessionInternal(
+      'unit-fixture-task-a',
+    );
+    expect(thread.lastArtifactSyncStatus, 'no-exported-artifacts');
+    expect(thread.lastTaskArtifactRelativePaths, isEmpty);
+  });
+
+  test('loads global and selected skill artifact-ignore policies', () async {
+    final controller = AppController(
+      environmentOverride: const <String, String>{},
+    );
+    addTearDown(controller.dispose);
+
+    final localWorkspace = await Directory.systemTemp.createTemp(
+      'xworkmate-skill-artifact-policy-',
+    );
+    addTearDown(() async {
+      if (await localWorkspace.exists()) {
+        await localWorkspace.delete(recursive: true);
+      }
+    });
+    await Directory(
+      '${localWorkspace.path}/skills/video-production/it-infra-evolution-video-v2',
+    ).create(recursive: true);
+    await File('${localWorkspace.path}/artifact-ignore.md').writeAsString(
+      '```artifact-ignore\n'
+      'tmp/\n'
+      '```\n',
+    );
+    await File(
+      '${localWorkspace.path}/skills/video-production/it-infra-evolution-video-v2/artifact-ignore.md',
+    ).writeAsString(
+      '```artifact-ignore\n'
+      'renders/tmp/\n'
+      '```\n',
+    );
+    final startedAtMs = DateTime.now().millisecondsSinceEpoch.toDouble();
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+    await Directory('${localWorkspace.path}/tmp').create();
+    await Directory(
+      '${localWorkspace.path}/renders/tmp',
+    ).create(recursive: true);
+    await Directory('${localWorkspace.path}/renders').create();
+    await File('${localWorkspace.path}/tmp/build.log').writeAsString('log');
+    await File(
+      '${localWorkspace.path}/renders/tmp/scratch.png',
+    ).writeAsBytes(<int>[1, 2, 3]);
+    await File(
+      '${localWorkspace.path}/renders/final.mp4',
+    ).writeAsBytes(<int>[4, 5, 6]);
+
+    controller.upsertTaskThreadInternal(
+      'unit-fixture-task-a',
+      workspaceBinding: WorkspaceBinding(
+        workspaceId: 'unit-fixture-task-a',
+        workspaceKind: WorkspaceKind.localFs,
+        workspacePath: localWorkspace.path,
+        displayPath: localWorkspace.path,
+        writable: true,
+      ),
+      selectedSkillKeys: const <String>[
+        'video-production/it-infra-evolution-video-v2',
+      ],
+      lifecycleStatus: 'running',
+      lastRunAtMs: startedAtMs,
+      lastResultCode: 'running',
+    );
+
+    const result = GoTaskServiceResult(
+      success: true,
+      message: 'done',
+      turnId: 'turn-1',
+      raw: <String, dynamic>{},
+      errorMessage: '',
+      resolvedModel: '',
+      route: GoTaskServiceRoute.externalAcpSingle,
+    );
+
+    await controller.persistGoTaskArtifactsForSessionInternal(
+      'unit-fixture-task-a',
+      result,
+    );
+
+    final thread = controller.requireTaskThreadForSessionInternal(
+      'unit-fixture-task-a',
+    );
+    expect(thread.lastArtifactSyncStatus, 'synced');
+    expect(thread.lastTaskArtifactRelativePaths, <String>['renders/final.mp4']);
+
+    controller.upsertTaskThreadInternal(
+      'unit-fixture-task-b',
+      workspaceBinding: WorkspaceBinding(
+        workspaceId: 'unit-fixture-task-b',
+        workspaceKind: WorkspaceKind.localFs,
+        workspacePath: localWorkspace.path,
+        displayPath: localWorkspace.path,
+        writable: true,
+      ),
+      selectedSkillKeys: const <String>[],
+      lifecycleStatus: 'running',
+      lastRunAtMs: startedAtMs,
+      lastResultCode: 'running',
+    );
+    await controller.persistGoTaskArtifactsForSessionInternal(
+      'unit-fixture-task-b',
+      result,
+    );
+    final unselectedSkillThread = controller
+        .requireTaskThreadForSessionInternal('unit-fixture-task-b');
+    expect(unselectedSkillThread.lastTaskArtifactRelativePaths, <String>[
+      'renders/final.mp4',
+      'renders/tmp/scratch.png',
+    ]);
+  });
 
   test('records ordinary empty artifact results as no artifacts', () async {
     final controller = AppController(
