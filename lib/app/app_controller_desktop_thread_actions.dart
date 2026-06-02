@@ -3,6 +3,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'app_metadata.dart';
 import 'app_capabilities.dart';
@@ -64,7 +65,11 @@ extension AppControllerDesktopThreadActions on AppController {
 
   bool assistantSessionHasPendingRun(String sessionKey) {
     final normalized = normalizedAssistantSessionKeyInternal(sessionKey);
+    final association = taskThreadForSessionInternal(
+      normalized,
+    )?.openClawTaskAssociation;
     return aiGatewayPendingSessionKeysInternal.contains(normalized) ||
+        (association != null && !association.isTerminal) ||
         openClawGatewayQueuedTurnsBySessionInternal[normalized]?.any(
               (turn) => !turn.cancelled,
             ) ==
@@ -558,6 +563,7 @@ extension AppControllerDesktopThreadActions on AppController {
       appendGatewayUserTurnInternal(sessionKey, message);
     }
     markGatewayChatRunInternal(sessionKey);
+    var handedOffToBridgeTask = false;
     try {
       final result = await goTaskServiceClientInternal.executeTask(
         GoTaskServiceRequest(
@@ -590,6 +596,22 @@ extension AppControllerDesktopThreadActions on AppController {
         clearAiGatewayStreamingTextInternal(sessionKey);
         return;
       }
+      final association = result.openClawTaskAssociation;
+      if (association != null) {
+        handedOffToBridgeTask = true;
+        persistOpenClawTaskAssociationInternal(
+          sessionKey: sessionKey,
+          association: association,
+        );
+        unawaited(
+          pollOpenClawTaskAssociationInternal(
+            sessionKey: sessionKey,
+            target: target,
+            association: association,
+          ),
+        );
+        return;
+      }
       await applyGatewayChatResultInternal(
         sessionKey: sessionKey,
         target: target,
@@ -610,11 +632,153 @@ extension AppControllerDesktopThreadActions on AppController {
         error: error,
       );
     } finally {
-      aiGatewayPendingSessionKeysInternal.remove(sessionKey);
-      clearAiGatewayStreamingTextInternal(sessionKey);
+      if (!handedOffToBridgeTask) {
+        aiGatewayPendingSessionKeysInternal.remove(sessionKey);
+        clearAiGatewayStreamingTextInternal(sessionKey);
+      }
       recomputeTasksInternal();
       notifyIfActiveInternal();
     }
+  }
+
+  void persistOpenClawTaskAssociationInternal({
+    required String sessionKey,
+    required OpenClawTaskAssociation association,
+  }) {
+    final nowMs = DateTime.now().millisecondsSinceEpoch.toDouble();
+    aiGatewayPendingSessionKeysInternal.add(sessionKey);
+    upsertTaskThreadInternal(
+      sessionKey,
+      lifecycleStatus: 'running',
+      lastResultCode: 'running',
+      lastRunAtMs: association.startedAtMs > 0
+          ? association.startedAtMs
+          : nowMs,
+      lastArtifactSyncAtMs: nowMs,
+      lastArtifactSyncStatus: 'running',
+      openClawTaskAssociation: association,
+      updatedAtMs: nowMs,
+    );
+    recomputeTasksInternal();
+    notifyIfActiveInternal();
+    unawaited(flushAssistantThreadPersistenceInternal());
+  }
+
+  Future<void> pollOpenClawTaskAssociationInternal({
+    required String sessionKey,
+    required AssistantExecutionTarget target,
+    required OpenClawTaskAssociation association,
+  }) async {
+    var current = association;
+    final pollDelay = _openClawAssociationPollDelayInternal(current);
+    final maxAttempts = math.max(
+      1,
+      ((math.max(1, current.runtimeBudgetMinutes) * 60) /
+              math.max(1, pollDelay.inSeconds))
+          .ceil(),
+    );
+    for (var attempt = 0; attempt < maxAttempts; attempt += 1) {
+      if (disposedInternal) {
+        return;
+      }
+      if (!aiGatewayPendingSessionKeysInternal.contains(sessionKey)) {
+        return;
+      }
+      if (attempt > 0) {
+        await Future<void>.delayed(pollDelay);
+      }
+      try {
+        final result = await goTaskServiceClientInternal.getTask(
+          route: GoTaskServiceRoute.externalAcpSingle,
+          target: target,
+          association: current,
+        );
+        final nextAssociation =
+            result.openClawTaskAssociation ??
+            current.copyWith(
+              status: result.status.trim().isEmpty
+                  ? current.status
+                  : result.status.trim(),
+            );
+        current = nextAssociation;
+        if (result.isOpenClawRunningTaskHandle) {
+          persistOpenClawTaskAssociationInternal(
+            sessionKey: sessionKey,
+            association: nextAssociation,
+          );
+          continue;
+        }
+        if (aiGatewayPendingSessionKeysInternal.contains(sessionKey)) {
+          await applyGatewayChatResultInternal(
+            sessionKey: sessionKey,
+            target: target,
+            result: result,
+          );
+        }
+        aiGatewayPendingSessionKeysInternal.remove(sessionKey);
+        clearAiGatewayStreamingTextInternal(sessionKey);
+        recomputeTasksInternal();
+        notifyIfActiveInternal();
+        return;
+      } catch (_) {
+        continue;
+      }
+    }
+    final nowMs = DateTime.now().millisecondsSinceEpoch.toDouble();
+    upsertTaskThreadInternal(
+      sessionKey,
+      lifecycleStatus: 'ready',
+      lastRunAtMs: nowMs,
+      lastResultCode: 'TASK_SLA_EXPIRED',
+      lastArtifactSyncAtMs: nowMs,
+      lastArtifactSyncStatus: 'failed',
+      openClawTaskAssociation: current.copyWith(status: 'failed'),
+      updatedAtMs: nowMs,
+    );
+    aiGatewayPendingSessionKeysInternal.remove(sessionKey);
+    clearAiGatewayStreamingTextInternal(sessionKey);
+    recomputeTasksInternal();
+    notifyIfActiveInternal();
+  }
+
+  Duration _openClawAssociationPollDelayInternal(
+    OpenClawTaskAssociation association,
+  ) {
+    final budget = association.runtimeBudgetMinutes;
+    if (budget >= 60) {
+      return const Duration(seconds: 5);
+    }
+    if (budget >= 30) {
+      return const Duration(seconds: 3);
+    }
+    return const Duration(seconds: 2);
+  }
+
+  void resumeOpenClawTaskAssociationsInternal({String? onlySessionKey}) {
+    final normalizedOnly = onlySessionKey == null
+        ? ''
+        : normalizedAssistantSessionKeyInternal(onlySessionKey);
+    for (final record in taskThreadRepositoryInternal.snapshot()) {
+      if (normalizedOnly.isNotEmpty && record.threadId != normalizedOnly) {
+        continue;
+      }
+      final association = record.openClawTaskAssociation;
+      if (association == null || association.isTerminal) {
+        continue;
+      }
+      aiGatewayPendingSessionKeysInternal.add(record.threadId);
+      unawaited(
+        pollOpenClawTaskAssociationInternal(
+          sessionKey: record.threadId,
+          target: assistantExecutionTargetFromExecutionMode(
+            record.executionBinding.executionMode,
+          ),
+          association: association,
+        ),
+      );
+    }
+    recomputeTasksInternal();
+    notifyIfActiveInternal();
   }
 
   String messageWithSelectedSkillsContextInternal({
@@ -844,6 +1008,7 @@ extension AppControllerDesktopThreadActions on AppController {
       lastArtifactSyncAtMs: nowMs,
       lastArtifactSyncStatus: 'failed',
       lastTaskArtifactRelativePaths: const <String>[],
+      clearOpenClawTaskAssociation: true,
       updatedAtMs: nowMs,
     );
     recomputeTasksInternal();
@@ -1017,6 +1182,7 @@ extension AppControllerDesktopThreadActions on AppController {
       lifecycleStatus: 'ready',
       lastRunAtMs: completedAtMs,
       lastResultCode: terminalResultCode,
+      clearOpenClawTaskAssociation: true,
       updatedAtMs: completedAtMs,
     );
     if (isOpenClawNoExportedArtifactsGuardResultInternal(result)) {
@@ -1102,6 +1268,7 @@ extension AppControllerDesktopThreadActions on AppController {
       lastArtifactSyncAtMs: completedAtMs,
       lastArtifactSyncStatus: 'failed',
       lastTaskArtifactRelativePaths: const <String>[],
+      clearOpenClawTaskAssociation: true,
       updatedAtMs: completedAtMs,
     );
     appendLocalSessionMessageInternal(
@@ -1254,6 +1421,9 @@ extension AppControllerDesktopThreadActions on AppController {
           target: assistantExecutionTargetForSession(sessionKey),
           sessionId: sessionKey,
           threadId: sessionKey,
+          association: taskThreadForSessionInternal(
+            sessionKey,
+          )?.openClawTaskAssociation,
         );
       } catch (_) {
         // Best effort cancellation only.
@@ -1287,6 +1457,9 @@ extension AppControllerDesktopThreadActions on AppController {
           target: assistantExecutionTargetForSession(sessionKey),
           sessionId: sessionKey,
           threadId: sessionKey,
+          association: taskThreadForSessionInternal(
+            sessionKey,
+          )?.openClawTaskAssociation,
         );
       } catch (_) {
         // Best effort cancellation only. Local state must still leave pending.
