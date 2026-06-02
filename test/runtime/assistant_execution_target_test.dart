@@ -3615,7 +3615,7 @@ void main() {
           'openclaw-second-task',
         );
         await secondSubmitFuture;
-        expect(controller.openClawGatewayActiveTasksInternal, 0);
+        await _waitForOpenClawActiveTaskCount(controller, 0);
         expect(
           controller.chatMessages.map((message) => message.text),
           contains('second task completed'),
@@ -4083,6 +4083,20 @@ Future<void> _selectGatewaySession(
   );
 }
 
+Future<void> _waitForOpenClawActiveTaskCount(
+  AppController controller,
+  int expected,
+) async {
+  final deadline = DateTime.now().add(const Duration(seconds: 5));
+  while (DateTime.now().isBefore(deadline)) {
+    if (controller.openClawGatewayActiveTasksInternal == expected) {
+      return;
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+  }
+  expect(controller.openClawGatewayActiveTasksInternal, expected);
+}
+
 Future<List<String>> _startOpenClawActiveTasks(
   AppController controller,
   _BlockingGoTaskServiceClient fakeGoTaskService, {
@@ -4218,11 +4232,35 @@ class _RecordingGoTaskServiceClient implements GoTaskServiceClient {
   }
 
   @override
+  Future<GoTaskServiceResult> getTask({
+    required AssistantExecutionTarget target,
+    required OpenClawTaskAssociation association,
+    required GoTaskServiceRoute route,
+  }) async {
+    return GoTaskServiceResult(
+      success: true,
+      message: 'ok',
+      turnId: association.turnId,
+      raw: <String, dynamic>{
+        'success': true,
+        'status': 'completed',
+        'turnId': association.turnId,
+        'runId': association.runId,
+        'output': 'ok',
+      },
+      errorMessage: '',
+      resolvedModel: '',
+      route: route,
+    );
+  }
+
+  @override
   Future<void> cancelTask({
     required GoTaskServiceRoute route,
     required AssistantExecutionTarget target,
     required String sessionId,
     required String threadId,
+    OpenClawTaskAssociation? association,
   }) async {}
 
   @override
@@ -4273,6 +4311,29 @@ class _BlockingGoTaskServiceClient implements GoTaskServiceClient {
     final completer = Completer<GoTaskServiceResult>();
     _pending[request.sessionId] = completer;
     return completer.future;
+  }
+
+  @override
+  Future<GoTaskServiceResult> getTask({
+    required AssistantExecutionTarget target,
+    required OpenClawTaskAssociation association,
+    required GoTaskServiceRoute route,
+  }) async {
+    return GoTaskServiceResult(
+      success: true,
+      message: 'cleanup',
+      turnId: association.turnId,
+      raw: <String, dynamic>{
+        'success': true,
+        'status': 'completed',
+        'turnId': association.turnId,
+        'runId': association.runId,
+        'output': 'cleanup',
+      },
+      errorMessage: '',
+      resolvedModel: '',
+      route: route,
+    );
   }
 
   Future<void> waitForRequestCount(int count) async {
@@ -4338,6 +4399,7 @@ class _BlockingGoTaskServiceClient implements GoTaskServiceClient {
     required AssistantExecutionTarget target,
     required String sessionId,
     required String threadId,
+    OpenClawTaskAssociation? association,
   }) async {
     cancelledSessionIds.add(sessionId);
   }

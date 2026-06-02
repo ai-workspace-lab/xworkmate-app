@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 
@@ -104,6 +103,7 @@ class ExternalCodeAgentAcpDesktopTransport
     var streamedText = '';
     String? completedMessage;
     Map<String, dynamic>? completedResultSnapshot;
+    Map<String, dynamic>? runningTaskSnapshot;
     try {
       final endpointOverride = _taskEndpointResolver == null
           ? _endpointResolver(request.target)
@@ -136,6 +136,11 @@ class ExternalCodeAgentAcpDesktopTransport
               update,
             );
           }
+          if (update.payload['status']?.toString().trim().toLowerCase() ==
+                  'running' &&
+              (update.payload['runId']?.toString().trim().isNotEmpty == true)) {
+            runningTaskSnapshot = <String, dynamic>{...update.payload};
+          }
           onUpdate(update);
         },
       );
@@ -155,6 +160,7 @@ class ExternalCodeAgentAcpDesktopTransport
           streamedText: streamedText,
           completedMessage: completedMessage,
           fallbackAvailable: completedResultSnapshot != null,
+          runningTaskSnapshot: runningTaskSnapshot,
         );
         if (recovered != null) {
           return recovered;
@@ -203,10 +209,26 @@ class ExternalCodeAgentAcpDesktopTransport
     required String streamedText,
     required String? completedMessage,
     bool fallbackAvailable = false,
+    Map<String, dynamic>? runningTaskSnapshot,
   }) async {
     final endpoint = _sessionSnapshotEndpoint(taskEndpoint);
     if (endpoint == null) {
       return null;
+    }
+    final association = OpenClawTaskAssociation.fromJsonOrNull(
+      runningTaskSnapshot,
+    );
+    if (association != null) {
+      return goTaskServiceResultFromAcpResponse(
+        <String, dynamic>{
+          'jsonrpc': '2.0',
+          'id': 'recovered-from-running-task-handle',
+          'result': runningTaskSnapshot,
+        },
+        route: request.route,
+        streamedText: streamedText,
+        completedMessage: completedMessage,
+      );
     }
     final attempts = _recoveryAttemptsForRequest(request);
     for (var attempt = 0; attempt < attempts; attempt += 1) {
@@ -216,7 +238,7 @@ class ExternalCodeAgentAcpDesktopTransport
       Map<String, dynamic> response;
       try {
         response = await _client.request(
-          method: 'xworkmate.sessions.get',
+          method: 'xworkmate.tasks.get',
           params: <String, dynamic>{
             'sessionId': request.sessionId,
             'threadId': request.threadId,
@@ -232,11 +254,7 @@ class ExternalCodeAgentAcpDesktopTransport
         continue;
       }
       final snapshot = _castMap(response['result']);
-      final task = _castMap(snapshot['task']);
-      final status = (task['state'] ?? snapshot['status'] ?? '')
-          .toString()
-          .trim()
-          .toLowerCase();
+      final status = (snapshot['status'] ?? '').toString().trim().toLowerCase();
       final terminal =
           status == 'completed' ||
           status == 'failed' ||
@@ -245,7 +263,19 @@ class ExternalCodeAgentAcpDesktopTransport
       if (!terminal) {
         continue;
       }
-      final result = _recoveredResultFromSessionSnapshot(snapshot);
+      if (status == 'failed' || status == 'cancelled' || status == 'canceled') {
+        return goTaskServiceResultFromAcpResponse(
+          <String, dynamic>{
+            'jsonrpc': '2.0',
+            'id': 'recovered-from-terminal-task-snapshot',
+            'result': _failureResultFromTaskSnapshot(snapshot, status),
+          },
+          route: request.route,
+          streamedText: streamedText,
+          completedMessage: completedMessage,
+        );
+      }
+      final result = _recoveredResultFromTaskSnapshot(snapshot);
       if (result.isNotEmpty) {
         return goTaskServiceResultFromAcpResponse(
           <String, dynamic>{
@@ -258,20 +288,29 @@ class ExternalCodeAgentAcpDesktopTransport
           completedMessage: completedMessage,
         );
       }
-      if (status == 'failed' || status == 'cancelled' || status == 'canceled') {
-        return goTaskServiceResultFromAcpResponse(
-          <String, dynamic>{
-            'jsonrpc': '2.0',
-            'id': 'recovered-from-terminal-session-snapshot',
-            'result': _failureResultFromSessionSnapshot(snapshot, status),
-          },
-          route: request.route,
-          streamedText: streamedText,
-          completedMessage: completedMessage,
-        );
-      }
     }
     return null;
+  }
+
+  @override
+  Future<GoTaskServiceResult> getTask({
+    required AssistantExecutionTarget target,
+    required OpenClawTaskAssociation association,
+    required GoTaskServiceRoute route,
+  }) async {
+    final endpoint = _sessionSnapshotEndpoint(_endpointResolver(target));
+    if (endpoint == null) {
+      throw const GatewayAcpException(
+        'xworkmate-bridge is not connected',
+        code: 'BRIDGE_NOT_CONNECTED',
+      );
+    }
+    final response = await _client.request(
+      method: 'xworkmate.tasks.get',
+      params: association.toTaskGetParams(),
+      endpointOverride: endpoint,
+    );
+    return goTaskServiceResultFromAcpResponse(response, route: route);
   }
 
   int _recoveryAttemptsForRequest(GoTaskServiceRequest request) {
@@ -279,13 +318,7 @@ class ExternalCodeAgentAcpDesktopTransport
     if (configured != null) {
       return configured <= 0 ? 1 : configured;
     }
-    final pollMicros = math.max(1, _recoveryPollDelay.inMicroseconds);
-    final budgetMicros = Duration(
-      minutes: gatewayAcpTaskRuntimeBudgetMinutesForParams(
-        request.toExternalAcpParams(),
-      ),
-    ).inMicroseconds;
-    return math.max(1, (budgetMicros / pollMicros).ceil());
+    return 1;
   }
 
   Uri? _sessionSnapshotEndpoint(Uri? taskEndpoint) {
@@ -303,7 +336,19 @@ class ExternalCodeAgentAcpDesktopTransport
     required AssistantExecutionTarget target,
     required String sessionId,
     required String threadId,
+    OpenClawTaskAssociation? association,
   }) async {
+    if (association != null) {
+      final endpoint = _sessionSnapshotEndpoint(_endpointResolver(target));
+      if (endpoint != null) {
+        await _client.request(
+          method: 'xworkmate.tasks.cancel',
+          params: association.toTaskGetParams(),
+          endpointOverride: endpoint,
+        );
+        return;
+      }
+    }
     await _client.cancelSession(
       sessionId: sessionId,
       threadId: threadId,
@@ -359,13 +404,16 @@ class ExternalCodeAgentAcpDesktopTransport
     return snapshot;
   }
 
-  Map<String, dynamic> _recoveredResultFromSessionSnapshot(
+  Map<String, dynamic> _recoveredResultFromTaskSnapshot(
     Map<String, dynamic> snapshot,
   ) {
-    final result = <String, dynamic>{..._castMap(snapshot['result'])};
+    final result = <String, dynamic>{
+      ..._castMap(snapshot['result']),
+      ...snapshot,
+    };
     final artifactRecord = _castMap(snapshot['artifacts']);
-    final artifactItems = _listValue(artifactRecord['items']);
-    if (artifactItems.isNotEmpty && !_hasArtifactList(result)) {
+    final artifactItems = artifactRecord['items'];
+    if (artifactItems is List && result['artifacts'] == artifactRecord) {
       result['artifacts'] = artifactItems;
     }
     for (final entry in <String, String>{
@@ -382,31 +430,23 @@ class ExternalCodeAgentAcpDesktopTransport
     return result;
   }
 
-  Map<String, dynamic> _failureResultFromSessionSnapshot(
+  Map<String, dynamic> _failureResultFromTaskSnapshot(
     Map<String, dynamic> snapshot,
     String status,
   ) {
-    final task = _castMap(snapshot['task']);
     final error = _castMap(snapshot['error']);
     final message = _firstNonEmptyDisplayText(
-      <String, dynamic>{...error, ...snapshot, 'taskMessage': task['message']},
-      const <String>[
-        'message',
-        'error',
-        'errorMessage',
-        'reason',
-        'taskMessage',
-        'code',
-      ],
+      <String, dynamic>{...error, ...snapshot},
+      const <String>['message', 'error', 'errorMessage', 'reason', 'code'],
     );
     final code = _firstNonEmptyDisplayText(
-      <String, dynamic>{...error, ...snapshot, 'taskCode': task['code']},
-      const <String>['code', 'errorCode', 'taskCode'],
+      <String, dynamic>{...error, ...snapshot},
+      const <String>['code', 'errorCode'],
     );
     final result = <String, dynamic>{
       'success': false,
       'status': status,
-      'turnId': task['turnId']?.toString().trim() ?? '',
+      'turnId': snapshot['turnId']?.toString().trim() ?? '',
       'error': message.isNotEmpty ? message : 'Bridge session ended: $status',
       'message': message.isNotEmpty ? message : 'Bridge session ended: $status',
     };
@@ -414,29 +454,6 @@ class ExternalCodeAgentAcpDesktopTransport
       result['code'] = code;
     }
     return result;
-  }
-
-  bool _hasArtifactList(Map<String, dynamic> result) {
-    for (final key in const <String>['artifacts', 'files', 'attachments']) {
-      if (_listValue(result[key]).isNotEmpty) {
-        return true;
-      }
-      final recordItems = _listValue(_castMap(result[key])['items']);
-      if (recordItems.isNotEmpty) {
-        return true;
-      }
-    }
-    for (final key in const <String>['payload', 'result', 'data']) {
-      final nested = _castMap(result[key]);
-      if (nested.isNotEmpty && _hasArtifactList(nested)) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  List<Object?> _listValue(Object? value) {
-    return value is List ? value : const <Object?>[];
   }
 
   String _firstNonEmptyDisplayText(

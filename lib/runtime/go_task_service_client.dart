@@ -494,6 +494,27 @@ class GoTaskServiceResult {
 
   String get code => raw['code']?.toString().trim() ?? '';
 
+  bool get isOpenClawRunningTaskHandle {
+    final normalizedStatus = status.trim().toLowerCase();
+    final runId = raw['runId']?.toString().trim() ?? '';
+    final artifactScope = raw['artifactScope']?.toString().trim() ?? '';
+    final provider =
+        raw['resolvedGatewayProviderId']?.toString().trim().toLowerCase() ??
+        raw['gatewayProviderId']?.toString().trim().toLowerCase() ??
+        '';
+    return normalizedStatus == 'running' &&
+        runId.isNotEmpty &&
+        artifactScope.isNotEmpty &&
+        provider.contains('openclaw');
+  }
+
+  OpenClawTaskAssociation? get openClawTaskAssociation {
+    if (!isOpenClawRunningTaskHandle) {
+      return null;
+    }
+    return OpenClawTaskAssociation.fromJsonOrNull(raw);
+  }
+
   String get resolvedExecutionTarget =>
       raw['resolvedExecutionTarget']?.toString().trim() ?? '';
 
@@ -651,10 +672,17 @@ abstract class ExternalCodeAgentAcpTransport {
     required void Function(GoTaskServiceUpdate update) onUpdate,
   });
 
+  Future<GoTaskServiceResult> getTask({
+    required AssistantExecutionTarget target,
+    required OpenClawTaskAssociation association,
+    required GoTaskServiceRoute route,
+  });
+
   Future<void> cancelTask({
     required AssistantExecutionTarget target,
     required String sessionId,
     required String threadId,
+    OpenClawTaskAssociation? association,
   });
 
   Future<void> closeTask({
@@ -683,11 +711,18 @@ abstract class GoTaskServiceClient {
     required void Function(GoTaskServiceUpdate update) onUpdate,
   });
 
+  Future<GoTaskServiceResult> getTask({
+    required AssistantExecutionTarget target,
+    required OpenClawTaskAssociation association,
+    required GoTaskServiceRoute route,
+  });
+
   Future<void> cancelTask({
     required GoTaskServiceRoute route,
     required AssistantExecutionTarget target,
     required String sessionId,
     required String threadId,
+    OpenClawTaskAssociation? association,
   });
 
   Future<void> closeTask({
