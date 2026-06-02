@@ -125,11 +125,7 @@ extension AssistantPageStateClosureInternal on AssistantPageStateInternal {
           lastResultCode: thread?.lifecycleState.lastResultCode ?? '',
           artifactSyncStatus: thread?.lastArtifactSyncStatus ?? '',
           runtimeBudgetMinutes:
-              gatewayAcpTaskRuntimeBudgetMinutesForParams(<String, dynamic>{
-                'taskPrompt': currentTask.preview,
-                'requestedExecutionTarget':
-                    currentTask.executionTarget.promptValue,
-              }),
+              thread?.openClawTaskAssociation?.runtimeBudgetMinutes ?? 10,
         );
 
         return SurfaceCard(

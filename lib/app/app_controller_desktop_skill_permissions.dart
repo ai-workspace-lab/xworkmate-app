@@ -76,6 +76,8 @@ extension AppControllerDesktopSkillPermissions on AppController {
     double? lastArtifactSyncAtMs,
     String? lastArtifactSyncStatus,
     List<String>? lastTaskArtifactRelativePaths,
+    OpenClawTaskAssociation? openClawTaskAssociation,
+    bool clearOpenClawTaskAssociation = false,
   }) {
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey,
@@ -225,6 +227,8 @@ extension AppControllerDesktopSkillPermissions on AppController {
               lastArtifactSyncAtMs: lastArtifactSyncAtMs,
               lastArtifactSyncStatus: lastArtifactSyncStatus,
               lastTaskArtifactRelativePaths: lastTaskArtifactRelativePaths,
+              openClawTaskAssociation: openClawTaskAssociation,
+              clearOpenClawTaskAssociation: clearOpenClawTaskAssociation,
             );
     final nextStatus =
         lifecycleStatus ??
@@ -263,6 +267,7 @@ extension AppControllerDesktopSkillPermissions on AppController {
       executionBinding: nextExecutionBinding,
       contextState: nextContextState,
       lifecycleState: nextLifecycleState,
+      openClawTaskAssociation: nextContextState.openClawTaskAssociation,
       updatedAtMs:
           updatedAtMs ??
           existing?.updatedAtMs ??

@@ -38,15 +38,28 @@ class DesktopGoTaskService implements GoTaskServiceClient {
   }) => _acpTransport.executeTask(request, onUpdate: onUpdate);
 
   @override
+  Future<GoTaskServiceResult> getTask({
+    required AssistantExecutionTarget target,
+    required OpenClawTaskAssociation association,
+    required GoTaskServiceRoute route,
+  }) => _acpTransport.getTask(
+    target: target,
+    association: association,
+    route: route,
+  );
+
+  @override
   Future<void> cancelTask({
     required GoTaskServiceRoute route,
     required AssistantExecutionTarget target,
     required String sessionId,
     required String threadId,
+    OpenClawTaskAssociation? association,
   }) => _acpTransport.cancelTask(
     target: target,
     sessionId: sessionId,
     threadId: threadId,
+    association: association,
   );
 
   @override

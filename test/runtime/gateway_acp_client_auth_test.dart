@@ -253,38 +253,6 @@ void main() {
     });
   });
 
-  group('Gateway ACP task runtime budget', () {
-    test(
-      'treats explicit document and media formats as long artifact tasks',
-      () {
-        expect(
-          gatewayAcpTaskRuntimeBudgetMinutesForParams(const <String, dynamic>{
-            'taskPrompt': '围绕上述话题输出一篇800-1000字左右的文章 markdown格式',
-          }),
-          30,
-        );
-        expect(
-          gatewayAcpTaskRuntimeBudgetMinutesForParams(const <String, dynamic>{
-            'taskPrompt': 'save the final article as article.docx',
-          }),
-          30,
-        );
-        expect(
-          gatewayAcpTaskRuntimeBudgetMinutesForParams(const <String, dynamic>{
-            'taskPrompt': '生成封面图 png 和短视频 mp4',
-          }),
-          30,
-        );
-        expect(
-          gatewayAcpTaskRuntimeBudgetMinutesForParams(const <String, dynamic>{
-            'taskPrompt': '导出 jpg、pptx 和 xls 文件',
-          }),
-          30,
-        );
-      },
-    );
-  });
-
   group('GatewayAcpClient authorization', () {
     test('normalizes raw resolver token into bearer header for HTTP', () async {
       final capture = await _startAcpHttpServer();
@@ -672,7 +640,7 @@ void main() {
     );
 
     test(
-      'recovers OpenClaw task result from bridge session snapshot after SSE connection close',
+      'recovers OpenClaw task result from bridge task snapshot after SSE connection close',
       () async {
         final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
         addTearDown(() => server.close(force: true));
@@ -701,7 +669,7 @@ void main() {
             socket.destroy();
             return;
           }
-          if (method == 'xworkmate.sessions.get') {
+          if (method == 'xworkmate.tasks.get') {
             request.response.headers.contentType = ContentType.json;
             request.response.write(
               jsonEncode(<String, dynamic>{
@@ -717,7 +685,7 @@ void main() {
                   },
                   'result': <String, dynamic>{
                     'success': true,
-                    'output': 'recovered from bridge session snapshot',
+                    'output': 'recovered from bridge task snapshot',
                     'turnId': 'turn-recovered',
                   },
                   'artifacts': <String, dynamic>{
@@ -772,7 +740,7 @@ void main() {
         );
 
         expect(result.success, isTrue);
-        expect(result.message, 'recovered from bridge session snapshot');
+        expect(result.message, 'recovered from bridge task snapshot');
         expect(result.artifacts.single.relativePath, 'exports/snapshot.md');
         expect(result.remoteWorkingDirectory, '/remote/openclaw/workspace');
         expect(result.remoteWorkspaceRefKind, WorkspaceRefKind.remotePath);
@@ -818,7 +786,7 @@ void main() {
             socket.destroy();
             return;
           }
-          if (method == 'xworkmate.sessions.get') {
+          if (method == 'xworkmate.tasks.get') {
             request.response.headers.contentType = ContentType.json;
             request.response.write(
               jsonEncode(<String, dynamic>{
@@ -890,13 +858,13 @@ void main() {
         expect(result.artifacts.single.relativePath, 'reports/final.md');
         expect(requestMethods, <String>[
           'session.start',
-          'xworkmate.sessions.get',
+          'xworkmate.tasks.get',
         ]);
       },
     );
 
     test(
-      'recovers OpenClaw follow-up from bridge session snapshot after SSE ends without final envelope',
+      'recovers OpenClaw follow-up from bridge task snapshot after SSE ends without final envelope',
       () async {
         final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
         addTearDown(() => server.close(force: true));
@@ -921,7 +889,7 @@ void main() {
             await request.response.close();
             return;
           }
-          if (method == 'xworkmate.sessions.get') {
+          if (method == 'xworkmate.tasks.get') {
             request.response.headers.contentType = ContentType.json;
             request.response.write(
               jsonEncode(<String, dynamic>{
@@ -1014,7 +982,7 @@ void main() {
             socket.destroy();
             return;
           }
-          if (method == 'xworkmate.sessions.get') {
+          if (method == 'xworkmate.tasks.get') {
             snapshotPolls += 1;
             final completed = snapshotPolls >= 3;
             request.response.headers.contentType = ContentType.json;
@@ -1081,96 +1049,6 @@ void main() {
     );
 
     test(
-      'uses long task budget for default OpenClaw SSE recovery polling',
-      () async {
-        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-        addTearDown(() => server.close(force: true));
-        var snapshotPolls = 0;
-        server.listen((request) async {
-          final body = await utf8.decoder.bind(request).join();
-          final decoded = jsonDecode(body) as Map<String, dynamic>;
-          final method = decoded['method']?.toString() ?? '';
-          final id = decoded['id']?.toString() ?? 'request-id';
-          if (method == 'session.start') {
-            final event = jsonEncode(<String, dynamic>{
-              'jsonrpc': '2.0',
-              'method': 'xworkmate.bridge.accepted',
-              'params': <String, dynamic>{'sessionId': 'unit-fixture-task-d'},
-            });
-            request.response.headers.set(
-              HttpHeaders.contentTypeHeader,
-              'text/event-stream',
-            );
-            request.response.write('data: $event\n\n');
-            await request.response.close();
-            return;
-          }
-          if (method == 'xworkmate.sessions.get') {
-            snapshotPolls += 1;
-            final completed = snapshotPolls >= 301;
-            request.response.headers.contentType = ContentType.json;
-            request.response.write(
-              jsonEncode(<String, dynamic>{
-                'jsonrpc': '2.0',
-                'id': id,
-                'result': <String, dynamic>{
-                  'status': completed ? 'completed' : 'running',
-                  'sessionId': 'unit-fixture-task-d',
-                  'threadId': 'unit-fixture-task-d',
-                  'task': <String, dynamic>{
-                    'state': completed ? 'completed' : 'running',
-                    'turnId': 'turn-recovered-long',
-                  },
-                  if (completed)
-                    'result': <String, dynamic>{
-                      'success': true,
-                      'output': 'recovered after long polling window',
-                      'turnId': 'turn-recovered-long',
-                    },
-                },
-              }),
-            );
-            await request.response.close();
-            return;
-          }
-          request.response.statusCode = HttpStatus.badRequest;
-          await request.response.close();
-        });
-        final endpoint = Uri.parse('http://127.0.0.1:${server.port}');
-        final transport = ExternalCodeAgentAcpDesktopTransport(
-          client: GatewayAcpClient(endpointResolver: () => endpoint),
-          endpointResolver: (_) => endpoint,
-          taskEndpointResolver: (_) => endpoint,
-          recoveryPollDelay: const Duration(microseconds: 1),
-        );
-        addTearDown(transport.dispose);
-
-        final result = await transport.executeTask(
-          const GoTaskServiceRequest(
-            sessionId: 'unit-fixture-task-d',
-            threadId: 'unit-fixture-task-d',
-            target: AssistantExecutionTarget.gateway,
-            provider: SingleAgentProvider.openclaw,
-            prompt: '生成封面图 png 和短视频 mp4',
-            workingDirectory: '/tmp/workspace',
-            model: '',
-            thinking: 'off',
-            selectedSkills: <String>[],
-            inlineAttachments: <GatewayChatAttachmentPayload>[],
-            localAttachments: <CollaborationAttachment>[],
-            agentId: '',
-            metadata: <String, dynamic>{},
-          ),
-          onUpdate: (_) {},
-        );
-
-        expect(snapshotPolls, 301);
-        expect(result.success, isTrue);
-        expect(result.message, 'recovered after long polling window');
-      },
-    );
-
-    test(
       'recovers terminal failed OpenClaw snapshot without displayable result',
       () async {
         final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
@@ -1198,7 +1076,7 @@ void main() {
             socket.destroy();
             return;
           }
-          if (method == 'xworkmate.sessions.get') {
+          if (method == 'xworkmate.tasks.get') {
             request.response.headers.contentType = ContentType.json;
             request.response.write(
               jsonEncode(<String, dynamic>{
@@ -1957,7 +1835,7 @@ void main() {
       },
     );
 
-    test('task submit uses dynamic HTTP response timeout budgets', () {
+    test('task submit uses short HTTP response timeout', () {
       final openClawEndpoint = Uri.parse(
         'https://xworkmate-bridge.svc.plus/acp/rpc',
       );
@@ -1971,7 +1849,7 @@ void main() {
           'session.start',
           const <String, dynamic>{'requestedExecutionTarget': 'gateway'},
         ),
-        const Duration(minutes: 10),
+        const Duration(seconds: 120),
       );
       expect(
         gatewayAcpHttpResponseTimeoutFor(
@@ -1982,11 +1860,11 @@ void main() {
             'requestedExecutionTarget': 'gateway',
           },
         ),
-        const Duration(minutes: 30),
+        const Duration(seconds: 120),
       );
       expect(
         gatewayAcpHttpResponseTimeoutFor(acpEndpoint, 'session.start'),
-        const Duration(minutes: 2),
+        const Duration(seconds: 120),
       );
       expect(
         gatewayAcpHttpResponseTimeoutFor(openClawEndpoint, 'acp.capabilities'),

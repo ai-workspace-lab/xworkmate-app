@@ -677,6 +677,7 @@ class ThreadContextState {
     this.lastArtifactSyncAtMs,
     this.lastArtifactSyncStatus,
     this.lastTaskArtifactRelativePaths = const <String>[],
+    this.openClawTaskAssociation,
   });
 
   final List<GatewayChatMessage> messages;
@@ -694,6 +695,7 @@ class ThreadContextState {
   final double? lastArtifactSyncAtMs;
   final String? lastArtifactSyncStatus;
   final List<String> lastTaskArtifactRelativePaths;
+  final OpenClawTaskAssociation? openClawTaskAssociation;
 
   ThreadContextState copyWith({
     List<GatewayChatMessage>? messages,
@@ -712,6 +714,8 @@ class ThreadContextState {
     double? lastArtifactSyncAtMs,
     String? lastArtifactSyncStatus,
     List<String>? lastTaskArtifactRelativePaths,
+    OpenClawTaskAssociation? openClawTaskAssociation,
+    bool clearOpenClawTaskAssociation = false,
   }) {
     return ThreadContextState(
       messages: messages ?? this.messages,
@@ -738,6 +742,9 @@ class ThreadContextState {
       lastTaskArtifactRelativePaths: lastTaskArtifactRelativePaths == null
           ? this.lastTaskArtifactRelativePaths
           : _stringListFromJson(lastTaskArtifactRelativePaths),
+      openClawTaskAssociation: clearOpenClawTaskAssociation
+          ? null
+          : (openClawTaskAssociation ?? this.openClawTaskAssociation),
     );
   }
 
@@ -758,6 +765,7 @@ class ThreadContextState {
       'lastArtifactSyncAtMs': lastArtifactSyncAtMs,
       'lastArtifactSyncStatus': lastArtifactSyncStatus,
       'lastTaskArtifactRelativePaths': lastTaskArtifactRelativePaths,
+      'openClawTaskAssociation': openClawTaskAssociation?.toJson(),
     };
   }
 
@@ -822,6 +830,163 @@ class ThreadContextState {
       lastArtifactSyncStatus: json['lastArtifactSyncStatus']?.toString(),
       lastTaskArtifactRelativePaths: _stringListFromJson(
         json['lastTaskArtifactRelativePaths'],
+      ),
+      openClawTaskAssociation: OpenClawTaskAssociation.fromJsonOrNull(
+        json['openClawTaskAssociation'],
+      ),
+    );
+  }
+}
+
+class OpenClawTaskAssociation {
+  const OpenClawTaskAssociation({
+    required this.sessionId,
+    required this.threadId,
+    required this.turnId,
+    required this.runId,
+    required this.artifactScope,
+    required this.artifactDirectory,
+    required this.gatewayProviderId,
+    required this.runtimeBudgetMinutes,
+    required this.startedAtMs,
+    required this.status,
+    this.taskLoadClass = '',
+    this.sessionKey = '',
+    this.requiredArtifactExtensions = const <String>[],
+    this.expectedArtifactExtensions = const <String>[],
+  });
+
+  final String sessionId;
+  final String threadId;
+  final String turnId;
+  final String runId;
+  final String artifactScope;
+  final String artifactDirectory;
+  final String gatewayProviderId;
+  final int runtimeBudgetMinutes;
+  final double startedAtMs;
+  final String status;
+  final String taskLoadClass;
+  final String sessionKey;
+  final List<String> requiredArtifactExtensions;
+  final List<String> expectedArtifactExtensions;
+
+  bool get isTerminal {
+    final normalized = status.trim().toLowerCase();
+    return normalized == 'completed' ||
+        normalized == 'failed' ||
+        normalized == 'cancelled' ||
+        normalized == 'canceled';
+  }
+
+  OpenClawTaskAssociation copyWith({String? status}) {
+    return OpenClawTaskAssociation(
+      sessionId: sessionId,
+      threadId: threadId,
+      turnId: turnId,
+      runId: runId,
+      artifactScope: artifactScope,
+      artifactDirectory: artifactDirectory,
+      gatewayProviderId: gatewayProviderId,
+      runtimeBudgetMinutes: runtimeBudgetMinutes,
+      startedAtMs: startedAtMs,
+      status: status ?? this.status,
+      taskLoadClass: taskLoadClass,
+      sessionKey: sessionKey,
+      requiredArtifactExtensions: requiredArtifactExtensions,
+      expectedArtifactExtensions: expectedArtifactExtensions,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return <String, dynamic>{
+      'sessionId': sessionId,
+      'threadId': threadId,
+      'turnId': turnId,
+      'runId': runId,
+      'artifactScope': artifactScope,
+      'artifactDirectory': artifactDirectory,
+      'gatewayProviderId': gatewayProviderId,
+      'runtimeBudgetMinutes': runtimeBudgetMinutes,
+      'startedAtMs': startedAtMs,
+      'status': status,
+      'taskLoadClass': taskLoadClass,
+      'sessionKey': sessionKey,
+      'requiredArtifactExtensions': requiredArtifactExtensions,
+      'expectedArtifactExtensions': expectedArtifactExtensions,
+    };
+  }
+
+  Map<String, dynamic> toTaskGetParams() {
+    return <String, dynamic>{
+      'sessionId': sessionId,
+      'threadId': threadId,
+      'turnId': turnId,
+      'runId': runId,
+      'artifactScope': artifactScope,
+      'artifactDirectory': artifactDirectory,
+      'gatewayProviderId': gatewayProviderId,
+      'runtimeBudgetMinutes': runtimeBudgetMinutes,
+      'taskLoadClass': taskLoadClass,
+      'sessionKey': sessionKey,
+      'requiredArtifactExtensions': requiredArtifactExtensions,
+      'expectedArtifactExtensions': expectedArtifactExtensions,
+    };
+  }
+
+  static OpenClawTaskAssociation? fromJsonOrNull(Object? value) {
+    if (value is! Map) {
+      return null;
+    }
+    final json = value.cast<String, dynamic>();
+    final runId = json['runId']?.toString().trim() ?? '';
+    final artifactScope = json['artifactScope']?.toString().trim() ?? '';
+    if (runId.isEmpty || artifactScope.isEmpty) {
+      return null;
+    }
+    int asInt(Object? raw) {
+      if (raw is int) {
+        return raw;
+      }
+      if (raw is num) {
+        return raw.toInt();
+      }
+      return int.tryParse(raw?.toString() ?? '') ?? 60;
+    }
+
+    double asDouble(Object? raw) {
+      if (raw is num) {
+        return raw.toDouble();
+      }
+      return double.tryParse(raw?.toString() ?? '') ?? 0;
+    }
+
+    return OpenClawTaskAssociation(
+      sessionId: json['sessionId']?.toString().trim() ?? '',
+      threadId: json['threadId']?.toString().trim() ?? '',
+      turnId: json['turnId']?.toString().trim() ?? '',
+      runId: runId,
+      artifactScope: artifactScope,
+      artifactDirectory: json['artifactDirectory']?.toString().trim() ?? '',
+      gatewayProviderId:
+          json['gatewayProviderId']?.toString().trim().isNotEmpty == true
+          ? json['gatewayProviderId'].toString().trim()
+          : (json['resolvedGatewayProviderId']?.toString().trim().isNotEmpty ==
+                    true
+                ? json['resolvedGatewayProviderId'].toString().trim()
+                : 'openclaw'),
+      runtimeBudgetMinutes: asInt(json['runtimeBudgetMinutes']),
+      startedAtMs: asDouble(json['startedAtMs']),
+      status: json['status']?.toString().trim().isNotEmpty == true
+          ? json['status'].toString().trim()
+          : 'running',
+      taskLoadClass: json['taskLoadClass']?.toString().trim() ?? '',
+      sessionKey: json['sessionKey']?.toString().trim() ?? '',
+      requiredArtifactExtensions: _stringListFromJson(
+        json['requiredArtifactExtensions'],
+      ),
+      expectedArtifactExtensions: _stringListFromJson(
+        json['expectedArtifactExtensions'],
       ),
     );
   }
@@ -931,6 +1096,7 @@ class TaskThread {
     double? lastArtifactSyncAtMs,
     String? lastArtifactSyncStatus,
     List<String>? lastTaskArtifactRelativePaths,
+    OpenClawTaskAssociation? openClawTaskAssociation,
   }) : threadId = _resolveThreadId(threadId),
        title = title ?? '',
        ownerScope =
@@ -977,6 +1143,7 @@ class TaskThread {
              lastTaskArtifactRelativePaths: _stringListFromJson(
                lastTaskArtifactRelativePaths,
              ),
+             openClawTaskAssociation: openClawTaskAssociation,
            ),
        lifecycleState =
            lifecycleState ??
@@ -1015,6 +1182,8 @@ class TaskThread {
   String? get lastArtifactSyncStatus => contextState.lastArtifactSyncStatus;
   List<String> get lastTaskArtifactRelativePaths =>
       contextState.lastTaskArtifactRelativePaths;
+  OpenClawTaskAssociation? get openClawTaskAssociation =>
+      contextState.openClawTaskAssociation;
   String get latestResolvedRuntimeModel =>
       contextState.latestResolvedRuntimeModel;
   String get latestResolvedProviderId => contextState.latestResolvedProviderId;
@@ -1058,6 +1227,8 @@ class TaskThread {
     double? lastArtifactSyncAtMs,
     String? lastArtifactSyncStatus,
     List<String>? lastTaskArtifactRelativePaths,
+    OpenClawTaskAssociation? openClawTaskAssociation,
+    bool clearOpenClawTaskAssociation = false,
   }) {
     return TaskThread(
       threadId: threadId ?? this.threadId,
@@ -1081,6 +1252,8 @@ class TaskThread {
         lastArtifactSyncAtMs: lastArtifactSyncAtMs,
         lastArtifactSyncStatus: lastArtifactSyncStatus,
         lastTaskArtifactRelativePaths: lastTaskArtifactRelativePaths,
+        openClawTaskAssociation: openClawTaskAssociation,
+        clearOpenClawTaskAssociation: clearOpenClawTaskAssociation,
       ),
       lifecycleState: (lifecycleState ?? this.lifecycleState).copyWith(
         archived: archived,
@@ -1197,6 +1370,7 @@ class TaskThread {
         'lastArtifactSyncAtMs': json['lastArtifactSyncAtMs'],
         'lastArtifactSyncStatus': json['lastArtifactSyncStatus'],
         'lastTaskArtifactRelativePaths': json['lastTaskArtifactRelativePaths'],
+        'openClawTaskAssociation': json['openClawTaskAssociation'],
       };
     }
 
