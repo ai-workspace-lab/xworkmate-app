@@ -145,6 +145,7 @@ extension AppControllerDesktopThreadStorage on AppController {
       normalized,
       persistSelection: false,
     );
+    resumeOpenClawTaskAssociationsInternal(onlySessionKey: normalized);
   }
 
   void handleRuntimeEventInternal(GatewayPushEvent event) {
