@@ -1370,6 +1370,14 @@ void main() {
           }
         });
         final fakeGoTaskService = _RecordingGoTaskServiceClient()
+          ..onExecuteTask = ((request) async {
+            await Directory(
+              '${request.workingDirectory}/assets/images',
+            ).create(recursive: true);
+            await File(
+              '${request.workingDirectory}/assets/images/final.v2.png',
+            ).writeAsBytes(<int>[1, 2, 3, 4]);
+          })
           ..updatesBeforeNextOutcome.add(
             const GoTaskServiceUpdate(
               sessionId: 'unit-fixture-task-a',
@@ -1432,7 +1440,13 @@ void main() {
           controller
               .taskThreadForSessionInternal('unit-fixture-task-a')
               ?.lastArtifactSyncStatus,
-          'failed',
+          'interrupted',
+        );
+        expect(
+          controller
+              .taskThreadForSessionInternal('unit-fixture-task-a')
+              ?.lastTaskArtifactRelativePaths,
+          <String>['assets/images/final.v2.png'],
         );
 
         await controller.sendChatMessage('follow up');
@@ -1869,6 +1883,11 @@ void main() {
         expect(fakeGoTaskService.requests.last.resumeSession, isFalse);
         await _waitForLastChatMessageText(controller, '全部 6 个文件已生成 ✅');
         expect(controller.chatMessages.last.text, '全部 6 个文件已生成 ✅');
+        await _waitForThreadLastResultCode(
+          controller,
+          'unit-fixture-task-a',
+          'SUCCESS',
+        );
         final thread = controller.taskThreadForSessionInternal(
           'unit-fixture-task-a',
         );
@@ -4185,6 +4204,7 @@ class _RecordingGoTaskServiceClient implements GoTaskServiceClient {
   final List<GoTaskServiceUpdate> updatesBeforeNextOutcome =
       <GoTaskServiceUpdate>[];
   final List<Object> outcomes = <Object>[];
+  Future<void> Function(GoTaskServiceRequest request)? onExecuteTask;
 
   @override
   Future<ExternalCodeAgentAcpCapabilities> loadExternalAcpCapabilities({
@@ -4207,6 +4227,7 @@ class _RecordingGoTaskServiceClient implements GoTaskServiceClient {
   }) async {
     executeCount += 1;
     requests.add(request);
+    await onExecuteTask?.call(request);
     for (final update in List<GoTaskServiceUpdate>.from(
       updatesBeforeNextOutcome,
     )) {

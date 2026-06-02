@@ -626,7 +626,7 @@ extension AppControllerDesktopThreadActions on AppController {
         clearAiGatewayStreamingTextInternal(sessionKey);
         return;
       }
-      applyGatewayChatFailureInternal(
+      await applyGatewayChatFailureInternal(
         sessionKey: sessionKey,
         target: target,
         error: error,
@@ -1087,7 +1087,7 @@ extension AppControllerDesktopThreadActions on AppController {
       );
     } catch (error) {
       if (!disposedInternal) {
-        applyGatewayChatFailureInternal(
+        await applyGatewayChatFailureInternal(
           sessionKey: turn.sessionKey,
           target: turn.target,
           error: error,
@@ -1252,13 +1252,15 @@ extension AppControllerDesktopThreadActions on AppController {
     await persistGoTaskArtifactsForSessionInternal(sessionKey, result);
   }
 
-  void applyGatewayChatFailureInternal({
+  Future<void> applyGatewayChatFailureInternal({
     required String sessionKey,
     required AssistantExecutionTarget target,
     required Object error,
-  }) {
+  }) async {
     clearAiGatewayStreamingTextInternal(sessionKey);
     final completedAtMs = DateTime.now().millisecondsSinceEpoch.toDouble();
+    final recoveredArtifactPaths =
+        await recoverGatewayFailureArtifactPathsInternal(sessionKey, error);
     upsertTaskThreadInternal(
       sessionKey,
       lifecycleStatus: 'ready',
@@ -1266,8 +1268,10 @@ extension AppControllerDesktopThreadActions on AppController {
       lastResultCode: gatewayFailureResultCodeInternal(error),
       lastRemoteWorkingDirectory: '',
       lastArtifactSyncAtMs: completedAtMs,
-      lastArtifactSyncStatus: 'failed',
-      lastTaskArtifactRelativePaths: const <String>[],
+      lastArtifactSyncStatus: recoveredArtifactPaths.isEmpty
+          ? 'failed'
+          : 'interrupted',
+      lastTaskArtifactRelativePaths: recoveredArtifactPaths,
       clearOpenClawTaskAssociation: true,
       updatedAtMs: completedAtMs,
     );
