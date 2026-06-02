@@ -366,6 +366,38 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     return false;
   }
 
+  Future<List<String>> recoverGatewayFailureArtifactPathsInternal(
+    String sessionKey,
+    Object error,
+  ) async {
+    if (interruptedAcpHttpTransportCodeInternal(error) !=
+        'ACP_HTTP_CONNECTION_CLOSED') {
+      return const <String>[];
+    }
+    final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
+      sessionKey,
+    );
+    final thread = taskThreadForSessionInternal(normalizedSessionKey);
+    if (thread == null ||
+        thread.workspaceBinding.workspaceKind != WorkspaceKind.localFs) {
+      return const <String>[];
+    }
+    final root = Directory(thread.workspaceBinding.workspacePath);
+    try {
+      final policy = await _loadArtifactSyncPolicyInternal(
+        root,
+        thread.selectedSkillKeys,
+      );
+      return _workspaceArtifactPathsModifiedSinceInternal(
+        root,
+        thread.lifecycleState.lastRunAtMs,
+        policy,
+      );
+    } catch (_) {
+      return const <String>[];
+    }
+  }
+
   String jsonLikeTextForDiagnosticsInternal(Object? value) {
     try {
       return jsonEncode(value);
