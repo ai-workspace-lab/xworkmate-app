@@ -758,15 +758,20 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
       );
       return;
     }
+    final root = Directory(existingThread.workspaceBinding.workspacePath);
+    final artifactSyncPolicy = await _loadArtifactSyncPolicyInternal(
+      root,
+      existingThread.selectedSkillKeys,
+    );
     final artifacts = result.artifacts;
     if (artifacts.isEmpty) {
-      final root = Directory(existingThread.workspaceBinding.workspacePath);
       final currentTaskArtifactRelativePaths =
           isOpenClawNoExportedArtifactsGuardResultInternal(result)
           ? const <String>[]
           : await _workspaceArtifactPathsModifiedSinceInternal(
               root,
               existingThread.lifecycleState.lastRunAtMs,
+              artifactSyncPolicy,
             );
       if (currentTaskArtifactRelativePaths.isNotEmpty) {
         upsertTaskThreadInternal(
@@ -789,18 +794,18 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
       );
       return;
     }
-    final root = Directory(existingThread.workspaceBinding.workspacePath);
     await root.create(recursive: true);
 
     var wroteArtifact = false;
     var failedArtifact = false;
     var skippedArtifact = false;
+    var rejectedArtifact = false;
     final currentTaskArtifactPaths = <String>{};
     for (final artifact in artifacts) {
       final relativePath = _sanitizeArtifactRelativePathInternal(
         artifact.relativePath,
       );
-      if (relativePath.isEmpty) {
+      if (relativePath.isEmpty || artifactSyncPolicy.ignores(relativePath)) {
         skippedArtifact = true;
         continue;
       }
@@ -811,13 +816,21 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
       final bytes = bytesResult.bytes;
       if (bytes == null) {
         final existingArtifactPaths =
-            await _existingWorkspaceArtifactPathsInternal(root, relativePath);
+            await _existingWorkspaceArtifactPathsInternal(
+              root,
+              relativePath,
+              artifactSyncPolicy,
+            );
         if (existingArtifactPaths.isEmpty) {
           skippedArtifact = true;
           continue;
         }
         currentTaskArtifactPaths.addAll(existingArtifactPaths);
         wroteArtifact = true;
+        continue;
+      }
+      if (artifactSyncPolicy.rejects(artifact, relativePath, bytes)) {
+        rejectedArtifact = true;
         continue;
       }
       final target = await _nextArtifactTargetFileInternal(root, relativePath);
@@ -848,6 +861,8 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
         ? (failedArtifact || skippedArtifact ? 'partial' : 'synced')
         : failedArtifact
         ? 'download-failed'
+        : rejectedArtifact
+        ? 'no-exported-artifacts'
         : 'no-artifacts';
     final currentTaskArtifactRelativePaths = wroteArtifact
         ? (currentTaskArtifactPaths.toList(growable: false)..sort())
@@ -1231,6 +1246,7 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
 Future<List<String>> _existingWorkspaceArtifactPathsInternal(
   Directory root,
   String relativePath,
+  _ArtifactSyncPolicy policy,
 ) async {
   final targetPath = DesktopThreadArtifactService.resolveAbsolutePathInternal(
     root.path,
@@ -1246,7 +1262,9 @@ Future<List<String>> _existingWorkspaceArtifactPathsInternal(
           root.path,
           targetPath,
         );
-    return resolvedRelativePath == null || resolvedRelativePath.isEmpty
+    return resolvedRelativePath == null ||
+            resolvedRelativePath.isEmpty ||
+            policy.ignores(resolvedRelativePath)
         ? const <String>[]
         : <String>[resolvedRelativePath];
   }
@@ -1260,7 +1278,9 @@ Future<List<String>> _existingWorkspaceArtifactPathsInternal(
   for (final file in files) {
     final resolvedRelativePath =
         DesktopThreadArtifactService.relativePathInternal(root.path, file.path);
-    if (resolvedRelativePath != null && resolvedRelativePath.isNotEmpty) {
+    if (resolvedRelativePath != null &&
+        resolvedRelativePath.isNotEmpty &&
+        !policy.ignores(resolvedRelativePath)) {
       paths.add(resolvedRelativePath);
     }
   }
@@ -1271,6 +1291,7 @@ Future<List<String>> _existingWorkspaceArtifactPathsInternal(
 Future<List<String>> _workspaceArtifactPathsModifiedSinceInternal(
   Directory root,
   double? sinceMs,
+  _ArtifactSyncPolicy policy,
 ) async {
   final thresholdMs = sinceMs ?? 0;
   if (thresholdMs <= 0 || !await root.exists()) {
@@ -1281,7 +1302,7 @@ Future<List<String>> _workspaceArtifactPathsModifiedSinceInternal(
   for (final file in files) {
     try {
       final stat = await file.stat();
-      if (stat.modified.millisecondsSinceEpoch.toDouble() < thresholdMs) {
+      if (stat.modified.millisecondsSinceEpoch.toDouble() <= thresholdMs) {
         continue;
       }
       final resolvedRelativePath =
@@ -1293,6 +1314,9 @@ Future<List<String>> _workspaceArtifactPathsModifiedSinceInternal(
         continue;
       }
       if (_isWorkspaceArtifactNoisePathInternal(resolvedRelativePath)) {
+        continue;
+      }
+      if (policy.ignores(resolvedRelativePath)) {
         continue;
       }
       paths.add(resolvedRelativePath);
@@ -1307,6 +1331,54 @@ Future<List<String>> _workspaceArtifactPathsModifiedSinceInternal(
 bool _isWorkspaceArtifactNoisePathInternal(String relativePath) {
   return DesktopThreadArtifactService.baseNameInternal(relativePath) ==
       '.DS_Store';
+}
+
+Future<_ArtifactSyncPolicy> _loadArtifactSyncPolicyInternal(
+  Directory root,
+  List<String> selectedSkillKeys,
+) async {
+  final files = <File>[
+    File(
+      DesktopThreadArtifactService.resolveAbsolutePathInternal(
+        root.path,
+        'artifact-ignore.md',
+      ),
+    ),
+  ];
+  for (final skillKey in selectedSkillKeys) {
+    final normalizedSkillKey = _sanitizeArtifactRelativePathInternal(skillKey);
+    if (normalizedSkillKey.isEmpty) {
+      continue;
+    }
+    files.add(
+      File(
+        DesktopThreadArtifactService.resolveAbsolutePathInternal(
+          root.path,
+          'skills/$normalizedSkillKey/artifact-ignore.md',
+        ),
+      ),
+    );
+  }
+  final policyFiles = <String>[];
+  for (final file in files) {
+    final resolvedRelativePath =
+        DesktopThreadArtifactService.relativePathInternal(root.path, file.path);
+    if (resolvedRelativePath != null && resolvedRelativePath.isNotEmpty) {
+      policyFiles.add(resolvedRelativePath);
+    }
+  }
+  final policies = <_ArtifactSyncPolicy>[];
+  try {
+    for (final file in files) {
+      if (!await file.exists()) {
+        continue;
+      }
+      policies.add(_ArtifactSyncPolicy.parse(await file.readAsString()));
+    }
+  } on FileSystemException {
+    return const _ArtifactSyncPolicy();
+  }
+  return _ArtifactSyncPolicy.merge(policies, policyFiles: policyFiles);
 }
 
 String _normalizeAuthorizationHeaderInternal(String raw) {
@@ -1354,6 +1426,238 @@ class _ArtifactBytesResult {
 
   final List<int>? bytes;
   final bool failed;
+}
+
+class _ArtifactSyncPolicy {
+  const _ArtifactSyncPolicy({
+    this.ignoreRules = const <_ArtifactIgnoreRule>[],
+    this.rejectRules = const <_ArtifactRejectRule>[],
+    this.policyFiles = const <String>[],
+  });
+
+  factory _ArtifactSyncPolicy.merge(
+    List<_ArtifactSyncPolicy> policies, {
+    required List<String> policyFiles,
+  }) {
+    return _ArtifactSyncPolicy(
+      ignoreRules: policies
+          .expand((policy) => policy.ignoreRules)
+          .toList(growable: false),
+      rejectRules: policies
+          .expand((policy) => policy.rejectRules)
+          .toList(growable: false),
+      policyFiles: policyFiles,
+    );
+  }
+
+  factory _ArtifactSyncPolicy.parse(String markdown) {
+    final ignoreRules = <_ArtifactIgnoreRule>[];
+    final rejectRules = <_ArtifactRejectRule>[];
+    var inIgnoreBlock = false;
+    var inRejectBlock = false;
+    var fields = <String, List<String>>{};
+    for (final rawLine in markdown.split(RegExp(r'\r?\n'))) {
+      final line = rawLine.trim();
+      if (line.startsWith('```')) {
+        final fenceName = line
+            .replaceFirst(RegExp(r'^`+'), '')
+            .trim()
+            .toLowerCase();
+        if (!inIgnoreBlock &&
+            !inRejectBlock &&
+            fenceName == 'artifact-ignore') {
+          inIgnoreBlock = true;
+          continue;
+        }
+        if (!inRejectBlock && fenceName == 'artifact-reject') {
+          inRejectBlock = true;
+          fields = <String, List<String>>{};
+          continue;
+        }
+        if (inIgnoreBlock) {
+          inIgnoreBlock = false;
+        }
+        if (inRejectBlock) {
+          final rule = _ArtifactRejectRule.tryParse(fields);
+          if (rule != null) {
+            rejectRules.add(rule);
+          }
+          inRejectBlock = false;
+          fields = <String, List<String>>{};
+        }
+        continue;
+      }
+      if (inIgnoreBlock) {
+        if (line.isEmpty || line.startsWith('#')) {
+          continue;
+        }
+        final rule = _ArtifactIgnoreRule.tryParse(line);
+        if (rule != null) {
+          ignoreRules.add(rule);
+        }
+        continue;
+      }
+      if (!inRejectBlock || line.isEmpty || line.startsWith('#')) {
+        continue;
+      }
+      final separator = line.indexOf('=');
+      if (separator <= 0) {
+        continue;
+      }
+      final key = line.substring(0, separator).trim().toLowerCase();
+      final value = line.substring(separator + 1).trim();
+      if (key.isEmpty || value.isEmpty) {
+        continue;
+      }
+      fields.putIfAbsent(key, () => <String>[]).add(value);
+    }
+    return _ArtifactSyncPolicy(
+      ignoreRules: ignoreRules,
+      rejectRules: rejectRules,
+    );
+  }
+
+  final List<_ArtifactIgnoreRule> ignoreRules;
+  final List<_ArtifactRejectRule> rejectRules;
+  final List<String> policyFiles;
+
+  bool ignores(String relativePath) {
+    if (_isWorkspaceArtifactNoisePathInternal(relativePath)) {
+      return true;
+    }
+    final normalizedPath = _sanitizeArtifactRelativePathInternal(relativePath);
+    if (DesktopThreadArtifactService.baseNameInternal(normalizedPath) ==
+            'artifact-ignore.md' ||
+        policyFiles.contains(normalizedPath)) {
+      return true;
+    }
+    for (final rule in ignoreRules) {
+      if (rule.matches(normalizedPath)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  bool rejects(
+    GoTaskServiceArtifact artifact,
+    String relativePath,
+    List<int> bytes,
+  ) {
+    for (final rule in rejectRules) {
+      if (rule.matches(artifact, relativePath, bytes)) {
+        return true;
+      }
+    }
+    return false;
+  }
+}
+
+class _ArtifactIgnoreRule {
+  const _ArtifactIgnoreRule(this.pattern);
+
+  static _ArtifactIgnoreRule? tryParse(String raw) {
+    final pattern = _sanitizeArtifactRelativePathInternal(raw);
+    if (pattern.isEmpty) {
+      return null;
+    }
+    return _ArtifactIgnoreRule(raw.trim());
+  }
+
+  final String pattern;
+
+  bool matches(String relativePath) {
+    final normalizedPath = _sanitizeArtifactRelativePathInternal(
+      relativePath,
+    ).toLowerCase();
+    final trimmedPattern = pattern.trim();
+    if (trimmedPattern.endsWith('/')) {
+      final directoryPattern = _sanitizeArtifactRelativePathInternal(
+        trimmedPattern.substring(0, trimmedPattern.length - 1),
+      ).toLowerCase();
+      return normalizedPath == directoryPattern ||
+          normalizedPath.startsWith('$directoryPattern/');
+    }
+    return _matchesArtifactPathPatternInternal(normalizedPath, trimmedPattern);
+  }
+}
+
+class _ArtifactRejectRule {
+  const _ArtifactRejectRule({
+    required this.path,
+    required this.contentType,
+    required this.contains,
+  });
+
+  static _ArtifactRejectRule? tryParse(Map<String, List<String>> fields) {
+    final contains = fields['contains'] ?? const <String>[];
+    if (contains.isEmpty) {
+      return null;
+    }
+    return _ArtifactRejectRule(
+      path: _firstValue(fields['path']),
+      contentType: _firstValue(fields['contenttype']),
+      contains: contains,
+    );
+  }
+
+  final String? path;
+  final String? contentType;
+  final List<String> contains;
+
+  static String? _firstValue(List<String>? values) {
+    if (values == null || values.isEmpty) {
+      return null;
+    }
+    return values.first;
+  }
+
+  bool matches(
+    GoTaskServiceArtifact artifact,
+    String relativePath,
+    List<int> bytes,
+  ) {
+    if (path != null &&
+        !_matchesArtifactPathPatternInternal(relativePath, path!)) {
+      return false;
+    }
+    if (contentType != null &&
+        !artifact.contentType.trim().toLowerCase().contains(
+          contentType!.trim().toLowerCase(),
+        )) {
+      return false;
+    }
+    final text = utf8.decode(bytes, allowMalformed: true);
+    for (final needle in contains) {
+      if (!text.contains(needle)) {
+        return false;
+      }
+    }
+    return true;
+  }
+}
+
+bool _matchesArtifactPathPatternInternal(String relativePath, String pattern) {
+  final normalizedPath = _sanitizeArtifactRelativePathInternal(
+    relativePath,
+  ).toLowerCase();
+  final normalizedPattern = _sanitizeArtifactRelativePathInternal(
+    pattern,
+  ).toLowerCase();
+  if (normalizedPath.isEmpty || normalizedPattern.isEmpty) {
+    return false;
+  }
+  if (normalizedPattern == normalizedPath) {
+    return true;
+  }
+  if (normalizedPattern.startsWith('*.')) {
+    return !normalizedPath.contains('/') &&
+        normalizedPath.endsWith(normalizedPattern.substring(1));
+  }
+  if (normalizedPattern.startsWith('**/*.')) {
+    return normalizedPath.endsWith(normalizedPattern.substring(4));
+  }
+  return false;
 }
 
 class _ArtifactDownloadAttemptResult {
