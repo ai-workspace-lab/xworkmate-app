@@ -87,7 +87,7 @@ class DesktopClient {
         method: 'xworkmate.desktop.offer',
         params: {
           'sessionId': sessionId,
-          'sdpOffer': offer.sdp,
+          'sdpOffer': offer.toMap(),
           'display': display,
           'width': width.toString(),
           'height': height.toString(),
@@ -97,13 +97,21 @@ class DesktopClient {
         },
       );
 
-      final sdpAnswer = response['result']?['sdpAnswer'] as String?;
-      if (sdpAnswer == null) {
+      final sdpAnswerData = response['result']?['sdpAnswer'];
+      if (sdpAnswerData == null) {
         throw Exception('Bridge failed to return SDP Answer');
       }
 
       // Apply SDP Answer
-      final answer = RTCSessionDescription(sdpAnswer, 'answer');
+      late RTCSessionDescription answer;
+      if (sdpAnswerData is Map) {
+        answer = RTCSessionDescription(
+          sdpAnswerData['sdp'] as String?,
+          sdpAnswerData['type'] as String? ?? 'answer',
+        );
+      } else {
+        answer = RTCSessionDescription(sdpAnswerData.toString(), 'answer');
+      }
       await _peerConnection!.setRemoteDescription(answer);
 
       _isConnecting = false;
