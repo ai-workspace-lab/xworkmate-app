@@ -124,6 +124,18 @@ class GatewayAcpClient {
       const GatewayAcpCapabilities.empty();
   DateTime? _capabilitiesRefreshedAt;
 
+  Future<Map<String, dynamic>> fetchSystemStatus() async {
+    final response = await _requestForResolvedEndpoint(
+      _GatewayAcpRpcRequest(
+        id: _nextRequestId('status'),
+        method: 'system.logs',
+        params: const <String, dynamic>{},
+      ),
+      onNotification: (_) {},
+    );
+    return asMap(response['result']);
+  }
+
   Future<GatewayAcpCapabilities> loadCapabilities({
     bool forceRefresh = false,
     Uri? endpointOverride,
