@@ -15,6 +15,38 @@ class SettingsRemoteDesktopPanel extends StatefulWidget {
 }
 
 class _SettingsRemoteDesktopPanelState extends State<SettingsRemoteDesktopPanel> {
+  final GlobalKey _desktopViewKey = GlobalKey();
+  bool _isMaximized = false;
+
+  void _toggleMaximize() {
+    if (_isMaximized) {
+      Navigator.of(context).pop();
+    } else {
+      setState(() => _isMaximized = true);
+      showDialog(
+        context: context,
+        useSafeArea: false,
+        barrierDismissible: false,
+        builder: (context) {
+          return Dialog.fullscreen(
+            child: DesktopView(
+              key: _desktopViewKey,
+              controller: widget.controller,
+              isMaximized: true,
+              onToggleMaximize: () {
+                Navigator.of(context).pop();
+              },
+            ),
+          );
+        },
+      ).then((_) {
+        if (mounted) {
+          setState(() => _isMaximized = false);
+        }
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
@@ -39,10 +71,16 @@ class _SettingsRemoteDesktopPanelState extends State<SettingsRemoteDesktopPanel>
           ],
         ),
         const SizedBox(height: 12),
-        SizedBox(
-          height: 640,
-          child: DesktopView(controller: widget.controller),
-        ),
+        if (!_isMaximized)
+          SizedBox(
+            height: 640,
+            child: DesktopView(
+              key: _desktopViewKey,
+              controller: widget.controller,
+              isMaximized: false,
+              onToggleMaximize: _toggleMaximize,
+            ),
+          ),
       ],
     );
   }

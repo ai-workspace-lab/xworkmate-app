@@ -31,9 +31,16 @@ void main() {
       // Verify the panel headers and titles
       expect(find.text('远程桌面'), findsOneWidget);
       expect(find.text('连接桌面'), findsOneWidget);
-      expect(find.text('GPU 加速'), findsOneWidget);
 
-      // Verify inputs
+      // Verify advanced options are hidden initially
+      expect(find.text('GPU 加速'), findsNothing);
+
+      // Tap to expand advanced options
+      await tester.tap(find.text('高级选项'));
+      await tester.pumpAndSettle();
+
+      // Verify advanced options appear
+      expect(find.text('GPU 加速'), findsOneWidget);
       expect(find.widgetWithText(TextField, 'Display'), findsOneWidget);
       expect(find.text('Display'), findsOneWidget);
     });
