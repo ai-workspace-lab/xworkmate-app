@@ -48,6 +48,7 @@ abstract final class UiFeatureKeys {
   static const settingsGateway = 'settings.gateway';
   static const settingsArchivedTasks = 'settings.archived_tasks';
   static const settingsRemoteDesktop = 'settings.remote_desktop';
+  static const settingsLogs = 'settings.logs';
   static const settingsAccountAccess = 'settings.account_access';
   static const settingsVaultServer = 'settings.vault_server';
   static const settingsExperimentalCanvas = 'settings.experimental_canvas';
@@ -368,6 +369,7 @@ class UiFeatureAccess {
         UiFeatureKeys.settingsGateway: SettingsTab.gateway,
         UiFeatureKeys.settingsArchivedTasks: SettingsTab.archivedTasks,
         UiFeatureKeys.settingsRemoteDesktop: SettingsTab.remoteDesktop,
+        UiFeatureKeys.settingsLogs: SettingsTab.logs,
       };
 
   bool isEnabledPath(String path) {
