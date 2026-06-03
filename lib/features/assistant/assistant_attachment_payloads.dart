@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:crypto/crypto.dart' as crypto;
+
 import '../../runtime/runtime_models.dart';
 import 'assistant_page_composer_clipboard.dart';
 
@@ -81,6 +83,7 @@ buildAssistantAttachmentPayloadsInternal(
         mimeType: mimeType,
         fileName: attachment.name,
         content: base64Encode(bytes),
+        sha256: crypto.sha256.convert(bytes).toString(),
       ),
     );
   }

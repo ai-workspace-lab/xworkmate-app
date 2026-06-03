@@ -1,0 +1,458 @@
+import 'dart:async';
+import 'package:flutter/gestures.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_webrtc/flutter_webrtc.dart';
+import 'desktop_client.dart';
+import 'desktop_input_handler.dart';
+import '../../app/app_controller.dart';
+import '../../widgets/surface_card.dart';
+
+class DesktopView extends StatefulWidget {
+  const DesktopView({super.key, required this.controller});
+
+  final AppController controller;
+
+  @override
+  State<DesktopView> createState() => _DesktopViewState();
+}
+
+class _DesktopViewState extends State<DesktopView> {
+  final RTCVideoRenderer _localRenderer = RTCVideoRenderer();
+  late DesktopClient _client;
+  DesktopInputHandler? _inputHandler;
+  
+  // Settings controllers
+  final TextEditingController _displayController = TextEditingController(text: ':0.0');
+  final TextEditingController _widthController = TextEditingController(text: '1280');
+  final TextEditingController _heightController = TextEditingController(text: '720');
+  final TextEditingController _fpsController = TextEditingController(text: '30');
+  final TextEditingController _bitrateController = TextEditingController(text: '2000');
+  
+  bool _useGpu = false;
+  String _connectionState = 'disconnected';
+  bool _hasStream = false;
+  bool _isFocused = false;
+  
+  final FocusNode _viewportFocusNode = FocusNode();
+  final GlobalKey _viewportKey = GlobalKey();
+
+  StreamSubscription<MediaStream>? _streamSubscription;
+  StreamSubscription<String>? _stateSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _initRenderer();
+    _client = DesktopClient(
+      controller: widget.controller,
+      sessionId: 'remote-desktop-session',
+    );
+    _inputHandler = DesktopInputHandler(onSendInput: (event) {
+      if (_connectionState == 'connected') {
+        _client.sendInput(event);
+      }
+    });
+
+    _streamSubscription = _client.onRemoteStream.listen((stream) {
+      if (mounted) {
+        setState(() {
+          _localRenderer.srcObject = stream;
+          _hasStream = true;
+        });
+      }
+    });
+
+    _stateSubscription = _client.onConnectionState.listen((state) {
+      if (mounted) {
+        setState(() {
+          _connectionState = state.toLowerCase();
+          if (_connectionState == 'disconnected' || _connectionState == 'failed') {
+            _hasStream = false;
+            _localRenderer.srcObject = null;
+          }
+        });
+      }
+    });
+  }
+
+  Future<void> _initRenderer() async {
+    await _localRenderer.initialize();
+  }
+
+  @override
+  void dispose() {
+    _streamSubscription?.cancel();
+    _stateSubscription?.cancel();
+    _client.disconnect();
+    _localRenderer.dispose();
+    _displayController.dispose();
+    _widthController.dispose();
+    _heightController.dispose();
+    _fpsController.dispose();
+    _bitrateController.dispose();
+    _viewportFocusNode.dispose();
+    super.dispose();
+  }
+
+  void _toggleConnection() async {
+    if (_connectionState == 'connected' || _connectionState == 'connecting') {
+      await _client.disconnect();
+    } else {
+      final display = _displayController.text.trim();
+      final width = int.tryParse(_widthController.text) ?? 1280;
+      final height = int.tryParse(_heightController.text) ?? 720;
+      final fps = int.tryParse(_fpsController.text) ?? 30;
+      final bitrate = int.tryParse(_bitrateController.text) ?? 2000;
+
+      try {
+        await _client.connect(
+          display: display,
+          width: width,
+          height: height,
+          fps: fps,
+          bitrate: bitrate,
+          useGpu: _useGpu,
+        );
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to connect remote desktop: $e'),
+              backgroundColor: Colors.redAccent,
+            ),
+          );
+        }
+      }
+    }
+  }
+
+  Size _getViewportSize() {
+    final renderBox = _viewportKey.currentContext?.findRenderObject() as RenderBox?;
+    return renderBox?.size ?? Size.zero;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Control panel card
+          SurfaceCard(
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Wrap(
+                spacing: 16,
+                runSpacing: 16,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  // Connection Button
+                  ElevatedButton.icon(
+                    onPressed: _toggleConnection,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _connectionState == 'connected'
+                          ? Colors.redAccent
+                          : (_connectionState == 'connecting'
+                              ? Colors.orangeAccent
+                              : theme.colorScheme.primary),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    ),
+                    icon: Icon(
+                      _connectionState == 'connected'
+                          ? Icons.portable_wifi_off_rounded
+                          : Icons.settings_remote_rounded,
+                    ),
+                    label: Text(
+                      _connectionState == 'connected'
+                          ? '断开连接'
+                          : (_connectionState == 'connecting' ? '正在连接...' : '连接桌面'),
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  
+                  // Display Selector
+                  SizedBox(
+                    width: 100,
+                    child: TextField(
+                      controller: _displayController,
+                      enabled: _connectionState == 'disconnected',
+                      decoration: const InputDecoration(
+                        labelText: 'Display',
+                        prefixIcon: Icon(Icons.monitor_rounded, size: 16),
+                      ),
+                    ),
+                  ),
+
+                  // Resolution settings
+                  SizedBox(
+                    width: 90,
+                    child: TextField(
+                      controller: _widthController,
+                      enabled: _connectionState == 'disconnected',
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(labelText: '宽度'),
+                    ),
+                  ),
+                  SizedBox(
+                    width: 90,
+                    child: TextField(
+                      controller: _heightController,
+                      enabled: _connectionState == 'disconnected',
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(labelText: '高度'),
+                    ),
+                  ),
+
+                  // FPS / Bitrate
+                  SizedBox(
+                    width: 70,
+                    child: TextField(
+                      controller: _fpsController,
+                      enabled: _connectionState == 'disconnected',
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(labelText: '帧率'),
+                    ),
+                  ),
+                  SizedBox(
+                    width: 90,
+                    child: TextField(
+                      controller: _bitrateController,
+                      enabled: _connectionState == 'disconnected',
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: '码率 (kbps)',
+                      ),
+                    ),
+                  ),
+
+                  // GPU accelerator toggle
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text('GPU 加速'),
+                      Switch(
+                        value: _useGpu,
+                        onChanged: _connectionState == 'disconnected'
+                            ? (val) => setState(() => _useGpu = val)
+                            : null,
+                      ),
+                    ],
+                  ),
+
+                  // Status Indicator
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: _connectionState == 'connected'
+                          ? Colors.green.withValues(alpha: 0.15)
+                          : (_connectionState == 'connecting'
+                              ? Colors.orange.withValues(alpha: 0.15)
+                              : Colors.grey.withValues(alpha: 0.15)),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: _connectionState == 'connected'
+                            ? Colors.green
+                            : (_connectionState == 'connecting'
+                                ? Colors.orange
+                                : Colors.grey),
+                        width: 1,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            color: _connectionState == 'connected'
+                                ? Colors.green
+                                : (_connectionState == 'connecting'
+                                    ? Colors.orange
+                                    : Colors.grey),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          _connectionState == 'connected'
+                              ? '已连接'
+                              : (_connectionState == 'connecting' ? '连接中' : '未连接'),
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: _connectionState == 'connected'
+                                ? Colors.green
+                                : (_connectionState == 'connecting'
+                                    ? Colors.orange
+                                    : (isDark ? Colors.white70 : Colors.black87)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          
+          const SizedBox(height: 16),
+
+          // Stream Viewport Card
+          Expanded(
+            child: Focus(
+              focusNode: _viewportFocusNode,
+              onFocusChange: (focused) {
+                setState(() {
+                  _isFocused = focused;
+                });
+              },
+              onKeyEvent: (node, event) {
+                if (_isFocused && _connectionState == 'connected' && _inputHandler != null) {
+                  _inputHandler!.handleKeyEvent(event);
+                  return KeyEventResult.handled;
+                }
+                return KeyEventResult.ignored;
+              },
+              child: Container(
+                key: _viewportKey,
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.black26 : Colors.black.withValues(alpha: 0.04),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: _isFocused
+                        ? theme.colorScheme.primary
+                        : (isDark ? Colors.white10 : Colors.black12),
+                    width: 2,
+                  ),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: Stack(
+                  children: [
+                    // Stream Viewport Renderer
+                    if (_hasStream)
+                      Positioned.fill(
+                        child: Listener(
+                          behavior: HitTestBehavior.opaque,
+                          onPointerHover: (event) {
+                            if (_inputHandler != null) {
+                              _inputHandler!.handlePointerMove(event, _getViewportSize());
+                            }
+                          },
+                          onPointerMove: (event) {
+                            if (_inputHandler != null) {
+                              _inputHandler!.handlePointerMove(event, _getViewportSize());
+                            }
+                          },
+                          onPointerDown: (event) {
+                            if (!_viewportFocusNode.hasFocus) {
+                              _viewportFocusNode.requestFocus();
+                            }
+                            if (_inputHandler != null) {
+                              _inputHandler!.handlePointerDown(event, _getViewportSize());
+                            }
+                          },
+                          onPointerUp: (event) {
+                            if (_inputHandler != null) {
+                              _inputHandler!.handlePointerUp(event, _getViewportSize());
+                            }
+                          },
+                          onPointerSignal: (event) {
+                            if (event is PointerScrollEvent && _inputHandler != null) {
+                              _inputHandler!.handleScroll(event);
+                            }
+                          },
+                          child: RTCVideoView(
+                            _localRenderer,
+                            objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitContain,
+                          ),
+                        ),
+                      ),
+
+                    // Placeholder/Status UI overlay
+                    if (!_hasStream)
+                      Positioned.fill(
+                        child: Container(
+                          color: isDark ? Colors.black54 : Colors.grey[100],
+                          child: Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.monitor_rounded,
+                                  size: 64,
+                                  color: theme.colorScheme.onSurface.withValues(alpha: 0.2),
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  _connectionState == 'connecting'
+                                      ? '正在建立 WebRTC 连接，请稍候...'
+                                      : '未开启远程桌面流。点击“连接桌面”启动视频流。',
+                                  style: TextStyle(
+                                    color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                                    fontSize: 14,
+                                  ),
+                                ),
+                                if (_connectionState == 'connecting') ...[
+                                  const SizedBox(height: 24),
+                                  const CircularProgressIndicator(),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+
+                    // Focus watermark badge
+                    if (_hasStream)
+                      Positioned(
+                        right: 8,
+                        bottom: 8,
+                        child: AnimatedOpacity(
+                          opacity: _isFocused ? 0.3 : 0.8,
+                          duration: const Duration(milliseconds: 200),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.6),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  _isFocused
+                                      ? Icons.keyboard_rounded
+                                      : Icons.keyboard_hide_rounded,
+                                  color: Colors.white,
+                                  size: 14,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  _isFocused ? '捕获键盘输入中' : '点击屏幕以捕获键盘',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
