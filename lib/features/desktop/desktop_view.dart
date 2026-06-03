@@ -8,9 +8,16 @@ import '../../app/app_controller.dart';
 import '../../widgets/surface_card.dart';
 
 class DesktopView extends StatefulWidget {
-  const DesktopView({super.key, required this.controller});
+  const DesktopView({
+    super.key,
+    required this.controller,
+    this.isMaximized = false,
+    this.onToggleMaximize,
+  });
 
   final AppController controller;
+  final bool isMaximized;
+  final VoidCallback? onToggleMaximize;
 
   @override
   State<DesktopView> createState() => _DesktopViewState();
@@ -29,6 +36,7 @@ class _DesktopViewState extends State<DesktopView> {
   final TextEditingController _bitrateController = TextEditingController(text: '2000');
   
   bool _useGpu = false;
+  bool _showAdvancedOptions = false;
   String _connectionState = 'disconnected';
   bool _hasStream = false;
   bool _isFocused = false;
@@ -145,158 +153,181 @@ class _DesktopViewState extends State<DesktopView> {
           SurfaceCard(
             child: Padding(
               padding: const EdgeInsets.all(16.0),
-              child: Wrap(
-                spacing: 16,
-                runSpacing: 16,
-                crossAxisAlignment: WrapCrossAlignment.center,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Connection Button
-                  ElevatedButton.icon(
-                    onPressed: _toggleConnection,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _connectionState == 'connected'
-                          ? Colors.redAccent
-                          : (_connectionState == 'connecting'
-                              ? Colors.orangeAccent
-                              : theme.colorScheme.primary),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                    ),
-                    icon: Icon(
-                      _connectionState == 'connected'
-                          ? Icons.portable_wifi_off_rounded
-                          : Icons.settings_remote_rounded,
-                    ),
-                    label: Text(
-                      _connectionState == 'connected'
-                          ? '断开连接'
-                          : (_connectionState == 'connecting' ? '正在连接...' : '连接桌面'),
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                  
-                  // Display Selector
-                  SizedBox(
-                    width: 100,
-                    child: TextField(
-                      controller: _displayController,
-                      enabled: _connectionState == 'disconnected',
-                      decoration: const InputDecoration(
-                        labelText: 'Display',
-                        prefixIcon: Icon(Icons.monitor_rounded, size: 16),
-                      ),
-                    ),
-                  ),
-
-                  // Resolution settings
-                  SizedBox(
-                    width: 90,
-                    child: TextField(
-                      controller: _widthController,
-                      enabled: _connectionState == 'disconnected',
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(labelText: '宽度'),
-                    ),
-                  ),
-                  SizedBox(
-                    width: 90,
-                    child: TextField(
-                      controller: _heightController,
-                      enabled: _connectionState == 'disconnected',
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(labelText: '高度'),
-                    ),
-                  ),
-
-                  // FPS / Bitrate
-                  SizedBox(
-                    width: 70,
-                    child: TextField(
-                      controller: _fpsController,
-                      enabled: _connectionState == 'disconnected',
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(labelText: '帧率'),
-                    ),
-                  ),
-                  SizedBox(
-                    width: 90,
-                    child: TextField(
-                      controller: _bitrateController,
-                      enabled: _connectionState == 'disconnected',
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        labelText: '码率 (kbps)',
-                      ),
-                    ),
-                  ),
-
-                  // GPU accelerator toggle
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
+                  Wrap(
+                    spacing: 16,
+                    runSpacing: 16,
+                    crossAxisAlignment: WrapCrossAlignment.center,
                     children: [
-                      const Text('GPU 加速'),
-                      Switch(
-                        value: _useGpu,
-                        onChanged: _connectionState == 'disconnected'
-                            ? (val) => setState(() => _useGpu = val)
-                            : null,
+                      // Connection Button
+                      ElevatedButton.icon(
+                        onPressed: _toggleConnection,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _connectionState == 'connected'
+                              ? Colors.redAccent
+                              : (_connectionState == 'connecting'
+                                  ? Colors.orangeAccent
+                                  : theme.colorScheme.primary),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        icon: Icon(
+                          _connectionState == 'connected'
+                              ? Icons.portable_wifi_off_rounded
+                              : Icons.settings_remote_rounded,
+                        ),
+                        label: Text(
+                          _connectionState == 'connected'
+                              ? '断开连接'
+                              : (_connectionState == 'connecting' ? '正在连接...' : '连接桌面'),
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
                       ),
-                    ],
-                  ),
-
-                  // Status Indicator
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: _connectionState == 'connected'
-                          ? Colors.green.withValues(alpha: 0.15)
-                          : (_connectionState == 'connecting'
-                              ? Colors.orange.withValues(alpha: 0.15)
-                              : Colors.grey.withValues(alpha: 0.15)),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: _connectionState == 'connected'
-                            ? Colors.green
-                            : (_connectionState == 'connecting'
-                                ? Colors.orange
-                                : Colors.grey),
-                        width: 1,
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 8,
-                          height: 8,
-                          decoration: BoxDecoration(
+                      // Status Indicator
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: _connectionState == 'connected'
+                              ? Colors.green.withValues(alpha: 0.15)
+                              : (_connectionState == 'connecting'
+                                  ? Colors.orange.withValues(alpha: 0.15)
+                                  : Colors.grey.withValues(alpha: 0.15)),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
                             color: _connectionState == 'connected'
                                 ? Colors.green
                                 : (_connectionState == 'connecting'
                                     ? Colors.orange
                                     : Colors.grey),
-                            shape: BoxShape.circle,
+                            width: 1,
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        Text(
-                          _connectionState == 'connected'
-                              ? '已连接'
-                              : (_connectionState == 'connecting' ? '连接中' : '未连接'),
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: _connectionState == 'connected'
-                                ? Colors.green
-                                : (_connectionState == 'connecting'
-                                    ? Colors.orange
-                                    : (isDark ? Colors.white70 : Colors.black87)),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Container(
+                              width: 8,
+                              height: 8,
+                              decoration: BoxDecoration(
+                                color: _connectionState == 'connected'
+                                    ? Colors.green
+                                    : (_connectionState == 'connecting'
+                                        ? Colors.orange
+                                        : Colors.grey),
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              _connectionState == 'connected'
+                                  ? '已连接'
+                                  : (_connectionState == 'connecting' ? '连接中' : '未连接'),
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: _connectionState == 'connected'
+                                    ? Colors.green
+                                    : (_connectionState == 'connecting'
+                                        ? Colors.orange
+                                        : (isDark ? Colors.white70 : Colors.black87)),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      // Advanced Options Toggle
+                      TextButton.icon(
+                        onPressed: () => setState(() => _showAdvancedOptions = !_showAdvancedOptions),
+                        icon: Icon(_showAdvancedOptions ? Icons.expand_less : Icons.expand_more),
+                        label: const Text('高级选项'),
+                      ),
+                      // Maximize Toggle
+                      if (widget.onToggleMaximize != null)
+                        IconButton(
+                          onPressed: widget.onToggleMaximize,
+                          icon: Icon(widget.isMaximized ? Icons.fullscreen_exit_rounded : Icons.fullscreen_rounded),
+                          tooltip: widget.isMaximized ? '恢复默认大小' : '最大化',
+                        ),
+                    ],
+                  ),
+                  if (_showAdvancedOptions) ...[
+                    const SizedBox(height: 16),
+                    Wrap(
+                      spacing: 16,
+                      runSpacing: 16,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        // Display Selector
+                        SizedBox(
+                          width: 100,
+                          child: TextField(
+                            controller: _displayController,
+                            enabled: _connectionState == 'disconnected',
+                            decoration: const InputDecoration(
+                              labelText: 'Display',
+                              prefixIcon: Icon(Icons.monitor_rounded, size: 16),
+                            ),
                           ),
+                        ),
+                        // Resolution settings
+                        SizedBox(
+                          width: 90,
+                          child: TextField(
+                            controller: _widthController,
+                            enabled: _connectionState == 'disconnected',
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(labelText: '宽度'),
+                          ),
+                        ),
+                        SizedBox(
+                          width: 90,
+                          child: TextField(
+                            controller: _heightController,
+                            enabled: _connectionState == 'disconnected',
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(labelText: '高度'),
+                          ),
+                        ),
+                        // FPS / Bitrate
+                        SizedBox(
+                          width: 70,
+                          child: TextField(
+                            controller: _fpsController,
+                            enabled: _connectionState == 'disconnected',
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(labelText: '帧率'),
+                          ),
+                        ),
+                        SizedBox(
+                          width: 90,
+                          child: TextField(
+                            controller: _bitrateController,
+                            enabled: _connectionState == 'disconnected',
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(
+                              labelText: '码率 (kbps)',
+                            ),
+                          ),
+                        ),
+                        // GPU accelerator toggle
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Text('GPU 加速'),
+                            Switch(
+                              value: _useGpu,
+                              onChanged: _connectionState == 'disconnected'
+                                  ? (val) => setState(() => _useGpu = val)
+                                  : null,
+                            ),
+                          ],
                         ),
                       ],
                     ),
-                  ),
+                  ],
                 ],
               ),
             ),
