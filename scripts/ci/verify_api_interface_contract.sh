@@ -84,14 +84,14 @@ elif mode == "capabilities":
         raise SystemExit(
             f"expected availableExecutionTargets {expected_targets!r}, got {result.get('availableExecutionTargets')!r}"
         )
-    provider_catalog = result.get("providerCatalog")
-    if provider_catalog is not None:
-        if not isinstance(provider_catalog, list):
-            raise SystemExit("providerCatalog is invalid")
-        provider_ids = [str(item.get("providerId")) for item in provider_catalog]
-        if provider_ids != ["codex", "opencode", "gemini", "hermes"]:
-            raise SystemExit(f"unexpected providerCatalog: {provider_ids!r}")
-    gateway_providers = result.get("gatewayProviders")
+    capabilities = result.get("capabilities") or {}
+    provider_catalog = result.get("providerCatalog") or capabilities.get("providerCatalog")
+    if not isinstance(provider_catalog, list):
+        raise SystemExit("providerCatalog is missing or invalid")
+    provider_ids = [str(item.get("providerId")) for item in provider_catalog]
+    if provider_ids != ["codex", "opencode", "gemini", "hermes"]:
+        raise SystemExit(f"unexpected providerCatalog: {provider_ids!r}")
+    gateway_providers = result.get("gatewayProviders") or capabilities.get("gatewayProviders")
     if not isinstance(gateway_providers, list):
         raise SystemExit("gatewayProviders is missing or invalid")
     if len(gateway_providers) != 1 or gateway_providers[0].get("providerId") != "openclaw":
