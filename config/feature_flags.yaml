@@ -67,6 +67,12 @@ mobile:
       build_modes: [debug, profile, release]
       description: Mobile archived task management
       ui_surface: settings_page
+    remote_desktop:
+      enabled: true
+      release_tier: stable
+      build_modes: [debug, profile, release]
+      description: Mobile WebRTC Remote Desktop view
+      ui_surface: settings_page
     account_access:
       enabled: true
       release_tier: stable
@@ -161,6 +167,12 @@ desktop:
       release_tier: stable
       build_modes: [debug, profile, release]
       description: Desktop archived task management
+      ui_surface: settings_page
+    remote_desktop:
+      enabled: true
+      release_tier: stable
+      build_modes: [debug, profile, release]
+      description: Desktop WebRTC Remote Desktop view
       ui_surface: settings_page
     account_access:
       enabled: true

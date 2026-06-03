@@ -1351,10 +1351,64 @@ void main() {
           base64Encode(utf8.encode('note body')),
         );
         expect(inlineAttachment['sizeBytes'], 9);
+        expect(
+          inlineAttachment['sha256'],
+          '1c727d26215adccb96d725e8b63b3ee11cf73215a554e60295877244b0778847',
+        );
         final attachments = params['attachments'] as List<dynamic>;
         final attachment = attachments.single as Map<String, dynamic>;
         expect(attachment['name'], 'note.txt');
         expect(attachment['path'], isEmpty);
+      },
+    );
+
+    test(
+      'sendChatMessage records task input attachments and does not reupload duplicates',
+      () async {
+        final fakeGoTaskService = _RecordingGoTaskServiceClient();
+        final controller = _connectedGatewayController(fakeGoTaskService);
+        addTearDown(controller.dispose);
+
+        await controller.ensureActiveAssistantThreadInternal();
+        await controller.setAssistantExecutionTarget(
+          AssistantExecutionTarget.gateway,
+        );
+
+        final imageAttachment = GatewayChatAttachmentPayload(
+          type: 'image',
+          mimeType: 'image/png',
+          fileName: 'diagram.png',
+          content: base64Encode(utf8.encode('image bytes')),
+        );
+
+        await controller.sendChatMessage(
+          'use the image',
+          attachments: <GatewayChatAttachmentPayload>[imageAttachment],
+        );
+        await controller.sendChatMessage(
+          'continue with the same image',
+          attachments: <GatewayChatAttachmentPayload>[imageAttachment],
+        );
+
+        expect(fakeGoTaskService.requests, hasLength(2));
+        expect(
+          fakeGoTaskService.requests.first.inlineAttachments,
+          hasLength(1),
+        );
+        expect(fakeGoTaskService.requests.last.inlineAttachments, isEmpty);
+        expect(
+          fakeGoTaskService.requests.last.prompt,
+          contains('- taskInputAttachments:'),
+        );
+        expect(
+          fakeGoTaskService.requests.last.prompt,
+          contains('diagram.png (image/png, sha256:'),
+        );
+        final thread = controller.requireTaskThreadForSessionInternal(
+          fakeGoTaskService.requests.last.sessionId,
+        );
+        expect(thread.taskInputAttachments, hasLength(1));
+        expect(thread.taskInputAttachments.single.name, 'diagram.png');
       },
     );
 
