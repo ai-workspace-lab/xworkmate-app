@@ -143,28 +143,29 @@ if result.get("availableExecutionTargets") != expected_targets:
     )
 
 provider_catalog = result.get("providerCatalog")
-if not isinstance(provider_catalog, list):
-    raise SystemExit("providerCatalog is missing or invalid")
+if provider_catalog is not None:
+    if not isinstance(provider_catalog, list):
+        raise SystemExit("providerCatalog is invalid")
+
+    expected_agent_ids = ["codex", "opencode", "gemini", "hermes"]
+    expected_agent_labels = ["Codex", "OpenCode", "Gemini", "Hermes"]
+    if len(provider_catalog) != len(expected_agent_ids):
+        raise SystemExit(
+            f"expected {len(expected_agent_ids)} agent providers, got {provider_catalog!r}"
+        )
+
+    for index, (provider_id, label) in enumerate(zip(expected_agent_ids, expected_agent_labels)):
+        item = provider_catalog[index]
+        if item.get("providerId") != provider_id:
+            raise SystemExit(f"expected providerId {provider_id!r} at index {index}, got {item!r}")
+        if item.get("label") != label:
+            raise SystemExit(f"expected provider label {label!r} at index {index}, got {item!r}")
+        if item.get("targets") != ["agent"]:
+            raise SystemExit(f"expected agent targets for {provider_id!r}, got {item!r}")
 
 gateway_providers = result.get("gatewayProviders")
 if not isinstance(gateway_providers, list):
     raise SystemExit("gatewayProviders is missing or invalid")
-
-expected_agent_ids = ["codex", "opencode", "gemini", "hermes"]
-expected_agent_labels = ["Codex", "OpenCode", "Gemini", "Hermes"]
-if len(provider_catalog) != len(expected_agent_ids):
-    raise SystemExit(
-        f"expected {len(expected_agent_ids)} agent providers, got {provider_catalog!r}"
-    )
-
-for index, (provider_id, label) in enumerate(zip(expected_agent_ids, expected_agent_labels)):
-    item = provider_catalog[index]
-    if item.get("providerId") != provider_id:
-        raise SystemExit(f"expected providerId {provider_id!r} at index {index}, got {item!r}")
-    if item.get("label") != label:
-        raise SystemExit(f"expected provider label {label!r} at index {index}, got {item!r}")
-    if item.get("targets") != ["agent"]:
-        raise SystemExit(f"expected agent targets for {provider_id!r}, got {item!r}")
 
 if len(gateway_providers) != 1:
     raise SystemExit(f"expected exactly one gateway provider, got {gateway_providers!r}")

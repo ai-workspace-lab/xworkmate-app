@@ -85,14 +85,15 @@ elif mode == "capabilities":
             f"expected availableExecutionTargets {expected_targets!r}, got {result.get('availableExecutionTargets')!r}"
         )
     provider_catalog = result.get("providerCatalog")
-    if not isinstance(provider_catalog, list):
-        raise SystemExit("providerCatalog is missing or invalid")
+    if provider_catalog is not None:
+        if not isinstance(provider_catalog, list):
+            raise SystemExit("providerCatalog is invalid")
+        provider_ids = [str(item.get("providerId")) for item in provider_catalog]
+        if provider_ids != ["codex", "opencode", "gemini", "hermes"]:
+            raise SystemExit(f"unexpected providerCatalog: {provider_ids!r}")
     gateway_providers = result.get("gatewayProviders")
     if not isinstance(gateway_providers, list):
         raise SystemExit("gatewayProviders is missing or invalid")
-    provider_ids = [str(item.get("providerId")) for item in provider_catalog]
-    if provider_ids != ["codex", "opencode", "gemini", "hermes"]:
-        raise SystemExit(f"unexpected providerCatalog: {provider_ids!r}")
     if len(gateway_providers) != 1 or gateway_providers[0].get("providerId") != "openclaw":
         raise SystemExit(f"unexpected gatewayProviders: {gateway_providers!r}")
 elif mode == "routing":
@@ -288,8 +289,14 @@ payload = json.loads(os.environ["RESPONSE_JSON"])
 result = payload.get("result")
 if not isinstance(result, dict):
     raise SystemExit("routing response missing result payload")
-if result.get("resolvedProviderId") != "codex":
-    raise SystemExit("unexpected resolvedProviderId")
+is_unavailable = result.get("unavailable") is True or result.get("unavailableCode") == "PROVIDER_UNAVAILABLE"
+resolved_provider = result.get("resolvedProviderId")
+if is_unavailable:
+    if resolved_provider != "":
+        raise SystemExit(f"expected empty resolvedProviderId when unavailable, got {resolved_provider!r}")
+else:
+    if resolved_provider != "codex":
+        raise SystemExit(f"unexpected resolvedProviderId: {resolved_provider!r}")
 PY
   verified_urls+=("${bridge_server_url}")
 done

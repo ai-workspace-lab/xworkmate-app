@@ -63,7 +63,7 @@ class DesktopClient {
         _stateController.add(state.toString().split('.').last);
       };
 
-      // Create data channel for inputs
+      // Create data channel for inputs BEFORE creating offer
       final dcConfig = RTCDataChannelInit()..ordered = true;
       _dataChannel =
           await _peerConnection!.createDataChannel('input', dcConfig);
@@ -75,11 +75,14 @@ class DesktopClient {
         }
       };
 
+      // Add transceiver for receiving video (required for unified-plan)
+      await _peerConnection!.addTransceiver(
+        kind: RTCRtpMediaType.RTCRtpMediaTypeVideo,
+        init: RTCRtpTransceiverInit(direction: TransceiverDirection.RecvOnly),
+      );
+
       // Create SDP Offer
-      final offer = await _peerConnection!.createOffer({
-        'offerToReceiveVideo': true,
-        'offerToReceiveAudio': false,
-      });
+      final offer = await _peerConnection!.createOffer({});
       await _peerConnection!.setLocalDescription(offer);
 
       // Send SDP Offer to Bridge
