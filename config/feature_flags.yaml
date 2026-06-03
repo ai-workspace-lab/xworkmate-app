@@ -73,6 +73,12 @@ mobile:
       build_modes: [debug, profile, release]
       description: Mobile WebRTC Remote Desktop view
       ui_surface: settings_page
+    logs:
+      enabled: true
+      release_tier: stable
+      build_modes: [debug, profile, release]
+      description: Mobile runtime logs view
+      ui_surface: settings_page
     account_access:
       enabled: true
       release_tier: stable
@@ -174,6 +180,12 @@ desktop:
       build_modes: [debug, profile, release]
       description: Desktop WebRTC Remote Desktop view
       ui_surface: settings_page
+    logs:
+      enabled: true
+      release_tier: stable
+      build_modes: [debug, profile, release]
+      description: Desktop runtime logs view
+      ui_surface: settings_page
     account_access:
       enabled: true
       release_tier: stable
@@ -268,6 +280,12 @@ web:
       release_tier: stable
       build_modes: [debug, profile, release]
       description: Web archived task management
+      ui_surface: settings_page
+    logs:
+      enabled: true
+      release_tier: stable
+      build_modes: [debug, profile, release]
+      description: Web runtime logs view
       ui_surface: settings_page
     account_access:
       enabled: true
