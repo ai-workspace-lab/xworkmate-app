@@ -1,3 +1,7 @@
+import 'dart:convert';
+
+import 'package:crypto/crypto.dart' as crypto;
+
 import 'runtime_models.dart';
 
 enum GoTaskServiceRoute { externalAcpSingle, externalAcpMulti }
@@ -308,6 +312,8 @@ class GoTaskServiceRequest {
                 'mimeType': item.mimeType,
                 'content': item.content,
                 'sizeBytes': goTaskServiceBase64Size(item.content),
+                if (goTaskServiceAttachmentSha256(item).isNotEmpty)
+                  'sha256': goTaskServiceAttachmentSha256(item),
               },
             )
             .toList(growable: false),
@@ -1003,6 +1009,20 @@ int goTaskServiceBase64Size(String base64) {
       ? 2
       : (normalized.endsWith('=') ? 1 : 0);
   return (normalized.length * 3 ~/ 4) - padding;
+}
+
+String goTaskServiceAttachmentSha256(GatewayChatAttachmentPayload attachment) {
+  final declared = attachment.sha256.trim().toLowerCase();
+  if (declared.isNotEmpty) {
+    return declared;
+  }
+  try {
+    return crypto.sha256
+        .convert(base64Decode(attachment.content.trim().split(',').last.trim()))
+        .toString();
+  } on FormatException {
+    return '';
+  }
 }
 
 Map<String, dynamic> _castMap(Object? value) {

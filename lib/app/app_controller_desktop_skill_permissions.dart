@@ -78,6 +78,7 @@ extension AppControllerDesktopSkillPermissions on AppController {
     List<String>? lastTaskArtifactRelativePaths,
     OpenClawTaskAssociation? openClawTaskAssociation,
     bool clearOpenClawTaskAssociation = false,
+    List<TaskInputAttachmentRecord>? taskInputAttachments,
   }) {
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey,
@@ -204,6 +205,7 @@ extension AppControllerDesktopSkillPermissions on AppController {
                   lastArtifactSyncAtMs: null,
                   lastArtifactSyncStatus: null,
                   lastTaskArtifactRelativePaths: const <String>[],
+                  taskInputAttachments: const <TaskInputAttachmentRecord>[],
                 ))
             .copyWith(
               messages: nextMessages,
@@ -229,6 +231,7 @@ extension AppControllerDesktopSkillPermissions on AppController {
               lastTaskArtifactRelativePaths: lastTaskArtifactRelativePaths,
               openClawTaskAssociation: openClawTaskAssociation,
               clearOpenClawTaskAssociation: clearOpenClawTaskAssociation,
+              taskInputAttachments: taskInputAttachments,
             );
     final nextStatus =
         lifecycleStatus ??
