@@ -17,6 +17,7 @@ import '../../widgets/surface_card.dart';
 import 'settings_account_panel.dart';
 import 'settings_about_panel.dart';
 import 'settings_archived_tasks_panel.dart';
+import 'settings_remote_desktop_panel.dart';
 
 Future<Map<String, dynamic>> loadBridgeMetadataForSettingsAbout({
   required Uri bridgeEndpoint,
@@ -514,7 +515,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   onRefresh: _refreshAboutSnapshot,
                 ),
               ),
-            ] else if (currentTab == SettingsTab.archivedTasks)
+            ] else if (currentTab == SettingsTab.archivedTasks) ...[
               SurfaceCard(
                 key: const ValueKey('settings-archived-tasks-panel-card'),
                 child: SettingsArchivedTasksPanel(
@@ -523,6 +524,12 @@ class _SettingsPageState extends State<SettingsPage> {
                   onDelete: _deleteArchivedTask,
                 ),
               ),
+            ] else if (currentTab == SettingsTab.remoteDesktop) ...[
+              SurfaceCard(
+                key: const ValueKey('settings-remote-desktop-panel-card'),
+                child: SettingsRemoteDesktopPanel(controller: controller),
+              ),
+            ],
           ],
         );
       },
@@ -555,9 +562,11 @@ class _SettingsTabSelector extends StatelessWidget {
             ButtonSegment<SettingsTab>(
               value: tab,
               icon: Icon(
-                tab == SettingsTab.archivedTasks
-                    ? Icons.inventory_2_outlined
-                    : Icons.hub_outlined,
+                tab == SettingsTab.remoteDesktop
+                    ? Icons.desktop_windows_outlined
+                    : (tab == SettingsTab.archivedTasks
+                        ? Icons.inventory_2_outlined
+                        : Icons.hub_outlined),
               ),
               label: Text(tab.label),
             ),

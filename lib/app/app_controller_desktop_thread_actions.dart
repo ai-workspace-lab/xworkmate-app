@@ -459,8 +459,13 @@ extension AppControllerDesktopThreadActions on AppController {
     final capturedSelectedSkillLabels = List<String>.unmodifiable(
       selectedSkillLabels,
     );
+    final inlineAttachmentsToUpload =
+        registerTaskInputAttachmentsForGatewayTurnInternal(
+          normalizedSessionKey,
+          attachments,
+        );
     final capturedAttachments = List<GatewayChatAttachmentPayload>.unmodifiable(
-      attachments,
+      inlineAttachmentsToUpload,
     );
     final capturedLocalAttachments = List<CollaborationAttachment>.unmodifiable(
       localAttachments,
@@ -523,6 +528,61 @@ extension AppControllerDesktopThreadActions on AppController {
     recomputeTasksInternal();
   }
 
+  List<GatewayChatAttachmentPayload>
+  registerTaskInputAttachmentsForGatewayTurnInternal(
+    String sessionKey,
+    List<GatewayChatAttachmentPayload> attachments,
+  ) {
+    if (attachments.isEmpty) {
+      return const <GatewayChatAttachmentPayload>[];
+    }
+    final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
+      sessionKey,
+    );
+    final existing = taskThreadForSessionInternal(normalizedSessionKey);
+    final existingByKey = <String, TaskInputAttachmentRecord>{
+      for (final item
+          in existing?.taskInputAttachments ??
+              const <TaskInputAttachmentRecord>[])
+        if (item.key.isNotEmpty) item.key: item,
+    };
+    final inlineAttachmentsToUpload = <GatewayChatAttachmentPayload>[];
+    final nextByKey = <String, TaskInputAttachmentRecord>{...existingByKey};
+    final uploadedAtMs = DateTime.now().millisecondsSinceEpoch.toDouble();
+    for (final attachment in attachments) {
+      final key = gatewayAttachmentPayloadSha256Internal(attachment);
+      if (key.isEmpty) {
+        inlineAttachmentsToUpload.add(attachment);
+        continue;
+      }
+      if (!existingByKey.containsKey(key)) {
+        inlineAttachmentsToUpload.add(attachment);
+      }
+      nextByKey.putIfAbsent(
+        key,
+        () => TaskInputAttachmentRecord(
+          name: attachment.fileName.trim(),
+          mimeType: attachment.mimeType.trim(),
+          sha256: key,
+          type: attachment.type.trim(),
+          uploadedAtMs: uploadedAtMs,
+        ),
+      );
+    }
+    if (nextByKey.length != existingByKey.length) {
+      upsertTaskThreadInternal(
+        normalizedSessionKey,
+        taskInputAttachments: nextByKey.values.toList(growable: false),
+        updatedAtMs: uploadedAtMs,
+      );
+    }
+    return inlineAttachmentsToUpload;
+  }
+
+  String gatewayAttachmentPayloadSha256Internal(
+    GatewayChatAttachmentPayload attachment,
+  ) => goTaskServiceAttachmentSha256(attachment);
+
   Future<void> runGatewayChatTurnInternal({
     required String sessionKey,
     required AssistantExecutionTarget target,
@@ -558,6 +618,9 @@ extension AppControllerDesktopThreadActions on AppController {
       executionWorkingDirectory: executionWorkingDirectory ?? workingDirectory,
       remoteWorkingDirectoryHint: remoteWorkingDirectoryHint,
       target: target,
+      taskInputAttachments:
+          taskThreadForSessionInternal(sessionKey)?.taskInputAttachments ??
+          const <TaskInputAttachmentRecord>[],
     );
     if (appendUserTurn) {
       appendGatewayUserTurnInternal(sessionKey, message);
@@ -592,7 +655,11 @@ extension AppControllerDesktopThreadActions on AppController {
           }
         },
       );
-      if (!aiGatewayPendingSessionKeysInternal.contains(sessionKey)) {
+      if (!aiGatewayPendingSessionKeysInternal.contains(sessionKey) &&
+          taskThreadForSessionInternal(
+                sessionKey,
+              )?.lifecycleState.lastResultCode ==
+              'aborted') {
         clearAiGatewayStreamingTextInternal(sessionKey);
         return;
       }
@@ -802,6 +869,8 @@ extension AppControllerDesktopThreadActions on AppController {
     String? executionWorkingDirectory,
     required String remoteWorkingDirectoryHint,
     required AssistantExecutionTarget target,
+    List<TaskInputAttachmentRecord> taskInputAttachments =
+        const <TaskInputAttachmentRecord>[],
   }) {
     final requestText = userPrompt.trim().isEmpty
         ? 'See attached.'
@@ -824,6 +893,17 @@ extension AppControllerDesktopThreadActions on AppController {
         ? '(Use the runtime-provided default workspace)'
         : workingDirectory.trim();
     buffer.writeln('- currentTaskWorkspace: $resolvedWorkspace');
+    final visibleTaskInputAttachments = taskInputAttachments
+        .where((item) => item.name.trim().isNotEmpty && item.key.isNotEmpty)
+        .toList(growable: false);
+    if (visibleTaskInputAttachments.isNotEmpty) {
+      buffer.writeln('- taskInputAttachments:');
+      for (final attachment in visibleTaskInputAttachments) {
+        buffer.writeln(
+          '  - ${attachment.name.trim()} (${attachment.mimeType.trim()}, sha256: ${attachment.key})',
+        );
+      }
+    }
     buffer
       ..writeln()
       ..writeln('Workspace isolation rules:')
@@ -844,6 +924,9 @@ extension AppControllerDesktopThreadActions on AppController {
       )
       ..writeln(
         '6. The app syncs final artifacts from currentTaskWorkspace back into localWorkspace.',
+      )
+      ..writeln(
+        '7. Files listed in taskInputAttachments already belong to this TaskThread; reuse them from the task context and do not ask the user to upload them again.',
       )
       ..writeln();
     buffer
@@ -1250,6 +1333,13 @@ extension AppControllerDesktopThreadActions on AppController {
     recomputeTasksInternal();
     notifyIfActiveInternal();
     await persistGoTaskArtifactsForSessionInternal(sessionKey, result);
+    upsertTaskThreadInternal(
+      sessionKey,
+      lifecycleStatus: 'ready',
+      lastRunAtMs: completedAtMs,
+      lastResultCode: terminalResultCode,
+      updatedAtMs: completedAtMs,
+    );
   }
 
   Future<void> applyGatewayChatFailureInternal({

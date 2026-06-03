@@ -16,12 +16,14 @@ class GatewayChatAttachmentPayload {
     required this.mimeType,
     required this.fileName,
     required this.content,
+    this.sha256 = '',
   });
 
   final String type;
   final String mimeType;
   final String fileName;
   final String content;
+  final String sha256;
 
   Map<String, dynamic> toJson() {
     return {
@@ -29,6 +31,7 @@ class GatewayChatAttachmentPayload {
       'mimeType': mimeType,
       'fileName': fileName,
       'content': content,
+      if (sha256.trim().isNotEmpty) 'sha256': sha256.trim(),
     };
   }
 }

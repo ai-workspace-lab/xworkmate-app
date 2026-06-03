@@ -20,6 +20,7 @@
 - [XHS 风格文案](./xhs-copy.md)
 - [微信文章文案](./wechat-article.md)
 - [PPT 演示稿](./ai-security-evolution-scenario.pptx)
+- [章节拆分 PDF 文稿](./ai-security-evolution-pdf.pdf)
 
 ## App 手动测试提示词
 

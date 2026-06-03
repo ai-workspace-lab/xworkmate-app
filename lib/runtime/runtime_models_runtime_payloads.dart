@@ -678,6 +678,7 @@ class ThreadContextState {
     this.lastArtifactSyncStatus,
     this.lastTaskArtifactRelativePaths = const <String>[],
     this.openClawTaskAssociation,
+    this.taskInputAttachments = const <TaskInputAttachmentRecord>[],
   });
 
   final List<GatewayChatMessage> messages;
@@ -696,6 +697,7 @@ class ThreadContextState {
   final String? lastArtifactSyncStatus;
   final List<String> lastTaskArtifactRelativePaths;
   final OpenClawTaskAssociation? openClawTaskAssociation;
+  final List<TaskInputAttachmentRecord> taskInputAttachments;
 
   ThreadContextState copyWith({
     List<GatewayChatMessage>? messages,
@@ -716,6 +718,7 @@ class ThreadContextState {
     List<String>? lastTaskArtifactRelativePaths,
     OpenClawTaskAssociation? openClawTaskAssociation,
     bool clearOpenClawTaskAssociation = false,
+    List<TaskInputAttachmentRecord>? taskInputAttachments,
   }) {
     return ThreadContextState(
       messages: messages ?? this.messages,
@@ -745,6 +748,7 @@ class ThreadContextState {
       openClawTaskAssociation: clearOpenClawTaskAssociation
           ? null
           : (openClawTaskAssociation ?? this.openClawTaskAssociation),
+      taskInputAttachments: taskInputAttachments ?? this.taskInputAttachments,
     );
   }
 
@@ -766,6 +770,9 @@ class ThreadContextState {
       'lastArtifactSyncStatus': lastArtifactSyncStatus,
       'lastTaskArtifactRelativePaths': lastTaskArtifactRelativePaths,
       'openClawTaskAssociation': openClawTaskAssociation?.toJson(),
+      'taskInputAttachments': taskInputAttachments
+          .map((item) => item.toJson())
+          .toList(growable: false),
     };
   }
 
@@ -834,8 +841,75 @@ class ThreadContextState {
       openClawTaskAssociation: OpenClawTaskAssociation.fromJsonOrNull(
         json['openClawTaskAssociation'],
       ),
+      taskInputAttachments: _taskInputAttachmentRecordsFromJson(
+        json['taskInputAttachments'],
+      ),
     );
   }
+}
+
+class TaskInputAttachmentRecord {
+  const TaskInputAttachmentRecord({
+    required this.name,
+    required this.mimeType,
+    required this.sha256,
+    required this.type,
+    required this.uploadedAtMs,
+  });
+
+  final String name;
+  final String mimeType;
+  final String sha256;
+  final String type;
+  final double uploadedAtMs;
+
+  String get key => sha256.trim().toLowerCase();
+
+  Map<String, dynamic> toJson() {
+    return <String, dynamic>{
+      'name': name.trim(),
+      'mimeType': mimeType.trim(),
+      'sha256': key,
+      'type': type.trim(),
+      'uploadedAtMs': uploadedAtMs,
+    };
+  }
+
+  factory TaskInputAttachmentRecord.fromJson(Map<String, dynamic> json) {
+    double uploadedAtMs(Object? value) {
+      if (value is num) {
+        return value.toDouble();
+      }
+      return double.tryParse(value?.toString() ?? '') ?? 0;
+    }
+
+    return TaskInputAttachmentRecord(
+      name: json['name']?.toString().trim() ?? '',
+      mimeType: json['mimeType']?.toString().trim() ?? '',
+      sha256: json['sha256']?.toString().trim().toLowerCase() ?? '',
+      type: json['type']?.toString().trim() ?? '',
+      uploadedAtMs: uploadedAtMs(json['uploadedAtMs']),
+    );
+  }
+}
+
+List<TaskInputAttachmentRecord> _taskInputAttachmentRecordsFromJson(
+  Object? value,
+) {
+  if (value is! List) {
+    return const <TaskInputAttachmentRecord>[];
+  }
+  final byKey = <String, TaskInputAttachmentRecord>{};
+  for (final item in value.whereType<Map>()) {
+    final record = TaskInputAttachmentRecord.fromJson(
+      item.cast<String, dynamic>(),
+    );
+    if (record.key.isEmpty || record.name.isEmpty) {
+      continue;
+    }
+    byKey.putIfAbsent(record.key, () => record);
+  }
+  return byKey.values.toList(growable: false);
 }
 
 class OpenClawTaskAssociation {
@@ -1097,6 +1171,7 @@ class TaskThread {
     String? lastArtifactSyncStatus,
     List<String>? lastTaskArtifactRelativePaths,
     OpenClawTaskAssociation? openClawTaskAssociation,
+    List<TaskInputAttachmentRecord>? taskInputAttachments,
   }) : threadId = _resolveThreadId(threadId),
        title = title ?? '',
        ownerScope =
@@ -1144,6 +1219,8 @@ class TaskThread {
                lastTaskArtifactRelativePaths,
              ),
              openClawTaskAssociation: openClawTaskAssociation,
+             taskInputAttachments:
+                 taskInputAttachments ?? const <TaskInputAttachmentRecord>[],
            ),
        lifecycleState =
            lifecycleState ??
@@ -1184,6 +1261,8 @@ class TaskThread {
       contextState.lastTaskArtifactRelativePaths;
   OpenClawTaskAssociation? get openClawTaskAssociation =>
       contextState.openClawTaskAssociation;
+  List<TaskInputAttachmentRecord> get taskInputAttachments =>
+      contextState.taskInputAttachments;
   String get latestResolvedRuntimeModel =>
       contextState.latestResolvedRuntimeModel;
   String get latestResolvedProviderId => contextState.latestResolvedProviderId;
@@ -1229,6 +1308,7 @@ class TaskThread {
     List<String>? lastTaskArtifactRelativePaths,
     OpenClawTaskAssociation? openClawTaskAssociation,
     bool clearOpenClawTaskAssociation = false,
+    List<TaskInputAttachmentRecord>? taskInputAttachments,
   }) {
     return TaskThread(
       threadId: threadId ?? this.threadId,
@@ -1254,6 +1334,7 @@ class TaskThread {
         lastTaskArtifactRelativePaths: lastTaskArtifactRelativePaths,
         openClawTaskAssociation: openClawTaskAssociation,
         clearOpenClawTaskAssociation: clearOpenClawTaskAssociation,
+        taskInputAttachments: taskInputAttachments,
       ),
       lifecycleState: (lifecycleState ?? this.lifecycleState).copyWith(
         archived: archived,
@@ -1371,6 +1452,7 @@ class TaskThread {
         'lastArtifactSyncStatus': json['lastArtifactSyncStatus'],
         'lastTaskArtifactRelativePaths': json['lastTaskArtifactRelativePaths'],
         'openClawTaskAssociation': json['openClawTaskAssociation'],
+        'taskInputAttachments': json['taskInputAttachments'],
       };
     }
 
