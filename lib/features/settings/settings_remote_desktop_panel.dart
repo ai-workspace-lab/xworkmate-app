@@ -17,33 +17,30 @@ class SettingsRemoteDesktopPanel extends StatefulWidget {
 class _SettingsRemoteDesktopPanelState extends State<SettingsRemoteDesktopPanel> {
   final GlobalKey _desktopViewKey = GlobalKey();
   bool _isMaximized = false;
+  OverlayEntry? _overlayEntry;
 
   void _toggleMaximize() {
     if (_isMaximized) {
-      Navigator.of(context).pop();
+      _overlayEntry?.remove();
+      _overlayEntry = null;
+      setState(() => _isMaximized = false);
     } else {
       setState(() => _isMaximized = true);
-      showDialog(
-        context: context,
-        useSafeArea: false,
-        barrierDismissible: false,
+      _overlayEntry = OverlayEntry(
         builder: (context) {
-          return Dialog.fullscreen(
-            child: DesktopView(
-              key: _desktopViewKey,
-              controller: widget.controller,
-              isMaximized: true,
-              onToggleMaximize: () {
-                Navigator.of(context).pop();
-              },
+          return Material(
+            child: SafeArea(
+              child: DesktopView(
+                key: _desktopViewKey,
+                controller: widget.controller,
+                isMaximized: true,
+                onToggleMaximize: _toggleMaximize,
+              ),
             ),
           );
         },
-      ).then((_) {
-        if (mounted) {
-          setState(() => _isMaximized = false);
-        }
-      });
+      );
+      Overlay.of(context).insert(_overlayEntry!);
     }
   }
 
