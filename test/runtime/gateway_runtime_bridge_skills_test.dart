@@ -176,4 +176,109 @@ void main() {
       expect(controller.items.first.eligible, isTrue);
     },
   );
+
+  test(
+    'GatewayRuntime loads skills from nested bridge status payload',
+    () async {
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      final subscription = server.listen((request) async {
+        final body = await utf8.decoder.bind(request).join();
+        final rpc = jsonDecode(body) as Map<String, dynamic>;
+        final method = rpc['method']?.toString().trim() ?? '';
+        request.response.headers.contentType = ContentType.json;
+
+        if (method == 'xworkmate.gateway.connect') {
+          request.response.write(
+            jsonEncode(<String, dynamic>{
+              'jsonrpc': '2.0',
+              'id': rpc['id'],
+              'result': <String, dynamic>{
+                'ok': true,
+                'snapshot': <String, dynamic>{
+                  'status': 'connected',
+                  'mode': 'remote',
+                  'statusText': 'Connected',
+                  'mainSessionKey': 'main',
+                },
+                'auth': <String, dynamic>{'role': 'operator'},
+                'returnedDeviceToken': '',
+              },
+            }),
+          );
+          await request.response.close();
+          return;
+        }
+
+        if (method == 'xworkmate.gateway.request') {
+          request.response.write(
+            jsonEncode(<String, dynamic>{
+              'jsonrpc': '2.0',
+              'id': rpc['id'],
+              'result': <String, dynamic>{
+                'ok': true,
+                'payload': <String, dynamic>{
+                  'status': <String, dynamic>{
+                    'workspaceDir': '/home/ubuntu/.openclaw/workspace',
+                    'managedSkillsDir': '/home/ubuntu/.openclaw/skills',
+                    'skills': <Map<String, dynamic>>[
+                      <String, dynamic>{
+                        'name': 'Browser Automation',
+                        'description': 'Drive browser workflows.',
+                        'source': 'agent',
+                        'id': 'browser-automation',
+                        'eligible': true,
+                        'disabled': false,
+                        'missingBins': <String>[],
+                        'missingEnv': <String>[],
+                        'missingConfig': <String>[],
+                      },
+                    ],
+                  },
+                },
+              },
+            }),
+          );
+          await request.response.close();
+          return;
+        }
+
+        request.response.statusCode = HttpStatus.badRequest;
+        await request.response.close();
+      });
+
+      final tempDir = await Directory.systemTemp.createTemp(
+        'xworkmate-bridge-skills-nested-test-',
+      );
+      final store = SecureConfigStore(
+        enableSecureStorage: false,
+        appDataRootPathResolver: () async => '${tempDir.path}/settings.sqlite3',
+        secretRootPathResolver: () async => tempDir.path,
+      );
+      final acpClient = GatewayAcpClient(
+        endpointResolver: () => Uri.parse('http://127.0.0.1:${server.port}'),
+        authorizationResolver: (_) async => 'bridge-token',
+      );
+      final identityStore = DeviceIdentityStore(store);
+      final runtime = GatewayRuntime(
+        store: store,
+        identityStore: identityStore,
+        sessionClient: GatewayAcpRuntimeSessionClient(client: acpClient),
+      );
+      await runtime.initialize();
+      addTearDown(() async {
+        runtime.dispose();
+        await subscription.cancel();
+        await server.close(force: true);
+        await tempDir.delete(recursive: true);
+      });
+
+      final controller = SkillsController(runtime);
+      await controller.refresh(agentId: 'main');
+
+      expect(controller.error, isNull);
+      expect(controller.items, hasLength(1));
+      expect(controller.items.single.skillKey, 'browser-automation');
+      expect(controller.items.single.missingBins, isEmpty);
+    },
+  );
 }
