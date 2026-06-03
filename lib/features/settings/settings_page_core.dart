@@ -17,6 +17,7 @@ import '../../widgets/surface_card.dart';
 import 'settings_account_panel.dart';
 import 'settings_about_panel.dart';
 import 'settings_archived_tasks_panel.dart';
+import 'settings_logs_panel.dart';
 import 'settings_remote_desktop_panel.dart';
 
 Future<Map<String, dynamic>> loadBridgeMetadataForSettingsAbout({
@@ -529,6 +530,11 @@ class _SettingsPageState extends State<SettingsPage> {
                 key: const ValueKey('settings-remote-desktop-panel-card'),
                 child: SettingsRemoteDesktopPanel(controller: controller),
               ),
+            ] else if (currentTab == SettingsTab.logs) ...[
+              SurfaceCard(
+                key: const ValueKey('settings-logs-panel-card'),
+                child: SettingsLogsPanel(controller: controller),
+              ),
             ],
           ],
         );
@@ -564,9 +570,11 @@ class _SettingsTabSelector extends StatelessWidget {
               icon: Icon(
                 tab == SettingsTab.remoteDesktop
                     ? Icons.desktop_windows_outlined
-                    : (tab == SettingsTab.archivedTasks
-                        ? Icons.inventory_2_outlined
-                        : Icons.hub_outlined),
+                    : (tab == SettingsTab.logs
+                        ? Icons.terminal_outlined
+                        : (tab == SettingsTab.archivedTasks
+                            ? Icons.inventory_2_outlined
+                            : Icons.hub_outlined)),
               ),
               label: Text(tab.label),
             ),
