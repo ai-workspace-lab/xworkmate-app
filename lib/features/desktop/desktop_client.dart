@@ -87,7 +87,7 @@ class DesktopClient {
         method: 'xworkmate.desktop.offer',
         params: {
           'sessionId': sessionId,
-          'sdpOffer': offer.toMap(),
+          'sdpOffer': offer.sdp,
           'display': display,
           'width': width.toString(),
           'height': height.toString(),
