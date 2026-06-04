@@ -56,6 +56,7 @@ class _SettingsLogsPanelState extends State<SettingsLogsPanel> {
         }
       }
     } catch (e) {
+      appLog('Failed to fetch system status: $e');
       if (mounted) {
         setState(() {
           _bridgeStatus = 'error';
