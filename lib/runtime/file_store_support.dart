@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:yaml/yaml.dart';
 
@@ -143,19 +144,7 @@ class StoreLayoutResolver {
         await _resolvePath(_supportRootPathResolver) ??
         await _defaultSupportRootPath();
     if (supportRootPath == null) {
-      // Fallback to a temporary directory instead of failing fast with an error.
-      // This ensures the app remains usable in "memory-only" or "ephemeral" mode.
-      final tempDir = await Directory.systemTemp.createTemp(
-        'xworkmate-fallback-',
-      );
-      final layout = StoreLayout(
-        rootDirectory: tempDir,
-        configDirectory: await ensureDirectory('${tempDir.path}/config'),
-        tasksDirectory: await ensureDirectory('${tempDir.path}/tasks'),
-        secretDirectory: await ensureDirectory('${tempDir.path}/secrets'),
-      );
-      _cached = layout;
-      return layout;
+      throw StateError('Persistent support root is unavailable.');
     }
     final appDataRootPath =
         await _resolvePath(_appDataRootPathResolver) ?? supportRootPath;
@@ -197,7 +186,8 @@ class StoreLayoutResolver {
     try {
       final supportDirectory = await getApplicationSupportDirectory();
       return '${supportDirectory.path}/xworkmate';
-    } catch (_) {
+    } catch (error) {
+      debugPrint('Application support directory lookup failed: $error');
       return defaultUserSettingsRootPath();
     }
   }
@@ -213,7 +203,8 @@ class StoreLayoutResolver {
         return null;
       }
       return normalizeStoreDirectoryPath(trimmed);
-    } catch (_) {
+    } catch (error) {
+      debugPrint('Store layout path resolver failed: $error');
       return null;
     }
   }
@@ -302,7 +293,8 @@ Object? decodeYamlDocument(String raw) {
   }
   try {
     return _yamlToObject(loadYaml(trimmed));
-  } catch (_) {
+  } catch (error) {
+    debugPrint('YAML decode failed: $error');
     return null;
   }
 }
