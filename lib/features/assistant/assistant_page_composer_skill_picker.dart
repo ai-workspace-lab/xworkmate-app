@@ -192,6 +192,22 @@ class SkillPickerPopoverInternal extends StatelessWidget {
                                   ),
                                 ),
                               ],
+                              if (!hasError && !isLoading && !hasQuery) ...[
+                                const SizedBox(height: 8),
+                                Text(
+                                  appText(
+                                    '技能来源于 Gateway 工作区。请确认 OpenClaw'
+                                    ' Gateway 已连接且安装了技能包。',
+                                    'Skills come from the Gateway workspace.'
+                                    ' Make sure OpenClaw Gateway is connected'
+                                    ' and skills are installed.',
+                                  ),
+                                  textAlign: TextAlign.center,
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: palette.textMuted,
+                                  ),
+                                ),
+                              ],
                               if ((hasError || (!isLoading && !hasQuery)) &&
                                   onRetry != null) ...[
                                 const SizedBox(height: 12),
