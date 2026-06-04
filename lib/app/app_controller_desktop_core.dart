@@ -33,12 +33,9 @@ import '../runtime/desktop_thread_artifact_service.dart';
 import '../runtime/external_code_agent_acp_desktop_transport.dart';
 import '../runtime/go_task_service_client.dart';
 import '../runtime/go_task_service_desktop_service.dart';
-import '../runtime/go_multi_agent_mount_desktop_client.dart';
 import '../runtime/go_runtime_dispatch_desktop_client.dart';
 import '../runtime/mode_switcher.dart';
 import '../runtime/agent_registry.dart';
-import '../runtime/multi_agent_mounts.dart';
-import '../runtime/multi_agent_orchestrator.dart';
 import '../runtime/platform_environment.dart';
 import 'task_thread_repositories.dart';
 import 'app_controller_openclaw_task_queue.dart';
@@ -71,7 +68,6 @@ class AppController extends ChangeNotifier {
     AccountRuntimeClient Function(String baseUrl)? accountClientFactory,
     Map<String, String>? environmentOverride,
     GoTaskServiceClient? goTaskServiceClient,
-    MultiAgentMountManager? multiAgentMountManager,
   }) {
     environmentOverrideInternal = environmentOverride == null
         ? null
@@ -165,19 +161,6 @@ class AppController extends ChangeNotifier {
             taskEndpointResolver: resolveExternalAcpEndpointForRequestInternal,
           ),
         );
-    multiAgentOrchestratorInternal = MultiAgentOrchestrator(
-      config: resolveMultiAgentConfigInternal(
-        settingsControllerInternal.snapshot,
-      ),
-    );
-    multiAgentMountManagerInternal =
-        multiAgentMountManager ??
-        MultiAgentMountManager(
-          resolver: GoMultiAgentMountDesktopClient(
-            client: gatewayAcpClientInternal,
-            endpointResolver: resolveGatewayAcpEndpointInternal,
-          ),
-        );
     bridgeAgentProviderCatalogInternal = normalizeSingleAgentProviderList(
       initialBridgeProviderCatalog ?? const <SingleAgentProvider>[],
     );
@@ -223,7 +206,6 @@ class AppController extends ChangeNotifier {
     tasksControllerInternal.dispose();
     storeInternal.dispose();
     desktopPlatformServiceInternal.dispose();
-    unawaited(multiAgentMountManagerInternal.dispose());
     unawaited(goTaskServiceClientInternal.dispose());
     unawaited(gatewayAcpClientInternal.dispose());
     super.dispose();
@@ -249,9 +231,6 @@ class AppController extends ChangeNotifier {
   late final DesktopPlatformService desktopPlatformServiceInternal;
   late final GatewayAcpClient gatewayAcpClientInternal;
   late final GoTaskServiceClient goTaskServiceClientInternal;
-  late final MultiAgentOrchestrator multiAgentOrchestratorInternal;
-  late final MultiAgentMountManager multiAgentMountManagerInternal;
-
   GoTaskServiceClient get goTaskServiceClientForTest =>
       goTaskServiceClientInternal;
 
@@ -291,7 +270,6 @@ class AppController extends ChangeNotifier {
       <String, OpenClawGatewayQueuedTurnInternal>{};
   int get openClawGatewayActiveTasksInternal =>
       openClawGatewayActiveTurnsInternal.length;
-  bool multiAgentRunPendingInternal = false;
   int localMessageCounterInternal = 0;
   int assistantDraftSessionCounterInternal = 0;
 
@@ -370,10 +348,6 @@ class AppController extends ChangeNotifier {
   GatewayAgentsController get agentsController => agentsControllerInternal;
   GatewaySessionsController get sessionsController =>
       sessionsControllerInternal;
-  MultiAgentOrchestrator get multiAgentOrchestrator =>
-      multiAgentOrchestratorInternal;
-  MultiAgentMountManager get multiAgentMountManager =>
-      multiAgentMountManagerInternal;
   GatewayChatController get chatController => chatControllerInternal;
   SkillsController get skillsController => skillsControllerInternal;
   ModelsController get modelsController => modelsControllerInternal;
@@ -617,11 +591,6 @@ class AppController extends ChangeNotifier {
     localAttachments: localAttachments,
     selectedSkillLabels: selectedSkillLabels,
   );
-
-  Future<void> refreshMultiAgentMounts({bool sync = false}) =>
-      AppControllerDesktopThreadSessions(
-        this,
-      ).refreshMultiAgentMounts(sync: sync);
 
   double get assistantSkillCount => skills.length.toDouble();
   int get currentAssistantSkillCount => skills.length;

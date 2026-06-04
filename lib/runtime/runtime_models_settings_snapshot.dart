@@ -10,7 +10,6 @@ import 'runtime_models_profiles.dart';
 import 'runtime_models_configs.dart';
 import 'runtime_models_runtime_payloads.dart';
 import 'runtime_models_gateway_entities.dart';
-import 'runtime_models_multi_agent.dart';
 
 const int settingsSnapshotSchemaVersion = 2;
 
@@ -34,7 +33,6 @@ class SettingsSnapshot {
     required this.vault,
     required this.aiGateway,
     required this.webSessionPersistence,
-    required this.multiAgent,
     required this.themeMode,
     required this.experimentalCanvas,
     required this.experimentalBridge,
@@ -67,7 +65,6 @@ class SettingsSnapshot {
   final VaultConfig vault;
   final AiGatewayProfile aiGateway;
   final WebSessionPersistenceConfig webSessionPersistence;
-  final MultiAgentConfig multiAgent;
   final ThemeMode themeMode;
   final bool experimentalCanvas;
   final bool experimentalBridge;
@@ -101,7 +98,6 @@ class SettingsSnapshot {
       vault: VaultConfig.defaults(),
       aiGateway: AiGatewayProfile.defaults(),
       webSessionPersistence: WebSessionPersistenceConfig.defaults(),
-      multiAgent: MultiAgentConfig.defaults(),
       themeMode: ThemeMode.system,
       experimentalCanvas: false,
       experimentalBridge: false,
@@ -136,7 +132,6 @@ class SettingsSnapshot {
     VaultConfig? vault,
     AiGatewayProfile? aiGateway,
     WebSessionPersistenceConfig? webSessionPersistence,
-    MultiAgentConfig? multiAgent,
     ThemeMode? themeMode,
     bool? experimentalCanvas,
     bool? experimentalBridge,
@@ -179,7 +174,6 @@ class SettingsSnapshot {
       aiGateway: aiGateway ?? this.aiGateway,
       webSessionPersistence:
           webSessionPersistence ?? this.webSessionPersistence,
-      multiAgent: multiAgent ?? this.multiAgent,
       themeMode: themeMode ?? this.themeMode,
       experimentalCanvas: experimentalCanvas ?? this.experimentalCanvas,
       experimentalBridge: experimentalBridge ?? this.experimentalBridge,
@@ -223,7 +217,6 @@ class SettingsSnapshot {
       'vault': vault.toJson(),
       'aiGateway': aiGateway.toJson(),
       'webSessionPersistence': webSessionPersistence.toJson(),
-      'multiAgent': multiAgent.toJson(),
       'themeMode': themeMode.name,
       'experimentalCanvas': experimentalCanvas,
       'experimentalBridge': experimentalBridge,
@@ -306,9 +299,6 @@ class SettingsSnapshot {
       webSessionPersistence: WebSessionPersistenceConfig.fromJson(
         (json['webSessionPersistence'] as Map?)?.cast<String, dynamic>() ??
             const {},
-      ),
-      multiAgent: MultiAgentConfig.fromJson(
-        (json['multiAgent'] as Map?)?.cast<String, dynamic>() ?? const {},
       ),
       themeMode: ThemeMode.values.firstWhere(
         (m) => m.name == json['themeMode'],
