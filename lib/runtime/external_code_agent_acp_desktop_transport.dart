@@ -218,18 +218,6 @@ class ExternalCodeAgentAcpDesktopTransport
     final association = OpenClawTaskAssociation.fromJsonOrNull(
       runningTaskSnapshot,
     );
-    if (association != null) {
-      return goTaskServiceResultFromAcpResponse(
-        <String, dynamic>{
-          'jsonrpc': '2.0',
-          'id': 'recovered-from-running-task-handle',
-          'result': runningTaskSnapshot,
-        },
-        route: request.route,
-        streamedText: streamedText,
-        completedMessage: completedMessage,
-      );
-    }
     final attempts = _recoveryAttemptsForRequest(request);
     for (var attempt = 0; attempt < attempts; attempt += 1) {
       if (attempt > 0) {
@@ -239,10 +227,11 @@ class ExternalCodeAgentAcpDesktopTransport
       try {
         response = await _client.request(
           method: 'xworkmate.tasks.get',
-          params: <String, dynamic>{
-            'sessionId': request.sessionId,
-            'threadId': request.threadId,
-          },
+          params: association?.toTaskGetParams() ??
+              <String, dynamic>{
+                'sessionId': request.sessionId,
+                'threadId': request.threadId,
+              },
           endpointOverride: endpoint,
         );
       } on GatewayAcpException {
