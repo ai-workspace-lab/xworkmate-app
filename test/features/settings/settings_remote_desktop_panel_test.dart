@@ -29,8 +29,8 @@ void main() {
       );
 
       // Verify the panel headers and titles
-      expect(find.text('远程桌面'), findsOneWidget);
-      expect(find.text('连接桌面'), findsOneWidget);
+      expect(find.text('AI工作空间'), findsOneWidget);
+      expect(find.text('连接AI工作空间'), findsOneWidget);
 
       // Verify advanced options are hidden initially
       expect(find.text('GPU 加速'), findsNothing);

@@ -6,6 +6,7 @@ import 'desktop_client.dart';
 import 'desktop_input_handler.dart';
 import '../../app/app_controller.dart';
 import '../../widgets/surface_card.dart';
+import '../../i18n/app_language.dart';
 
 class DesktopView extends StatefulWidget {
   const DesktopView({
@@ -141,7 +142,9 @@ class _DesktopViewState extends State<DesktopView> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Failed to connect remote desktop: $e'),
+              content: Text(
+                appText('连接AI工作空间失败: $e', 'Failed to connect AI Workspace: $e'),
+              ),
               backgroundColor: Colors.redAccent,
             ),
           );
@@ -204,10 +207,10 @@ class _DesktopViewState extends State<DesktopView> {
                         ),
                         label: Text(
                           _connectionState == 'connected'
-                              ? '断开连接'
+                              ? appText('断开连接', 'Disconnect')
                               : (_connectionState == 'connecting'
-                                    ? '正在连接...'
-                                    : '连接桌面'),
+                                    ? appText('正在连接...', 'Connecting...')
+                                    : appText('连接AI工作空间', 'Connect AI Workspace')),
                           style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
                       ),
@@ -251,10 +254,10 @@ class _DesktopViewState extends State<DesktopView> {
                             const SizedBox(width: 8),
                             Text(
                               _connectionState == 'connected'
-                                  ? '已连接'
+                                  ? appText('已连接', 'Connected')
                                   : (_connectionState == 'connecting'
-                                        ? '连接中'
-                                        : '未连接'),
+                                        ? appText('连接中', 'Connecting')
+                                        : appText('已断开', 'Disconnected')),
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.bold,
@@ -508,8 +511,8 @@ class _DesktopViewState extends State<DesktopView> {
                                 const SizedBox(height: 16),
                                 Text(
                                   _connectionState == 'connecting'
-                                      ? '正在建立 WebRTC 连接，请稍候...'
-                                      : '未开启远程桌面流。点击“连接桌面”启动视频流。',
+                                      ? appText('正在建立 WebRTC 连接，请稍候...', 'Establishing WebRTC connection, please wait...')
+                                      : appText('未开启 AI 工作空间流。点击“连接AI工作空间”启动视频流。', 'AI Workspace stream not enabled. Click "Connect AI Workspace" to start the video stream.'),
                                   style: TextStyle(
                                     color: theme.colorScheme.onSurface
                                         .withValues(alpha: 0.6),
