@@ -496,9 +496,28 @@ class GoTaskServiceResult {
       ? raw['resultSummary'].toString().trim()
       : raw['summary']?.toString().trim() ?? '';
 
-  String get status => raw['status']?.toString().trim() ?? '';
+  String get status => _firstNestedGoTaskString(
+    raw,
+    const <List<String>>[
+      <String>['status'],
+      <String>['error', 'status'],
+      <String>['details', 'status'],
+      <String>['payload', 'status'],
+      <String>['result', 'status'],
+    ],
+  );
 
-  String get code => raw['code']?.toString().trim() ?? '';
+  String get code => _firstNestedGoTaskString(
+    raw,
+    const <List<String>>[
+      <String>['code'],
+      <String>['error', 'code'],
+      <String>['error', 'details', 'code'],
+      <String>['details', 'code'],
+      <String>['payload', 'code'],
+      <String>['result', 'code'],
+    ],
+  );
 
   bool get isOpenClawRunningTaskHandle {
     final normalizedStatus = status.trim().toLowerCase();
@@ -793,7 +812,8 @@ GoTaskServiceResult goTaskServiceResultFromAcpResponse(
       .map((item) => item['id']?.toString().trim() ?? '')
       .where((item) => item.isNotEmpty)
       .toList(growable: false);
-  final success = _boolValue(result['success']) ?? true;
+  final success =
+      _boolValue(result['success']) ?? _inferGoTaskSuccess(result);
   final fallbackFailureText = () {
     if (success) {
       return '';
@@ -821,7 +841,7 @@ GoTaskServiceResult goTaskServiceResultFromAcpResponse(
               ? streamedText.trim()
               : '')
           .trim();
-  final directErrorMessage = result['error']?.toString().trim() ?? '';
+  final directErrorMessage = _extractGoTaskDisplayText(result['error']);
   final effectiveErrorMessage = success
       ? directErrorMessage
       : fallbackFailureText.isNotEmpty
@@ -841,6 +861,44 @@ GoTaskServiceResult goTaskServiceResultFromAcpResponse(
         '',
     route: route,
   );
+}
+
+bool _inferGoTaskSuccess(Map<String, dynamic> result) {
+  if (result.containsKey('error')) {
+    return false;
+  }
+  final status = _firstNestedGoTaskString(
+    result,
+    const <List<String>>[
+      <String>['status'],
+      <String>['details', 'status'],
+      <String>['payload', 'status'],
+      <String>['result', 'status'],
+    ],
+  ).toLowerCase();
+  if (status == 'failed' ||
+      status == 'error' ||
+      status == 'artifact_missing' ||
+      status == 'cancelled' ||
+      status == 'canceled') {
+    return false;
+  }
+  final code = _firstNestedGoTaskString(
+    result,
+    const <List<String>>[
+      <String>['code'],
+      <String>['details', 'code'],
+      <String>['payload', 'code'],
+      <String>['result', 'code'],
+    ],
+  ).toUpperCase();
+  if (code == 'OPENCLAW_REQUIRED_ARTIFACT_MISSING' ||
+      code == 'OPENCLAW_ARTIFACT_MISSING' ||
+      code == 'OPENCLAW_NO_EXPORTED_ARTIFACTS' ||
+      code == 'ARTIFACT_MISSING') {
+    return false;
+  }
+  return true;
 }
 
 String _firstGoTaskFailureText(Map<String, dynamic> result) {
@@ -1059,6 +1117,27 @@ List<Map<String, dynamic>> _castMapList(Object? raw) {
     return const <Map<String, dynamic>>[];
   }
   return raw.map(_castMap).toList(growable: false);
+}
+
+String _firstNestedGoTaskString(
+  Map<String, dynamic> source,
+  List<List<String>> paths,
+) {
+  for (final path in paths) {
+    Object? current = source;
+    for (final key in path) {
+      if (current is! Map) {
+        current = null;
+        break;
+      }
+      current = current[key];
+    }
+    final value = current?.toString().trim() ?? '';
+    if (value.isNotEmpty) {
+      return value;
+    }
+  }
+  return '';
 }
 
 List<dynamic> _castList(Object? raw) {

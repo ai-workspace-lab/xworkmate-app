@@ -149,14 +149,12 @@ Future<AiGatewayProfile> syncAiGatewayCatalogSettingsInternal(
       ? await controller.resolveSecretValueInternal(
           explicitValue: apiKeyOverride,
           refName: profile.apiKeyRef,
-          fallbackRefName: 'ai_gateway_api_key',
           accountTarget: kAccountManagedSecretTargetAIGatewayAccessToken,
           allowVaultLookup: false,
           persistExplicitValue: false,
         )
       : await controller.resolveSecretValueInternal(
           refName: profile.apiKeyRef,
-          fallbackRefName: 'ai_gateway_api_key',
           accountTarget: kAccountManagedSecretTargetAIGatewayAccessToken,
         );
   if (apiKey.isEmpty && !_allowsAnonymousAiGatewayInternal(normalizedBaseUrl)) {
@@ -254,14 +252,12 @@ Future<AiGatewayConnectionCheck> testAiGatewayConnectionSettingsInternal(
       ? await controller.resolveSecretValueInternal(
           explicitValue: apiKeyOverride,
           refName: profile.apiKeyRef,
-          fallbackRefName: 'ai_gateway_api_key',
           accountTarget: kAccountManagedSecretTargetAIGatewayAccessToken,
           allowVaultLookup: false,
           persistExplicitValue: false,
         )
       : await controller.resolveSecretValueInternal(
           refName: profile.apiKeyRef,
-          fallbackRefName: 'ai_gateway_api_key',
           accountTarget: kAccountManagedSecretTargetAIGatewayAccessToken,
         );
   final endpoint = controller
@@ -320,14 +316,12 @@ Future<List<GatewayModelSummary>> loadAiGatewayModelsSettingsInternal(
       ? await controller.resolveSecretValueInternal(
           explicitValue: apiKeyOverride,
           refName: activeProfile.apiKeyRef,
-          fallbackRefName: 'ai_gateway_api_key',
           accountTarget: kAccountManagedSecretTargetAIGatewayAccessToken,
           allowVaultLookup: false,
           persistExplicitValue: false,
         )
       : await controller.resolveSecretValueInternal(
           refName: activeProfile.apiKeyRef,
-          fallbackRefName: 'ai_gateway_api_key',
           accountTarget: kAccountManagedSecretTargetAIGatewayAccessToken,
         );
   if (apiKey.isEmpty && !_allowsAnonymousAiGatewayInternal(normalizedBaseUrl)) {

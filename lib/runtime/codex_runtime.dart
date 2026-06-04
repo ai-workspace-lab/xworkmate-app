@@ -1,4 +1,3 @@
-import 'dart:async';
 
 /// Codex sandbox mode for controlling file system access.
 enum CodexSandboxMode {
@@ -273,70 +272,6 @@ enum CodexConnectionState {
 
 /// Codex App Server RPC client.
 class CodexRuntime {}
-
-List<Map<String, dynamic>> _decodeModelListResponse(
-  Map<String, dynamic> result,
-) {
-  final rawModels = <Object?>[
-    ...switch (result['models']) {
-      final List<Object?> items => items,
-      _ => const <Object?>[],
-    },
-    if (switch (result['models']) {
-      final List<Object?> items => items.isEmpty,
-      _ => true,
-    })
-      ...switch (result['data']) {
-        final List<Object?> items => items,
-        _ => const <Object?>[],
-      },
-  ];
-  final seen = <String>{};
-  final items = <Map<String, dynamic>>[];
-  for (final item in rawModels) {
-    if (item is! Map) {
-      continue;
-    }
-    final model = item.cast<String, dynamic>();
-    final rawId = model['id'] ?? model['name'];
-    final id = rawId is String ? rawId.trim() : '';
-    if (id.isEmpty || !seen.add(id)) {
-      continue;
-    }
-    items.add(model);
-  }
-  return items;
-}
-
-Object _normalizeModelListError(Object error) {
-  if (error is TimeoutException) {
-    return TimeoutException('Codex model refresh timed out');
-  }
-  if (error is CodexRpcError) {
-    final message = error.message.trim();
-    final lower = message.toLowerCase();
-    if (lower.contains('cloudflare') || lower.contains('403 forbidden')) {
-      return CodexRpcError(
-        code: error.code,
-        message: 'Codex model refresh blocked by Cloudflare (403)',
-        data: error.data,
-      );
-    }
-    if (lower.contains('timeout waiting for child process to exit')) {
-      return TimeoutException(
-        'Codex model refresh timed out waiting for child process exit',
-      );
-    }
-    if (lower.contains('missing field `models`')) {
-      return CodexRpcError(
-        code: error.code,
-        message: 'Codex model list payload used an unsupported schema',
-        data: error.data,
-      );
-    }
-  }
-  return error;
-}
 
 class CodexLaunchConfiguration {
   const CodexLaunchConfiguration({

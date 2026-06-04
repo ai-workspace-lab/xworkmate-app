@@ -424,15 +424,12 @@ Future<String> resolveSecretValueSettingsInternal(
   SettingsController controller, {
   String explicitValue = '',
   String refName = '',
-  String fallbackRefName = '',
   String accountTarget = '',
   bool allowVaultLookup = true,
   bool persistExplicitValue = true,
 }) async {
   final trimmedExplicit = explicitValue.trim();
-  final normalizedRef = refName.trim().isNotEmpty
-      ? refName.trim()
-      : fallbackRefName.trim();
+  final normalizedRef = refName.trim();
   if (trimmedExplicit.isNotEmpty) {
     if (persistExplicitValue && normalizedRef.isNotEmpty) {
       await controller.storeInternal.saveSecretValueByRef(
@@ -463,8 +460,9 @@ Future<String> resolveSecretValueSettingsInternal(
           );
           return vaultValue;
         }
-      } catch (_) {
-        // Keep account-managed fallback available even when Vault lookup fails.
+      } catch (error) {
+        debugPrint('Vault secret lookup failed for $normalizedRef: $error');
+        // Keep account-managed secret resolution available even when Vault lookup fails.
       }
     }
   }

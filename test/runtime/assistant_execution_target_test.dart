@@ -1307,6 +1307,13 @@ void main() {
         final request = fakeGoTaskService.requests.single;
         expect(request.metadata, isNot(contains('taskLoadClass')));
         expect(request.metadata, isNot(contains('expectedArtifactExtensions')));
+        expect(request.metadata, contains('xworkmateTaskArtifactContract'));
+        final artifactContract =
+            (request.metadata['xworkmateTaskArtifactContract'] as Map)
+                .cast<String, dynamic>();
+        expect(artifactContract['finalDeliverableDetection'], 'remote-runtime');
+        expect(artifactContract['requiresExportBeforeFinalResponse'], isTrue);
+        expect(artifactContract, isNot(contains('expectedArtifactExtensions')));
         expect(request.prompt, isNot(contains('Task load classification:')));
         expect(
           request.prompt,
@@ -1345,7 +1352,22 @@ void main() {
         final request = fakeGoTaskService.requests.single;
         expect(request.metadata, isNot(contains('taskLoadClass')));
         expect(request.metadata, isNot(contains('expectedArtifactExtensions')));
+        expect(request.metadata, contains('xworkmateTaskArtifactContract'));
+        final artifactContract =
+            (request.metadata['xworkmateTaskArtifactContract'] as Map)
+                .cast<String, dynamic>();
+        expect(artifactContract['scopeKind'], 'task');
+        expect(artifactContract['rejectTextOnlyFileClaims'], isTrue);
+        expect(
+          artifactContract['currentTaskWorkspace'],
+          request.workingDirectory,
+        );
         expect(request.prompt, isNot(contains('Required final artifact')));
+        expect(request.prompt, contains('XWorkmate task artifact contract:'));
+        expect(
+          request.prompt,
+          contains('export the final deliverables through the current XWorkmate task artifact scope'),
+        );
         expect(request.prompt, contains('最后 输出 PDF文件'));
       },
     );
@@ -1927,6 +1949,68 @@ void main() {
         await _waitForLastChatMessageText(
           controller,
           'final artifact delivered',
+        );
+      },
+    );
+
+    test(
+      'sendChatMessage treats nested OpenClaw artifact errors as terminal failures',
+      () async {
+        final fakeGoTaskService = _RecordingGoTaskServiceClient()
+          ..outcomes.add(
+            goTaskServiceResultFromAcpResponse(
+              const <String, dynamic>{
+                'jsonrpc': '2.0',
+                'id': 'nested-openclaw-artifact-error',
+                'result': <String, dynamic>{
+                  'status': 'failed',
+                  'error': <String, dynamic>{
+                    'code': 'OPENCLAW_REQUIRED_ARTIFACT_MISSING',
+                    'message':
+                        'openclaw returned partial artifacts without required final deliverables',
+                  },
+                },
+              },
+              route: GoTaskServiceRoute.externalAcpSingle,
+            ),
+          )
+          ..outcomes.add(
+            const GoTaskServiceResult(
+              success: true,
+              message: 'new OpenClaw session delivered final artifacts',
+              turnId: 'turn-2',
+              raw: <String, dynamic>{},
+              errorMessage: '',
+              resolvedModel: '',
+              route: GoTaskServiceRoute.externalAcpSingle,
+            ),
+          );
+        final controller = _connectedController(fakeGoTaskService);
+        addTearDown(controller.dispose);
+
+        await controller.sessionsController.switchSession(
+          'unit-fixture-task-a',
+        );
+
+        await controller.sendChatMessage('first turn');
+
+        expect(fakeGoTaskService.requests, hasLength(1));
+        final failedThread = controller.taskThreadForSessionInternal(
+          'unit-fixture-task-a',
+        );
+        expect(
+          failedThread?.lifecycleState.lastResultCode,
+          'OPENCLAW_REQUIRED_ARTIFACT_MISSING',
+        );
+        expect(failedThread?.lastArtifactSyncStatus, 'failed');
+
+        await controller.sendChatMessage('retry final artifact');
+
+        expect(fakeGoTaskService.requests, hasLength(2));
+        expect(fakeGoTaskService.requests.last.resumeSession, isFalse);
+        await _waitForLastChatMessageText(
+          controller,
+          'new OpenClaw session delivered final artifacts',
         );
       },
     );
@@ -4355,6 +4439,21 @@ UiFeatureManifest _defaultDesktopManifest() {
   );
 }
 
+Future<void> _resilientDelete(Directory dir) async {
+  if (!await dir.exists()) {
+    return;
+  }
+  for (var attempt = 0; attempt < 8; attempt++) {
+    try {
+      await dir.delete(recursive: true);
+      return;
+    } catch (_) {
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    }
+  }
+  await dir.delete(recursive: true);
+}
+
 AppController _sandboxController({
   SecureConfigStore? store,
   RuntimeCoordinator? runtimeCoordinator,
@@ -4371,10 +4470,7 @@ AppController _sandboxController({
   final actualHome = homeDir ?? Directory.systemTemp.createTempSync('xworkmate-sandbox-home-').path;
   if (homeDir == null) {
     addTearDown(() async {
-      final dir = Directory(actualHome);
-      if (await dir.exists()) {
-        await dir.delete(recursive: true);
-      }
+      await _resilientDelete(Directory(actualHome));
     });
   }
   return AppController(
