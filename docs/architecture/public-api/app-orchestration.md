@@ -17,7 +17,7 @@
 | `lib/app/app_controller_desktop_navigation.dart` | 页面切换、settings/detail 导航、语言/主题切换 |
 | `lib/app/app_controller_desktop_settings.dart` | settings draft、保存、落盘与本地状态清理 |
 | `lib/app/app_controller_desktop_settings_runtime.dart` | settings 与 runtime 之间的副作用桥接 |
-| `lib/app/app_controller_desktop_thread_sessions.dart` | 会话/线程、artifact、多 agent 协作入口 |
+| `lib/app/app_controller_desktop_thread_sessions.dart` | 会话/线程、artifact、agent 协作入口 |
 | `lib/app/app_controller_desktop_workspace_execution.dart` | 执行目标、provider、thread context 主链 |
 | `lib/app/app_controller_desktop_runtime_coordination_impl.dart` | runtime 能力刷新与任务重算函数 |
 | `lib/app/workspace_page_registry.dart` | destination 到 page builder 的唯一映射 |
@@ -41,10 +41,8 @@
 | `initialBridgeProviderCatalog` | `List<SingleAgentProvider>?` | No | empty | 初始单 agent provider catalog |
 | `initialGatewayProviderCatalog` | `List<SingleAgentProvider>?` | No | empty | 初始 gateway provider catalog |
 | `initialAvailableExecutionTargets` | `List<AssistantExecutionTarget>?` | No | empty | 初始可见执行目标 |
-| `skillDirectoryAccessService` | `SkillDirectoryAccessService?` | No | platform factory | 技能目录授权能力 |
 | `accountClientFactory` | `AccountRuntimeClient Function(String)?` | No | default impl | account runtime client 构造 |
 | `environmentOverride` | `Map<String, String>?` | No | `null` | 测试/运行时环境覆盖 |
-| `singleAgentSharedSkillScanRootOverrides` | `List<String>?` | No | `null` | 共享 skill 扫描根覆写 |
 | `goTaskServiceClient` | `GoTaskServiceClient?` | No | `DesktopGoTaskService` | 外部 ACP / gateway 任务入口 |
 
 ### Returns
