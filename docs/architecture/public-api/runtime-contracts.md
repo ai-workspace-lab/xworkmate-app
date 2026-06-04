@@ -8,7 +8,7 @@
 - task request / routing request / provider catalog
 - settings 与 secret 持久化访问
 - gateway session / agent / chat 控制器
-- desktop 平台能力、skill 目录授权、多 agent mount
+- desktop 平台能力、skill 目录授权
 - Codex CLI 与 config bridge
 
 ## `GatewayAcpException`
@@ -37,14 +37,13 @@
 - Source: `lib/runtime/gateway_acp_client.dart`
 - Type: `class`
 - Responsibility:
-  保存 `acp.capabilities` 的解析结果，是 app 侧 single-agent / multi-agent / execution-target / provider catalog 的只读快照。
+  保存 `acp.capabilities` 的解析结果，是 app 侧 single-agent / execution-target / provider catalog 的只读快照。
 
 ### Constructor Parameters
 
 | Param | Type | Required | Meaning |
 | --- | --- | --- | --- |
 | `singleAgent` | `bool` | Yes | 是否支持单 agent |
-| `multiAgent` | `bool` | Yes | 是否支持多 agent |
 | `availableExecutionTargets` | `List<AssistantExecutionTarget>` | Yes | 当前 bridge 允许的执行目标 |
 | `providerCatalog` | `List<SingleAgentProvider>` | Yes | agent 侧 provider catalog |
 | `gatewayProviderCatalog` | `List<SingleAgentProvider>` | Yes | gateway 侧 provider catalog |
@@ -56,25 +55,6 @@
 | API | Returns | Meaning |
 | --- | --- | --- |
 | `GatewayAcpCapabilities.empty()` | `GatewayAcpCapabilities` | 空 capability 占位 |
-
-## `GatewayAcpMultiAgentRequest`
-
-- Source: `lib/runtime/gateway_acp_client.dart`
-- Type: `class`
-- Responsibility:
-  描述一次 multi-agent session.start / session.message 请求。
-
-### Constructor Parameters
-
-| Param | Type | Required | Meaning |
-| --- | --- | --- | --- |
-| `sessionId` | `String` | Yes | 协作会话 ID |
-| `threadId` | `String` | Yes | thread ID |
-| `prompt` | `String` | Yes | 主任务提示词 |
-| `workingDirectory` | `String` | Yes | 工作目录 |
-| `attachments` | `List<CollaborationAttachment>` | Yes | 本地文件附件 |
-| `selectedSkills` | `List<String>` | Yes | 显式选中的技能键 |
-| `resumeSession` | `bool` | Yes | `false` 时发 `session.start`，`true` 时发 `session.message` |
 
 ## `GatewayAcpClient`
 
@@ -95,19 +75,17 @@
 | Method | Parameters | Returns | Meaning |
 | --- | --- | --- | --- |
 | `loadCapabilities` | `{bool forceRefresh=false, Uri? endpointOverride, String authorizationOverride=''}` | `Future<GatewayAcpCapabilities>` | 拉取并缓存 15 秒 capability 快照 |
-| `runMultiAgent` | `GatewayAcpMultiAgentRequest request` | `Stream<MultiAgentRunEvent>` | 打开 ACP multi-agent 事件流 |
 
 ### Main Call Chain
 
 - `AppController.refreshAcpCapabilitiesRuntimeInternal` -> `loadCapabilities`
-- `GoRuntimeDispatchDesktopClient` / multi-agent flows -> `GatewayAcpClient`
+- `GoRuntimeDispatchDesktopClient` -> `GatewayAcpClient`
 - `GatewayAcpClient` -> ACP JSON-RPC -> bridge
 
 ### Side Effects
 
 - 网络请求
 - 本地 capability 缓存
-- 将 ACP 通知转换成 `MultiAgentRunEvent`
 
 ## `ExternalCodeAgentAcpCapabilities`
 
@@ -188,14 +166,11 @@
 | `provider` | `SingleAgentProvider` | No | 当前 provider |
 | `remoteWorkingDirectoryHint` | `String` | No | 远端工作目录 hint |
 | `resumeSession` | `bool` | No | 是否续跑 |
-| `collaborationMode` | `GoTaskServiceCollaborationMode` | No | standard / multiAgent |
-| `multiAgent` | `bool` | No | 是否强制多 agent |
 
 ### Returns
 
 | Getter / Method | Returns | Meaning |
 | --- | --- | --- |
-| `isMultiAgentRequest` | `bool` | 是否走多 agent route |
 | `route` | `GoTaskServiceRoute` | 计算出的实际 route |
 | `acpMode` | `String` | ACP session mode |
 | `routingExecutionTarget` | `String` | 发送给 routing 的目标值 |
