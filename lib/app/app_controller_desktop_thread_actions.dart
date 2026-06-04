@@ -1546,7 +1546,6 @@ extension AppControllerDesktopThreadActions on AppController {
         normalized == 'OPENCLAW_GATEWAY_QUEUE_FULL' ||
         normalized == 'OPENCLAW_AGENT_FAILED_BEFORE_REPLY' ||
         normalized == 'OPENCLAW_NO_DISPLAYABLE_OUTPUT' ||
-        normalized == 'OPENCLAW_REQUIRED_ARTIFACT_MISSING' ||
         normalized == 'OPENCLAW_NO_EXPORTED_ARTIFACTS' ||
         normalized == 'OPENCLAW_ARTIFACT_MISSING' ||
         normalized == 'ARTIFACT_MISSING') {

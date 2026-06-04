@@ -892,8 +892,7 @@ bool _inferGoTaskSuccess(Map<String, dynamic> result) {
       <String>['result', 'code'],
     ],
   ).toUpperCase();
-  if (code == 'OPENCLAW_REQUIRED_ARTIFACT_MISSING' ||
-      code == 'OPENCLAW_ARTIFACT_MISSING' ||
+  if (code == 'OPENCLAW_ARTIFACT_MISSING' ||
       code == 'OPENCLAW_NO_EXPORTED_ARTIFACTS' ||
       code == 'ARTIFACT_MISSING') {
     return false;
