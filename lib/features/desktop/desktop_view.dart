@@ -47,6 +47,7 @@ class _DesktopViewState extends State<DesktopView> {
 
   bool _useGpu = false;
   bool _showAdvancedOptions = false;
+  bool _showControlPanel = true;
   String _connectionState = 'disconnected';
   bool _hasStream = false;
   bool _isFocused = false;
@@ -166,12 +167,13 @@ class _DesktopViewState extends State<DesktopView> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // Control panel card
-          SurfaceCard(
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
+          if (_showControlPanel)
+            SurfaceCard(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
                   Wrap(
                     spacing: 16,
                     runSpacing: 16,
@@ -280,19 +282,25 @@ class _DesktopViewState extends State<DesktopView> {
                         ),
                         label: const Text('高级选项'),
                       ),
-                      // Maximize Toggle
-                      if (widget.onToggleMaximize != null)
-                        IconButton(
-                          onPressed: widget.onToggleMaximize,
-                          icon: Icon(
-                            widget.isMaximized
-                                ? Icons.fullscreen_exit_rounded
-                                : Icons.fullscreen_rounded,
+                        // Maximize Toggle
+                        if (widget.onToggleMaximize != null)
+                          IconButton(
+                            onPressed: widget.onToggleMaximize,
+                            icon: Icon(
+                              widget.isMaximized
+                                  ? Icons.fullscreen_exit_rounded
+                                  : Icons.fullscreen_rounded,
+                            ),
+                            tooltip: widget.isMaximized ? '恢复默认大小' : '最大化',
                           ),
-                          tooltip: widget.isMaximized ? '恢复默认大小' : '最大化',
+                        // Collapse Toggle
+                        IconButton(
+                          onPressed: () => setState(() => _showControlPanel = false),
+                          icon: const Icon(Icons.expand_less),
+                          tooltip: '折叠面板',
                         ),
-                    ],
-                  ),
+                      ],
+                    ),
                   if (_showAdvancedOptions) ...[
                     const SizedBox(height: 16),
                     Wrap(
@@ -373,7 +381,21 @@ class _DesktopViewState extends State<DesktopView> {
             ),
           ),
 
-          const SizedBox(height: 16),
+          if (!_showControlPanel)
+            Align(
+              alignment: Alignment.centerRight,
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 8.0),
+                child: FilledButton.tonalIcon(
+                  onPressed: () => setState(() => _showControlPanel = true),
+                  icon: const Icon(Icons.expand_more, size: 18),
+                  label: const Text('展开控制面板'),
+                ),
+              ),
+            ),
+
+          if (_showControlPanel)
+            const SizedBox(height: 16),
 
           // Stream Viewport Card
           Expanded(
