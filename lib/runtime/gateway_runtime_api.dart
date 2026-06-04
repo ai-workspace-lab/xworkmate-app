@@ -203,18 +203,34 @@ extension GatewayRuntimeApiInternal on GatewayRuntime {
       if (agentId != null && agentId.trim().isNotEmpty)
         'agentId': agentId.trim(),
     };
+    if (sessionClientInternal == null) {
+      throw GatewayRuntimeException(
+        'skills.status requires bridge session (ACP transport)',
+        code: 'BRIDGE_NOT_CONFIGURED',
+      );
+    }
     final payload = asMap(
-      sessionClientInternal == null
-          ? await request('skills.status', params: params)
-          : await sessionClientInternal!.request(
-              runtimeId: runtimeIdInternal,
-              method: 'skills.status',
-              params: params,
-              allowErrorPayload: true,
-            ),
+      await sessionClientInternal!.request(
+        runtimeId: runtimeIdInternal,
+        method: 'skills.status',
+        params: params,
+        allowErrorPayload: true,
+      ),
     );
-    final statusPayload = skillsStatusPayloadInternal(payload);
-    return asList(statusPayload['skills'])
+    final skillsList = asList(payload['skills']);
+    // When allowErrorPayload returns the payload from an ok:false envelope,
+    // the error info is in the payload itself rather than thrown as an exception.
+    if (skillsList.isEmpty) {
+      final errorMsg =
+          stringValue(payload['error']) ?? stringValue(payload['message']);
+      if (errorMsg != null && errorMsg.isNotEmpty) {
+        throw GatewayRuntimeException(
+          'Failed to load skills: $errorMsg',
+          code: 'SKILLS_STATUS_ERROR',
+        );
+      }
+    }
+    return skillsList
         .map((item) {
           final map = asMap(item);
           return GatewaySkillSummary(
@@ -559,24 +575,6 @@ extension GatewayRuntimeApiInternal on GatewayRuntime {
     );
     return result.payload;
   }
-}
-
-Map<String, dynamic> skillsStatusPayloadInternal(Map<String, dynamic> payload) {
-  if (asList(payload['skills']).isNotEmpty) {
-    return payload;
-  }
-  for (final key in const <String>[
-    'status',
-    'skillStatus',
-    'data',
-    'payload',
-  ]) {
-    final nested = asMap(payload[key]);
-    if (asList(nested['skills']).isNotEmpty) {
-      return nested;
-    }
-  }
-  return payload;
 }
 
 List<String> skillMissingListInternal(
