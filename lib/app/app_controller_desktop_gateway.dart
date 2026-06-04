@@ -232,9 +232,17 @@ extension AppControllerDesktopGateway on AppController {
     await refreshGatewayHealth();
     await refreshAgents();
     await refreshSessions();
-    await modelsControllerInternal.refresh();
-    await cronJobsControllerInternal.refresh();
-    await devicesControllerInternal.refresh(quiet: true);
+    // Refresh independent controllers concurrently.
+    await Future.wait(<Future<void>>[
+      skillsControllerInternal.refresh(
+        agentId: agentsControllerInternal.selectedAgentId.isEmpty
+            ? null
+            : agentsControllerInternal.selectedAgentId,
+      ),
+      modelsControllerInternal.refresh(),
+      cronJobsControllerInternal.refresh(),
+      devicesControllerInternal.refresh(quiet: true),
+    ]);
     await settingsControllerInternal.refreshDerivedState();
     try {
       await refreshAcpCapabilitiesInternal(
