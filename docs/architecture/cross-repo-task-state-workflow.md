@@ -1,188 +1,262 @@
-# Cross-Repo Task State Workflow
+# Cross-Repo TaskThread Workflow
 
-This document records the task-state workflow across:
+This document is the current TaskThread workflow record across:
 
 - `xworkmate-app`
 - `xworkmate-bridge`
 - `openclaw-multi-session-plugins`
 
-The core ownership split is:
+It replaces older local-classification and app-side artifact fallback descriptions. The current rule is:
 
-- `xworkmate-app` owns task UI state, `TaskThread` persistence, local thread workspaces, and the OpenClaw submit queue.
-- `xworkmate-bridge` owns public session/routing contracts, provider compatibility, normalized results, and OpenClaw task-submit routing.
-- `openclaw-multi-session-plugins` owns OpenClaw task-scoped artifact preparation, export, and artifact-scope isolation.
+> The app owns TaskThread state and local sync. The bridge/OpenClaw terminal task snapshot is the truth source for final artifacts.
 
-## Overall Flow
+## Ownership
+
+### xworkmate-app
+
+The app owns local state and UI only:
+
+- Resolve or create the current `TaskThread` by `sessionKey` / `threadId`.
+- Ensure the local workspace at `$HOME/.xworkmate/threads/<session>`.
+- Build the external `TaskThread workspace context` prompt prefix.
+- Send `metadata.xworkmateTaskArtifactContract`.
+- Queue OpenClaw gateway work locally when the constrained OpenClaw lane is busy.
+- Apply normalized bridge results to `TaskThread.lifecycleState`.
+- Sync bridge-provided artifacts into the local TaskThread workspace.
+
+The app must not infer required final file types from user text. It must not treat partial artifacts as final deliverables.
+
+### xworkmate-bridge
+
+The bridge owns the public protocol boundary:
+
+- Expose the unified `/acp/rpc` entrypoint.
+- Resolve routing for agent providers and gateway/OpenClaw.
+- Normalize provider/OpenClaw results into a stable result shape.
+- Stream `session.update` events.
+- Serve `xworkmate.tasks.get` snapshots for asynchronous recovery and terminal result lookup.
+- Serve `xworkmate.tasks.cancel` for OpenClaw task cancellation.
+
+The bridge should return standard contract fields such as `artifacts`, `artifacts.items`, `files`, or `attachments`. App-side support for ad hoc final-artifact field names is not a compatibility layer.
+
+### openclaw-multi-session-plugins
+
+OpenClaw plugins own execution-time artifact scope:
+
+- Create a run.
+- Allocate `runId`.
+- Prepare `artifactScope = tasks/<session>/<run>`.
+- Execute the user task.
+- Export real final deliverables into the current task artifact scope.
+- Validate that artifact scope matches the current session and run.
+- Return artifact refs/files to the bridge.
+
+Text-only file claims, placeholder files, global workspace files, previous-run files, and partial/intermediate artifacts are not final deliverables.
+
+## Main Flow
 
 ```mermaid
-flowchart LR
-  U["User input / follow-up"] --> APP["xworkmate-app<br/>TaskThread + UI state"]
-  APP -->|session.start / session.message| BR["xworkmate-bridge<br/>/acp/rpc"]
-  BR -->|xworkmate.routing.resolve| ROUTE{"Execution target"}
-  ROUTE -->|single-agent| AG["codex / opencode / gemini / hermes"]
-  ROUTE -->|gateway=openclaw| OC["OpenClaw Gateway Runtime"]
-  OC --> PLUG["openclaw-multi-session-plugins<br/>task-scoped artifacts"]
-  PLUG -->|artifactRef / files / downloadUrl| BR
-  BR -->|normalized result / SSE update| APP
-  APP -->|write files| LOCAL["$HOME/.xworkmate/threads/<session>"]
-  APP -->|persist index| STORE["~/Library/Application Support/xworkmate/tasks/threads.json"]
+flowchart TD
+  U["User input / follow-up"] --> UI["Assistant UI"]
+  UI --> APP["AppController / TaskThread"]
+
+  APP --> T0{"Current TaskThread exists?"}
+  T0 -->|No| T1["Create draft TaskThread<br/>sessionKey / threadId"]
+  T0 -->|Yes| T2["Load current TaskThread"]
+  T1 --> W["Prepare local workspace<br/>$HOME/.xworkmate/threads/<session>"]
+  T2 --> W
+
+  W --> C["Build external task context<br/>TaskThread workspace context"]
+  C --> M["Attach metadata<br/>xworkmateTaskArtifactContract"]
+
+  M --> R{"Execution target"}
+  R -->|Agent: codex / opencode / gemini / hermes| B1["bridge /acp/rpc<br/>session.start or session.message"]
+  R -->|Gateway: OpenClaw| Q{"OpenClaw local lane idle?"}
+
+  Q -->|Idle| B2["bridge /acp/rpc<br/>session.start or session.message"]
+  Q -->|Busy| Q1["Local OpenClaw queue<br/>lifecycleStatus=queued"]
+  Q1 --> Q2["drainOpenClawGatewayQueue"]
+  Q2 --> B2
+
+  B1 --> BR["xworkmate-bridge<br/>routing + protocol normalization"]
+  B2 --> BR
+
+  BR --> P{"Provider / runtime"}
+  P -->|Agent provider| A["Codex / Opencode / Gemini / Hermes"]
+  P -->|OpenClaw| O["OpenClaw runtime"]
+  O --> OS["OpenClaw task artifact scope<br/>tasks/<session>/<run>"]
+
+  A --> N["Bridge normalized result"]
+  OS --> N
+
+  N --> S{"Return path"}
+  S -->|Final response| APP2["APP applyGatewayChatResult"]
+  S -->|SSE update| SSE["APP receives session.update"]
+  S -->|SSE closed / no final envelope| POLL["Transport calls xworkmate.tasks.get<br/>until terminal snapshot"]
+
+  SSE --> H{"Running task handle?"}
+  H -->|Yes| POLL
+  H -->|No| APP2
+  POLL --> APP2
+
+  APP2 --> OK{"success=true and artifacts present?"}
+  OK -->|Yes| SYNC["Sync artifacts to local TaskThread workspace"]
+  OK -->|No, failure| FAIL["Record lastResultCode<br/>lastArtifactSyncStatus=failed"]
+  OK -->|No exported artifacts guard| NOART["lastArtifactSyncStatus=no-exported-artifacts"]
+
+  SYNC --> READY["TaskThread ready"]
+  FAIL --> READY
+  NOART --> READY
 ```
 
-## App TaskThread State Machine
+## TaskThread State Machine
 
-`TaskThread.lifecycleState.status` is intentionally small. Most terminal outcomes return to `ready`; the specific terminal result is stored in `lastResultCode`.
+`TaskThread.lifecycleState.status` is intentionally small. Most terminal outcomes return to `ready`; result detail is stored in `lastResultCode`.
 
 ```mermaid
 stateDiagram-v2
-  [*] --> Ready: create task / restore persisted task
+  [*] --> Ready: create / restore TaskThread
 
-  Ready --> Queued: OpenClaw gateway active slot is full
+  Ready --> Running: sendChatMessage
+  Ready --> Queued: OpenClaw lane busy
   Queued --> Running: drainOpenClawGatewayQueue
-  Queued --> Ready: abortRun\nlastResultCode=aborted
-  Queued --> Ready: queue full\nlastResultCode=OPENCLAW_GATEWAY_QUEUE_FULL
+  Queued --> Ready: abort / queue full
 
-  Ready --> Running: sendChatMessage\nmarkGatewayChatRun
-  Running --> Ready: GoTaskServiceResult.success=true\nlastResultCode=success
-  Running --> Ready: result.status / result.code\nlastResultCode=<status|code>
-  Running --> Ready: no displayable output\nlastResultCode=failed
-  Running --> Ready: ACP interrupted / timeout\nlastResultCode=ACP_*
-  Running --> Ready: abortRun\nlastResultCode=aborted
+  Running --> Running: SSE delta / session.update
+  Running --> Running: OpenClaw running handle
+  Running --> Running: xworkmate.tasks.get polling
+
+  Running --> Ready: success
+  Running --> Ready: failed / artifact_missing
+  Running --> Ready: ACP_HTTP_* / unrecovered SSE interruption
+  Running --> Ready: abort
 
   Ready --> Archived: user archives task
   Archived --> Ready: user restores task
 
   note right of Ready
-    lifecycleStatus terminal state is usually ready.
-    Read lastResultCode for result detail:
-    success / failed / error / aborted /
-    artifact_missing / ACP_HTTP_*
+    lifecycleStatus=ready does not mean success.
+    Read lastResultCode for terminal detail:
+    success / failed / aborted /
+    artifact_missing / ACP_HTTP_* /
+    OPENCLAW_REQUIRED_ARTIFACT_MISSING.
+  end note
+
+  note right of Running
+    Running does not mean final files exist.
+    An OpenClaw running handle is only an async task handle.
+    The transport must continue polling the bridge task snapshot.
   end note
 ```
 
-## Task Workspace Context Injection
-
-Every app-owned task has a local workspace under `$HOME/.xworkmate/threads/<session>`. For remote execution, the bridge/runtime may also resolve a remote task workspace hint. The app passes the task workspace in two ways:
-
-- Structured request fields: `workingDirectory` and, when available, `remoteWorkingDirectoryHint`.
-- External conversation context: a `TaskThread workspace context` prefix is added to the prompt sent to Bridge/OpenClaw.
-
-The local chat transcript still stores the user's original text. Only the external task prompt is enriched, so the UI does not show internal workspace rules as user content.
-
-```mermaid
-sequenceDiagram
-  participant UI as "XWorkmate UI"
-  participant APP as "TaskThread runtime"
-  participant BR as "Bridge session"
-  participant OC as "OpenClaw / provider"
-  participant WS as "Task workspace"
-
-  UI->>APP: "user message"
-  APP->>WS: "ensure $HOME/.xworkmate/threads/<session>"
-  APP->>APP: "build TaskThread workspace context"
-  APP->>BR: "taskPrompt + workingDirectory + remoteWorkingDirectoryHint"
-  BR->>OC: "session.start / session.message"
-  OC->>WS: "final files must be exported into task scope"
-  BR-->>APP: "result + artifact refs"
-  APP->>WS: "sync inline/downloaded artifacts"
-```
-
-Prompt-level workspace rules are deliberately strict. `remoteWorkingDirectoryHint` is the writable task workspace for remote OpenClaw/provider execution when present; otherwise `workingDirectory` is used.
-
-- Treat the current task workspace as the only writable workspace for the task execution.
-- Create, modify, and export task files inside that workspace or its task artifact scope.
-- Do not use global OpenClaw media/cache paths, `/tmp`, Downloads, Desktop, or other arbitrary directories as final deliverable locations.
-- If a tool creates output outside the task workspace, copy/export the final deliverables into the task workspace before claiming completion.
-- Prefer local task-workspace paths, or paths relative to that workspace, when reporting files back to the user.
-
-## OpenClaw Gateway Queue
-
-The app serializes OpenClaw gateway execution locally because OpenClaw task execution is treated as a constrained gateway lane.
-
-```mermaid
-flowchart TD
-  A["APP selects Gateway + OpenClaw"] --> B{"active < 1 ?"}
-  B -->|yes| C["Run immediately<br/>lifecycleStatus=running"]
-  B -->|no| D{"queue < 20 ?"}
-  D -->|yes| E["Enqueue<br/>lifecycleStatus=queued<br/>lastArtifactSyncStatus=queued"]
-  D -->|no| F["Queue full<br/>lastResultCode=OPENCLAW_GATEWAY_QUEUE_FULL"]
-
-  E --> G["drain queue"]
-  G --> C
-  C --> H["Bridge /acp/rpc<br/>routing=gateway/openclaw"]
-  H --> I["OpenClaw execution"]
-  I --> J{"Result"}
-  J -->|success + output/files| K["APP ready<br/>lastResultCode=success<br/>sync artifacts"]
-  J -->|artifact guard| L["APP ready<br/>lastResultCode=artifact_missing"]
-  J -->|failure/interruption| M["APP ready<br/>lastResultCode=failed/error/ACP_*"]
-```
-
-## Bridge Session And Routing Workflow
-
-The bridge exposes one public session contract while keeping provider-specific behavior behind bridge-owned routing. OpenClaw task submit uses `/acp/rpc` with explicit gateway routing metadata, not a separate app-facing path.
-
-```mermaid
-flowchart TD
-  REQ["APP request"] --> EP{"HTTP / WS entry"}
-  EP -->|/acp or /acp/rpc| RPC["General JSON-RPC"]
-
-  RPC --> METHOD{"method"}
-  METHOD -->|acp.capabilities| CAP["Return agent providers + gatewayProviders=openclaw"]
-  METHOD -->|xworkmate.routing.resolve| ROUTE["Resolve single-agent / gateway"]
-  METHOD -->|session.start| START["Create / start session turn"]
-  METHOD -->|session.message| MSG["Continue existing session"]
-  METHOD -->|session.cancel / session.close| CTRL["Cancel / close session"]
-
-  START --> ORCH["session_orchestrator"]
-  MSG --> ORCH
-  ORCH --> PROVIDER{"provider compat"}
-  PROVIDER -->|single-agent| SA["codex / opencode / gemini / hermes"]
-  PROVIDER -->|gateway| OCG["OpenClaw runtime"]
-
-  SA --> NORM["normalized result"]
-  OCG --> NORM
-  NORM --> OUT["success / status / turnId / output / artifacts / resolved*"]
-```
-
-## OpenClaw Plugin Artifact Scope
-
-OpenClaw artifacts are scoped by task session and run. This prevents one task or turn from borrowing files from another.
-
-```mermaid
-flowchart TD
-  CTX["OpenClaw plugin context<br/>sessionKey + runId + workspaceDir"] --> PREP["prepareXWorkmateArtifacts"]
-  PREP --> SCOPE["artifactScope = tasks/<sessionKey>/<runId>"]
-  SCOPE --> DIR["artifactDirectory"]
-  DIR --> RUN["OpenClaw writes files"]
-  RUN --> EXPORT["exportXWorkmateArtifacts"]
-  EXPORT --> VALIDATE{"scope matches sessionKey/runId ?"}
-  VALIDATE -->|no| ERR["Reject cross-task / cross-run artifact"]
-  VALIDATE -->|yes| MANIFEST["manifest + artifactRef + files"]
-  MANIFEST --> BR["Bridge result"]
-  BR --> APP["APP downloads or inlines into local thread workspace"]
-
-  note right of SCOPE
-    Concurrent task isolation is based on:
-    tasks/<session>/<run>
-    Do not reuse other sessions or previous run files.
-  end note
-```
-
-## Status Field Mapping
+## State Field Relationship
 
 ```mermaid
 flowchart LR
-  APP1["APP TaskThread.lifecycleState.status"] --> A1["queued / running / ready / archived"]
-  APP2["APP TaskThread.lifecycleState.lastResultCode"] --> A2["queued / running / success / failed / error / aborted / artifact_missing / ACP_HTTP_*"]
-  APP3["APP lastArtifactSyncStatus"] --> A3["queued / running / synced / no-artifacts / failed"]
-  BR1["Bridge result.status"] --> B1["available / success / failed / provider status"]
-  BR2["Bridge result.success"] --> B2["true / false"]
-  PL1["Plugin artifact export"] --> P1["scopeKind=task<br/>artifactScope=tasks/session/run"]
+  LS["TaskThread.lifecycleStatus"] --> LS2["ready / queued / running / archived"]
+  RC["TaskThread.lastResultCode"] --> RC2["success / failed / aborted / artifact_missing / ACP_HTTP_* / OPENCLAW_*"]
+  AS["TaskThread.lastArtifactSyncStatus"] --> AS2["queued / running / syncing / synced / partial / failed / no-artifacts / no-exported-artifacts"]
+  AP["TaskThread.lastTaskArtifactRelativePaths"] --> AP2["Only files synced from the current run"]
+```
+
+Rules:
+
+- `lifecycleStatus=ready` only means no task is currently running.
+- Success or failure is read from `lastResultCode`.
+- The artifact panel reads `lastArtifactSyncStatus` and `lastTaskArtifactRelativePaths`.
+- `lastTaskArtifactRelativePaths` must only contain artifacts from the current run.
+
+## App Request Contract
+
+App requests to bridge use the unified ACP entrypoint. OpenClaw is selected with routing metadata, not with an app-facing OpenClaw URL.
+
+The app sends:
+
+- `sessionId`
+- `threadId`
+- `prompt`
+- `workingDirectory`
+- `remoteWorkingDirectoryHint`
+- `routing`
+- `metadata.xworkmateTaskArtifactContract`
+
+For Gateway/OpenClaw, the app injects `currentTaskWorkspace` into both prompt context and metadata. The remote runtime must export final files into the current task artifact scope before returning success.
+
+The prompt context contains:
+
+- `sessionKey`
+- local workspace
+- remote workspace hint when available
+- current task workspace
+- workspace isolation rules
+- final artifact contract rules
+
+The local transcript stores the user's original text. Internal workspace context is only sent to the external task runtime.
+
+## Bridge / OpenClaw Async Contract
+
+The transport handles these bridge methods:
+
+- `session.start`: start a new turn.
+- `session.message`: continue an existing TaskThread.
+- `xworkmate.tasks.get`: recover or query terminal task snapshot.
+- `xworkmate.tasks.cancel`: cancel a running OpenClaw task.
+
+Important recovery rule:
+
+> A running OpenClaw task handle is never a final result.
+
+When `session.update` contains `status=running` with `runId` and `artifactScope`, the app transport must use those fields only as query parameters for `xworkmate.tasks.get`. It must continue polling until the bridge returns a terminal snapshot:
+
+- `completed` with artifacts -> success path.
+- `failed`, `artifact_missing`, `cancelled`, or `canceled` -> failure path.
+- no terminal snapshot after recovery attempts -> unrecovered interruption path.
+
+## Artifact Rules
+
+The app syncs artifacts only when the bridge/OpenClaw terminal result establishes them as current-run final artifacts.
+
+Valid success:
+
+- `success=true`
+- terminal bridge/OpenClaw snapshot
+- standard artifact contract fields are present
+- artifact scope belongs to the current session and run
+
+Failure / no-sync cases:
+
+- `success=false` with partial artifacts
+- `OPENCLAW_REQUIRED_ARTIFACT_MISSING`
+- `artifact_missing`
+- `no-exported-artifacts`
+- text-only file/path claims
+- files from previous runs
+- files from global OpenClaw workspace/cache
+- placeholder artifacts generated by a guard
+
+`openclaw returned partial artifacts without required final deliverables` means the remote artifact contract was not satisfied. It is not an app-side UI classification failure.
+
+## OpenClaw Artifact Scope
+
+```mermaid
+flowchart TD
+  CTX["OpenClaw context<br/>sessionKey + runId + workspaceDir"] --> PREP["prepareXWorkmateArtifacts"]
+  PREP --> SCOPE["artifactScope = tasks/<session>/<run>"]
+  SCOPE --> DIR["artifactDirectory"]
+  DIR --> RUN["OpenClaw writes files"]
+  RUN --> EXPORT["exportXWorkmateArtifacts"]
+  EXPORT --> VALIDATE{"scope matches session/run?"}
+  VALIDATE -->|No| ERR["Reject cross-session / cross-run artifact"]
+  VALIDATE -->|Yes| MANIFEST["manifest + artifact refs/files"]
+  MANIFEST --> BR["Bridge terminal snapshot"]
+  BR --> APP["App syncs current-run artifacts"]
 ```
 
 ## Boundary Rules
 
-- The app does not store OpenClaw URLs. It only consumes bridge capabilities where `gatewayProviders` includes `openclaw`.
-- OpenClaw `session.start` and `session.message` use `/acp/rpc` with explicit OpenClaw gateway routing metadata; `/gateway/openclaw` is not an app-facing endpoint.
-- Follow-up conversation uses the same `sessionKey` / `threadId`. Bridge `session.message` must continue the provider session state or return a structured continuation error.
-- Artifact ownership is enforced by `openclaw-multi-session-plugins` with `tasks/<session>/<run>` scope. The app syncs only the current run's artifacts into the local thread workspace.
-- Upgrade/install flows must preserve real local history. Cleanup must only remove explicitly known test-pollution session keys.
+- The app does not store or construct OpenClaw runtime URLs.
+- OpenClaw `session.start` and `session.message` use `/acp/rpc` with explicit routing metadata.
+- `/gateway/openclaw` and provider-specific paths are not app-facing paths.
+- The bridge/OpenClaw terminal task snapshot is the final artifact truth source.
+- App local workspace contents are not used to decide whether a remote run produced final deliverables.
+- Compatibility/fallback fields for final artifacts are not allowed unless an explicit bridge contract requires them.
