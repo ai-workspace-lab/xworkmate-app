@@ -1954,7 +1954,7 @@ void main() {
     );
 
     test(
-      'sendChatMessage keeps partial OpenClaw artifacts on terminal artifact failure',
+      'sendChatMessage rejects partial OpenClaw artifacts on terminal artifact failure',
       () async {
         final fakeGoTaskService = _RecordingGoTaskServiceClient()
           ..outcomes.add(
@@ -1995,10 +1995,8 @@ void main() {
           failedThread?.lifecycleState.lastResultCode,
           'OPENCLAW_REQUIRED_ARTIFACT_MISSING',
         );
-        expect(failedThread?.lastArtifactSyncStatus, 'synced');
-        expect(failedThread?.lastTaskArtifactRelativePaths, <String>[
-          'stages/chapter.md',
-        ]);
+        expect(failedThread?.lastArtifactSyncStatus, 'failed');
+        expect(failedThread?.lastTaskArtifactRelativePaths, isEmpty);
       },
     );
 
