@@ -13,7 +13,6 @@ import '../i18n/app_language.dart';
 import '../models/app_models.dart';
 import '../runtime/device_identity_store.dart';
 
-import '../runtime/go_core.dart';
 import '../runtime/runtime_bootstrap.dart';
 import '../runtime/desktop_platform_service.dart';
 import '../runtime/gateway_runtime.dart';
@@ -97,10 +96,14 @@ extension AppControllerDesktopThreadActions on AppController {
     }
     try {
       await runtimeInternal.health();
-    } catch (_) {}
+    } catch (error) {
+      debugPrint('Gateway health refresh failed: $error');
+    }
     try {
       await runtimeInternal.status();
-    } catch (_) {}
+    } catch (error) {
+      debugPrint('Gateway status refresh failed: $error');
+    }
     notifyListeners();
   }
 
@@ -465,11 +468,19 @@ extension AppControllerDesktopThreadActions on AppController {
     final capturedLocalAttachments = List<CollaborationAttachment>.unmodifiable(
       localAttachments,
     );
-    final taskMetadata = Map<String, dynamic>.unmodifiable(dispatch.metadata);
     final executionWorkingDirectory = gatewayExecutionWorkingDirectoryInternal(
       target: currentTarget,
       workingDirectory: workingDirectory,
       remoteWorkingDirectoryHint: remoteWorkingDirectoryHint,
+    );
+    final taskMetadata = Map<String, dynamic>.unmodifiable(
+      gatewayTaskMetadataWithArtifactContractInternal(
+        baseMetadata: dispatch.metadata,
+        sessionKey: normalizedSessionKey,
+        localWorkingDirectory: workingDirectory,
+        executionWorkingDirectory: executionWorkingDirectory,
+        remoteWorkingDirectoryHint: remoteWorkingDirectoryHint,
+      ),
     );
     if (usesOpenClawGatewayQueueInternal(currentTarget, provider)) {
       await enqueueOpenClawGatewayTurnInternal(
@@ -924,10 +935,55 @@ extension AppControllerDesktopThreadActions on AppController {
         '7. Files listed in taskInputAttachments already belong to this TaskThread; reuse them from the task context and do not ask the user to upload them again.',
       )
       ..writeln();
+    if (target.isGateway) {
+      buffer
+        ..writeln('XWorkmate task artifact contract:')
+        ..writeln(
+          '- The remote runtime owns final-deliverable detection; do not rely on local task classification.',
+        )
+        ..writeln(
+          '- If this request needs files, export the final deliverables through the current XWorkmate task artifact scope before final response.',
+        )
+        ..writeln(
+          '- A textual download/path claim is not a deliverable unless the file has been exported into the current task artifact scope.',
+        )
+        ..writeln(
+          '- Do not reuse artifacts from previous sessions, previous runs, or global OpenClaw workspaces.',
+        )
+        ..writeln();
+    }
     buffer
       ..writeln('User request:')
       ..write(requestText);
     return buffer.toString();
+  }
+
+  Map<String, dynamic> gatewayTaskMetadataWithArtifactContractInternal({
+    required Map<String, dynamic> baseMetadata,
+    required String sessionKey,
+    required String localWorkingDirectory,
+    required String executionWorkingDirectory,
+    required String remoteWorkingDirectoryHint,
+  }) {
+    final localWorkspace = localWorkingDirectory.trim();
+    final executionWorkspace = executionWorkingDirectory.trim();
+    final remoteHint = remoteWorkingDirectoryHint.trim();
+    return <String, dynamic>{
+      ...baseMetadata,
+      'xworkmateTaskArtifactContract': <String, dynamic>{
+        'version': 1,
+        'sessionKey': sessionKey,
+        'scopeKind': 'task',
+        'finalDeliverableDetection': 'remote-runtime',
+        'requiresExportBeforeFinalResponse': true,
+        'rejectTextOnlyFileClaims': true,
+        'currentTaskWorkspace': executionWorkspace.isNotEmpty
+            ? executionWorkspace
+            : (remoteHint.isNotEmpty ? remoteHint : localWorkspace),
+        if (localWorkspace.isNotEmpty) 'localWorkspace': localWorkspace,
+        if (remoteHint.isNotEmpty) 'remoteWorkspaceHint': remoteHint,
+      },
+    };
   }
 
   bool usesOpenClawGatewayQueueInternal(

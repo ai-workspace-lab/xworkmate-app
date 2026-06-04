@@ -1,6 +1,104 @@
+import 'dart:typed_data';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:xworkmate/features/desktop/desktop_client.dart';
+
+class FakeMediaStream extends MediaStream {
+  FakeMediaStream(String id) : super(id, 'test');
+
+  final List<MediaStreamTrack> tracks = [];
+  final List<bool> addToNativeValues = [];
+
+  @override
+  bool? get active => true;
+
+  @override
+  Future<void> addTrack(
+    MediaStreamTrack track, {
+    bool addToNative = true,
+  }) async {
+    tracks.add(track);
+    addToNativeValues.add(addToNative);
+  }
+
+  @override
+  Future<void> getMediaTracks() async {}
+
+  @override
+  List<MediaStreamTrack> getAudioTracks() =>
+      tracks.where((track) => track.kind == 'audio').toList();
+
+  @override
+  MediaStreamTrack? getTrackById(String trackId) {
+    for (final track in tracks) {
+      if (track.id == trackId) {
+        return track;
+      }
+    }
+    return null;
+  }
+
+  @override
+  List<MediaStreamTrack> getTracks() => List.unmodifiable(tracks);
+
+  @override
+  List<MediaStreamTrack> getVideoTracks() =>
+      tracks.where((track) => track.kind == 'video').toList();
+
+  @override
+  Future<void> removeTrack(
+    MediaStreamTrack track, {
+    bool removeFromNative = true,
+  }) async {
+    tracks.remove(track);
+  }
+}
+
+class FakeMediaStreamTrack extends MediaStreamTrack {
+  FakeMediaStreamTrack({required this.trackId, required this.trackKind});
+
+  final String trackId;
+  final String trackKind;
+  bool _enabled = true;
+
+  @override
+  Future<ByteBuffer> captureFrame() {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<void> dispose() async {}
+
+  @override
+  bool get enabled => _enabled;
+
+  @override
+  set enabled(bool b) {
+    _enabled = b;
+  }
+
+  @override
+  Future<bool> hasTorch() async => false;
+
+  @override
+  String? get id => trackId;
+
+  @override
+  String? get kind => trackKind;
+
+  @override
+  String? get label => trackKind;
+
+  @override
+  bool? get muted => false;
+
+  @override
+  Future<void> setTorch(bool torch) async {}
+
+  @override
+  Future<void> stop() async {}
+}
 
 void main() {
   group('DesktopClient protocol helpers', () {
@@ -41,6 +139,63 @@ void main() {
       expect(params['useGpu'], isA<bool>());
       expect(params['width'], 1280);
       expect(params['height'], 720);
+    });
+
+    test('uses bridge-provided remote stream when present', () async {
+      var fallbackCreated = false;
+      final providedStream = FakeMediaStream('provided-stream');
+      final track = FakeMediaStreamTrack(
+        trackId: 'video-track-1',
+        trackKind: 'video',
+      );
+
+      final stream = await desktopRemoteVideoStreamForTrack(
+        RTCTrackEvent(streams: [providedStream], track: track),
+        createFallbackStream: (label) async {
+          fallbackCreated = true;
+          return FakeMediaStream(label);
+        },
+      );
+
+      expect(stream, same(providedStream));
+      expect(fallbackCreated, isFalse);
+      expect(providedStream.tracks, isEmpty);
+    });
+
+    test('synthesizes stream for streamless remote video track', () async {
+      final track = FakeMediaStreamTrack(
+        trackId: 'video-track-1',
+        trackKind: 'video',
+      );
+      final fallbackStream = FakeMediaStream('fallback-stream');
+
+      final stream = await desktopRemoteVideoStreamForTrack(
+        RTCTrackEvent(streams: const [], track: track),
+        createFallbackStream: (label) async => fallbackStream,
+      );
+
+      expect(stream, same(fallbackStream));
+      expect(fallbackStream.tracks, [same(track)]);
+      expect(fallbackStream.addToNativeValues, [isFalse]);
+    });
+
+    test('ignores streamless non-video tracks', () async {
+      var fallbackCreated = false;
+      final track = FakeMediaStreamTrack(
+        trackId: 'audio-track-1',
+        trackKind: 'audio',
+      );
+
+      final stream = await desktopRemoteVideoStreamForTrack(
+        RTCTrackEvent(streams: const [], track: track),
+        createFallbackStream: (label) async {
+          fallbackCreated = true;
+          return FakeMediaStream(label);
+        },
+      );
+
+      expect(stream, isNull);
+      expect(fallbackCreated, isFalse);
     });
   });
 }
