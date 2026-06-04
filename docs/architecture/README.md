@@ -17,7 +17,7 @@
 - [任务控制面统一主线](./task-control-plane-unification.md)
 - [任务线程 Session Key 隔离（2026-03-29）](./task-thread-session-key-isolation-20260329.md)
 - [Task Dialog Provider 选择主线](./task-dialog-provider-selection-mainline.md)
-- [跨仓库任务状态工作流](./cross-repo-task-state-workflow.md)
+- [TaskThread 跨仓库主流程与状态图](./cross-repo-task-state-workflow.md)
 
 ## 设置与配置
 
