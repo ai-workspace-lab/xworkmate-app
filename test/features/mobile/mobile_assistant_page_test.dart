@@ -105,7 +105,7 @@ void main() {
     ) async {
       final controller = AppController(
         environmentOverride: const <String, String>{},
-        uiFeatureManifest: _manifestWithDesktopMultiAgentEnabled(),
+        uiFeatureManifest: _defaultDesktopManifest(),
         initialBridgeProviderCatalog: const <SingleAgentProvider>[
           SingleAgentProvider.codex,
         ],
@@ -248,18 +248,8 @@ Widget _buildTestApp({
   );
 }
 
-UiFeatureManifest _manifestWithDesktopMultiAgentEnabled() {
+UiFeatureManifest _defaultDesktopManifest() {
   return UiFeatureManifest.fromYamlString(
     File(UiFeatureManifest.assetPath).readAsStringSync(),
-  ).copyWithFeature(
-    platform: UiFeaturePlatform.desktop,
-    module: 'assistant',
-    feature: 'multi_agent',
-    enabled: true,
-    buildModes: const <UiFeatureBuildMode>{
-      UiFeatureBuildMode.debug,
-      UiFeatureBuildMode.profile,
-      UiFeatureBuildMode.release,
-    },
   );
 }

@@ -184,49 +184,6 @@
 | `copyWith(...)` | `AiGatewayProfile` | 更新 profile |
 | `toJson()` / `fromJson(...)` | contract mapping | 序列化 / 恢复 |
 
-## `MultiAgentConfig`
-
-- Source: `lib/runtime/runtime_models_multi_agent.dart`
-- Type: `class`
-- Responsibility:
-  描述 native / ARIS 多 agent 协作的总配置，包括角色 worker、迭代次数、超时、AI gateway 注入策略、managed skills/MCP/mount targets。
-
-### Constructor Parameters
-
-| Param Group | Meaning |
-| --- | --- |
-| enable/framework | `enabled`, `autoSync`, `framework`, `arisEnabled`, `arisMode`, `arisBundleVersion`, `arisCompatStatus` |
-| worker roles | `architect`, `engineer`, `tester` |
-| execution policy | `ollamaEndpoint`, `maxIterations`, `minAcceptableScore`, `timeoutSeconds`, `aiGatewayInjectionPolicy` |
-| managed assets | `managedSkills`, `managedMcpServers`, `mountTargets` |
-
-### Key Returns
-
-| API / Getter | Returns | Meaning |
-| --- | --- | --- |
-| `defaults()` | `MultiAgentConfig` | 默认协作配置 |
-| `architectEnabled` / `architectTool` / `architectModel` | primitive | Architect 快捷访问 |
-| `engineerTool` / `engineerModel` | primitive | Engineer 快捷访问 |
-| `testerTool` / `testerModel` | primitive | Tester 快捷访问 |
-| `usesAris` | `bool` | 当前是否落到 ARIS |
-
-## `AgentWorkerConfig`
-
-- Source: `lib/runtime/runtime_models_multi_agent.dart`
-- Type: `class`
-- Responsibility:
-  描述单个角色 worker 的 CLI、模型与重试策略。
-
-### Constructor Parameters
-
-| Param | Type | Required | Default | Meaning |
-| --- | --- | --- | --- | --- |
-| `role` | `MultiAgentRole` | Yes | none | 角色 |
-| `cliTool` | `String` | Yes | none | `claude/codex/opencode/...` |
-| `model` | `String` | Yes | none | 对应模型 |
-| `enabled` | `bool` | Yes | none | 是否启用 |
-| `maxRetries` | `int` | No | `2` | 最大重试次数 |
-
 ## `AppTheme` / `AppPalette`
 
 - Source: `lib/theme/app_theme.dart`, `lib/theme/app_palette.dart`
