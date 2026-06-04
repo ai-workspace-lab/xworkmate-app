@@ -102,6 +102,11 @@ class _DesktopViewState extends State<DesktopView> {
 
   Future<void> _initRenderer() async {
     await _localRenderer.initialize();
+    _localRenderer.onResize = () {
+      if (mounted) {
+        setState(() {});
+      }
+    };
   }
 
   @override
