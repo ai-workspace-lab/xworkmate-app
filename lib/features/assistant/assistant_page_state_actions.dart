@@ -156,7 +156,8 @@ extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
         selectedSkillLabels: selectedSkillLabels,
       );
       clearComposerDraftForSessionInternal(submittedSessionKey);
-    } catch (_) {
+    } catch (error) {
+      debugPrint('Assistant task submission failed: $error');
       if (!mounted) {
         rethrow;
       }

@@ -1,6 +1,104 @@
+import 'dart:typed_data';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:xworkmate/features/desktop/desktop_client.dart';
+
+class FakeMediaStream extends MediaStream {
+  FakeMediaStream(String id) : super(id, 'test');
+
+  final List<MediaStreamTrack> tracks = [];
+  final List<bool> addToNativeValues = [];
+
+  @override
+  bool? get active => true;
+
+  @override
+  Future<void> addTrack(
+    MediaStreamTrack track, {
+    bool addToNative = true,
+  }) async {
+    tracks.add(track);
+    addToNativeValues.add(addToNative);
+  }
+
+  @override
+  Future<void> getMediaTracks() async {}
+
+  @override
+  List<MediaStreamTrack> getAudioTracks() =>
+      tracks.where((track) => track.kind == 'audio').toList();
+
+  @override
+  MediaStreamTrack? getTrackById(String trackId) {
+    for (final track in tracks) {
+      if (track.id == trackId) {
+        return track;
+      }
+    }
+    return null;
+  }
+
+  @override
+  List<MediaStreamTrack> getTracks() => List.unmodifiable(tracks);
+
+  @override
+  List<MediaStreamTrack> getVideoTracks() =>
+      tracks.where((track) => track.kind == 'video').toList();
+
+  @override
+  Future<void> removeTrack(
+    MediaStreamTrack track, {
+    bool removeFromNative = true,
+  }) async {
+    tracks.remove(track);
+  }
+}
+
+class FakeMediaStreamTrack extends MediaStreamTrack {
+  FakeMediaStreamTrack({required this.trackId, required this.trackKind});
+
+  final String trackId;
+  final String trackKind;
+  bool _enabled = true;
+
+  @override
+  Future<ByteBuffer> captureFrame() {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<void> dispose() async {}
+
+  @override
+  bool get enabled => _enabled;
+
+  @override
+  set enabled(bool b) {
+    _enabled = b;
+  }
+
+  @override
+  Future<bool> hasTorch() async => false;
+
+  @override
+  String? get id => trackId;
+
+  @override
+  String? get kind => trackKind;
+
+  @override
+  String? get label => trackKind;
+
+  @override
+  bool? get muted => false;
+
+  @override
+  Future<void> setTorch(bool torch) async {}
+
+  @override
+  Future<void> stop() async {}
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -45,112 +143,61 @@ void main() {
       expect(params['height'], 720);
     });
 
-    test('creates a synthetic media stream when the bridge omits streams', () async {
-      final track = _FakeMediaStreamTrack(
-        id: 'track-1',
-        kind: 'video',
+    test('uses bridge-provided remote stream when present', () async {
+      var fallbackCreated = false;
+      final providedStream = FakeMediaStream('provided-stream');
+      final track = FakeMediaStreamTrack(
+        trackId: 'video-track-1',
+        trackKind: 'video',
       );
-      final createdStreams = <_FakeMediaStream>[];
 
-      final stream = await desktopRemoteStreamFromTrack(
-        track: track,
-        streams: const <MediaStream>[],
-        streamFactory: (streamId) async {
-          final stream = _FakeMediaStream(streamId);
-          createdStreams.add(stream);
-          return stream;
+      final stream = await desktopRemoteVideoStreamForTrack(
+        RTCTrackEvent(streams: [providedStream], track: track),
+        createFallbackStream: (label) async {
+          fallbackCreated = true;
+          return FakeMediaStream(label);
         },
       );
 
-      expect(stream, isNotNull);
-      expect(createdStreams, hasLength(1));
-      expect(stream, same(createdStreams.single));
-      expect(createdStreams.single.getVideoTracks(), hasLength(1));
-      expect(createdStreams.single.getVideoTracks().single, same(track));
+      expect(stream, same(providedStream));
+      expect(fallbackCreated, isFalse);
+      expect(providedStream.tracks, isEmpty);
     });
 
-    test('prefers the attached remote stream when one is present', () async {
-      final track = _FakeMediaStreamTrack(
-        id: 'track-2',
-        kind: 'video',
+    test('synthesizes stream for streamless remote video track', () async {
+      final track = FakeMediaStreamTrack(
+        trackId: 'video-track-1',
+        trackKind: 'video',
       );
-      final attachedStream = _FakeMediaStream('attached-stream');
+      final fallbackStream = FakeMediaStream('fallback-stream');
 
-      final stream = await desktopRemoteStreamFromTrack(
-        track: track,
-        streams: <MediaStream>[attachedStream],
-        streamFactory: (streamId) async => _FakeMediaStream(streamId),
+      final stream = await desktopRemoteVideoStreamForTrack(
+        RTCTrackEvent(streams: const [], track: track),
+        createFallbackStream: (label) async => fallbackStream,
       );
 
-      expect(stream, same(attachedStream));
-      expect(stream!.getVideoTracks(), isEmpty);
+      expect(stream, same(fallbackStream));
+      expect(fallbackStream.tracks, [same(track)]);
+      expect(fallbackStream.addToNativeValues, [isTrue]);
+    });
+
+    test('ignores streamless non-video tracks', () async {
+      var fallbackCreated = false;
+      final track = FakeMediaStreamTrack(
+        trackId: 'audio-track-1',
+        trackKind: 'audio',
+      );
+
+      final stream = await desktopRemoteVideoStreamForTrack(
+        RTCTrackEvent(streams: const [], track: track),
+        createFallbackStream: (label) async {
+          fallbackCreated = true;
+          return FakeMediaStream(label);
+        },
+      );
+
+      expect(stream, isNull);
+      expect(fallbackCreated, isFalse);
     });
   });
-}
-
-class _FakeMediaStreamTrack extends MediaStreamTrack {
-  _FakeMediaStreamTrack({required this.id, required this.kind});
-
-  @override
-  final String id;
-
-  @override
-  final String kind;
-
-  @override
-  String? get label => 'fake';
-
-  @override
-  bool get enabled => true;
-
-  @override
-  set enabled(bool b) {}
-
-  @override
-  bool? get muted => false;
-
-  @override
-  Future<void> stop() async {}
-
-  @override
-  Future<void> dispose() async {}
-}
-
-class _FakeMediaStream extends MediaStream {
-  _FakeMediaStream(String id) : super(id, 'test-owner');
-
-  final List<MediaStreamTrack> _tracks = <MediaStreamTrack>[];
-
-  @override
-  bool? get active => _tracks.isNotEmpty;
-
-  @override
-  Future<void> getMediaTracks() async {}
-
-  @override
-  Future<void> addTrack(MediaStreamTrack track, {bool addToNative = true}) async {
-    _tracks.add(track);
-  }
-
-  @override
-  Future<void> removeTrack(
-    MediaStreamTrack track, {
-    bool removeFromNative = true,
-  }) async {
-    _tracks.remove(track);
-  }
-
-  @override
-  List<MediaStreamTrack> getTracks() => List<MediaStreamTrack>.unmodifiable(_tracks);
-
-  @override
-  List<MediaStreamTrack> getAudioTracks() =>
-      _tracks.where((track) => track.kind == 'audio').toList(growable: false);
-
-  @override
-  List<MediaStreamTrack> getVideoTracks() =>
-      _tracks.where((track) => track.kind == 'video').toList(growable: false);
-
-  @override
-  Future<MediaStream> clone() async => _FakeMediaStream('${id}_clone');
 }

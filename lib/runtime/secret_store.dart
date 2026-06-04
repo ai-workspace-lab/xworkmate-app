@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
+
 import 'file_store_support.dart';
 import 'runtime_models.dart';
 
@@ -127,7 +129,8 @@ class SecretStore {
       _secureStorage = FileSecureStorageClient(
         () async => _layout?.secretDirectory,
       );
-    } catch (_) {
+    } catch (error) {
+      debugPrint('Secret store initialization failed: $error');
       _layout = null;
       _secureStorage = null;
     }
@@ -231,7 +234,8 @@ class SecretStore {
       return AccountSessionSummary.fromJson(
         (jsonDecode(raw!) as Map).cast<String, dynamic>(),
       );
-    } catch (_) {
+    } catch (error) {
+      debugPrint('Account session summary decode failed: $error');
       return null;
     }
   }
@@ -251,7 +255,8 @@ class SecretStore {
       return AccountSyncState.fromJson(
         (jsonDecode(raw!) as Map).cast<String, dynamic>(),
       );
-    } catch (_) {
+    } catch (error) {
+      debugPrint('Account sync state decode failed: $error');
       return null;
     }
   }
@@ -532,7 +537,8 @@ class SecretStore {
           .map((item) => item.toString().trim())
           .where((item) => item.isNotEmpty)
           .toSet();
-    } catch (_) {
+    } catch (error) {
+      debugPrint('Custom secret ref registry decode failed: $error');
       return <String>{};
     }
   }
@@ -561,7 +567,8 @@ class SecretStore {
           _memorySecure[key] = value;
           return value;
         }
-      } catch (_) {
+      } catch (error) {
+        debugPrint('Secure read failed for $key: $error');
         // Fall back to memory only when the secret path is unavailable.
       }
     }

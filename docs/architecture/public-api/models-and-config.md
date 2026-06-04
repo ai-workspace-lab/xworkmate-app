@@ -24,7 +24,7 @@
 | execution/provider fields | `defaultModel`、`defaultProvider`、`assistantExecutionTarget`、`assistantPermissionLevel` |
 | connection fields | `gatewayProfiles`、`webSessionPersistence` |
 | integration fields | `ollamaLocal`、`ollamaCloud`、`vault`、`aiGateway` |
-| multi-agent fields | `multiAgent`、`authorizedSkillDirectories` |
+| skill/permission fields | `authorizedSkillDirectories` |
 | account fields | `accountBaseUrl`、`accountUsername`、`accountWorkspace`、`accountWorkspaceFollowed` |
 | desktop/server fields | `acpBridgeServerModeConfig`、`linuxDesktop` |
 

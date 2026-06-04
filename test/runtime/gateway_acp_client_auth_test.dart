@@ -251,6 +251,7 @@ void main() {
         'https://xworkmate-bridge.svc.plus/artifacts/summary.pdf',
       );
     });
+
   });
 
   group('GatewayAcpClient authorization', () {
@@ -1045,6 +1046,130 @@ void main() {
         expect(snapshotPolls, 3);
         expect(result.success, isTrue);
         expect(result.message, 'recovered after running snapshot');
+      },
+    );
+
+    test(
+      'polls terminal OpenClaw snapshot after receiving a running task handle',
+      () async {
+        final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+        addTearDown(() => server.close(force: true));
+        var snapshotPolls = 0;
+        final taskGetParams = <Map<String, dynamic>>[];
+        server.listen((request) async {
+          final body = await utf8.decoder.bind(request).join();
+          final decoded = jsonDecode(body) as Map<String, dynamic>;
+          final method = decoded['method']?.toString() ?? '';
+          final id = decoded['id']?.toString() ?? 'request-id';
+          if (method == 'session.start') {
+            final event = jsonEncode(<String, dynamic>{
+              'jsonrpc': '2.0',
+              'method': 'session.update',
+              'params': <String, dynamic>{
+                'sessionId': 'unit-fixture-task-handle',
+                'threadId': 'unit-fixture-task-handle',
+                'turnId': 'turn-running',
+                'type': 'status',
+                'event': 'running',
+                'status': 'running',
+                'runId': 'run-running',
+                'artifactScope':
+                    'tasks/unit-fixture-task-handle/run-running',
+                'artifactDirectory':
+                    '/home/ubuntu/.openclaw/workspace/tasks/unit-fixture-task-handle/run-running',
+                'gatewayProviderId': 'openclaw',
+              },
+            });
+            final eventBytes = utf8.encode('data: $event\n\n');
+            request.response.headers.set(
+              HttpHeaders.contentTypeHeader,
+              'text/event-stream',
+            );
+            request.response.contentLength = eventBytes.length + 128;
+            final socket = await request.response.detachSocket();
+            socket.add(eventBytes);
+            await socket.flush();
+            socket.destroy();
+            return;
+          }
+          if (method == 'xworkmate.tasks.get') {
+            snapshotPolls += 1;
+            taskGetParams.add(
+              (decoded['params'] as Map).cast<String, dynamic>(),
+            );
+            request.response.headers.contentType = ContentType.json;
+            request.response.write(
+              jsonEncode(<String, dynamic>{
+                'jsonrpc': '2.0',
+                'id': id,
+                'result': <String, dynamic>{
+                  'status': 'completed',
+                  'sessionId': 'unit-fixture-task-handle',
+                  'threadId': 'unit-fixture-task-handle',
+                  'turnId': 'turn-running',
+                  'result': <String, dynamic>{
+                    'success': true,
+                    'output': 'completed after task handle',
+                    'turnId': 'turn-running',
+                  },
+                  'artifacts': <String, dynamic>{
+                    'items': <Map<String, dynamic>>[
+                      <String, dynamic>{
+                        'relativePath': 'reports/final.md',
+                        'downloadUrl':
+                            'https://xworkmate-bridge.svc.plus/artifacts/openclaw/download'
+                            '?sessionKey=unit-fixture-task-handle&runId=run-running&relativePath=reports%2Ffinal.md',
+                        'contentType': 'text/markdown',
+                      },
+                    ],
+                  },
+                },
+              }),
+            );
+            await request.response.close();
+            return;
+          }
+          request.response.statusCode = HttpStatus.badRequest;
+          await request.response.close();
+        });
+        final endpoint = Uri.parse('http://127.0.0.1:${server.port}');
+        final transport = ExternalCodeAgentAcpDesktopTransport(
+          client: GatewayAcpClient(endpointResolver: () => endpoint),
+          endpointResolver: (_) => endpoint,
+          taskEndpointResolver: (_) => endpoint,
+          recoveryPollDelay: Duration.zero,
+          recoveryMaxAttempts: 2,
+        );
+        addTearDown(transport.dispose);
+
+        final result = await transport.executeTask(
+          const GoTaskServiceRequest(
+            sessionId: 'unit-fixture-task-handle',
+            threadId: 'unit-fixture-task-handle',
+            target: AssistantExecutionTarget.gateway,
+            provider: SingleAgentProvider.openclaw,
+            prompt: 'create final markdown',
+            workingDirectory: '/tmp/workspace',
+            model: '',
+            thinking: 'off',
+            selectedSkills: <String>[],
+            inlineAttachments: <GatewayChatAttachmentPayload>[],
+            localAttachments: <CollaborationAttachment>[],
+            agentId: '',
+            metadata: <String, dynamic>{},
+          ),
+          onUpdate: (_) {},
+        );
+
+        expect(snapshotPolls, 1);
+        expect(taskGetParams.single['runId'], 'run-running');
+        expect(
+          taskGetParams.single['artifactScope'],
+          'tasks/unit-fixture-task-handle/run-running',
+        );
+        expect(result.success, isTrue);
+        expect(result.message, 'completed after task handle');
+        expect(result.artifacts.single.relativePath, 'reports/final.md');
       },
     );
 
@@ -2128,8 +2253,6 @@ void main() {
         );
       },
     );
-
-
   });
 }
 
