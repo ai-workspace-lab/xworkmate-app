@@ -33,7 +33,6 @@ import '../runtime/desktop_thread_artifact_service.dart';
 import '../runtime/go_task_service_client.dart';
 import '../runtime/mode_switcher.dart';
 import '../runtime/agent_registry.dart';
-import '../runtime/multi_agent_orchestrator.dart';
 import '../runtime/platform_environment.dart';
 import 'app_controller_desktop_core.dart';
 import 'app_controller_desktop_navigation.dart';
@@ -602,15 +601,6 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     forceRefresh: forceRefresh,
   );
 
-  List<ManagedMountTargetState> mergeAcpCapabilitiesIntoMountTargetsInternal(
-    List<ManagedMountTargetState> current,
-    GatewayAcpCapabilities capabilities,
-  ) => mergeAcpCapabilitiesIntoMountTargetsRuntimeInternal(
-    this,
-    current,
-    capabilities,
-  );
-
   String? assistantWorkingDirectoryForSessionInternal(String sessionKey) =>
       assistantWorkingDirectoryForSessionRuntimeInternal(this, sessionKey);
 
@@ -681,7 +671,6 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     cronJobsControllerInternal.addListener(relayChildChangeInternal);
     devicesControllerInternal.addListener(relayChildChangeInternal);
     tasksControllerInternal.addListener(relayChildChangeInternal);
-    multiAgentOrchestratorInternal.addListener(relayChildChangeInternal);
   }
 
   void detachChildListenersInternal() {
@@ -696,7 +685,6 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     cronJobsControllerInternal.removeListener(relayChildChangeInternal);
     devicesControllerInternal.removeListener(relayChildChangeInternal);
     tasksControllerInternal.removeListener(relayChildChangeInternal);
-    multiAgentOrchestratorInternal.removeListener(relayChildChangeInternal);
   }
 
   void handleSettingsControllerChangeInternal() {
@@ -737,7 +725,6 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
       return;
     }
     setActiveAppLanguage(current.appLanguage);
-    multiAgentOrchestratorInternal.updateConfig(current.multiAgent);
     if (previous.codeAgentRuntimeMode != current.codeAgentRuntimeMode) {
       registerCodexExternalProviderInternal();
       if (disposedInternal) {

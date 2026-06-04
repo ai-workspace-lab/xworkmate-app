@@ -15,7 +15,6 @@ import '../../app/app_metadata.dart';
 import '../../app/ui_feature_manifest.dart';
 import '../../i18n/app_language.dart';
 import '../../models/app_models.dart';
-import '../../runtime/multi_agent_orchestrator.dart';
 import '../../runtime/runtime_models.dart';
 import '../../theme/app_palette.dart';
 import '../../theme/app_theme.dart';
@@ -154,15 +153,6 @@ extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
         sessionKey: submittedSessionKey,
         thinking: thinkingLabelInternal,
         attachments: attachmentPayloads,
-        localAttachments: submittedAttachments
-            .map(
-              (item) => CollaborationAttachment(
-                name: item.name,
-                description: item.mimeType,
-                path: item.path,
-              ),
-            )
-            .toList(growable: false),
         selectedSkillLabels: selectedSkillLabels,
       );
       clearComposerDraftForSessionInternal(submittedSessionKey);
