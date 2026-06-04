@@ -163,7 +163,8 @@ extension AppControllerDesktopThreadBinding on AppController {
     }
     try {
       Directory(normalizedPath).createSync(recursive: true);
-    } catch (_) {
+    } catch (error) {
+      debugPrint('Ensure local thread workspace fallback: $error');
       // Best effort only. The caller can still decide whether to fail fast.
     }
     return Directory(normalizedPath).existsSync();
