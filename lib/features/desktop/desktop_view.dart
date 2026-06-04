@@ -47,7 +47,7 @@ class _DesktopViewState extends State<DesktopView> {
   );
 
   bool _useGpu = false;
-  bool _adaptiveResolution = true;
+  bool _adaptiveResolution = false;
   bool _showAdvancedOptions = false;
   bool _showControlPanel = true;
   String _connectionState = 'disconnected';
@@ -514,18 +514,10 @@ class _DesktopViewState extends State<DesktopView> {
                               _inputHandler!.handleScroll(event);
                             }
                           },
-                          child: SizedBox.expand(
-                            child: FittedBox(
-                              fit: BoxFit.fill,
-                              child: SizedBox(
-                                width: _remoteDesktopSize.width > 0 ? _remoteDesktopSize.width : 1280,
-                                height: _remoteDesktopSize.height > 0 ? _remoteDesktopSize.height : 720,
-                                child: RTCVideoView(
-                                  _localRenderer,
-                                  objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitContain,
-                                ),
-                              ),
-                            ),
+                          child: RTCVideoView(
+                            _localRenderer,
+                            objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitContain,
+                            filterQuality: FilterQuality.medium,
                           ),
                         ),
                       ),
