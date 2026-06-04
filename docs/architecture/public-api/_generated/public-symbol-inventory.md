@@ -5,18 +5,18 @@
 > Scope: `lib/app`, `lib/runtime`, `lib/models`, `lib/features/**`, `lib/theme`, `rust/src`.
 > Excludes private `_` symbols and non-top-level Dart members.
 
-- Generated at: `2026-05-13T08:37:25.180831+00:00`
-- Files scanned: `129`
-- Public symbols extracted: `603`
+- Generated at: `2026-06-04T06:23:23.858629+00:00`
+- Files scanned: `132`
+- Public symbols extracted: `590`
 
 ## Group Summary
 
 | Group | Files | Public Symbols |
 | --- | ---: | ---: |
-| `lib/app` | 30 | 68 |
-| `lib/features` | 26 | 103 |
+| `lib/app` | 31 | 69 |
+| `lib/features` | 39 | 128 |
 | `lib/models` | 1 | 31 |
-| `lib/runtime` | 66 | 372 |
+| `lib/runtime` | 55 | 333 |
 | `lib/theme` | 2 | 13 |
 | `rust/src` | 4 | 16 |
 
@@ -24,19 +24,19 @@
 
 | Scope | Files | Public Symbols |
 | --- | ---: | ---: |
-| `lib/app` | 30 | 68 |
-| `lib/runtime` | 66 | 372 |
+| `lib/app` | 31 | 69 |
+| `lib/runtime` | 55 | 333 |
 | `lib/models` | 1 | 31 |
-| `lib/features/assistant` | 16 | 79 |
-| `lib/features/settings` | 4 | 5 |
-| `lib/features/mobile` | 6 | 19 |
+| `lib/features/assistant` | 16 | 86 |
+| `lib/features/settings` | 7 | 8 |
+| `lib/features/mobile` | 13 | 27 |
 | `lib/theme` | 2 | 13 |
 | `rust/src` | 4 | 16 |
 
 ## lib/app
 
-- Files: `30`
-- Public symbols: `68`
+- Files: `31`
+- Public symbols: `69`
 
 ### `lib/app/app.dart`
 
@@ -77,9 +77,9 @@ _No extracted public top-level symbols._
 
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
-| 57 | `enum` | `CodexCooperationState` | `enum CodexCooperationState { notStarted, bridgeOnly, registered }` |
-| 59 | `class` | `SingleAgentSkillScanRootInternal` | `class SingleAgentSkillScanRootInternal {` |
-| 91 | `class` | `AppController` | `class AppController extends ChangeNotifier {` |
+| 53 | `enum` | `CodexCooperationState` | `enum CodexCooperationState { notStarted, bridgeOnly, registered }` |
+| 55 | `class` | `AppController` | `class AppController extends ChangeNotifier {` |
+| 599 | `top-level function` | `resolveUserHomeDirectoryFromControllerEnvironmentInternal` | `String resolveUserHomeDirectoryFromControllerEnvironmentInternal( Map<String, String>? environment, ) {` |
 
 ### `lib/app/app_controller_desktop_external_acp_routing.dart`
 
@@ -88,7 +88,7 @@ _No extracted public top-level symbols._
 
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
-| 39 | `extension` | `AppControllerDesktopExternalAcpRouting` | `extension AppControllerDesktopExternalAcpRouting on AppController {` |
+| 37 | `extension` | `AppControllerDesktopExternalAcpRouting` | `extension AppControllerDesktopExternalAcpRouting on AppController {` |
 
 ### `lib/app/app_controller_desktop_gateway.dart`
 
@@ -97,7 +97,7 @@ _No extracted public top-level symbols._
 
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
-| 48 | `extension` | `AppControllerDesktopGateway` | `extension AppControllerDesktopGateway on AppController {` |
+| 46 | `extension` | `AppControllerDesktopGateway` | `extension AppControllerDesktopGateway on AppController {` |
 
 ### `lib/app/app_controller_desktop_navigation.dart`
 
@@ -106,7 +106,7 @@ _No extracted public top-level symbols._
 
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
-| 47 | `extension` | `AppControllerDesktopNavigation` | `extension AppControllerDesktopNavigation on AppController {` |
+| 45 | `extension` | `AppControllerDesktopNavigation` | `extension AppControllerDesktopNavigation on AppController {` |
 
 ### `lib/app/app_controller_desktop_runtime_coordination_impl.dart`
 
@@ -115,16 +115,16 @@ _No extracted public top-level symbols._
 
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
-| 48 | `top-level function` | `refreshAcpCapabilitiesRuntimeInternal` | `Future<void> refreshAcpCapabilitiesRuntimeInternal( AppController controller, { bool forceRefresh = false, bool persistMountTargets = false, }) async {` |
-| 98 | `top-level function` | `refreshSingleAgentCapabilitiesRuntimeInternal` | `Future<void> refreshSingleAgentCapabilitiesRuntimeInternal( AppController controller, { bool forceRefresh = false, }) async {` |
-| 170 | `top-level function` | `assistantWorkingDirectoryForSessionRuntimeInternal` | `String? assistantWorkingDirectoryForSessionRuntimeInternal( AppController controller, String sessionKey, ) {` |
-| 181 | `top-level function` | `assistantRemoteWorkingDirectoryHintForSessionRuntimeInternal` | `String? assistantRemoteWorkingDirectoryHintForSessionRuntimeInternal( AppController controller, String sessionKey, ) {` |
-| 200 | `top-level function` | `resolveLocalAssistantWorkingDirectoryForSessionRuntimeInternal` | `String? resolveLocalAssistantWorkingDirectoryForSessionRuntimeInternal( AppController controller, String sessionKey, { bool requireLocalExistence = true, }) {` |
-| 223 | `top-level function` | `buildCodeAgentNodeStateRuntimeInternal` | `CodeAgentNodeState buildCodeAgentNodeStateRuntimeInternal( AppController controller, { AssistantExecutionTarget? executionTarget, }) {` |
-| 239 | `top-level function` | `bridgeGatewayModeRuntimeInternal` | `GatewayMode bridgeGatewayModeRuntimeInternal(AppController controller) {` |
-| 249 | `top-level function` | `ensureCodexGatewayRegistrationRuntimeInternal` | `Future<void> ensureCodexGatewayRegistrationRuntimeInternal( AppController controller, ) async {` |
-| 317 | `top-level function` | `clearCodexGatewayRegistrationRuntimeInternal` | `void clearCodexGatewayRegistrationRuntimeInternal(AppController controller) {` |
-| 327 | `top-level function` | `recomputeTasksRuntimeInternal` | `void recomputeTasksRuntimeInternal(AppController controller) {` |
+| 46 | `top-level function` | `refreshAcpCapabilitiesRuntimeInternal` | `Future<void> refreshAcpCapabilitiesRuntimeInternal( AppController controller, { bool forceRefresh = false, bool persistMountTargets = false, }) async {` |
+| 80 | `top-level function` | `refreshSingleAgentCapabilitiesRuntimeInternal` | `Future<void> refreshSingleAgentCapabilitiesRuntimeInternal( AppController controller, { bool forceRefresh = false, }) async {` |
+| 104 | `top-level function` | `assistantWorkingDirectoryForSessionRuntimeInternal` | `String? assistantWorkingDirectoryForSessionRuntimeInternal( AppController controller, String sessionKey, ) {` |
+| 128 | `top-level function` | `assistantRemoteWorkingDirectoryHintForSessionRuntimeInternal` | `String? assistantRemoteWorkingDirectoryHintForSessionRuntimeInternal( AppController controller, String sessionKey, ) {` |
+| 147 | `top-level function` | `resolveLocalAssistantWorkingDirectoryForSessionRuntimeInternal` | `String? resolveLocalAssistantWorkingDirectoryForSessionRuntimeInternal( AppController controller, String sessionKey, { bool requireLocalExistence = true, }) {` |
+| 170 | `top-level function` | `buildCodeAgentNodeStateRuntimeInternal` | `CodeAgentNodeState buildCodeAgentNodeStateRuntimeInternal( AppController controller, { AssistantExecutionTarget? executionTarget, }) {` |
+| 186 | `top-level function` | `bridgeGatewayModeRuntimeInternal` | `GatewayMode bridgeGatewayModeRuntimeInternal(AppController controller) {` |
+| 196 | `top-level function` | `ensureCodexGatewayRegistrationRuntimeInternal` | `Future<void> ensureCodexGatewayRegistrationRuntimeInternal( AppController controller, ) async {` |
+| 264 | `top-level function` | `clearCodexGatewayRegistrationRuntimeInternal` | `void clearCodexGatewayRegistrationRuntimeInternal(AppController controller) {` |
+| 274 | `top-level function` | `recomputeTasksRuntimeInternal` | `void recomputeTasksRuntimeInternal(AppController controller) {` |
 
 ### `lib/app/app_controller_desktop_runtime_exceptions.dart`
 
@@ -143,7 +143,7 @@ _No extracted public top-level symbols._
 
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
-| 53 | `extension` | `AppControllerDesktopRuntimeHelpers` | `extension AppControllerDesktopRuntimeHelpers on AppController {` |
+| 51 | `extension` | `AppControllerDesktopRuntimeHelpers` | `extension AppControllerDesktopRuntimeHelpers on AppController {` |
 
 ### `lib/app/app_controller_desktop_settings.dart`
 
@@ -152,7 +152,7 @@ _No extracted public top-level symbols._
 
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
-| 48 | `extension` | `AppControllerDesktopSettings` | `extension AppControllerDesktopSettings on AppController {` |
+| 46 | `extension` | `AppControllerDesktopSettings` | `extension AppControllerDesktopSettings on AppController {` |
 
 ### `lib/app/app_controller_desktop_settings_runtime.dart`
 
@@ -161,7 +161,7 @@ _No extracted public top-level symbols._
 
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
-| 50 | `extension` | `AppControllerDesktopSettingsRuntime` | `extension AppControllerDesktopSettingsRuntime on AppController {` |
+| 48 | `extension` | `AppControllerDesktopSettingsRuntime` | `extension AppControllerDesktopSettingsRuntime on AppController {` |
 
 ### `lib/app/app_controller_desktop_skill_permissions.dart`
 
@@ -170,7 +170,7 @@ _No extracted public top-level symbols._
 
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
-| 48 | `extension` | `AppControllerDesktopSkillPermissions` | `extension AppControllerDesktopSkillPermissions on AppController {` |
+| 46 | `extension` | `AppControllerDesktopSkillPermissions` | `extension AppControllerDesktopSkillPermissions on AppController {` |
 
 ### `lib/app/app_controller_desktop_thread_actions.dart`
 
@@ -179,7 +179,7 @@ _No extracted public top-level symbols._
 
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
-| 51 | `extension` | `AppControllerDesktopThreadActions` | `extension AppControllerDesktopThreadActions on AppController {` |
+| 50 | `extension` | `AppControllerDesktopThreadActions` | `extension AppControllerDesktopThreadActions on AppController {` |
 
 ### `lib/app/app_controller_desktop_thread_binding.dart`
 
@@ -188,9 +188,9 @@ _No extracted public top-level symbols._
 
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
-| 47 | `class` | `DesktopThreadBindingSnapshotInternal` | `class DesktopThreadBindingSnapshotInternal {` |
-| 76 | `extension` | `AppControllerDesktopThreadBinding` | `extension AppControllerDesktopThreadBinding on AppController {` |
-| 337 | `top-level function` | `pickDraftThreadExecutionTargetInternal` | `AssistantExecutionTarget pickDraftThreadExecutionTargetInternal({ required AssistantExecutionTarget currentTarget, required Iterable<AssistantExecutionTarget> visibleTargets, bool? localWorkspaceAvailable, }) {` |
+| 45 | `class` | `DesktopThreadBindingSnapshotInternal` | `class DesktopThreadBindingSnapshotInternal {` |
+| 74 | `extension` | `AppControllerDesktopThreadBinding` | `extension AppControllerDesktopThreadBinding on AppController {` |
+| 351 | `top-level function` | `pickDraftThreadExecutionTargetInternal` | `AssistantExecutionTarget pickDraftThreadExecutionTargetInternal({ required AssistantExecutionTarget currentTarget, required Iterable<AssistantExecutionTarget> visibleTargets, bool? localWorkspaceAvailable, }) {` |
 
 ### `lib/app/app_controller_desktop_thread_sessions.dart`
 
@@ -199,31 +199,28 @@ _No extracted public top-level symbols._
 
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
-| 55 | `top-level function` | `resolveGatewayThreadConnectionStateInternal` | `AssistantThreadConnectionState resolveGatewayThreadConnectionStateInternal({ required AssistantExecutionTarget target, required bool bridgeReady, required String bridgeLabel, required AccountSyncState? accountSyncState, required bool accountSignedIn, required bool bridgeConfigured, bool bridgeDiscoveryAttempted = false, String bridgeDiscoveryError = '', bool providerCatalogEmpty = false, }) {` |
-| 180 | `top-level function` | `bridgeCapabilityReadyForExecutionTargetInternal` | `bool bridgeCapabilityReadyForExecutionTargetInternal({ required AssistantExecutionTarget target, required bool bridgeConfigured, required List<SingleAgentProvider> providers, required List<AssistantExecutionTarget> availableTargets, }) {` |
-| 192 | `extension` | `AppControllerDesktopThreadSessions` | `extension AppControllerDesktopThreadSessions on AppController {` |
-| 655 | `top-level function` | `resolveAssistantExecutionTargetFromRecordForTest` | `AssistantExecutionTarget resolveAssistantExecutionTargetFromRecordForTest( TaskThread? record, { required AssistantExecutionTarget defaultExecutionTarget, }) {` |
+| 53 | `top-level function` | `resolveGatewayThreadConnectionStateInternal` | `AssistantThreadConnectionState resolveGatewayThreadConnectionStateInternal({ required AssistantExecutionTarget target, required bool bridgeReady, required String bridgeLabel, required AccountSyncState? accountSyncState, required bool accountSignedIn, required bool bridgeConfigured, bool bridgeDiscoveryAttempted = false, String bridgeDiscoveryError = '', bool providerCatalogEmpty = false, }) {` |
+| 178 | `top-level function` | `bridgeCapabilityReadyForExecutionTargetInternal` | `bool bridgeCapabilityReadyForExecutionTargetInternal({ required AssistantExecutionTarget target, required bool bridgeConfigured, required List<SingleAgentProvider> providers, required List<AssistantExecutionTarget> availableTargets, }) {` |
+| 190 | `extension` | `AppControllerDesktopThreadSessions` | `extension AppControllerDesktopThreadSessions on AppController {` |
+| 650 | `top-level function` | `resolveAssistantExecutionTargetFromRecordForTest` | `AssistantExecutionTarget resolveAssistantExecutionTargetFromRecordForTest( TaskThread? record, { required AssistantExecutionTarget defaultExecutionTarget, }) {` |
 
 ### `lib/app/app_controller_desktop_thread_sessions_collaboration_impl.dart`
 
 - Language: `dart`
-- Public symbols: `13`
+- Public symbols: `10`
 
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
-| 49 | `top-level function` | `loadAiGatewayApiKeyThreadSessionInternal` | `Future<String> loadAiGatewayApiKeyThreadSessionInternal( AppController controller, ) async {` |
-| 55 | `top-level function` | `saveMultiAgentConfigThreadSessionInternal` | `Future<void> saveMultiAgentConfigThreadSessionInternal( AppController controller, MultiAgentConfig config, ) async {` |
-| 72 | `top-level function` | `refreshMultiAgentMountsThreadSessionInternal` | `Future<void> refreshMultiAgentMountsThreadSessionInternal( AppController controller, { bool sync = false, }) async {` |
-| 97 | `top-level function` | `runMultiAgentCollaborationThreadSessionInternal` | `Future<void> runMultiAgentCollaborationThreadSessionInternal( AppController controller, { required String rawPrompt, required String composedPrompt, required List<CollaborationAttachment> attachments, required List<String> selectedSkillLabels, }) async {` |
-| 283 | `top-level function` | `openOnlineWorkspaceThreadSessionInternal` | `Future<void> openOnlineWorkspaceThreadSessionInternal( AppController controller, ) async {` |
-| 304 | `top-level function` | `aiGatewayModelChoicesThreadSessionInternal` | `List<String> aiGatewayModelChoicesThreadSessionInternal( AppController controller, ) {` |
-| 310 | `top-level function` | `connectedGatewayModelChoicesThreadSessionInternal` | `List<String> connectedGatewayModelChoicesThreadSessionInternal( AppController controller, ) {` |
-| 322 | `top-level function` | `assistantModelChoicesThreadSessionInternal` | `List<String> assistantModelChoicesThreadSessionInternal( AppController controller, ) {` |
-| 331 | `top-level function` | `assistantModelChoicesForSessionThreadSessionInternal` | `List<String> assistantModelChoicesForSessionThreadSessionInternal( AppController controller, String sessionKey, ) {` |
-| 346 | `top-level function` | `resolvedDefaultModelThreadSessionInternal` | `String resolvedDefaultModelThreadSessionInternal(AppController controller) {` |
-| 368 | `top-level function` | `canQuickConnectGatewayThreadSessionInternal` | `bool canQuickConnectGatewayThreadSessionInternal(AppController controller) {` |
-| 388 | `top-level function` | `joinConnectionPartsThreadSessionInternal` | `String joinConnectionPartsThreadSessionInternal(List<String> parts) {` |
-| 396 | `top-level function` | `gatewayAddressLabelThreadSessionInternal` | `String gatewayAddressLabelThreadSessionInternal( GatewayConnectionProfile profile, ) {` |
+| 47 | `top-level function` | `loadAiGatewayApiKeyThreadSessionInternal` | `Future<String> loadAiGatewayApiKeyThreadSessionInternal( AppController controller, ) async {` |
+| 53 | `top-level function` | `openOnlineWorkspaceThreadSessionInternal` | `Future<void> openOnlineWorkspaceThreadSessionInternal( AppController controller, ) async {` |
+| 74 | `top-level function` | `aiGatewayModelChoicesThreadSessionInternal` | `List<String> aiGatewayModelChoicesThreadSessionInternal( AppController controller, ) {` |
+| 80 | `top-level function` | `connectedGatewayModelChoicesThreadSessionInternal` | `List<String> connectedGatewayModelChoicesThreadSessionInternal( AppController controller, ) {` |
+| 92 | `top-level function` | `assistantModelChoicesThreadSessionInternal` | `List<String> assistantModelChoicesThreadSessionInternal( AppController controller, ) {` |
+| 101 | `top-level function` | `assistantModelChoicesForSessionThreadSessionInternal` | `List<String> assistantModelChoicesForSessionThreadSessionInternal( AppController controller, String sessionKey, ) {` |
+| 116 | `top-level function` | `resolvedDefaultModelThreadSessionInternal` | `String resolvedDefaultModelThreadSessionInternal(AppController controller) {` |
+| 138 | `top-level function` | `canQuickConnectGatewayThreadSessionInternal` | `bool canQuickConnectGatewayThreadSessionInternal(AppController controller) {` |
+| 158 | `top-level function` | `joinConnectionPartsThreadSessionInternal` | `String joinConnectionPartsThreadSessionInternal(List<String> parts) {` |
+| 166 | `top-level function` | `gatewayAddressLabelThreadSessionInternal` | `String gatewayAddressLabelThreadSessionInternal( GatewayConnectionProfile profile, ) {` |
 
 ### `lib/app/app_controller_desktop_thread_storage.dart`
 
@@ -232,7 +229,7 @@ _No extracted public top-level symbols._
 
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
-| 47 | `extension` | `AppControllerDesktopThreadStorage` | `extension AppControllerDesktopThreadStorage on AppController {` |
+| 45 | `extension` | `AppControllerDesktopThreadStorage` | `extension AppControllerDesktopThreadStorage on AppController {` |
 
 ### `lib/app/app_controller_desktop_workspace_execution.dart`
 
@@ -241,7 +238,7 @@ _No extracted public top-level symbols._
 
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
-| 48 | `extension` | `AppControllerDesktopWorkspaceExecution` | `extension AppControllerDesktopWorkspaceExecution on AppController {` |
+| 46 | `extension` | `AppControllerDesktopWorkspaceExecution` | `extension AppControllerDesktopWorkspaceExecution on AppController {` |
 
 ### `lib/app/app_controller_openclaw_task_queue.dart`
 
@@ -250,7 +247,17 @@ _No extracted public top-level symbols._
 
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
-| 9 | `class` | `OpenClawGatewayQueuedTurnInternal` | `class OpenClawGatewayQueuedTurnInternal {` |
+| 7 | `class` | `OpenClawGatewayQueuedTurnInternal` | `class OpenClawGatewayQueuedTurnInternal {` |
+
+### `lib/app/app_logger.dart`
+
+- Language: `dart`
+- Public symbols: `2`
+
+| Line | Kind | Name | Signature |
+| ---: | --- | --- | --- |
+| 3 | `class` | `AppLogger` | `class AppLogger {` |
+| 31 | `top-level function` | `appLog` | `void appLog(String message) {` |
 
 ### `lib/app/app_metadata.dart`
 
@@ -314,10 +321,10 @@ _No extracted public top-level symbols._
 | 14 | `enum` | `UiFeatureBuildMode` | `enum UiFeatureBuildMode { debug, profile, release }` |
 | 16 | `top-level function` | `currentUiFeatureBuildMode` | `UiFeatureBuildMode currentUiFeatureBuildMode() {` |
 | 26 | `top-level function` | `resolveUiFeaturePlatformFromContext` | `UiFeaturePlatform resolveUiFeaturePlatformFromContext(BuildContext context) {` |
-| 57 | `class` | `UiFeatureFlag` | `class UiFeatureFlag {` |
-| 89 | `class` | `UiFeatureManifest` | `class UiFeatureManifest {` |
-| 336 | `class` | `UiFeatureAccess` | `class UiFeatureAccess {` |
-| 466 | `class` | `UiFeatureManifestLoader` | `class UiFeatureManifestLoader {` |
+| 60 | `class` | `UiFeatureFlag` | `class UiFeatureFlag {` |
+| 92 | `class` | `UiFeatureManifest` | `class UiFeatureManifest {` |
+| 339 | `class` | `UiFeatureAccess` | `class UiFeatureAccess {` |
+| 476 | `class` | `UiFeatureManifestLoader` | `class UiFeatureManifestLoader {` |
 
 ### `lib/app/workspace_navigation.dart`
 
@@ -332,19 +339,31 @@ _No extracted public top-level symbols._
 ### `lib/app/workspace_page_registry.dart`
 
 - Language: `dart`
-- Public symbols: `4`
+- Public symbols: `6`
 
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
-| 8 | `enum` | `WorkspacePageSurface` | `enum WorkspacePageSurface { desktop, mobile }` |
-| 10 | `typedef` | `WorkspacePageBuilder` | `typedef WorkspacePageBuilder = Widget Function( AppController controller, ValueChanged<DetailPanelData> onOpenDetail, );` |
-| 16 | `class` | `WorkspacePageSpec` | `class WorkspacePageSpec {` |
-| 56 | `top-level function` | `buildWorkspacePage` | `Widget buildWorkspacePage({ required WorkspaceDestination destination, required AppController controller, required ValueChanged<DetailPanelData> onOpenDetail, required WorkspacePageSurface surface, }) {` |
+| 10 | `enum` | `WorkspacePageSurface` | `enum WorkspacePageSurface { desktop, mobile }` |
+| 12 | `class` | `MobileWorkspaceActions` | `class MobileWorkspaceActions {` |
+| 20 | `typedef` | `WorkspacePageBuilder` | `typedef WorkspacePageBuilder = Widget Function( AppController controller, ValueChanged<DetailPanelData> onOpenDetail, );` |
+| 26 | `typedef` | `MobileWorkspacePageBuilder` | `typedef MobileWorkspacePageBuilder = Widget Function( AppController controller, ValueChanged<DetailPanelData> onOpenDetail, MobileWorkspaceActions mobileActions, );` |
+| 33 | `class` | `WorkspacePageSpec` | `class WorkspacePageSpec {` |
+| 72 | `top-level function` | `buildWorkspacePage` | `Widget buildWorkspacePage({ required WorkspaceDestination destination, required AppController controller, required ValueChanged<DetailPanelData> onOpenDetail, required WorkspacePageSurface surface, MobileWorkspaceActions mobileActions = const MobileWorkspaceActions(), }) {` |
 
 ## lib/features
 
-- Files: `26`
-- Public symbols: `103`
+- Files: `39`
+- Public symbols: `128`
+
+### `lib/features/assistant/assistant_attachment_payloads.dart`
+
+- Language: `dart`
+- Public symbols: `2`
+
+| Line | Kind | Name | Signature |
+| ---: | --- | --- | --- |
+| 12 | `class` | `AssistantAttachmentLimitException` | `class AssistantAttachmentLimitException implements Exception {` |
+| 93 | `top-level function` | `formatAssistantAttachmentBytesInternal` | `String formatAssistantAttachmentBytesInternal(int bytes) {` |
 
 ### `lib/features/assistant/assistant_page.dart`
 
@@ -360,12 +379,12 @@ _No extracted public top-level symbols._
 
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
-| 40 | `class` | `AssistantTaskRailInternal` | `class AssistantTaskRailInternal extends StatefulWidget {` |
-| 73 | `class` | `AssistantTaskRailStateInternal` | `class AssistantTaskRailStateInternal extends State<AssistantTaskRailInternal> {` |
-| 283 | `top-level function` | `groupTasksForRailInternal` | `List<AssistantTaskGroupInternal> groupTasksForRailInternal( List<AssistantTaskEntryInternal> tasks, List<AssistantExecutionTarget> visibleExecutionTargets, ) {` |
-| 313 | `class` | `AssistantTaskTileInternal` | `class AssistantTaskTileInternal extends StatelessWidget {` |
-| 462 | `class` | `AssistantTaskGroupHeaderInternal` | `class AssistantTaskGroupHeaderInternal extends StatelessWidget {` |
-| 526 | `class` | `AssistantEmptyStateInternal` | `class AssistantEmptyStateInternal extends StatelessWidget {` |
+| 38 | `class` | `AssistantTaskRailInternal` | `class AssistantTaskRailInternal extends StatefulWidget {` |
+| 71 | `class` | `AssistantTaskRailStateInternal` | `class AssistantTaskRailStateInternal extends State<AssistantTaskRailInternal> {` |
+| 281 | `top-level function` | `groupTasksForRailInternal` | `List<AssistantTaskGroupInternal> groupTasksForRailInternal( List<AssistantTaskEntryInternal> tasks, List<AssistantExecutionTarget> visibleExecutionTargets, ) {` |
+| 311 | `class` | `AssistantTaskTileInternal` | `class AssistantTaskTileInternal extends StatelessWidget {` |
+| 460 | `class` | `AssistantTaskGroupHeaderInternal` | `class AssistantTaskGroupHeaderInternal extends StatelessWidget {` |
+| 524 | `class` | `AssistantEmptyStateInternal` | `class AssistantEmptyStateInternal extends StatelessWidget {` |
 
 ### `lib/features/assistant/assistant_page_components_core.dart`
 
@@ -381,8 +400,8 @@ _No extracted public top-level symbols._
 
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
-| 40 | `class` | `ComposerBarInternal` | `class ComposerBarInternal extends StatefulWidget {` |
-| 90 | `class` | `ComposerBarStateInternal` | `class ComposerBarStateInternal extends State<ComposerBarInternal> {` |
+| 38 | `class` | `ComposerBarInternal` | `class ComposerBarInternal extends StatefulWidget {` |
+| 88 | `class` | `ComposerBarStateInternal` | `class ComposerBarStateInternal extends State<ComposerBarInternal> {` |
 
 ### `lib/features/assistant/assistant_page_composer_clipboard.dart`
 
@@ -391,32 +410,29 @@ _No extracted public top-level symbols._
 
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
-| 40 | `class` | `ComposerAttachmentInternal` | `class ComposerAttachmentInternal {` |
-| 82 | `class` | `AssistantPasteIntent` | `class AssistantPasteIntent extends Intent {` |
-| 86 | `top-level function` | `readClipboardImageAsXFileInternal` | `Future<XFile?> readClipboardImageAsXFileInternal() async {` |
-| 118 | `top-level function` | `readClipboardImageForFormatInternal` | `Future<XFile?> readClipboardImageForFormatInternal( ClipboardReader reader, { required FileFormat format, required String extension, required String mimeType, }) async {` |
-| 171 | `top-level function` | `resolveClipboardAttachmentTempDirectoryInternal` | `Future<Directory> resolveClipboardAttachmentTempDirectoryInternal() async {` |
-
-### `lib/features/assistant/assistant_page_composer_skill_models.dart`
-
-- Language: `dart`
-- Public symbols: `2`
-
-| Line | Kind | Name | Signature |
-| ---: | --- | --- | --- |
-| 40 | `top-level function` | `skillOptionFromGatewayInternal` | `ComposerSkillOptionInternal skillOptionFromGatewayInternal( GatewaySkillSummary skill, ) {` |
-| 61 | `class` | `ComposerSkillOptionInternal` | `class ComposerSkillOptionInternal {` |
+| 38 | `class` | `ComposerAttachmentInternal` | `class ComposerAttachmentInternal {` |
+| 80 | `class` | `AssistantPasteIntent` | `class AssistantPasteIntent extends Intent {` |
+| 84 | `top-level function` | `readClipboardImageAsXFileInternal` | `Future<XFile?> readClipboardImageAsXFileInternal() async {` |
+| 116 | `top-level function` | `readClipboardImageForFormatInternal` | `Future<XFile?> readClipboardImageForFormatInternal( ClipboardReader reader, { required FileFormat format, required String extension, required String mimeType, }) async {` |
+| 169 | `top-level function` | `resolveClipboardAttachmentTempDirectoryInternal` | `Future<Directory> resolveClipboardAttachmentTempDirectoryInternal() async {` |
 
 ### `lib/features/assistant/assistant_page_composer_skill_picker.dart`
 
 - Language: `dart`
-- Public symbols: `3`
+- Public symbols: `10`
 
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
-| 40 | `class` | `ComposerSelectedSkillChipInternal` | `class ComposerSelectedSkillChipInternal extends StatelessWidget {` |
-| 69 | `class` | `SkillPickerPopoverInternal` | `class SkillPickerPopoverInternal extends StatelessWidget {` |
-| 202 | `class` | `SkillPickerTileInternal` | `class SkillPickerTileInternal extends StatelessWidget {` |
+| 38 | `class` | `ComposerSelectedSkillChipInternal` | `class ComposerSelectedSkillChipInternal extends StatelessWidget {` |
+| 67 | `class` | `SkillPickerPopoverInternal` | `class SkillPickerPopoverInternal extends StatelessWidget {` |
+| 261 | `top-level function` | `skillPickerSectionsInternal` | `List<SkillPickerRowInternal> skillPickerSectionsInternal( List<ComposerSkillOptionInternal> skills, ) {` |
+| 291 | `class` | `SkillPickerRowInternal` | `class SkillPickerRowInternal {` |
+| 299 | `class` | `SkillPickerGroupHeaderInternal` | `class SkillPickerGroupHeaderInternal extends StatelessWidget {` |
+| 323 | `class` | `SkillPickerTileInternal` | `class SkillPickerTileInternal extends StatelessWidget {` |
+| 378 | `top-level function` | `skillOptionFromGatewayInternal` | `ComposerSkillOptionInternal skillOptionFromGatewayInternal( GatewaySkillSummary skill, ) {` |
+| 402 | `top-level function` | `skillGroupForSourceInternal` | `ComposerSkillGroupInternal skillGroupForSourceInternal(String source) {` |
+| 434 | `class` | `ComposerSkillGroupInternal` | `class ComposerSkillGroupInternal {` |
+| 444 | `class` | `ComposerSkillOptionInternal` | `class ComposerSkillOptionInternal {` |
 
 ### `lib/features/assistant/assistant_page_composer_state_helpers.dart`
 
@@ -425,7 +441,7 @@ _No extracted public top-level symbols._
 
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
-| 44 | `top-level function` | `buildSkillPickerOverlayForInternal` | `Widget buildSkillPickerOverlayForInternal( ComposerBarStateInternal state, BuildContext context, ) {` |
+| 42 | `top-level function` | `buildSkillPickerOverlayForInternal` | `Widget buildSkillPickerOverlayForInternal( ComposerBarStateInternal state, BuildContext context, ) {` |
 
 ### `lib/features/assistant/assistant_page_composer_support.dart`
 
@@ -434,15 +450,15 @@ _No extracted public top-level symbols._
 
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
-| 40 | `class` | `ComposerIconButtonInternal` | `class ComposerIconButtonInternal extends StatefulWidget {` |
-| 50 | `class` | `ComposerResizeHandleInternal` | `class ComposerResizeHandleInternal extends StatefulWidget {` |
-| 60 | `class` | `ComposerResizeHandleStateInternal` | `class ComposerResizeHandleStateInternal extends State<ComposerResizeHandleInternal> {` |
-| 102 | `class` | `ComposerIconButtonStateInternal` | `class ComposerIconButtonStateInternal extends State<ComposerIconButtonInternal> {` |
-| 129 | `class` | `ComposerToolbarChipInternal` | `class ComposerToolbarChipInternal extends StatefulWidget {` |
-| 153 | `class` | `ComposerToolbarChipStateInternal` | `class ComposerToolbarChipStateInternal extends State<ComposerToolbarChipInternal> {` |
-| 198 | `extension` | `AssistantExecutionTargetIconInternal` | `extension AssistantExecutionTargetIconInternal on AssistantExecutionTarget {` |
-| 205 | `extension` | `AssistantPermissionLevelIconInternal` | `extension AssistantPermissionLevelIconInternal on AssistantPermissionLevel {` |
-| 212 | `class` | `SingleAgentProviderBadgeInternal` | `class SingleAgentProviderBadgeInternal extends StatelessWidget {` |
+| 38 | `class` | `ComposerIconButtonInternal` | `class ComposerIconButtonInternal extends StatefulWidget {` |
+| 48 | `class` | `ComposerResizeHandleInternal` | `class ComposerResizeHandleInternal extends StatefulWidget {` |
+| 58 | `class` | `ComposerResizeHandleStateInternal` | `class ComposerResizeHandleStateInternal extends State<ComposerResizeHandleInternal> {` |
+| 100 | `class` | `ComposerIconButtonStateInternal` | `class ComposerIconButtonStateInternal extends State<ComposerIconButtonInternal> {` |
+| 127 | `class` | `ComposerToolbarChipInternal` | `class ComposerToolbarChipInternal extends StatefulWidget {` |
+| 151 | `class` | `ComposerToolbarChipStateInternal` | `class ComposerToolbarChipStateInternal extends State<ComposerToolbarChipInternal> {` |
+| 196 | `extension` | `AssistantExecutionTargetIconInternal` | `extension AssistantExecutionTargetIconInternal on AssistantExecutionTarget {` |
+| 203 | `extension` | `AssistantPermissionLevelIconInternal` | `extension AssistantPermissionLevelIconInternal on AssistantPermissionLevel {` |
+| 210 | `class` | `SingleAgentProviderBadgeInternal` | `class SingleAgentProviderBadgeInternal extends StatelessWidget {` |
 
 ### `lib/features/assistant/assistant_page_main.dart`
 
@@ -451,16 +467,16 @@ _No extracted public top-level symbols._
 
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
-| 56 | `typedef` | `AssistantClipboardImageReader` | `typedef AssistantClipboardImageReader = Future<XFile?> Function();` |
-| 58 | `class` | `AssistantPage` | `class AssistantPage extends StatefulWidget {` |
-| 80 | `class` | `AssistantPageStateInternal` | `class AssistantPageStateInternal extends State<AssistantPage> {` |
-| 278 | `enum` | `AssistantSidePaneInternal` | `enum AssistantSidePaneInternal { tasks, navigation, focused }` |
-| 280 | `class` | `AssistantUnifiedSidePaneInternal` | `class AssistantUnifiedSidePaneInternal extends StatelessWidget {` |
-| 352 | `class` | `AssistantSideTabRailInternal` | `class AssistantSideTabRailInternal extends StatelessWidget {` |
-| 452 | `class` | `AssistantSideTabButtonInternal` | `class AssistantSideTabButtonInternal extends StatefulWidget {` |
-| 471 | `class` | `AssistantSideTabButtonStateInternal` | `class AssistantSideTabButtonStateInternal extends State<AssistantSideTabButtonInternal> {` |
-| 520 | `class` | `AssistantLowerPaneInternal` | `class AssistantLowerPaneInternal extends StatelessWidget {` |
-| 604 | `class` | `ConversationAreaInternal` | `class ConversationAreaInternal extends StatelessWidget {` |
+| 54 | `typedef` | `AssistantClipboardImageReader` | `typedef AssistantClipboardImageReader = Future<XFile?> Function();` |
+| 56 | `class` | `AssistantPage` | `class AssistantPage extends StatefulWidget {` |
+| 78 | `class` | `AssistantPageStateInternal` | `class AssistantPageStateInternal extends State<AssistantPage> {` |
+| 363 | `enum` | `AssistantSidePaneInternal` | `enum AssistantSidePaneInternal { tasks, navigation, focused }` |
+| 365 | `class` | `AssistantUnifiedSidePaneInternal` | `class AssistantUnifiedSidePaneInternal extends StatelessWidget {` |
+| 437 | `class` | `AssistantSideTabRailInternal` | `class AssistantSideTabRailInternal extends StatelessWidget {` |
+| 537 | `class` | `AssistantSideTabButtonInternal` | `class AssistantSideTabButtonInternal extends StatefulWidget {` |
+| 556 | `class` | `AssistantSideTabButtonStateInternal` | `class AssistantSideTabButtonStateInternal extends State<AssistantSideTabButtonInternal> {` |
+| 605 | `class` | `AssistantLowerPaneInternal` | `class AssistantLowerPaneInternal extends StatelessWidget {` |
+| 695 | `class` | `ConversationAreaInternal` | `class ConversationAreaInternal extends StatelessWidget {` |
 
 ### `lib/features/assistant/assistant_page_message_widgets.dart`
 
@@ -469,18 +485,18 @@ _No extracted public top-level symbols._
 
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
-| 40 | `class` | `MessageBubbleInternal` | `class MessageBubbleInternal extends StatelessWidget {` |
-| 113 | `class` | `MessageBubbleBodyInternal` | `class MessageBubbleBodyInternal extends StatefulWidget {` |
-| 130 | `class` | `MessageBubbleBodyStateInternal` | `class MessageBubbleBodyStateInternal extends State<MessageBubbleBodyInternal> {` |
-| 294 | `class` | `PromptDebugSnapshotInternal` | `class PromptDebugSnapshotInternal {` |
-| 365 | `class` | `MessageMetaToggleButtonInternal` | `class MessageMetaToggleButtonInternal extends StatelessWidget {` |
-| 409 | `class` | `MessageMetaBlockInternal` | `class MessageMetaBlockInternal extends StatelessWidget {` |
-| 437 | `class` | `ToolCallTileInternal` | `class ToolCallTileInternal extends StatefulWidget {` |
-| 457 | `class` | `ToolCallTileStateInternal` | `class ToolCallTileStateInternal extends State<ToolCallTileInternal> {` |
-| 588 | `class` | `StatusPillInternal` | `class StatusPillInternal extends StatelessWidget {` |
-| 621 | `class` | `ConnectionChipInternal` | `class ConnectionChipInternal extends StatelessWidget {` |
-| 653 | `class` | `ConnectionStatusChipInternal` | `class ConnectionStatusChipInternal extends StatelessWidget {` |
-| 691 | `class` | `MessageViewModeChipInternal` | `class MessageViewModeChipInternal extends StatelessWidget {` |
+| 38 | `class` | `MessageBubbleInternal` | `class MessageBubbleInternal extends StatelessWidget {` |
+| 111 | `class` | `MessageBubbleBodyInternal` | `class MessageBubbleBodyInternal extends StatefulWidget {` |
+| 128 | `class` | `MessageBubbleBodyStateInternal` | `class MessageBubbleBodyStateInternal extends State<MessageBubbleBodyInternal> {` |
+| 292 | `class` | `PromptDebugSnapshotInternal` | `class PromptDebugSnapshotInternal {` |
+| 363 | `class` | `MessageMetaToggleButtonInternal` | `class MessageMetaToggleButtonInternal extends StatelessWidget {` |
+| 407 | `class` | `MessageMetaBlockInternal` | `class MessageMetaBlockInternal extends StatelessWidget {` |
+| 435 | `class` | `ToolCallTileInternal` | `class ToolCallTileInternal extends StatefulWidget {` |
+| 455 | `class` | `ToolCallTileStateInternal` | `class ToolCallTileStateInternal extends State<ToolCallTileInternal> {` |
+| 586 | `class` | `StatusPillInternal` | `class StatusPillInternal extends StatelessWidget {` |
+| 619 | `class` | `ConnectionChipInternal` | `class ConnectionChipInternal extends StatelessWidget {` |
+| 651 | `class` | `ConnectionStatusChipInternal` | `class ConnectionStatusChipInternal extends StatelessWidget {` |
+| 689 | `class` | `MessageViewModeChipInternal` | `class MessageViewModeChipInternal extends StatelessWidget {` |
 
 ### `lib/features/assistant/assistant_page_state_actions.dart`
 
@@ -489,7 +505,7 @@ _No extracted public top-level symbols._
 
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
-| 42 | `extension` | `AssistantPageStateActionsInternal` | `extension AssistantPageStateActionsInternal on AssistantPageStateInternal {` |
+| 39 | `extension` | `AssistantPageStateActionsInternal` | `extension AssistantPageStateActionsInternal on AssistantPageStateInternal {` |
 
 ### `lib/features/assistant/assistant_page_state_closure.dart`
 
@@ -498,7 +514,7 @@ _No extracted public top-level symbols._
 
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
-| 44 | `extension` | `AssistantPageStateClosureInternal` | `extension AssistantPageStateClosureInternal on AssistantPageStateInternal {` |
+| 42 | `extension` | `AssistantPageStateClosureInternal` | `extension AssistantPageStateClosureInternal on AssistantPageStateInternal {` |
 
 ### `lib/features/assistant/assistant_page_task_dialog_controls.dart`
 
@@ -516,25 +532,25 @@ _No extracted public top-level symbols._
 
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
-| 40 | `enum` | `BubbleToneInternal` | `enum BubbleToneInternal { user, assistant, agent }` |
-| 42 | `enum` | `TimelineItemKindInternal` | `enum TimelineItemKindInternal { user, assistant, agent, toolCall }` |
-| 44 | `class` | `TimelineItemInternal` | `class TimelineItemInternal {` |
-| 89 | `class` | `AssistantTaskSeedInternal` | `class AssistantTaskSeedInternal {` |
-| 128 | `class` | `AssistantTaskEntryInternal` | `class AssistantTaskEntryInternal {` |
-| 182 | `class` | `AssistantTaskGroupInternal` | `class AssistantTaskGroupInternal {` |
-| 192 | `class` | `PillStyleInternal` | `class PillStyleInternal {` |
-| 202 | `class` | `MetaPillInternal` | `class MetaPillInternal extends StatelessWidget {` |
-| 256 | `top-level function` | `pillStyleForStatusInternal` | `PillStyleInternal pillStyleForStatusInternal( BuildContext context, String label, ) {` |
-| 282 | `top-level function` | `normalizedTaskStatusInternal` | `String normalizedTaskStatusInternal(String status) {` |
-| 295 | `top-level function` | `toolCallStatusLabelInternal` | `String toolCallStatusLabelInternal(String status) =>` |
-| 303 | `top-level function` | `assistantThinkingLabelInternal` | `String assistantThinkingLabelInternal(String level) => switch (level) {` |
-| 310 | `top-level function` | `sessionDisplayTitleInternal` | `String sessionDisplayTitleInternal(GatewaySessionSummary session) {` |
-| 318 | `top-level function` | `fallbackSessionTitleInternal` | `String fallbackSessionTitleInternal(String sessionKey) {` |
-| 326 | `top-level function` | `sessionPreviewInternal` | `String? sessionPreviewInternal(GatewaySessionSummary session) {` |
-| 338 | `top-level function` | `sessionStatusInternal` | `String sessionStatusInternal( GatewaySessionSummary session, { required bool sessionPending, String lifecycleStatus = '', }) {` |
-| 359 | `top-level function` | `sessionUpdatedAtLabelInternal` | `String sessionUpdatedAtLabelInternal(double? updatedAtMs) {` |
-| 378 | `top-level function` | `estimatedComposerWrapSectionHeightInternal` | `double estimatedComposerWrapSectionHeightInternal({ required int itemCount, required double availableWidth, required double averageChipWidth, }) {` |
-| 394 | `top-level function` | `sessionKeysMatchInternal` | `bool sessionKeysMatchInternal(String incoming, String current) {` |
+| 38 | `enum` | `BubbleToneInternal` | `enum BubbleToneInternal { user, assistant, agent }` |
+| 40 | `enum` | `TimelineItemKindInternal` | `enum TimelineItemKindInternal { user, assistant, agent, toolCall }` |
+| 42 | `class` | `TimelineItemInternal` | `class TimelineItemInternal {` |
+| 93 | `class` | `AssistantTaskSeedInternal` | `class AssistantTaskSeedInternal {` |
+| 132 | `class` | `AssistantTaskEntryInternal` | `class AssistantTaskEntryInternal {` |
+| 186 | `class` | `AssistantTaskGroupInternal` | `class AssistantTaskGroupInternal {` |
+| 196 | `class` | `PillStyleInternal` | `class PillStyleInternal {` |
+| 206 | `class` | `MetaPillInternal` | `class MetaPillInternal extends StatelessWidget {` |
+| 260 | `top-level function` | `pillStyleForStatusInternal` | `PillStyleInternal pillStyleForStatusInternal( BuildContext context, String label, ) {` |
+| 286 | `top-level function` | `normalizedTaskStatusInternal` | `String normalizedTaskStatusInternal(String status) {` |
+| 299 | `top-level function` | `toolCallStatusLabelInternal` | `String toolCallStatusLabelInternal(String status) =>` |
+| 307 | `top-level function` | `assistantThinkingLabelInternal` | `String assistantThinkingLabelInternal(String level) => switch (level) {` |
+| 314 | `top-level function` | `sessionDisplayTitleInternal` | `String sessionDisplayTitleInternal(GatewaySessionSummary session) {` |
+| 322 | `top-level function` | `fallbackSessionTitleInternal` | `String fallbackSessionTitleInternal(String sessionKey) {` |
+| 330 | `top-level function` | `sessionPreviewInternal` | `String? sessionPreviewInternal(GatewaySessionSummary session) {` |
+| 342 | `top-level function` | `sessionStatusInternal` | `String sessionStatusInternal( GatewaySessionSummary session, { required bool sessionPending, String lifecycleStatus = '', }) {` |
+| 366 | `top-level function` | `sessionUpdatedAtLabelInternal` | `String sessionUpdatedAtLabelInternal(double? updatedAtMs) {` |
+| 385 | `top-level function` | `estimatedComposerWrapSectionHeightInternal` | `double estimatedComposerWrapSectionHeightInternal({ required int itemCount, required double availableWidth, required double averageChipWidth, }) {` |
+| 401 | `top-level function` | `sessionKeysMatchInternal` | `bool sessionKeysMatchInternal(String incoming, String current) {` |
 
 ### `lib/features/assistant/assistant_page_tooltip_labels.dart`
 
@@ -543,13 +559,136 @@ _No extracted public top-level symbols._
 
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
-| 40 | `top-level function` | `executionTargetTooltipInternal` | `String executionTargetTooltipInternal(AssistantExecutionTarget target) =>` |
-| 46 | `top-level function` | `providerTooltipInternal` | `String providerTooltipInternal(SingleAgentProvider provider) => appText( '智能体 Provider: ${provider.label}', 'Agent provider: ${provider.label}', );` |
-| 51 | `top-level function` | `modelTooltipInternal` | `String modelTooltipInternal(String modelLabel) {` |
-| 59 | `top-level function` | `skillsTooltipInternal` | `String skillsTooltipInternal(int selectedCount) => selectedCount <= 0` |
-| 63 | `top-level function` | `permissionTooltipInternal` | `String permissionTooltipInternal(AssistantPermissionLevel level) =>` |
-| 66 | `top-level function` | `thinkingTooltipInternal` | `String thinkingTooltipInternal(String level) => appText( '推理强度: ${assistantThinkingLabelInternal(level)}', 'Reasoning: ${assistantThinkingLabelInternal(level)}', );` |
-| 71 | `top-level function` | `skillOptionTooltipInternal` | `String skillOptionTooltipInternal(ComposerSkillOptionInternal option) {` |
+| 38 | `top-level function` | `executionTargetTooltipInternal` | `String executionTargetTooltipInternal(AssistantExecutionTarget target) =>` |
+| 44 | `top-level function` | `providerTooltipInternal` | `String providerTooltipInternal(SingleAgentProvider provider) => appText( '智能体 Provider: ${provider.label}', 'Agent provider: ${provider.label}', );` |
+| 49 | `top-level function` | `modelTooltipInternal` | `String modelTooltipInternal(String modelLabel) {` |
+| 57 | `top-level function` | `skillsTooltipInternal` | `String skillsTooltipInternal(int selectedCount) => selectedCount <= 0` |
+| 61 | `top-level function` | `permissionTooltipInternal` | `String permissionTooltipInternal(AssistantPermissionLevel level) =>` |
+| 64 | `top-level function` | `thinkingTooltipInternal` | `String thinkingTooltipInternal(String level) => appText( '推理强度: ${assistantThinkingLabelInternal(level)}', 'Reasoning: ${assistantThinkingLabelInternal(level)}', );` |
+| 69 | `top-level function` | `skillOptionTooltipInternal` | `String skillOptionTooltipInternal(ComposerSkillOptionInternal option) {` |
+
+### `lib/features/desktop/desktop_client.dart`
+
+- Language: `dart`
+- Public symbols: `3`
+
+| Line | Kind | Name | Signature |
+| ---: | --- | --- | --- |
+| 6 | `top-level function` | `desktopConnectionStateName` | `String desktopConnectionStateName(RTCPeerConnectionState state) {` |
+| 11 | `top-level function` | `desktopOfferParams` | `Map<String, Object?> desktopOfferParams({ required String sessionId, required String? sdpOffer, required String display, required int width, required int height, required int fps, required int bitrate, required bool useGpu, }) {` |
+| 33 | `class` | `DesktopClient` | `class DesktopClient {` |
+
+### `lib/features/desktop/desktop_input_handler.dart`
+
+- Language: `dart`
+- Public symbols: `3`
+
+| Line | Kind | Name | Signature |
+| ---: | --- | --- | --- |
+| 5 | `class` | `DesktopInputHandler` | `class DesktopInputHandler {` |
+| 84 | `top-level function` | `desktopKeyName` | `String? desktopKeyName(LogicalKeyboardKey key) {` |
+| 158 | `top-level function` | `desktopContentPosition` | `Offset? desktopContentPosition( Offset localPosition, Size viewportSize, { Size? contentSize, }) {` |
+
+### `lib/features/desktop/desktop_view.dart`
+
+- Language: `dart`
+- Public symbols: `1`
+
+| Line | Kind | Name | Signature |
+| ---: | --- | --- | --- |
+| 11 | `class` | `DesktopView` | `class DesktopView extends StatefulWidget {` |
+
+### `lib/features/mobile/mobile_assistant_list_page.dart`
+
+- Language: `dart`
+- Public symbols: `1`
+
+| Line | Kind | Name | Signature |
+| ---: | --- | --- | --- |
+| 11 | `class` | `MobileAssistantListPage` | `class MobileAssistantListPage extends StatefulWidget {` |
+
+### `lib/features/mobile/mobile_assistant_nav_page.dart`
+
+- Language: `dart`
+- Public symbols: `1`
+
+| Line | Kind | Name | Signature |
+| ---: | --- | --- | --- |
+| 9 | `class` | `MobileAssistantNavPage` | `class MobileAssistantNavPage extends StatefulWidget {` |
+
+### `lib/features/mobile/mobile_assistant_page.dart`
+
+- Language: `dart`
+- Public symbols: `0`
+
+_No extracted public top-level symbols._
+
+### `lib/features/mobile/mobile_assistant_page_composer.dart`
+
+- Language: `dart`
+- Public symbols: `2`
+
+| Line | Kind | Name | Signature |
+| ---: | --- | --- | --- |
+| 12 | `class` | `MobileAssistantComposer` | `class MobileAssistantComposer extends StatelessWidget {` |
+| 259 | `class` | `MobileAssistantActionChip` | `class MobileAssistantActionChip extends StatelessWidget {` |
+
+### `lib/features/mobile/mobile_assistant_page_conversation.dart`
+
+- Language: `dart`
+- Public symbols: `2`
+
+| Line | Kind | Name | Signature |
+| ---: | --- | --- | --- |
+| 9 | `class` | `MobileAssistantConversation` | `class MobileAssistantConversation extends StatelessWidget {` |
+| 110 | `class` | `MobileAssistantEmptyState` | `class MobileAssistantEmptyState extends StatelessWidget {` |
+
+### `lib/features/mobile/mobile_assistant_page_core.dart`
+
+- Language: `dart`
+- Public symbols: `2`
+
+| Line | Kind | Name | Signature |
+| ---: | --- | --- | --- |
+| 19 | `class` | `MobileAssistantDetailPage` | `class MobileAssistantDetailPage extends StatefulWidget {` |
+| 239 | `class` | `MobileAssistantStatusBanner` | `class MobileAssistantStatusBanner extends StatelessWidget {` |
+
+### `lib/features/mobile/mobile_assistant_page_sheets.dart`
+
+- Language: `dart`
+- Public symbols: `8`
+
+| Line | Kind | Name | Signature |
+| ---: | --- | --- | --- |
+| 10 | `top-level function` | `showMobileAssistantTargetSheet` | `Future<void> showMobileAssistantTargetSheet( BuildContext context, { required AppController controller, required Future<void> Function(AssistantExecutionTarget target) onSelected, }) {` |
+| 46 | `top-level function` | `showMobileAssistantProviderSheet` | `Future<void> showMobileAssistantProviderSheet( BuildContext context, { required AppController controller, required AssistantExecutionTarget target, required SingleAgentProvider selectedProvider, required Future<void> Function(SingleAgentProvider provider) onSelected, }) {` |
+| 100 | `top-level function` | `showMobileAssistantPermissionSheet` | `Future<void> showMobileAssistantPermissionSheet( BuildContext context, { required AppController controller, }) {` |
+| 125 | `top-level function` | `showMobileAssistantThinkingSheet` | `Future<void> showMobileAssistantThinkingSheet( BuildContext context, { required String value, required ValueChanged<String> onSelected, }) {` |
+| 151 | `top-level function` | `showMobileAssistantSheet` | `Future<void> showMobileAssistantSheet( BuildContext context, { required String title, required List<Widget> children, }) {` |
+| 196 | `top-level function` | `mobileThinkingLabel` | `String mobileThinkingLabel(String value) {` |
+| 206 | `top-level function` | `mobilePermissionIcon` | `IconData mobilePermissionIcon(AssistantPermissionLevel level) {` |
+| 213 | `top-level function` | `mobileProviderBadgeLabel` | `String mobileProviderBadgeLabel(SingleAgentProvider provider) {` |
+
+### `lib/features/mobile/mobile_settings_page.dart`
+
+- Language: `dart`
+- Public symbols: `1`
+
+| Line | Kind | Name | Signature |
+| ---: | --- | --- | --- |
+| 14 | `class` | `MobileSettingsPage` | `class MobileSettingsPage extends StatefulWidget {` |
+
+### `lib/features/mobile/mobile_settings_page_widgets.dart`
+
+- Language: `dart`
+- Public symbols: `4`
+
+| Line | Kind | Name | Signature |
+| ---: | --- | --- | --- |
+| 6 | `class` | `MobileSettingsTabSelectorInternal` | `class MobileSettingsTabSelectorInternal extends StatelessWidget {` |
+| 44 | `class` | `MobileSettingsCardInternal` | `class MobileSettingsCardInternal extends StatelessWidget {` |
+| 109 | `class` | `MobileSettingsTextFieldInternal` | `class MobileSettingsTextFieldInternal extends StatelessWidget {` |
+| 147 | `class` | `MobileSettingsMetaRowInternal` | `class MobileSettingsMetaRowInternal extends StatelessWidget {` |
 
 ### `lib/features/mobile/mobile_shell.dart`
 
@@ -565,10 +704,10 @@ _No extracted public top-level symbols._
 
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
-| 21 | `enum` | `MobileShellTab` | `enum MobileShellTab { assistant, settings }` |
-| 23 | `extension` | `MobileShellTabPresentationInternal` | `extension MobileShellTabPresentationInternal on MobileShellTab {` |
-| 35 | `class` | `MobileShell` | `class MobileShell extends StatefulWidget {` |
-| 44 | `class` | `MobileShellStateInternal` | `class MobileShellStateInternal extends State<MobileShell> {` |
+| 13 | `enum` | `MobileShellTab` | `enum MobileShellTab { assistant, settings }` |
+| 15 | `extension` | `MobileShellTabPresentationInternal` | `extension MobileShellTabPresentationInternal on MobileShellTab {` |
+| 27 | `class` | `MobileShell` | `class MobileShell extends StatefulWidget {` |
+| 36 | `class` | `MobileShellStateInternal` | `class MobileShellStateInternal extends State<MobileShell> {` |
 
 ### `lib/features/mobile/mobile_shell_nav.dart`
 
@@ -577,7 +716,16 @@ _No extracted public top-level symbols._
 
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
-| 19 | `class` | `BottomPillNavInternal` | `class BottomPillNavInternal extends StatelessWidget {` |
+| 6 | `class` | `BottomPillNavInternal` | `class BottomPillNavInternal extends StatelessWidget {` |
+
+### `lib/features/mobile/mobile_workspace_files_page.dart`
+
+- Language: `dart`
+- Public symbols: `1`
+
+| Line | Kind | Name | Signature |
+| ---: | --- | --- | --- |
+| 9 | `class` | `MobileWorkspaceFilesPage` | `class MobileWorkspaceFilesPage extends StatefulWidget {` |
 
 ### `lib/features/settings/settings_about_panel.dart`
 
@@ -596,7 +744,25 @@ _No extracted public top-level symbols._
 
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
-| 6 | `class` | `SettingsAccountPanel` | `class SettingsAccountPanel extends StatelessWidget {` |
+| 6 | `class` | `SettingsAccountPanel` | `class SettingsAccountPanel extends StatefulWidget {` |
+
+### `lib/features/settings/settings_archived_tasks_panel.dart`
+
+- Language: `dart`
+- Public symbols: `1`
+
+| Line | Kind | Name | Signature |
+| ---: | --- | --- | --- |
+| 7 | `class` | `SettingsArchivedTasksPanel` | `class SettingsArchivedTasksPanel extends StatefulWidget {` |
+
+### `lib/features/settings/settings_logs_panel.dart`
+
+- Language: `dart`
+- Public symbols: `1`
+
+| Line | Kind | Name | Signature |
+| ---: | --- | --- | --- |
+| 8 | `class` | `SettingsLogsPanel` | `class SettingsLogsPanel extends StatefulWidget {` |
 
 ### `lib/features/settings/settings_page.dart`
 
@@ -612,8 +778,17 @@ _No extracted public top-level symbols._
 
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
-| 19 | `top-level function` | `loadBridgeMetadataForSettingsAbout` | `Future<Map<String, dynamic>> loadBridgeMetadataForSettingsAbout({ required Uri bridgeEndpoint, required Future<String?> Function(Uri endpoint) authorizationResolver, HttpClient Function()? clientFactory, }) async {` |
-| 109 | `class` | `SettingsPage` | `class SettingsPage extends StatefulWidget {` |
+| 23 | `top-level function` | `loadBridgeMetadataForSettingsAbout` | `Future<Map<String, dynamic>> loadBridgeMetadataForSettingsAbout({ required Uri bridgeEndpoint, required Future<String?> Function(Uri endpoint) authorizationResolver, HttpClient Function()? clientFactory, }) async {` |
+| 124 | `class` | `SettingsPage` | `class SettingsPage extends StatefulWidget {` |
+
+### `lib/features/settings/settings_remote_desktop_panel.dart`
+
+- Language: `dart`
+- Public symbols: `1`
+
+| Line | Kind | Name | Signature |
+| ---: | --- | --- | --- |
+| 7 | `class` | `SettingsRemoteDesktopPanel` | `class SettingsRemoteDesktopPanel extends StatefulWidget {` |
 
 ## lib/models
 
@@ -637,32 +812,32 @@ _No extracted public top-level symbols._
 | 141 | `enum` | `AppSidebarState` | `enum AppSidebarState { expanded, collapsed, hidden }` |
 | 143 | `enum` | `AssistantMode` | `enum AssistantMode { code, office }` |
 | 145 | `extension` | `AssistantModeCopy` | `extension AssistantModeCopy on AssistantMode {` |
-| 152 | `enum` | `SettingsTab` | `enum SettingsTab { gateway }` |
+| 152 | `enum` | `SettingsTab` | `enum SettingsTab { gateway, archivedTasks, remoteDesktop, logs }` |
 | 154 | `extension` | `SettingsTabCopy` | `extension SettingsTabCopy on SettingsTab {` |
-| 160 | `class` | `QuickAction` | `class QuickAction {` |
-| 172 | `class` | `RecentSession` | `class RecentSession {` |
-| 184 | `class` | `MetricSummary` | `class MetricSummary {` |
-| 200 | `class` | `TaskSummary` | `class TaskSummary {` |
-| 218 | `class` | `ModuleSummary` | `class ModuleSummary {` |
-| 234 | `class` | `NodeSummary` | `class NodeSummary {` |
-| 252 | `class` | `AgentSummary` | `class AgentSummary {` |
-| 268 | `class` | `SkillSummary` | `class SkillSummary {` |
-| 286 | `class` | `ConnectorSummary` | `class ConnectorSummary {` |
-| 302 | `class` | `SecretSummary` | `class SecretSummary {` |
-| 318 | `class` | `SecretReference` | `class SecretReference {` |
-| 334 | `class` | `ProviderSummary` | `class ProviderSummary {` |
-| 348 | `class` | `AuditSummary` | `class AuditSummary {` |
-| 366 | `class` | `SettingSummary` | `class SettingSummary {` |
-| 378 | `class` | `WorkspaceProfile` | `class WorkspaceProfile {` |
-| 392 | `class` | `DetailPanelData` | `class DetailPanelData {` |
-| 414 | `class` | `DetailSection` | `class DetailSection {` |
-| 421 | `class` | `DetailItem` | `class DetailItem {` |
-| 428 | `class` | `CommandEntry` | `class CommandEntry {` |
+| 163 | `class` | `QuickAction` | `class QuickAction {` |
+| 175 | `class` | `RecentSession` | `class RecentSession {` |
+| 187 | `class` | `MetricSummary` | `class MetricSummary {` |
+| 203 | `class` | `TaskSummary` | `class TaskSummary {` |
+| 221 | `class` | `ModuleSummary` | `class ModuleSummary {` |
+| 237 | `class` | `NodeSummary` | `class NodeSummary {` |
+| 255 | `class` | `AgentSummary` | `class AgentSummary {` |
+| 271 | `class` | `SkillSummary` | `class SkillSummary {` |
+| 289 | `class` | `ConnectorSummary` | `class ConnectorSummary {` |
+| 305 | `class` | `SecretSummary` | `class SecretSummary {` |
+| 321 | `class` | `SecretReference` | `class SecretReference {` |
+| 337 | `class` | `ProviderSummary` | `class ProviderSummary {` |
+| 351 | `class` | `AuditSummary` | `class AuditSummary {` |
+| 369 | `class` | `SettingSummary` | `class SettingSummary {` |
+| 381 | `class` | `WorkspaceProfile` | `class WorkspaceProfile {` |
+| 395 | `class` | `DetailPanelData` | `class DetailPanelData {` |
+| 417 | `class` | `DetailSection` | `class DetailSection {` |
+| 424 | `class` | `DetailItem` | `class DetailItem {` |
+| 431 | `class` | `CommandEntry` | `class CommandEntry {` |
 
 ## lib/runtime
 
-- Files: `66`
-- Public symbols: `372`
+- Files: `55`
+- Public symbols: `333`
 
 ### `lib/runtime/account_runtime_client.dart`
 
@@ -698,15 +873,6 @@ _No extracted public top-level symbols._
 | 129 | `class` | `AgentResponse` | `class AgentResponse {` |
 | 153 | `class` | `AgentException` | `class AgentException implements Exception {` |
 | 165 | `class` | `AgentRegistry` | `class AgentRegistry with ChangeNotifier {` |
-
-### `lib/runtime/aris_llm_chat_client.dart`
-
-- Language: `dart`
-- Public symbols: `1`
-
-| Line | Kind | Name | Signature |
-| ---: | --- | --- | --- |
-| 3 | `class` | `ArisLlmChatClient` | `class ArisLlmChatClient {` |
 
 ### `lib/runtime/assistant_artifacts.dart`
 
@@ -818,12 +984,12 @@ _No extracted public top-level symbols._
 
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
-| 10 | `class` | `ExternalCodeAgentAcpDesktopTransport` | `class ExternalCodeAgentAcpDesktopTransport implements ExternalCodeAgentAcpTransport {` |
+| 11 | `class` | `ExternalCodeAgentAcpDesktopTransport` | `class ExternalCodeAgentAcpDesktopTransport implements ExternalCodeAgentAcpTransport {` |
 
 ### `lib/runtime/file_store_support.dart`
 
 - Language: `dart`
-- Public symbols: `17`
+- Public symbols: `18`
 
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
@@ -835,29 +1001,29 @@ _No extracted public top-level symbols._
 | 75 | `class` | `PersistentWriteFailures` | `class PersistentWriteFailures {` |
 | 92 | `class` | `StoreLayout` | `class StoreLayout {` |
 | 122 | `class` | `StoreLayoutResolver` | `class StoreLayoutResolver {` |
-| 220 | `top-level function` | `normalizeStoreDirectoryPath` | `String normalizeStoreDirectoryPath(String path) {` |
-| 237 | `top-level function` | `ensureDirectory` | `Future<Directory> ensureDirectory(String path) async {` |
-| 245 | `top-level function` | `ensureOwnerOnlyDirectory` | `Future<void> ensureOwnerOnlyDirectory(Directory directory) async {` |
-| 252 | `top-level function` | `ensureOwnerOnlyFile` | `Future<void> ensureOwnerOnlyFile(File file) async {` |
-| 259 | `top-level function` | `encodeStableFileKey` | `String encodeStableFileKey(String key) {` |
-| 263 | `top-level function` | `atomicWriteString` | `Future<void> atomicWriteString( File file, String contents, { bool ownerOnly = false, }) async {` |
-| 285 | `top-level function` | `deleteIfExists` | `Future<void> deleteIfExists(File file) async {` |
-| 291 | `top-level function` | `decodeYamlDocument` | `Object? decodeYamlDocument(String raw) {` |
-| 316 | `top-level function` | `encodeYamlDocument` | `String encodeYamlDocument(Object? value) {` |
+| 222 | `top-level function` | `normalizeStoreDirectoryPath` | `String normalizeStoreDirectoryPath(String path) {` |
+| 239 | `top-level function` | `ensureDirectory` | `Future<Directory> ensureDirectory(String path) async {` |
+| 247 | `top-level function` | `ensureOwnerOnlyDirectory` | `Future<void> ensureOwnerOnlyDirectory(Directory directory) async {` |
+| 254 | `top-level function` | `ensureOwnerOnlyFile` | `Future<void> ensureOwnerOnlyFile(File file) async {` |
+| 261 | `top-level function` | `shouldApplyUnixOwnerOnlyPermissionsInternal` | `bool shouldApplyUnixOwnerOnlyPermissionsInternal({String? operatingSystem}) {` |
+| 266 | `top-level function` | `encodeStableFileKey` | `String encodeStableFileKey(String key) {` |
+| 270 | `top-level function` | `atomicWriteString` | `Future<void> atomicWriteString( File file, String contents, { bool ownerOnly = false, }) async {` |
+| 292 | `top-level function` | `deleteIfExists` | `Future<void> deleteIfExists(File file) async {` |
+| 298 | `top-level function` | `decodeYamlDocument` | `Object? decodeYamlDocument(String raw) {` |
+| 323 | `top-level function` | `encodeYamlDocument` | `String encodeYamlDocument(Object? value) {` |
 
 ### `lib/runtime/gateway_acp_client.dart`
 
 - Language: `dart`
-- Public symbols: `6`
+- Public symbols: `5`
 
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
-| 16 | `class` | `GatewayAcpException` | `class GatewayAcpException implements Exception {` |
-| 33 | `class` | `GatewayAcpCapabilities` | `class GatewayAcpCapabilities {` |
-| 91 | `class` | `GatewayAcpMultiAgentRequest` | `class GatewayAcpMultiAgentRequest {` |
-| 111 | `class` | `GatewayAcpClient` | `class GatewayAcpClient {` |
-| 1392 | `top-level function` | `gatewayAcpHttpResponseTimeoutFor` | `Duration gatewayAcpHttpResponseTimeoutFor( Uri endpoint, String method, [ Map<String, dynamic> params = const <String, dynamic>{}, ]) {` |
-| 1412 | `top-level function` | `gatewayAcpTaskRuntimeBudgetMinutesForParams` | `int gatewayAcpTaskRuntimeBudgetMinutesForParams(Map<String, dynamic> params) {` |
+| 18 | `class` | `GatewayAcpException` | `class GatewayAcpException implements Exception {` |
+| 35 | `class` | `GatewayAcpCapabilities` | `class GatewayAcpCapabilities {` |
+| 113 | `class` | `GatewayAcpClient` | `class GatewayAcpClient {` |
+| 1384 | `class` | `GatewayAcpRuntimeSessionClient` | `class GatewayAcpRuntimeSessionClient implements GatewayRuntimeSessionClient {` |
+| 1478 | `top-level function` | `gatewayAcpHttpResponseTimeoutFor` | `Duration gatewayAcpHttpResponseTimeoutFor( Uri endpoint, String method, [ Map<String, dynamic> params = const <String, dynamic>{}, ]) {` |
 
 ### `lib/runtime/gateway_runtime.dart`
 
@@ -869,11 +1035,12 @@ _No extracted public top-level symbols._
 ### `lib/runtime/gateway_runtime_api.dart`
 
 - Language: `dart`
-- Public symbols: `1`
+- Public symbols: `2`
 
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
 | 3 | `extension` | `GatewayRuntimeApiInternal` | `extension GatewayRuntimeApiInternal on GatewayRuntime {` |
+| 608 | `top-level function` | `skillMissingListInternal` | `List<String> skillMissingListInternal( Map<String, dynamic> skill, String nestedKey, String flatKey, ) {` |
 
 ### `lib/runtime/gateway_runtime_core.dart`
 
@@ -946,8 +1113,8 @@ _No extracted public top-level symbols._
 | 114 | `enum` | `GatewayRuntimeSessionUpdateType` | `enum GatewayRuntimeSessionUpdateType { snapshot, log, push }` |
 | 116 | `class` | `GatewayRuntimeSessionUpdate` | `class GatewayRuntimeSessionUpdate {` |
 | 177 | `abstract interface` | `GatewayRuntimeSessionClient` | `abstract class GatewayRuntimeSessionClient {` |
-| 196 | `top-level function` | `gatewayConnectionSnapshotFromJson` | `GatewayConnectionSnapshot gatewayConnectionSnapshotFromJson( Map<String, dynamic> json, ) {` |
-| 223 | `top-level function` | `runtimeLogEntryFromJson` | `RuntimeLogEntry runtimeLogEntryFromJson(Map<String, dynamic> json) {` |
+| 197 | `top-level function` | `gatewayConnectionSnapshotFromJson` | `GatewayConnectionSnapshot gatewayConnectionSnapshotFromJson( Map<String, dynamic> json, ) {` |
+| 224 | `top-level function` | `runtimeLogEntryFromJson` | `RuntimeLogEntry runtimeLogEntryFromJson(Map<String, dynamic> json) {` |
 
 ### `lib/runtime/go_core.dart`
 
@@ -961,15 +1128,6 @@ _No extracted public top-level symbols._
 | 21 | `typedef` | `GoCoreBinaryExistsResolver` | `typedef GoCoreBinaryExistsResolver = Future<bool> Function(String command);` |
 | 24 | `class` | `GoCoreLocator` | `class GoCoreLocator {` |
 
-### `lib/runtime/go_multi_agent_mount_desktop_client.dart`
-
-- Language: `dart`
-- Public symbols: `1`
-
-| Line | Kind | Name | Signature |
-| ---: | --- | --- | --- |
-| 5 | `class` | `GoMultiAgentMountDesktopClient` | `class GoMultiAgentMountDesktopClient implements MultiAgentMountResolver {` |
-
 ### `lib/runtime/go_runtime_dispatch_desktop_client.dart`
 
 - Language: `dart`
@@ -982,29 +1140,30 @@ _No extracted public top-level symbols._
 ### `lib/runtime/go_task_service_client.dart`
 
 - Language: `dart`
-- Public symbols: `19`
+- Public symbols: `20`
 
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
-| 3 | `enum` | `GoTaskServiceRoute` | `enum GoTaskServiceRoute { externalAcpSingle, externalAcpMulti }` |
-| 5 | `enum` | `GoTaskServiceCollaborationMode` | `enum GoTaskServiceCollaborationMode { standard, multiAgent }` |
-| 7 | `class` | `ExternalCodeAgentAcpCapabilities` | `class ExternalCodeAgentAcpCapabilities {` |
-| 33 | `class` | `ExternalCodeAgentAcpRoutingResolution` | `class ExternalCodeAgentAcpRoutingResolution {` |
-| 82 | `enum` | `ExternalCodeAgentAcpRoutingMode` | `enum ExternalCodeAgentAcpRoutingMode { auto, explicit }` |
-| 84 | `class` | `ExternalCodeAgentAcpAvailableSkill` | `class ExternalCodeAgentAcpAvailableSkill {` |
-| 107 | `class` | `ExternalCodeAgentAcpRoutingConfig` | `class ExternalCodeAgentAcpRoutingConfig {` |
-| 167 | `class` | `ExternalCodeAgentAcpSkillInstallApproval` | `class ExternalCodeAgentAcpSkillInstallApproval {` |
-| 187 | `class` | `GoTaskServiceRequest` | `class GoTaskServiceRequest {` |
-| 359 | `class` | `GoTaskServiceUpdate` | `class GoTaskServiceUpdate {` |
-| 388 | `class` | `GoTaskServiceArtifact` | `class GoTaskServiceArtifact {` |
-| 443 | `class` | `GoTaskServiceResult` | `class GoTaskServiceResult {` |
-| 577 | `top-level function` | `goTaskServiceGatewayEntryState` | `String? goTaskServiceGatewayEntryState({ required AssistantExecutionTarget requestedTarget, required GoTaskServiceResult result, }) {` |
-| 612 | `abstract interface` | `ExternalCodeAgentAcpTransport` | `abstract class ExternalCodeAgentAcpTransport {` |
-| 644 | `abstract interface` | `GoTaskServiceClient` | `abstract class GoTaskServiceClient {` |
-| 678 | `top-level function` | `goTaskServiceUpdateFromAcpNotification` | `GoTaskServiceUpdate? goTaskServiceUpdateFromAcpNotification( Map<String, dynamic> notification, ) {` |
-| 719 | `top-level function` | `goTaskServiceResultFromAcpResponse` | `GoTaskServiceResult goTaskServiceResultFromAcpResponse( Map<String, dynamic> response, { required GoTaskServiceRoute route, String streamedText = '', String? completedMessage, }) {` |
-| 913 | `top-level function` | `mergeGoTaskServiceResponseResult` | `Map<String, dynamic> mergeGoTaskServiceResponseResult( Map<String, dynamic> response, Map<String, dynamic> overlay, ) {` |
-| 937 | `top-level function` | `goTaskServiceBase64Size` | `int goTaskServiceBase64Size(String base64) {` |
+| 7 | `enum` | `GoTaskServiceRoute` | `enum GoTaskServiceRoute { externalAcpSingle, externalAcpMulti }` |
+| 9 | `enum` | `GoTaskServiceCollaborationMode` | `enum GoTaskServiceCollaborationMode { standard, multiAgent }` |
+| 11 | `class` | `ExternalCodeAgentAcpCapabilities` | `class ExternalCodeAgentAcpCapabilities {` |
+| 37 | `class` | `ExternalCodeAgentAcpRoutingResolution` | `class ExternalCodeAgentAcpRoutingResolution {` |
+| 86 | `enum` | `ExternalCodeAgentAcpRoutingMode` | `enum ExternalCodeAgentAcpRoutingMode { auto, explicit }` |
+| 88 | `class` | `ExternalCodeAgentAcpAvailableSkill` | `class ExternalCodeAgentAcpAvailableSkill {` |
+| 111 | `class` | `ExternalCodeAgentAcpRoutingConfig` | `class ExternalCodeAgentAcpRoutingConfig {` |
+| 188 | `class` | `ExternalCodeAgentAcpSkillInstallApproval` | `class ExternalCodeAgentAcpSkillInstallApproval {` |
+| 208 | `class` | `GoTaskServiceRequest` | `class GoTaskServiceRequest {` |
+| 385 | `class` | `GoTaskServiceUpdate` | `class GoTaskServiceUpdate {` |
+| 414 | `class` | `GoTaskServiceArtifact` | `class GoTaskServiceArtifact {` |
+| 469 | `class` | `GoTaskServiceResult` | `class GoTaskServiceResult {` |
+| 629 | `top-level function` | `goTaskServiceGatewayEntryState` | `String? goTaskServiceGatewayEntryState({ required AssistantExecutionTarget requestedTarget, required GoTaskServiceResult result, }) {` |
+| 664 | `abstract interface` | `ExternalCodeAgentAcpTransport` | `abstract class ExternalCodeAgentAcpTransport {` |
+| 703 | `abstract interface` | `GoTaskServiceClient` | `abstract class GoTaskServiceClient {` |
+| 744 | `top-level function` | `goTaskServiceUpdateFromAcpNotification` | `GoTaskServiceUpdate? goTaskServiceUpdateFromAcpNotification( Map<String, dynamic> notification, ) {` |
+| 785 | `top-level function` | `goTaskServiceResultFromAcpResponse` | `GoTaskServiceResult goTaskServiceResultFromAcpResponse( Map<String, dynamic> response, { required GoTaskServiceRoute route, String streamedText = '', String? completedMessage, }) {` |
+| 979 | `top-level function` | `mergeGoTaskServiceResponseResult` | `Map<String, dynamic> mergeGoTaskServiceResponseResult( Map<String, dynamic> response, Map<String, dynamic> overlay, ) {` |
+| 1003 | `top-level function` | `goTaskServiceBase64Size` | `int goTaskServiceBase64Size(String base64) {` |
+| 1014 | `top-level function` | `goTaskServiceAttachmentSha256` | `String goTaskServiceAttachmentSha256(GatewayChatAttachmentPayload attachment) {` |
 
 ### `lib/runtime/go_task_service_desktop_service.dart`
 
@@ -1027,97 +1186,6 @@ _No extracted public top-level symbols._
 | 38 | `class` | `ModeSwitchResult` | `class ModeSwitchResult {` |
 | 53 | `class` | `ModeCapabilities` | `class ModeCapabilities {` |
 | 96 | `class` | `ModeSwitcher` | `class ModeSwitcher extends ChangeNotifier {` |
-
-### `lib/runtime/multi_agent_frameworks.dart`
-
-- Language: `dart`
-- Public symbols: `3`
-
-| Line | Kind | Name | Signature |
-| ---: | --- | --- | --- |
-| 3 | `abstract interface` | `FrameworkPreset` | `abstract class FrameworkPreset {` |
-| 16 | `class` | `NativeFrameworkPreset` | `class NativeFrameworkPreset extends FrameworkPreset {` |
-| 45 | `class` | `ArisFrameworkPreset` | `class ArisFrameworkPreset extends FrameworkPreset {` |
-
-### `lib/runtime/multi_agent_mount_resolver.dart`
-
-- Language: `dart`
-- Public symbols: `2`
-
-| Line | Kind | Name | Signature |
-| ---: | --- | --- | --- |
-| 3 | `class` | `ArisMountProbe` | `class ArisMountProbe {` |
-| 39 | `abstract interface` | `MultiAgentMountResolver` | `abstract class MultiAgentMountResolver {` |
-
-### `lib/runtime/multi_agent_mounts.dart`
-
-- Language: `dart`
-- Public symbols: `7`
-
-| Line | Kind | Name | Signature |
-| ---: | --- | --- | --- |
-| 9 | `class` | `MultiAgentMountManager` | `class MultiAgentMountManager {` |
-| 90 | `abstract interface` | `CliMountAdapter` | `abstract class CliMountAdapter {` |
-| 112 | `class` | `CodexMountAdapter` | `class CodexMountAdapter extends CliMountAdapter {` |
-| 154 | `class` | `ClaudeMountAdapter` | `class ClaudeMountAdapter extends CliMountAdapter {` |
-| 193 | `class` | `GeminiMountAdapter` | `class GeminiMountAdapter extends CliMountAdapter {` |
-| 232 | `class` | `OpencodeMountAdapter` | `class OpencodeMountAdapter extends CliMountAdapter {` |
-| 273 | `class` | `OpenClawMountAdapter` | `class OpenClawMountAdapter extends CliMountAdapter {` |
-
-### `lib/runtime/multi_agent_orchestrator.dart`
-
-- Language: `dart`
-- Public symbols: `0`
-
-_No extracted public top-level symbols._
-
-### `lib/runtime/multi_agent_orchestrator_core.dart`
-
-- Language: `dart`
-- Public symbols: `1`
-
-| Line | Kind | Name | Signature |
-| ---: | --- | --- | --- |
-| 20 | `class` | `MultiAgentOrchestrator` | `class MultiAgentOrchestrator extends ChangeNotifier {` |
-
-### `lib/runtime/multi_agent_orchestrator_protocol.dart`
-
-- Language: `dart`
-- Public symbols: `13`
-
-| Line | Kind | Name | Signature |
-| ---: | --- | --- | --- |
-| 17 | `typedef` | `CliProcessStarter` | `typedef CliProcessStarter = Future<Process> Function( String executable, List<String> arguments, { Map<String, String>? environment, String? workingDirectory, });` |
-| 26 | `class` | `CollaborationLogEntry` | `class CollaborationLogEntry {` |
-| 47 | `enum` | `CollaborationLogLevel` | `enum CollaborationLogLevel { debug, info, warning, error, success }` |
-| 50 | `class` | `CliResult` | `class CliResult {` |
-| 65 | `class` | `ArchitectResult` | `class ArchitectResult {` |
-| 78 | `class` | `EngineerResult` | `class EngineerResult {` |
-| 93 | `class` | `TesterResult` | `class TesterResult {` |
-| 108 | `class` | `CollaborationStep` | `class CollaborationStep {` |
-| 137 | `enum` | `StepStatus` | `enum StepStatus { pending, running, completed, failed }` |
-| 140 | `class` | `SubTask` | `class SubTask {` |
-| 154 | `enum` | `SubTaskType` | `enum SubTaskType { design, implementation, testing, documentation, deployment }` |
-| 157 | `class` | `CollaborationAttachment` | `class CollaborationAttachment {` |
-| 170 | `class` | `CollaborationResult` | `class CollaborationResult {` |
-
-### `lib/runtime/multi_agent_orchestrator_support.dart`
-
-- Language: `dart`
-- Public symbols: `1`
-
-| Line | Kind | Name | Signature |
-| ---: | --- | --- | --- |
-| 17 | `extension` | `MultiAgentOrchestratorSupportInternal` | `extension MultiAgentOrchestratorSupportInternal on MultiAgentOrchestrator {` |
-
-### `lib/runtime/multi_agent_orchestrator_workflow.dart`
-
-- Language: `dart`
-- Public symbols: `1`
-
-| Line | Kind | Name | Signature |
-| ---: | --- | --- | --- |
-| 17 | `extension` | `MultiAgentOrchestratorWorkflowInternal` | `extension MultiAgentOrchestratorWorkflowInternal on MultiAgentOrchestrator {` |
 
 ### `lib/runtime/opencode_config_bridge.dart`
 
@@ -1181,9 +1249,9 @@ _No extracted public top-level symbols._
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
 | 14 | `class` | `SkillsController` | `class SkillsController extends ChangeNotifier {` |
-| 48 | `class` | `ModelsController` | `class ModelsController extends ChangeNotifier {` |
-| 121 | `class` | `CronJobsController` | `class CronJobsController extends ChangeNotifier {` |
-| 155 | `class` | `DevicesController` | `class DevicesController extends ChangeNotifier {` |
+| 97 | `class` | `ModelsController` | `class ModelsController extends ChangeNotifier {` |
+| 170 | `class` | `CronJobsController` | `class CronJobsController extends ChangeNotifier {` |
+| 204 | `class` | `DevicesController` | `class DevicesController extends ChangeNotifier {` |
 
 ### `lib/runtime/runtime_controllers_gateway.dart`
 
@@ -1218,19 +1286,21 @@ _No extracted public top-level symbols._
 ### `lib/runtime/runtime_controllers_settings_account_impl.dart`
 
 - Language: `dart`
-- Public symbols: `9`
+- Public symbols: `11`
 
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
 | 5 | `top-level function` | `loginAccountSettingsInternal` | `Future<void> loginAccountSettingsInternal( SettingsController controller, { required String baseUrl, required String identifier, required String password, }) async {` |
 | 64 | `top-level function` | `verifyAccountMfaSettingsInternal` | `Future<void> verifyAccountMfaSettingsInternal( SettingsController controller, { required String baseUrl, required String code, }) async {` |
 | 121 | `top-level function` | `completeAccountSignInSettingsInternal` | `Future<void> completeAccountSignInSettingsInternal( SettingsController controller, { required String baseUrl, required Map<String, dynamic> payload, required String identifier, }) async {` |
-| 158 | `top-level function` | `restoreAccountSessionSettingsInternal` | `Future<void> restoreAccountSessionSettingsInternal( SettingsController controller, { String baseUrl = '', bool quiet = false, }) async {` |
-| 225 | `top-level function` | `syncAccountSettingsInternal` | `Future<AccountSyncResult> syncAccountSettingsInternal( SettingsController controller, { String baseUrl = '', bool quiet = false, Map<String, dynamic> profilePayloadOverride = const <String, dynamic>{}, }) async {` |
-| 371 | `top-level function` | `logoutAccountSettingsInternal` | `Future<void> logoutAccountSettingsInternal( SettingsController controller, { String statusMessage = 'Signed out', bool quiet = false, }) async {` |
-| 424 | `top-level function` | `cancelAccountMfaChallengeSettingsInternal` | `Future<void> cancelAccountMfaChallengeSettingsInternal( SettingsController controller, ) async {` |
-| 454 | `top-level function` | `normalizeAccountBaseUrlSettingsInternal` | `String normalizeAccountBaseUrlSettingsInternal( String raw, { String fallback = '', }) {` |
-| 574 | `top-level function` | `resolveAcpBridgeServerEffectiveConfigInternal` | `AcpBridgeServerEffectiveConfig resolveAcpBridgeServerEffectiveConfigInternal( SettingsController controller, { required AcpBridgeServerModeConfig config, }) {` |
+| 160 | `top-level function` | `restoreAccountSessionSettingsInternal` | `Future<void> restoreAccountSessionSettingsInternal( SettingsController controller, { String baseUrl = '', bool quiet = false, }) async {` |
+| 227 | `top-level function` | `syncAccountSettingsInternal` | `Future<AccountSyncResult> syncAccountSettingsInternal( SettingsController controller, { String baseUrl = '', bool quiet = false, Map<String, dynamic> profilePayloadOverride = const <String, dynamic>{}, }) async {` |
+| 373 | `top-level function` | `logoutAccountSettingsInternal` | `Future<void> logoutAccountSettingsInternal( SettingsController controller, { String statusMessage = 'Signed out', bool quiet = false, }) async {` |
+| 426 | `top-level function` | `markAccountBridgeRuntimeUnavailableInternal` | `Future<AccountSyncResult> markAccountBridgeRuntimeUnavailableInternal( SettingsController controller, { required String message, }) async {` |
+| 444 | `top-level function` | `cancelAccountMfaChallengeSettingsInternal` | `Future<void> cancelAccountMfaChallengeSettingsInternal( SettingsController controller, ) async {` |
+| 474 | `top-level function` | `normalizeAccountBaseUrlSettingsInternal` | `String normalizeAccountBaseUrlSettingsInternal( String raw, { String fallback = '', }) {` |
+| 594 | `top-level function` | `resolveAcpBridgeServerEffectiveConfigInternal` | `AcpBridgeServerEffectiveConfig resolveAcpBridgeServerEffectiveConfigInternal( SettingsController controller, { required AcpBridgeServerModeConfig config, }) {` |
+| 615 | `top-level function` | `buildSavedAccountProfileSettingsInternal` | `Future<SettingsSnapshot> buildSavedAccountProfileSettingsInternal( SettingsController controller, { required SettingsSnapshot settings, required String accountBaseUrl, required String accountIdentifier, required String bridgeServerUrl, required String bridgeToken, required bool isManualBridge, }) async {` |
 
 ### `lib/runtime/runtime_controllers_settings_connectivity_impl.dart`
 
@@ -1392,39 +1462,30 @@ _No extracted public top-level symbols._
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
 | 13 | `class` | `GatewayChatAttachmentPayload` | `class GatewayChatAttachmentPayload {` |
-| 36 | `class` | `GatewayInstanceSummary` | `class GatewayInstanceSummary {` |
-| 66 | `class` | `GatewaySkillSummary` | `class GatewaySkillSummary {` |
-| 92 | `class` | `GatewayConnectorSummary` | `class GatewayConnectorSummary {` |
-| 120 | `class` | `GatewayModelSummary` | `class GatewayModelSummary {` |
-| 136 | `class` | `GatewayCronJobSummary` | `class GatewayCronJobSummary {` |
-| 162 | `class` | `GatewayDevicePairingList` | `class GatewayDevicePairingList {` |
-| 173 | `class` | `GatewayPendingDevice` | `class GatewayPendingDevice {` |
-| 200 | `class` | `GatewayPairedDevice` | `class GatewayPairedDevice {` |
-| 229 | `class` | `GatewayDeviceTokenSummary` | `class GatewayDeviceTokenSummary {` |
-| 249 | `class` | `SecretReferenceEntry` | `class SecretReferenceEntry {` |
-| 265 | `class` | `SecretAuditEntry` | `class SecretAuditEntry {` |
-| 305 | `class` | `DerivedTaskItem` | `class DerivedTaskItem {` |
-| 329 | `class` | `LocalDeviceIdentity` | `class LocalDeviceIdentity {` |
+| 39 | `class` | `GatewayInstanceSummary` | `class GatewayInstanceSummary {` |
+| 69 | `class` | `GatewaySkillSummary` | `class GatewaySkillSummary {` |
+| 95 | `class` | `GatewayConnectorSummary` | `class GatewayConnectorSummary {` |
+| 123 | `class` | `GatewayModelSummary` | `class GatewayModelSummary {` |
+| 139 | `class` | `GatewayCronJobSummary` | `class GatewayCronJobSummary {` |
+| 165 | `class` | `GatewayDevicePairingList` | `class GatewayDevicePairingList {` |
+| 176 | `class` | `GatewayPendingDevice` | `class GatewayPendingDevice {` |
+| 203 | `class` | `GatewayPairedDevice` | `class GatewayPairedDevice {` |
+| 232 | `class` | `GatewayDeviceTokenSummary` | `class GatewayDeviceTokenSummary {` |
+| 252 | `class` | `SecretReferenceEntry` | `class SecretReferenceEntry {` |
+| 268 | `class` | `SecretAuditEntry` | `class SecretAuditEntry {` |
+| 308 | `class` | `DerivedTaskItem` | `class DerivedTaskItem {` |
+| 332 | `class` | `LocalDeviceIdentity` | `class LocalDeviceIdentity {` |
 
 ### `lib/runtime/runtime_models_multi_agent.dart`
 
 - Language: `dart`
-- Public symbols: `12`
+- Public symbols: `3`
 
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
-| 13 | `enum` | `MultiAgentRole` | `enum MultiAgentRole {` |
-| 19 | `enum` | `MultiAgentFramework` | `enum MultiAgentFramework { native, aris }` |
-| 21 | `extension` | `MultiAgentFrameworkCopy` | `extension MultiAgentFrameworkCopy on MultiAgentFramework {` |
-| 35 | `extension` | `MultiAgentRoleCopy` | `extension MultiAgentRoleCopy on MultiAgentRole {` |
-| 49 | `enum` | `AiGatewayInjectionPolicy` | `enum AiGatewayInjectionPolicy { disabled, launchScoped, appManagedDefault }` |
-| 51 | `extension` | `AiGatewayInjectionPolicyCopy` | `extension AiGatewayInjectionPolicyCopy on AiGatewayInjectionPolicy {` |
-| 73 | `class` | `AgentWorkerConfig` | `class AgentWorkerConfig {` |
-| 105 | `class` | `ManagedSkillEntry` | `class ManagedSkillEntry {` |
-| 146 | `class` | `ManagedMcpServerEntry` | `class ManagedMcpServerEntry {` |
-| 222 | `class` | `ManagedMountTargetState` | `class ManagedMountTargetState {` |
-| 431 | `class` | `MultiAgentConfig` | `class MultiAgentConfig {` |
-| 788 | `class` | `MultiAgentRunEvent` | `class MultiAgentRunEvent {` |
+| 1 | `class` | `ManagedSkillEntry` | `class ManagedSkillEntry {` |
+| 42 | `class` | `ManagedMcpServerEntry` | `class ManagedMcpServerEntry {` |
+| 118 | `class` | `ManagedMountTargetState` | `class ManagedMountTargetState {` |
 
 ### `lib/runtime/runtime_models_profiles.dart`
 
@@ -1457,7 +1518,7 @@ _No extracted public top-level symbols._
 ### `lib/runtime/runtime_models_runtime_payloads.dart`
 
 - Language: `dart`
-- Public symbols: `31`
+- Public symbols: `32`
 
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
@@ -1468,30 +1529,31 @@ _No extracted public top-level symbols._
 | 240 | `class` | `GatewayAgentSummary` | `class GatewayAgentSummary {` |
 | 254 | `class` | `GatewaySessionSummary` | `class GatewaySessionSummary {` |
 | 308 | `class` | `GatewayChatMessage` | `class GatewayChatMessage {` |
-| 391 | `class` | `AssistantThreadSkillEntry` | `class AssistantThreadSkillEntry {` |
-| 457 | `enum` | `ThreadRealm` | `enum ThreadRealm { local, remote }` |
-| 459 | `extension` | `ThreadRealmCopy` | `extension ThreadRealmCopy on ThreadRealm {` |
-| 468 | `enum` | `ThreadSubjectType` | `enum ThreadSubjectType { tenant, user }` |
-| 470 | `extension` | `ThreadSubjectTypeCopy` | `extension ThreadSubjectTypeCopy on ThreadSubjectType {` |
-| 479 | `enum` | `WorkspaceKind` | `enum WorkspaceKind { localFs, remoteFs }` |
-| 481 | `extension` | `WorkspaceKindCopy` | `extension WorkspaceKindCopy on WorkspaceKind {` |
-| 500 | `top-level function` | `isLegacyAutoThreadExecutionModeValue` | `bool isLegacyAutoThreadExecutionModeValue(String? value) {` |
-| 504 | `enum` | `ThreadExecutionMode` | `enum ThreadExecutionMode { agent, gateway }` |
-| 506 | `extension` | `ThreadExecutionModeCopy` | `extension ThreadExecutionModeCopy on ThreadExecutionMode {` |
-| 515 | `enum` | `ThreadSelectionSource` | `enum ThreadSelectionSource { inherited, explicit }` |
-| 517 | `extension` | `ThreadSelectionSourceCopy` | `extension ThreadSelectionSourceCopy on ThreadSelectionSource {` |
-| 526 | `class` | `ThreadOwnerScope` | `class ThreadOwnerScope {` |
-| 574 | `class` | `WorkspaceBinding` | `class WorkspaceBinding {` |
-| 638 | `class` | `ExecutionBinding` | `class ExecutionBinding {` |
-| 702 | `top-level function` | `threadExecutionModeFromAssistantExecutionTarget` | `ThreadExecutionMode threadExecutionModeFromAssistantExecutionTarget( AssistantExecutionTarget target, ) {` |
-| 711 | `top-level function` | `assistantExecutionTargetFromExecutionMode` | `AssistantExecutionTarget assistantExecutionTargetFromExecutionMode( ThreadExecutionMode mode, ) {` |
-| 720 | `top-level function` | `workspaceRefKindFromWorkspaceKind` | `WorkspaceRefKind workspaceRefKindFromWorkspaceKind(WorkspaceKind kind) {` |
-| 727 | `class` | `ThreadContextState` | `class ThreadContextState {` |
-| 935 | `class` | `ThreadLifecycleState` | `class ThreadLifecycleState {` |
-| 991 | `class` | `TaskThread` | `class TaskThread {` |
-| 1332 | `top-level function` | `isNewConversationTaskTitle` | `bool isNewConversationTaskTitle(String title) {` |
-| 1337 | `top-level function` | `firstUserMessageTaskTitle` | `String firstUserMessageTaskTitle( Iterable<GatewayChatMessage> messages, { String fallback = '', }) {` |
-| 1359 | `top-level function` | `derivePersistedTaskTitle` | `String derivePersistedTaskTitle( String currentTitle, Iterable<GatewayChatMessage> messages, { String fallback = '', bool hasCustomTitle = false, }) {` |
+| 393 | `enum` | `ThreadRealm` | `enum ThreadRealm { local, remote }` |
+| 395 | `extension` | `ThreadRealmCopy` | `extension ThreadRealmCopy on ThreadRealm {` |
+| 404 | `enum` | `ThreadSubjectType` | `enum ThreadSubjectType { tenant, user }` |
+| 406 | `extension` | `ThreadSubjectTypeCopy` | `extension ThreadSubjectTypeCopy on ThreadSubjectType {` |
+| 415 | `enum` | `WorkspaceKind` | `enum WorkspaceKind { localFs, remoteFs }` |
+| 417 | `extension` | `WorkspaceKindCopy` | `extension WorkspaceKindCopy on WorkspaceKind {` |
+| 436 | `top-level function` | `isLegacyAutoThreadExecutionModeValue` | `bool isLegacyAutoThreadExecutionModeValue(String? value) {` |
+| 440 | `enum` | `ThreadExecutionMode` | `enum ThreadExecutionMode { agent, gateway }` |
+| 442 | `extension` | `ThreadExecutionModeCopy` | `extension ThreadExecutionModeCopy on ThreadExecutionMode {` |
+| 451 | `enum` | `ThreadSelectionSource` | `enum ThreadSelectionSource { inherited, explicit }` |
+| 453 | `extension` | `ThreadSelectionSourceCopy` | `extension ThreadSelectionSourceCopy on ThreadSelectionSource {` |
+| 462 | `class` | `ThreadOwnerScope` | `class ThreadOwnerScope {` |
+| 510 | `class` | `WorkspaceBinding` | `class WorkspaceBinding {` |
+| 574 | `class` | `ExecutionBinding` | `class ExecutionBinding {` |
+| 638 | `top-level function` | `threadExecutionModeFromAssistantExecutionTarget` | `ThreadExecutionMode threadExecutionModeFromAssistantExecutionTarget( AssistantExecutionTarget target, ) {` |
+| 647 | `top-level function` | `assistantExecutionTargetFromExecutionMode` | `AssistantExecutionTarget assistantExecutionTargetFromExecutionMode( ThreadExecutionMode mode, ) {` |
+| 656 | `top-level function` | `workspaceRefKindFromWorkspaceKind` | `WorkspaceRefKind workspaceRefKindFromWorkspaceKind(WorkspaceKind kind) {` |
+| 663 | `class` | `ThreadContextState` | `class ThreadContextState {` |
+| 851 | `class` | `TaskInputAttachmentRecord` | `class TaskInputAttachmentRecord {` |
+| 915 | `class` | `OpenClawTaskAssociation` | `class OpenClawTaskAssociation {` |
+| 1090 | `class` | `ThreadLifecycleState` | `class ThreadLifecycleState {` |
+| 1146 | `class` | `TaskThread` | `class TaskThread {` |
+| 1496 | `top-level function` | `isNewConversationTaskTitle` | `bool isNewConversationTaskTitle(String title) {` |
+| 1501 | `top-level function` | `firstUserMessageTaskTitle` | `String firstUserMessageTaskTitle( Iterable<GatewayChatMessage> messages, { String fallback = '', }) {` |
+| 1523 | `top-level function` | `derivePersistedTaskTitle` | `String derivePersistedTaskTitle( String currentTitle, Iterable<GatewayChatMessage> messages, { String fallback = '', bool hasCustomTitle = false, }) {` |
 
 ### `lib/runtime/runtime_models_settings_snapshot.dart`
 
@@ -1500,7 +1562,7 @@ _No extracted public top-level symbols._
 
 | Line | Kind | Name | Signature |
 | ---: | --- | --- | --- |
-| 17 | `class` | `SettingsSnapshot` | `class SettingsSnapshot {` |
+| 16 | `class` | `SettingsSnapshot` | `class SettingsSnapshot {` |
 
 ### `lib/runtime/runtime_models_ui_state.dart`
 
@@ -1544,20 +1606,6 @@ _No extracted public top-level symbols._
 | 20 | `enum` | `SkippedTaskThreadReason` | `enum SkippedTaskThreadReason {` |
 | 26 | `class` | `SkippedTaskThreadRecord` | `class SkippedTaskThreadRecord {` |
 | 36 | `class` | `SettingsStore` | `class SettingsStore {` |
-
-### `lib/runtime/skill_directory_access.dart`
-
-- Language: `dart`
-- Public symbols: `6`
-
-| Line | Kind | Name | Signature |
-| ---: | --- | --- | --- |
-| 10 | `abstract interface` | `SkillDirectoryAccessService` | `abstract class SkillDirectoryAccessService {` |
-| 33 | `class` | `SkillDirectoryAccessHandle` | `class SkillDirectoryAccessHandle {` |
-| 47 | `top-level function` | `createSkillDirectoryAccessService` | `SkillDirectoryAccessService createSkillDirectoryAccessService() {` |
-| 58 | `class` | `UnsupportedSkillDirectoryAccessService` | `class UnsupportedSkillDirectoryAccessService implements SkillDirectoryAccessService {` |
-| 90 | `class` | `FileSelectorSkillDirectoryAccessService` | `class FileSelectorSkillDirectoryAccessService implements SkillDirectoryAccessService {` |
-| 154 | `class` | `MacOsSkillDirectoryAccessService` | `class MacOsSkillDirectoryAccessService implements SkillDirectoryAccessService {` |
 
 ## lib/theme
 

@@ -1900,14 +1900,6 @@ void main() {
               provider: SingleAgentProvider.unspecified,
             ),
           );
-      final multiAgentGateway = controller
-          .resolveExternalAcpEndpointForRequestInternal(
-            _taskRequest(
-              target: AssistantExecutionTarget.gateway,
-              provider: SingleAgentProvider.openclaw,
-              multiAgent: true,
-            ),
-          );
       final agentTask = controller.resolveExternalAcpEndpointForRequestInternal(
         _taskRequest(
           target: AssistantExecutionTarget.agent,
@@ -1918,7 +1910,6 @@ void main() {
       expect(openClawStart?.path, '/acp/rpc');
       expect(openClawFollowUp?.path, '/acp/rpc');
       expect(unspecifiedGateway?.path, '/acp/rpc');
-      expect(multiAgentGateway?.path, '/acp/rpc');
       expect(agentTask?.path, '/acp/rpc');
     });
 
@@ -2138,90 +2129,7 @@ void main() {
       },
     );
 
-    test('multi-agent execution uses session lifecycle methods', () async {
-      final capture = await _startAcpHttpServer();
-      addTearDown(capture.close);
-      final client = GatewayAcpClient(
-        endpointResolver: () => capture.baseEndpoint,
-        authorizationResolver: (_) async => 'bridge-token',
-      );
 
-      final events = await client
-          .runMultiAgent(
-            const GatewayAcpMultiAgentRequest(
-              sessionId: 'session-1',
-              threadId: 'session-1',
-              prompt: 'hi',
-              workingDirectory: '/tmp',
-              attachments: <CollaborationAttachment>[],
-              selectedSkills: <String>[],
-              resumeSession: false,
-            ),
-          )
-          .toList();
-
-      expect(events, isNotEmpty);
-      expect(
-        capture.requestBodies,
-        contains(
-          predicate<String>((body) {
-            return body.contains('"method":"session.start"');
-          }),
-        ),
-      );
-      expect(
-        capture.requestBodies,
-        isNot(
-          contains(
-            predicate<String>((body) {
-              return body.contains('"method":"thread/start"');
-            }),
-          ),
-        ),
-      );
-    });
-
-    test('multi-agent follow-up uses session.message', () async {
-      final capture = await _startAcpHttpServer();
-      addTearDown(capture.close);
-      final client = GatewayAcpClient(
-        endpointResolver: () => capture.baseEndpoint,
-        authorizationResolver: (_) async => 'bridge-token',
-      );
-
-      await client
-          .runMultiAgent(
-            const GatewayAcpMultiAgentRequest(
-              sessionId: 'session-1',
-              threadId: 'session-1',
-              prompt: 'hi',
-              workingDirectory: '/tmp',
-              attachments: <CollaborationAttachment>[],
-              selectedSkills: <String>[],
-              resumeSession: true,
-            ),
-          )
-          .toList();
-
-      expect(
-        capture.requestBodies,
-        contains(
-          predicate<String>((body) {
-            return body.contains('"method":"session.message"');
-          }),
-        ),
-      );
-      expect(
-        capture.requestBodies,
-        isNot(
-          contains(
-            predicate<String>((body) {
-              return body.contains('"method":"turn/start"');
-            }),
-          ),
-        ),
-      );
-    });
   });
 }
 
@@ -2249,7 +2157,6 @@ GoTaskServiceRequest _taskRequest({
   required AssistantExecutionTarget target,
   required SingleAgentProvider provider,
   bool resumeSession = false,
-  bool multiAgent = false,
   String remoteWorkingDirectoryHint = '',
 }) {
   return GoTaskServiceRequest(
@@ -2268,7 +2175,6 @@ GoTaskServiceRequest _taskRequest({
     provider: provider,
     remoteWorkingDirectoryHint: remoteWorkingDirectoryHint,
     resumeSession: resumeSession,
-    multiAgent: multiAgent,
   );
 }
 

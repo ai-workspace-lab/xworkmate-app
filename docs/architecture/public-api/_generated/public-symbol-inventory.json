@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-13T08:37:25.180831+00:00",
+  "generatedAt": "2026-06-04T06:23:23.858629+00:00",
   "targets": [
     "lib/app",
     "lib/runtime",
@@ -11,13 +11,13 @@
   "coverageScopes": [
     {
       "scope": "lib/app",
-      "fileCount": 30,
-      "symbolCount": 68
+      "fileCount": 31,
+      "symbolCount": 69
     },
     {
       "scope": "lib/runtime",
-      "fileCount": 66,
-      "symbolCount": 372
+      "fileCount": 55,
+      "symbolCount": 333
     },
     {
       "scope": "lib/models",
@@ -27,17 +27,17 @@
     {
       "scope": "lib/features/assistant",
       "fileCount": 16,
-      "symbolCount": 79
+      "symbolCount": 86
     },
     {
       "scope": "lib/features/settings",
-      "fileCount": 4,
-      "symbolCount": 5
+      "fileCount": 7,
+      "symbolCount": 8
     },
     {
       "scope": "lib/features/mobile",
-      "fileCount": 6,
-      "symbolCount": 19
+      "fileCount": 13,
+      "symbolCount": 27
     },
     {
       "scope": "lib/theme",
@@ -51,14 +51,14 @@
     }
   ],
   "totals": {
-    "fileCount": 129,
-    "symbolCount": 603
+    "fileCount": 132,
+    "symbolCount": 590
   },
   "groups": [
     {
       "group": "lib/app",
-      "fileCount": 30,
-      "symbolCount": 68,
+      "fileCount": 31,
+      "symbolCount": 69,
       "files": [
         {
           "path": "lib/app/app.dart",
@@ -110,7 +110,7 @@
             {
               "language": "dart",
               "path": "lib/app/app_controller_desktop_core.dart",
-              "line": 57,
+              "line": 53,
               "kind": "enum",
               "name": "CodexCooperationState",
               "signature": "enum CodexCooperationState { notStarted, bridgeOnly, registered }"
@@ -118,18 +118,18 @@
             {
               "language": "dart",
               "path": "lib/app/app_controller_desktop_core.dart",
-              "line": 59,
+              "line": 55,
               "kind": "class",
-              "name": "SingleAgentSkillScanRootInternal",
-              "signature": "class SingleAgentSkillScanRootInternal {"
+              "name": "AppController",
+              "signature": "class AppController extends ChangeNotifier {"
             },
             {
               "language": "dart",
               "path": "lib/app/app_controller_desktop_core.dart",
-              "line": 91,
-              "kind": "class",
-              "name": "AppController",
-              "signature": "class AppController extends ChangeNotifier {"
+              "line": 599,
+              "kind": "top-level function",
+              "name": "resolveUserHomeDirectoryFromControllerEnvironmentInternal",
+              "signature": "String resolveUserHomeDirectoryFromControllerEnvironmentInternal( Map<String, String>? environment, ) {"
             }
           ]
         },
@@ -141,7 +141,7 @@
             {
               "language": "dart",
               "path": "lib/app/app_controller_desktop_external_acp_routing.dart",
-              "line": 39,
+              "line": 37,
               "kind": "extension",
               "name": "AppControllerDesktopExternalAcpRouting",
               "signature": "extension AppControllerDesktopExternalAcpRouting on AppController {"
@@ -156,7 +156,7 @@
             {
               "language": "dart",
               "path": "lib/app/app_controller_desktop_gateway.dart",
-              "line": 48,
+              "line": 46,
               "kind": "extension",
               "name": "AppControllerDesktopGateway",
               "signature": "extension AppControllerDesktopGateway on AppController {"
@@ -171,7 +171,7 @@
             {
               "language": "dart",
               "path": "lib/app/app_controller_desktop_navigation.dart",
-              "line": 47,
+              "line": 45,
               "kind": "extension",
               "name": "AppControllerDesktopNavigation",
               "signature": "extension AppControllerDesktopNavigation on AppController {"
@@ -186,7 +186,7 @@
             {
               "language": "dart",
               "path": "lib/app/app_controller_desktop_runtime_coordination_impl.dart",
-              "line": 48,
+              "line": 46,
               "kind": "top-level function",
               "name": "refreshAcpCapabilitiesRuntimeInternal",
               "signature": "Future<void> refreshAcpCapabilitiesRuntimeInternal( AppController controller, { bool forceRefresh = false, bool persistMountTargets = false, }) async {"
@@ -194,7 +194,7 @@
             {
               "language": "dart",
               "path": "lib/app/app_controller_desktop_runtime_coordination_impl.dart",
-              "line": 98,
+              "line": 80,
               "kind": "top-level function",
               "name": "refreshSingleAgentCapabilitiesRuntimeInternal",
               "signature": "Future<void> refreshSingleAgentCapabilitiesRuntimeInternal( AppController controller, { bool forceRefresh = false, }) async {"
@@ -202,7 +202,7 @@
             {
               "language": "dart",
               "path": "lib/app/app_controller_desktop_runtime_coordination_impl.dart",
-              "line": 170,
+              "line": 104,
               "kind": "top-level function",
               "name": "assistantWorkingDirectoryForSessionRuntimeInternal",
               "signature": "String? assistantWorkingDirectoryForSessionRuntimeInternal( AppController controller, String sessionKey, ) {"
@@ -210,7 +210,7 @@
             {
               "language": "dart",
               "path": "lib/app/app_controller_desktop_runtime_coordination_impl.dart",
-              "line": 181,
+              "line": 128,
               "kind": "top-level function",
               "name": "assistantRemoteWorkingDirectoryHintForSessionRuntimeInternal",
               "signature": "String? assistantRemoteWorkingDirectoryHintForSessionRuntimeInternal( AppController controller, String sessionKey, ) {"
@@ -218,7 +218,7 @@
             {
               "language": "dart",
               "path": "lib/app/app_controller_desktop_runtime_coordination_impl.dart",
-              "line": 200,
+              "line": 147,
               "kind": "top-level function",
               "name": "resolveLocalAssistantWorkingDirectoryForSessionRuntimeInternal",
               "signature": "String? resolveLocalAssistantWorkingDirectoryForSessionRuntimeInternal( AppController controller, String sessionKey, { bool requireLocalExistence = true, }) {"
@@ -226,7 +226,7 @@
             {
               "language": "dart",
               "path": "lib/app/app_controller_desktop_runtime_coordination_impl.dart",
-              "line": 223,
+              "line": 170,
               "kind": "top-level function",
               "name": "buildCodeAgentNodeStateRuntimeInternal",
               "signature": "CodeAgentNodeState buildCodeAgentNodeStateRuntimeInternal( AppController controller, { AssistantExecutionTarget? executionTarget, }) {"
@@ -234,7 +234,7 @@
             {
               "language": "dart",
               "path": "lib/app/app_controller_desktop_runtime_coordination_impl.dart",
-              "line": 239,
+              "line": 186,
               "kind": "top-level function",
               "name": "bridgeGatewayModeRuntimeInternal",
               "signature": "GatewayMode bridgeGatewayModeRuntimeInternal(AppController controller) {"
@@ -242,7 +242,7 @@
             {
               "language": "dart",
               "path": "lib/app/app_controller_desktop_runtime_coordination_impl.dart",
-              "line": 249,
+              "line": 196,
               "kind": "top-level function",
               "name": "ensureCodexGatewayRegistrationRuntimeInternal",
               "signature": "Future<void> ensureCodexGatewayRegistrationRuntimeInternal( AppController controller, ) async {"
@@ -250,7 +250,7 @@
             {
               "language": "dart",
               "path": "lib/app/app_controller_desktop_runtime_coordination_impl.dart",
-              "line": 317,
+              "line": 264,
               "kind": "top-level function",
               "name": "clearCodexGatewayRegistrationRuntimeInternal",
               "signature": "void clearCodexGatewayRegistrationRuntimeInternal(AppController controller) {"
@@ -258,7 +258,7 @@
             {
               "language": "dart",
               "path": "lib/app/app_controller_desktop_runtime_coordination_impl.dart",
-              "line": 327,
+              "line": 274,
               "kind": "top-level function",
               "name": "recomputeTasksRuntimeInternal",
               "signature": "void recomputeTasksRuntimeInternal(AppController controller) {"
@@ -296,7 +296,7 @@
             {
               "language": "dart",
               "path": "lib/app/app_controller_desktop_runtime_helpers.dart",
-              "line": 53,
+              "line": 51,
               "kind": "extension",
               "name": "AppControllerDesktopRuntimeHelpers",
               "signature": "extension AppControllerDesktopRuntimeHelpers on AppController {"
@@ -311,7 +311,7 @@
             {
               "language": "dart",
               "path": "lib/app/app_controller_desktop_settings.dart",
-              "line": 48,
+              "line": 46,
               "kind": "extension",
               "name": "AppControllerDesktopSettings",
               "signature": "extension AppControllerDesktopSettings on AppController {"
@@ -326,7 +326,7 @@
             {
               "language": "dart",
               "path": "lib/app/app_controller_desktop_settings_runtime.dart",
-              "line": 50,
+              "line": 48,
               "kind": "extension",
               "name": "AppControllerDesktopSettingsRuntime",
               "signature": "extension AppControllerDesktopSettingsRuntime on AppController {"
@@ -341,7 +341,7 @@
             {
               "language": "dart",
               "path": "lib/app/app_controller_desktop_skill_permissions.dart",
-              "line": 48,
+              "line": 46,
               "kind": "extension",
               "name": "AppControllerDesktopSkillPermissions",
               "signature": "extension AppControllerDesktopSkillPermissions on AppController {"
@@ -356,7 +356,7 @@
             {
               "language": "dart",
               "path": "lib/app/app_controller_desktop_thread_actions.dart",
-              "line": 51,
+              "line": 50,
               "kind": "extension",
               "name": "AppControllerDesktopThreadActions",
               "signature": "extension AppControllerDesktopThreadActions on AppController {"
@@ -371,7 +371,7 @@
             {
               "language": "dart",
               "path": "lib/app/app_controller_desktop_thread_binding.dart",
-              "line": 47,
+              "line": 45,
               "kind": "class",
               "name": "DesktopThreadBindingSnapshotInternal",
               "signature": "class DesktopThreadBindingSnapshotInternal {"
@@ -379,7 +379,7 @@
             {
               "language": "dart",
               "path": "lib/app/app_controller_desktop_thread_binding.dart",
-              "line": 76,
+              "line": 74,
               "kind": "extension",
               "name": "AppControllerDesktopThreadBinding",
               "signature": "extension AppControllerDesktopThreadBinding on AppController {"
@@ -387,7 +387,7 @@
             {
               "language": "dart",
               "path": "lib/app/app_controller_desktop_thread_binding.dart",
-              "line": 337,
+              "line": 351,
               "kind": "top-level function",
               "name": "pickDraftThreadExecutionTargetInternal",
               "signature": "AssistantExecutionTarget pickDraftThreadExecutionTargetInternal({ required AssistantExecutionTarget currentTarget, required Iterable<AssistantExecutionTarget> visibleTargets, bool? localWorkspaceAvailable, }) {"
@@ -402,7 +402,7 @@
             {
               "language": "dart",
               "path": "lib/app/app_controller_desktop_thread_sessions.dart",
-              "line": 55,
+              "line": 53,
               "kind": "top-level function",
               "name": "resolveGatewayThreadConnectionStateInternal",
               "signature": "AssistantThreadConnectionState resolveGatewayThreadConnectionStateInternal({ required AssistantExecutionTarget target, required bool bridgeReady, required String bridgeLabel, required AccountSyncState? accountSyncState, required bool accountSignedIn, required bool bridgeConfigured, bool bridgeDiscoveryAttempted = false, String bridgeDiscoveryError = '', bool providerCatalogEmpty = false, }) {"
@@ -410,7 +410,7 @@
             {
               "language": "dart",
               "path": "lib/app/app_controller_desktop_thread_sessions.dart",
-              "line": 180,
+              "line": 178,
               "kind": "top-level function",
               "name": "bridgeCapabilityReadyForExecutionTargetInternal",
               "signature": "bool bridgeCapabilityReadyForExecutionTargetInternal({ required AssistantExecutionTarget target, required bool bridgeConfigured, required List<SingleAgentProvider> providers, required List<AssistantExecutionTarget> availableTargets, }) {"
@@ -418,7 +418,7 @@
             {
               "language": "dart",
               "path": "lib/app/app_controller_desktop_thread_sessions.dart",
-              "line": 192,
+              "line": 190,
               "kind": "extension",
               "name": "AppControllerDesktopThreadSessions",
               "signature": "extension AppControllerDesktopThreadSessions on AppController {"
@@ -426,7 +426,7 @@
             {
               "language": "dart",
               "path": "lib/app/app_controller_desktop_thread_sessions.dart",
-              "line": 655,
+              "line": 650,
               "kind": "top-level function",
               "name": "resolveAssistantExecutionTargetFromRecordForTest",
               "signature": "AssistantExecutionTarget resolveAssistantExecutionTargetFromRecordForTest( TaskThread? record, { required AssistantExecutionTarget defaultExecutionTarget, }) {"
@@ -436,12 +436,12 @@
         {
           "path": "lib/app/app_controller_desktop_thread_sessions_collaboration_impl.dart",
           "language": "dart",
-          "symbolCount": 13,
+          "symbolCount": 10,
           "symbols": [
             {
               "language": "dart",
               "path": "lib/app/app_controller_desktop_thread_sessions_collaboration_impl.dart",
-              "line": 49,
+              "line": 47,
               "kind": "top-level function",
               "name": "loadAiGatewayApiKeyThreadSessionInternal",
               "signature": "Future<String> loadAiGatewayApiKeyThreadSessionInternal( AppController controller, ) async {"
@@ -449,31 +449,7 @@
             {
               "language": "dart",
               "path": "lib/app/app_controller_desktop_thread_sessions_collaboration_impl.dart",
-              "line": 55,
-              "kind": "top-level function",
-              "name": "saveMultiAgentConfigThreadSessionInternal",
-              "signature": "Future<void> saveMultiAgentConfigThreadSessionInternal( AppController controller, MultiAgentConfig config, ) async {"
-            },
-            {
-              "language": "dart",
-              "path": "lib/app/app_controller_desktop_thread_sessions_collaboration_impl.dart",
-              "line": 72,
-              "kind": "top-level function",
-              "name": "refreshMultiAgentMountsThreadSessionInternal",
-              "signature": "Future<void> refreshMultiAgentMountsThreadSessionInternal( AppController controller, { bool sync = false, }) async {"
-            },
-            {
-              "language": "dart",
-              "path": "lib/app/app_controller_desktop_thread_sessions_collaboration_impl.dart",
-              "line": 97,
-              "kind": "top-level function",
-              "name": "runMultiAgentCollaborationThreadSessionInternal",
-              "signature": "Future<void> runMultiAgentCollaborationThreadSessionInternal( AppController controller, { required String rawPrompt, required String composedPrompt, required List<CollaborationAttachment> attachments, required List<String> selectedSkillLabels, }) async {"
-            },
-            {
-              "language": "dart",
-              "path": "lib/app/app_controller_desktop_thread_sessions_collaboration_impl.dart",
-              "line": 283,
+              "line": 53,
               "kind": "top-level function",
               "name": "openOnlineWorkspaceThreadSessionInternal",
               "signature": "Future<void> openOnlineWorkspaceThreadSessionInternal( AppController controller, ) async {"
@@ -481,7 +457,7 @@
             {
               "language": "dart",
               "path": "lib/app/app_controller_desktop_thread_sessions_collaboration_impl.dart",
-              "line": 304,
+              "line": 74,
               "kind": "top-level function",
               "name": "aiGatewayModelChoicesThreadSessionInternal",
               "signature": "List<String> aiGatewayModelChoicesThreadSessionInternal( AppController controller, ) {"
@@ -489,7 +465,7 @@
             {
               "language": "dart",
               "path": "lib/app/app_controller_desktop_thread_sessions_collaboration_impl.dart",
-              "line": 310,
+              "line": 80,
               "kind": "top-level function",
               "name": "connectedGatewayModelChoicesThreadSessionInternal",
               "signature": "List<String> connectedGatewayModelChoicesThreadSessionInternal( AppController controller, ) {"
@@ -497,7 +473,7 @@
             {
               "language": "dart",
               "path": "lib/app/app_controller_desktop_thread_sessions_collaboration_impl.dart",
-              "line": 322,
+              "line": 92,
               "kind": "top-level function",
               "name": "assistantModelChoicesThreadSessionInternal",
               "signature": "List<String> assistantModelChoicesThreadSessionInternal( AppController controller, ) {"
@@ -505,7 +481,7 @@
             {
               "language": "dart",
               "path": "lib/app/app_controller_desktop_thread_sessions_collaboration_impl.dart",
-              "line": 331,
+              "line": 101,
               "kind": "top-level function",
               "name": "assistantModelChoicesForSessionThreadSessionInternal",
               "signature": "List<String> assistantModelChoicesForSessionThreadSessionInternal( AppController controller, String sessionKey, ) {"
@@ -513,7 +489,7 @@
             {
               "language": "dart",
               "path": "lib/app/app_controller_desktop_thread_sessions_collaboration_impl.dart",
-              "line": 346,
+              "line": 116,
               "kind": "top-level function",
               "name": "resolvedDefaultModelThreadSessionInternal",
               "signature": "String resolvedDefaultModelThreadSessionInternal(AppController controller) {"
@@ -521,7 +497,7 @@
             {
               "language": "dart",
               "path": "lib/app/app_controller_desktop_thread_sessions_collaboration_impl.dart",
-              "line": 368,
+              "line": 138,
               "kind": "top-level function",
               "name": "canQuickConnectGatewayThreadSessionInternal",
               "signature": "bool canQuickConnectGatewayThreadSessionInternal(AppController controller) {"
@@ -529,7 +505,7 @@
             {
               "language": "dart",
               "path": "lib/app/app_controller_desktop_thread_sessions_collaboration_impl.dart",
-              "line": 388,
+              "line": 158,
               "kind": "top-level function",
               "name": "joinConnectionPartsThreadSessionInternal",
               "signature": "String joinConnectionPartsThreadSessionInternal(List<String> parts) {"
@@ -537,7 +513,7 @@
             {
               "language": "dart",
               "path": "lib/app/app_controller_desktop_thread_sessions_collaboration_impl.dart",
-              "line": 396,
+              "line": 166,
               "kind": "top-level function",
               "name": "gatewayAddressLabelThreadSessionInternal",
               "signature": "String gatewayAddressLabelThreadSessionInternal( GatewayConnectionProfile profile, ) {"
@@ -552,7 +528,7 @@
             {
               "language": "dart",
               "path": "lib/app/app_controller_desktop_thread_storage.dart",
-              "line": 47,
+              "line": 45,
               "kind": "extension",
               "name": "AppControllerDesktopThreadStorage",
               "signature": "extension AppControllerDesktopThreadStorage on AppController {"
@@ -567,7 +543,7 @@
             {
               "language": "dart",
               "path": "lib/app/app_controller_desktop_workspace_execution.dart",
-              "line": 48,
+              "line": 46,
               "kind": "extension",
               "name": "AppControllerDesktopWorkspaceExecution",
               "signature": "extension AppControllerDesktopWorkspaceExecution on AppController {"
@@ -582,10 +558,33 @@
             {
               "language": "dart",
               "path": "lib/app/app_controller_openclaw_task_queue.dart",
-              "line": 9,
+              "line": 7,
               "kind": "class",
               "name": "OpenClawGatewayQueuedTurnInternal",
               "signature": "class OpenClawGatewayQueuedTurnInternal {"
+            }
+          ]
+        },
+        {
+          "path": "lib/app/app_logger.dart",
+          "language": "dart",
+          "symbolCount": 2,
+          "symbols": [
+            {
+              "language": "dart",
+              "path": "lib/app/app_logger.dart",
+              "line": 3,
+              "kind": "class",
+              "name": "AppLogger",
+              "signature": "class AppLogger {"
+            },
+            {
+              "language": "dart",
+              "path": "lib/app/app_logger.dart",
+              "line": 31,
+              "kind": "top-level function",
+              "name": "appLog",
+              "signature": "void appLog(String message) {"
             }
           ]
         },
@@ -716,7 +715,7 @@
             {
               "language": "dart",
               "path": "lib/app/ui_feature_manifest_core.dart",
-              "line": 57,
+              "line": 60,
               "kind": "class",
               "name": "UiFeatureFlag",
               "signature": "class UiFeatureFlag {"
@@ -724,7 +723,7 @@
             {
               "language": "dart",
               "path": "lib/app/ui_feature_manifest_core.dart",
-              "line": 89,
+              "line": 92,
               "kind": "class",
               "name": "UiFeatureManifest",
               "signature": "class UiFeatureManifest {"
@@ -732,7 +731,7 @@
             {
               "language": "dart",
               "path": "lib/app/ui_feature_manifest_core.dart",
-              "line": 336,
+              "line": 339,
               "kind": "class",
               "name": "UiFeatureAccess",
               "signature": "class UiFeatureAccess {"
@@ -740,7 +739,7 @@
             {
               "language": "dart",
               "path": "lib/app/ui_feature_manifest_core.dart",
-              "line": 466,
+              "line": 476,
               "kind": "class",
               "name": "UiFeatureManifestLoader",
               "signature": "class UiFeatureManifestLoader {"
@@ -773,12 +772,12 @@
         {
           "path": "lib/app/workspace_page_registry.dart",
           "language": "dart",
-          "symbolCount": 4,
+          "symbolCount": 6,
           "symbols": [
             {
               "language": "dart",
               "path": "lib/app/workspace_page_registry.dart",
-              "line": 8,
+              "line": 10,
               "kind": "enum",
               "name": "WorkspacePageSurface",
               "signature": "enum WorkspacePageSurface { desktop, mobile }"
@@ -786,7 +785,15 @@
             {
               "language": "dart",
               "path": "lib/app/workspace_page_registry.dart",
-              "line": 10,
+              "line": 12,
+              "kind": "class",
+              "name": "MobileWorkspaceActions",
+              "signature": "class MobileWorkspaceActions {"
+            },
+            {
+              "language": "dart",
+              "path": "lib/app/workspace_page_registry.dart",
+              "line": 20,
               "kind": "typedef",
               "name": "WorkspacePageBuilder",
               "signature": "typedef WorkspacePageBuilder = Widget Function( AppController controller, ValueChanged<DetailPanelData> onOpenDetail, );"
@@ -794,7 +801,15 @@
             {
               "language": "dart",
               "path": "lib/app/workspace_page_registry.dart",
-              "line": 16,
+              "line": 26,
+              "kind": "typedef",
+              "name": "MobileWorkspacePageBuilder",
+              "signature": "typedef MobileWorkspacePageBuilder = Widget Function( AppController controller, ValueChanged<DetailPanelData> onOpenDetail, MobileWorkspaceActions mobileActions, );"
+            },
+            {
+              "language": "dart",
+              "path": "lib/app/workspace_page_registry.dart",
+              "line": 33,
               "kind": "class",
               "name": "WorkspacePageSpec",
               "signature": "class WorkspacePageSpec {"
@@ -802,10 +817,10 @@
             {
               "language": "dart",
               "path": "lib/app/workspace_page_registry.dart",
-              "line": 56,
+              "line": 72,
               "kind": "top-level function",
               "name": "buildWorkspacePage",
-              "signature": "Widget buildWorkspacePage({ required WorkspaceDestination destination, required AppController controller, required ValueChanged<DetailPanelData> onOpenDetail, required WorkspacePageSurface surface, }) {"
+              "signature": "Widget buildWorkspacePage({ required WorkspaceDestination destination, required AppController controller, required ValueChanged<DetailPanelData> onOpenDetail, required WorkspacePageSurface surface, MobileWorkspaceActions mobileActions = const MobileWorkspaceActions(), }) {"
             }
           ]
         }
@@ -813,9 +828,32 @@
     },
     {
       "group": "lib/features",
-      "fileCount": 26,
-      "symbolCount": 103,
+      "fileCount": 39,
+      "symbolCount": 128,
       "files": [
+        {
+          "path": "lib/features/assistant/assistant_attachment_payloads.dart",
+          "language": "dart",
+          "symbolCount": 2,
+          "symbols": [
+            {
+              "language": "dart",
+              "path": "lib/features/assistant/assistant_attachment_payloads.dart",
+              "line": 12,
+              "kind": "class",
+              "name": "AssistantAttachmentLimitException",
+              "signature": "class AssistantAttachmentLimitException implements Exception {"
+            },
+            {
+              "language": "dart",
+              "path": "lib/features/assistant/assistant_attachment_payloads.dart",
+              "line": 93,
+              "kind": "top-level function",
+              "name": "formatAssistantAttachmentBytesInternal",
+              "signature": "String formatAssistantAttachmentBytesInternal(int bytes) {"
+            }
+          ]
+        },
         {
           "path": "lib/features/assistant/assistant_page.dart",
           "language": "dart",
@@ -830,7 +868,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_components.dart",
-              "line": 40,
+              "line": 38,
               "kind": "class",
               "name": "AssistantTaskRailInternal",
               "signature": "class AssistantTaskRailInternal extends StatefulWidget {"
@@ -838,7 +876,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_components.dart",
-              "line": 73,
+              "line": 71,
               "kind": "class",
               "name": "AssistantTaskRailStateInternal",
               "signature": "class AssistantTaskRailStateInternal extends State<AssistantTaskRailInternal> {"
@@ -846,7 +884,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_components.dart",
-              "line": 283,
+              "line": 281,
               "kind": "top-level function",
               "name": "groupTasksForRailInternal",
               "signature": "List<AssistantTaskGroupInternal> groupTasksForRailInternal( List<AssistantTaskEntryInternal> tasks, List<AssistantExecutionTarget> visibleExecutionTargets, ) {"
@@ -854,7 +892,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_components.dart",
-              "line": 313,
+              "line": 311,
               "kind": "class",
               "name": "AssistantTaskTileInternal",
               "signature": "class AssistantTaskTileInternal extends StatelessWidget {"
@@ -862,7 +900,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_components.dart",
-              "line": 462,
+              "line": 460,
               "kind": "class",
               "name": "AssistantTaskGroupHeaderInternal",
               "signature": "class AssistantTaskGroupHeaderInternal extends StatelessWidget {"
@@ -870,7 +908,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_components.dart",
-              "line": 526,
+              "line": 524,
               "kind": "class",
               "name": "AssistantEmptyStateInternal",
               "signature": "class AssistantEmptyStateInternal extends StatelessWidget {"
@@ -891,7 +929,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_composer_bar.dart",
-              "line": 40,
+              "line": 38,
               "kind": "class",
               "name": "ComposerBarInternal",
               "signature": "class ComposerBarInternal extends StatefulWidget {"
@@ -899,7 +937,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_composer_bar.dart",
-              "line": 90,
+              "line": 88,
               "kind": "class",
               "name": "ComposerBarStateInternal",
               "signature": "class ComposerBarStateInternal extends State<ComposerBarInternal> {"
@@ -914,7 +952,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_composer_clipboard.dart",
-              "line": 40,
+              "line": 38,
               "kind": "class",
               "name": "ComposerAttachmentInternal",
               "signature": "class ComposerAttachmentInternal {"
@@ -922,7 +960,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_composer_clipboard.dart",
-              "line": 82,
+              "line": 80,
               "kind": "class",
               "name": "AssistantPasteIntent",
               "signature": "class AssistantPasteIntent extends Intent {"
@@ -930,7 +968,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_composer_clipboard.dart",
-              "line": 86,
+              "line": 84,
               "kind": "top-level function",
               "name": "readClipboardImageAsXFileInternal",
               "signature": "Future<XFile?> readClipboardImageAsXFileInternal() async {"
@@ -938,7 +976,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_composer_clipboard.dart",
-              "line": 118,
+              "line": 116,
               "kind": "top-level function",
               "name": "readClipboardImageForFormatInternal",
               "signature": "Future<XFile?> readClipboardImageForFormatInternal( ClipboardReader reader, { required FileFormat format, required String extension, required String mimeType, }) async {"
@@ -946,7 +984,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_composer_clipboard.dart",
-              "line": 171,
+              "line": 169,
               "kind": "top-level function",
               "name": "resolveClipboardAttachmentTempDirectoryInternal",
               "signature": "Future<Directory> resolveClipboardAttachmentTempDirectoryInternal() async {"
@@ -954,37 +992,14 @@
           ]
         },
         {
-          "path": "lib/features/assistant/assistant_page_composer_skill_models.dart",
-          "language": "dart",
-          "symbolCount": 2,
-          "symbols": [
-            {
-              "language": "dart",
-              "path": "lib/features/assistant/assistant_page_composer_skill_models.dart",
-              "line": 40,
-              "kind": "top-level function",
-              "name": "skillOptionFromGatewayInternal",
-              "signature": "ComposerSkillOptionInternal skillOptionFromGatewayInternal( GatewaySkillSummary skill, ) {"
-            },
-            {
-              "language": "dart",
-              "path": "lib/features/assistant/assistant_page_composer_skill_models.dart",
-              "line": 61,
-              "kind": "class",
-              "name": "ComposerSkillOptionInternal",
-              "signature": "class ComposerSkillOptionInternal {"
-            }
-          ]
-        },
-        {
           "path": "lib/features/assistant/assistant_page_composer_skill_picker.dart",
           "language": "dart",
-          "symbolCount": 3,
+          "symbolCount": 10,
           "symbols": [
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_composer_skill_picker.dart",
-              "line": 40,
+              "line": 38,
               "kind": "class",
               "name": "ComposerSelectedSkillChipInternal",
               "signature": "class ComposerSelectedSkillChipInternal extends StatelessWidget {"
@@ -992,7 +1007,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_composer_skill_picker.dart",
-              "line": 69,
+              "line": 67,
               "kind": "class",
               "name": "SkillPickerPopoverInternal",
               "signature": "class SkillPickerPopoverInternal extends StatelessWidget {"
@@ -1000,10 +1015,66 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_composer_skill_picker.dart",
-              "line": 202,
+              "line": 261,
+              "kind": "top-level function",
+              "name": "skillPickerSectionsInternal",
+              "signature": "List<SkillPickerRowInternal> skillPickerSectionsInternal( List<ComposerSkillOptionInternal> skills, ) {"
+            },
+            {
+              "language": "dart",
+              "path": "lib/features/assistant/assistant_page_composer_skill_picker.dart",
+              "line": 291,
+              "kind": "class",
+              "name": "SkillPickerRowInternal",
+              "signature": "class SkillPickerRowInternal {"
+            },
+            {
+              "language": "dart",
+              "path": "lib/features/assistant/assistant_page_composer_skill_picker.dart",
+              "line": 299,
+              "kind": "class",
+              "name": "SkillPickerGroupHeaderInternal",
+              "signature": "class SkillPickerGroupHeaderInternal extends StatelessWidget {"
+            },
+            {
+              "language": "dart",
+              "path": "lib/features/assistant/assistant_page_composer_skill_picker.dart",
+              "line": 323,
               "kind": "class",
               "name": "SkillPickerTileInternal",
               "signature": "class SkillPickerTileInternal extends StatelessWidget {"
+            },
+            {
+              "language": "dart",
+              "path": "lib/features/assistant/assistant_page_composer_skill_picker.dart",
+              "line": 378,
+              "kind": "top-level function",
+              "name": "skillOptionFromGatewayInternal",
+              "signature": "ComposerSkillOptionInternal skillOptionFromGatewayInternal( GatewaySkillSummary skill, ) {"
+            },
+            {
+              "language": "dart",
+              "path": "lib/features/assistant/assistant_page_composer_skill_picker.dart",
+              "line": 402,
+              "kind": "top-level function",
+              "name": "skillGroupForSourceInternal",
+              "signature": "ComposerSkillGroupInternal skillGroupForSourceInternal(String source) {"
+            },
+            {
+              "language": "dart",
+              "path": "lib/features/assistant/assistant_page_composer_skill_picker.dart",
+              "line": 434,
+              "kind": "class",
+              "name": "ComposerSkillGroupInternal",
+              "signature": "class ComposerSkillGroupInternal {"
+            },
+            {
+              "language": "dart",
+              "path": "lib/features/assistant/assistant_page_composer_skill_picker.dart",
+              "line": 444,
+              "kind": "class",
+              "name": "ComposerSkillOptionInternal",
+              "signature": "class ComposerSkillOptionInternal {"
             }
           ]
         },
@@ -1015,7 +1086,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_composer_state_helpers.dart",
-              "line": 44,
+              "line": 42,
               "kind": "top-level function",
               "name": "buildSkillPickerOverlayForInternal",
               "signature": "Widget buildSkillPickerOverlayForInternal( ComposerBarStateInternal state, BuildContext context, ) {"
@@ -1030,7 +1101,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_composer_support.dart",
-              "line": 40,
+              "line": 38,
               "kind": "class",
               "name": "ComposerIconButtonInternal",
               "signature": "class ComposerIconButtonInternal extends StatefulWidget {"
@@ -1038,7 +1109,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_composer_support.dart",
-              "line": 50,
+              "line": 48,
               "kind": "class",
               "name": "ComposerResizeHandleInternal",
               "signature": "class ComposerResizeHandleInternal extends StatefulWidget {"
@@ -1046,7 +1117,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_composer_support.dart",
-              "line": 60,
+              "line": 58,
               "kind": "class",
               "name": "ComposerResizeHandleStateInternal",
               "signature": "class ComposerResizeHandleStateInternal extends State<ComposerResizeHandleInternal> {"
@@ -1054,7 +1125,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_composer_support.dart",
-              "line": 102,
+              "line": 100,
               "kind": "class",
               "name": "ComposerIconButtonStateInternal",
               "signature": "class ComposerIconButtonStateInternal extends State<ComposerIconButtonInternal> {"
@@ -1062,7 +1133,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_composer_support.dart",
-              "line": 129,
+              "line": 127,
               "kind": "class",
               "name": "ComposerToolbarChipInternal",
               "signature": "class ComposerToolbarChipInternal extends StatefulWidget {"
@@ -1070,7 +1141,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_composer_support.dart",
-              "line": 153,
+              "line": 151,
               "kind": "class",
               "name": "ComposerToolbarChipStateInternal",
               "signature": "class ComposerToolbarChipStateInternal extends State<ComposerToolbarChipInternal> {"
@@ -1078,7 +1149,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_composer_support.dart",
-              "line": 198,
+              "line": 196,
               "kind": "extension",
               "name": "AssistantExecutionTargetIconInternal",
               "signature": "extension AssistantExecutionTargetIconInternal on AssistantExecutionTarget {"
@@ -1086,7 +1157,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_composer_support.dart",
-              "line": 205,
+              "line": 203,
               "kind": "extension",
               "name": "AssistantPermissionLevelIconInternal",
               "signature": "extension AssistantPermissionLevelIconInternal on AssistantPermissionLevel {"
@@ -1094,7 +1165,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_composer_support.dart",
-              "line": 212,
+              "line": 210,
               "kind": "class",
               "name": "SingleAgentProviderBadgeInternal",
               "signature": "class SingleAgentProviderBadgeInternal extends StatelessWidget {"
@@ -1109,7 +1180,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_main.dart",
-              "line": 56,
+              "line": 54,
               "kind": "typedef",
               "name": "AssistantClipboardImageReader",
               "signature": "typedef AssistantClipboardImageReader = Future<XFile?> Function();"
@@ -1117,7 +1188,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_main.dart",
-              "line": 58,
+              "line": 56,
               "kind": "class",
               "name": "AssistantPage",
               "signature": "class AssistantPage extends StatefulWidget {"
@@ -1125,7 +1196,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_main.dart",
-              "line": 80,
+              "line": 78,
               "kind": "class",
               "name": "AssistantPageStateInternal",
               "signature": "class AssistantPageStateInternal extends State<AssistantPage> {"
@@ -1133,7 +1204,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_main.dart",
-              "line": 278,
+              "line": 363,
               "kind": "enum",
               "name": "AssistantSidePaneInternal",
               "signature": "enum AssistantSidePaneInternal { tasks, navigation, focused }"
@@ -1141,7 +1212,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_main.dart",
-              "line": 280,
+              "line": 365,
               "kind": "class",
               "name": "AssistantUnifiedSidePaneInternal",
               "signature": "class AssistantUnifiedSidePaneInternal extends StatelessWidget {"
@@ -1149,7 +1220,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_main.dart",
-              "line": 352,
+              "line": 437,
               "kind": "class",
               "name": "AssistantSideTabRailInternal",
               "signature": "class AssistantSideTabRailInternal extends StatelessWidget {"
@@ -1157,7 +1228,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_main.dart",
-              "line": 452,
+              "line": 537,
               "kind": "class",
               "name": "AssistantSideTabButtonInternal",
               "signature": "class AssistantSideTabButtonInternal extends StatefulWidget {"
@@ -1165,7 +1236,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_main.dart",
-              "line": 471,
+              "line": 556,
               "kind": "class",
               "name": "AssistantSideTabButtonStateInternal",
               "signature": "class AssistantSideTabButtonStateInternal extends State<AssistantSideTabButtonInternal> {"
@@ -1173,7 +1244,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_main.dart",
-              "line": 520,
+              "line": 605,
               "kind": "class",
               "name": "AssistantLowerPaneInternal",
               "signature": "class AssistantLowerPaneInternal extends StatelessWidget {"
@@ -1181,7 +1252,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_main.dart",
-              "line": 604,
+              "line": 695,
               "kind": "class",
               "name": "ConversationAreaInternal",
               "signature": "class ConversationAreaInternal extends StatelessWidget {"
@@ -1196,7 +1267,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_message_widgets.dart",
-              "line": 40,
+              "line": 38,
               "kind": "class",
               "name": "MessageBubbleInternal",
               "signature": "class MessageBubbleInternal extends StatelessWidget {"
@@ -1204,7 +1275,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_message_widgets.dart",
-              "line": 113,
+              "line": 111,
               "kind": "class",
               "name": "MessageBubbleBodyInternal",
               "signature": "class MessageBubbleBodyInternal extends StatefulWidget {"
@@ -1212,7 +1283,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_message_widgets.dart",
-              "line": 130,
+              "line": 128,
               "kind": "class",
               "name": "MessageBubbleBodyStateInternal",
               "signature": "class MessageBubbleBodyStateInternal extends State<MessageBubbleBodyInternal> {"
@@ -1220,7 +1291,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_message_widgets.dart",
-              "line": 294,
+              "line": 292,
               "kind": "class",
               "name": "PromptDebugSnapshotInternal",
               "signature": "class PromptDebugSnapshotInternal {"
@@ -1228,7 +1299,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_message_widgets.dart",
-              "line": 365,
+              "line": 363,
               "kind": "class",
               "name": "MessageMetaToggleButtonInternal",
               "signature": "class MessageMetaToggleButtonInternal extends StatelessWidget {"
@@ -1236,7 +1307,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_message_widgets.dart",
-              "line": 409,
+              "line": 407,
               "kind": "class",
               "name": "MessageMetaBlockInternal",
               "signature": "class MessageMetaBlockInternal extends StatelessWidget {"
@@ -1244,7 +1315,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_message_widgets.dart",
-              "line": 437,
+              "line": 435,
               "kind": "class",
               "name": "ToolCallTileInternal",
               "signature": "class ToolCallTileInternal extends StatefulWidget {"
@@ -1252,7 +1323,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_message_widgets.dart",
-              "line": 457,
+              "line": 455,
               "kind": "class",
               "name": "ToolCallTileStateInternal",
               "signature": "class ToolCallTileStateInternal extends State<ToolCallTileInternal> {"
@@ -1260,7 +1331,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_message_widgets.dart",
-              "line": 588,
+              "line": 586,
               "kind": "class",
               "name": "StatusPillInternal",
               "signature": "class StatusPillInternal extends StatelessWidget {"
@@ -1268,7 +1339,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_message_widgets.dart",
-              "line": 621,
+              "line": 619,
               "kind": "class",
               "name": "ConnectionChipInternal",
               "signature": "class ConnectionChipInternal extends StatelessWidget {"
@@ -1276,7 +1347,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_message_widgets.dart",
-              "line": 653,
+              "line": 651,
               "kind": "class",
               "name": "ConnectionStatusChipInternal",
               "signature": "class ConnectionStatusChipInternal extends StatelessWidget {"
@@ -1284,7 +1355,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_message_widgets.dart",
-              "line": 691,
+              "line": 689,
               "kind": "class",
               "name": "MessageViewModeChipInternal",
               "signature": "class MessageViewModeChipInternal extends StatelessWidget {"
@@ -1299,7 +1370,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_state_actions.dart",
-              "line": 42,
+              "line": 39,
               "kind": "extension",
               "name": "AssistantPageStateActionsInternal",
               "signature": "extension AssistantPageStateActionsInternal on AssistantPageStateInternal {"
@@ -1314,7 +1385,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_state_closure.dart",
-              "line": 44,
+              "line": 42,
               "kind": "extension",
               "name": "AssistantPageStateClosureInternal",
               "signature": "extension AssistantPageStateClosureInternal on AssistantPageStateInternal {"
@@ -1344,7 +1415,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_task_models.dart",
-              "line": 40,
+              "line": 38,
               "kind": "enum",
               "name": "BubbleToneInternal",
               "signature": "enum BubbleToneInternal { user, assistant, agent }"
@@ -1352,7 +1423,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_task_models.dart",
-              "line": 42,
+              "line": 40,
               "kind": "enum",
               "name": "TimelineItemKindInternal",
               "signature": "enum TimelineItemKindInternal { user, assistant, agent, toolCall }"
@@ -1360,7 +1431,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_task_models.dart",
-              "line": 44,
+              "line": 42,
               "kind": "class",
               "name": "TimelineItemInternal",
               "signature": "class TimelineItemInternal {"
@@ -1368,7 +1439,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_task_models.dart",
-              "line": 89,
+              "line": 93,
               "kind": "class",
               "name": "AssistantTaskSeedInternal",
               "signature": "class AssistantTaskSeedInternal {"
@@ -1376,7 +1447,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_task_models.dart",
-              "line": 128,
+              "line": 132,
               "kind": "class",
               "name": "AssistantTaskEntryInternal",
               "signature": "class AssistantTaskEntryInternal {"
@@ -1384,7 +1455,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_task_models.dart",
-              "line": 182,
+              "line": 186,
               "kind": "class",
               "name": "AssistantTaskGroupInternal",
               "signature": "class AssistantTaskGroupInternal {"
@@ -1392,7 +1463,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_task_models.dart",
-              "line": 192,
+              "line": 196,
               "kind": "class",
               "name": "PillStyleInternal",
               "signature": "class PillStyleInternal {"
@@ -1400,7 +1471,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_task_models.dart",
-              "line": 202,
+              "line": 206,
               "kind": "class",
               "name": "MetaPillInternal",
               "signature": "class MetaPillInternal extends StatelessWidget {"
@@ -1408,7 +1479,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_task_models.dart",
-              "line": 256,
+              "line": 260,
               "kind": "top-level function",
               "name": "pillStyleForStatusInternal",
               "signature": "PillStyleInternal pillStyleForStatusInternal( BuildContext context, String label, ) {"
@@ -1416,7 +1487,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_task_models.dart",
-              "line": 282,
+              "line": 286,
               "kind": "top-level function",
               "name": "normalizedTaskStatusInternal",
               "signature": "String normalizedTaskStatusInternal(String status) {"
@@ -1424,7 +1495,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_task_models.dart",
-              "line": 295,
+              "line": 299,
               "kind": "top-level function",
               "name": "toolCallStatusLabelInternal",
               "signature": "String toolCallStatusLabelInternal(String status) =>"
@@ -1432,7 +1503,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_task_models.dart",
-              "line": 303,
+              "line": 307,
               "kind": "top-level function",
               "name": "assistantThinkingLabelInternal",
               "signature": "String assistantThinkingLabelInternal(String level) => switch (level) {"
@@ -1440,7 +1511,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_task_models.dart",
-              "line": 310,
+              "line": 314,
               "kind": "top-level function",
               "name": "sessionDisplayTitleInternal",
               "signature": "String sessionDisplayTitleInternal(GatewaySessionSummary session) {"
@@ -1448,7 +1519,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_task_models.dart",
-              "line": 318,
+              "line": 322,
               "kind": "top-level function",
               "name": "fallbackSessionTitleInternal",
               "signature": "String fallbackSessionTitleInternal(String sessionKey) {"
@@ -1456,7 +1527,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_task_models.dart",
-              "line": 326,
+              "line": 330,
               "kind": "top-level function",
               "name": "sessionPreviewInternal",
               "signature": "String? sessionPreviewInternal(GatewaySessionSummary session) {"
@@ -1464,7 +1535,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_task_models.dart",
-              "line": 338,
+              "line": 342,
               "kind": "top-level function",
               "name": "sessionStatusInternal",
               "signature": "String sessionStatusInternal( GatewaySessionSummary session, { required bool sessionPending, String lifecycleStatus = '', }) {"
@@ -1472,7 +1543,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_task_models.dart",
-              "line": 359,
+              "line": 366,
               "kind": "top-level function",
               "name": "sessionUpdatedAtLabelInternal",
               "signature": "String sessionUpdatedAtLabelInternal(double? updatedAtMs) {"
@@ -1480,7 +1551,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_task_models.dart",
-              "line": 378,
+              "line": 385,
               "kind": "top-level function",
               "name": "estimatedComposerWrapSectionHeightInternal",
               "signature": "double estimatedComposerWrapSectionHeightInternal({ required int itemCount, required double availableWidth, required double averageChipWidth, }) {"
@@ -1488,7 +1559,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_task_models.dart",
-              "line": 394,
+              "line": 401,
               "kind": "top-level function",
               "name": "sessionKeysMatchInternal",
               "signature": "bool sessionKeysMatchInternal(String incoming, String current) {"
@@ -1503,7 +1574,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_tooltip_labels.dart",
-              "line": 40,
+              "line": 38,
               "kind": "top-level function",
               "name": "executionTargetTooltipInternal",
               "signature": "String executionTargetTooltipInternal(AssistantExecutionTarget target) =>"
@@ -1511,7 +1582,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_tooltip_labels.dart",
-              "line": 46,
+              "line": 44,
               "kind": "top-level function",
               "name": "providerTooltipInternal",
               "signature": "String providerTooltipInternal(SingleAgentProvider provider) => appText( '智能体 Provider: ${provider.label}', 'Agent provider: ${provider.label}', );"
@@ -1519,7 +1590,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_tooltip_labels.dart",
-              "line": 51,
+              "line": 49,
               "kind": "top-level function",
               "name": "modelTooltipInternal",
               "signature": "String modelTooltipInternal(String modelLabel) {"
@@ -1527,7 +1598,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_tooltip_labels.dart",
-              "line": 59,
+              "line": 57,
               "kind": "top-level function",
               "name": "skillsTooltipInternal",
               "signature": "String skillsTooltipInternal(int selectedCount) => selectedCount <= 0"
@@ -1535,7 +1606,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_tooltip_labels.dart",
-              "line": 63,
+              "line": 61,
               "kind": "top-level function",
               "name": "permissionTooltipInternal",
               "signature": "String permissionTooltipInternal(AssistantPermissionLevel level) =>"
@@ -1543,7 +1614,7 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_tooltip_labels.dart",
-              "line": 66,
+              "line": 64,
               "kind": "top-level function",
               "name": "thinkingTooltipInternal",
               "signature": "String thinkingTooltipInternal(String level) => appText( '推理强度: ${assistantThinkingLabelInternal(level)}', 'Reasoning: ${assistantThinkingLabelInternal(level)}', );"
@@ -1551,10 +1622,317 @@
             {
               "language": "dart",
               "path": "lib/features/assistant/assistant_page_tooltip_labels.dart",
-              "line": 71,
+              "line": 69,
               "kind": "top-level function",
               "name": "skillOptionTooltipInternal",
               "signature": "String skillOptionTooltipInternal(ComposerSkillOptionInternal option) {"
+            }
+          ]
+        },
+        {
+          "path": "lib/features/desktop/desktop_client.dart",
+          "language": "dart",
+          "symbolCount": 3,
+          "symbols": [
+            {
+              "language": "dart",
+              "path": "lib/features/desktop/desktop_client.dart",
+              "line": 6,
+              "kind": "top-level function",
+              "name": "desktopConnectionStateName",
+              "signature": "String desktopConnectionStateName(RTCPeerConnectionState state) {"
+            },
+            {
+              "language": "dart",
+              "path": "lib/features/desktop/desktop_client.dart",
+              "line": 11,
+              "kind": "top-level function",
+              "name": "desktopOfferParams",
+              "signature": "Map<String, Object?> desktopOfferParams({ required String sessionId, required String? sdpOffer, required String display, required int width, required int height, required int fps, required int bitrate, required bool useGpu, }) {"
+            },
+            {
+              "language": "dart",
+              "path": "lib/features/desktop/desktop_client.dart",
+              "line": 33,
+              "kind": "class",
+              "name": "DesktopClient",
+              "signature": "class DesktopClient {"
+            }
+          ]
+        },
+        {
+          "path": "lib/features/desktop/desktop_input_handler.dart",
+          "language": "dart",
+          "symbolCount": 3,
+          "symbols": [
+            {
+              "language": "dart",
+              "path": "lib/features/desktop/desktop_input_handler.dart",
+              "line": 5,
+              "kind": "class",
+              "name": "DesktopInputHandler",
+              "signature": "class DesktopInputHandler {"
+            },
+            {
+              "language": "dart",
+              "path": "lib/features/desktop/desktop_input_handler.dart",
+              "line": 84,
+              "kind": "top-level function",
+              "name": "desktopKeyName",
+              "signature": "String? desktopKeyName(LogicalKeyboardKey key) {"
+            },
+            {
+              "language": "dart",
+              "path": "lib/features/desktop/desktop_input_handler.dart",
+              "line": 158,
+              "kind": "top-level function",
+              "name": "desktopContentPosition",
+              "signature": "Offset? desktopContentPosition( Offset localPosition, Size viewportSize, { Size? contentSize, }) {"
+            }
+          ]
+        },
+        {
+          "path": "lib/features/desktop/desktop_view.dart",
+          "language": "dart",
+          "symbolCount": 1,
+          "symbols": [
+            {
+              "language": "dart",
+              "path": "lib/features/desktop/desktop_view.dart",
+              "line": 11,
+              "kind": "class",
+              "name": "DesktopView",
+              "signature": "class DesktopView extends StatefulWidget {"
+            }
+          ]
+        },
+        {
+          "path": "lib/features/mobile/mobile_assistant_list_page.dart",
+          "language": "dart",
+          "symbolCount": 1,
+          "symbols": [
+            {
+              "language": "dart",
+              "path": "lib/features/mobile/mobile_assistant_list_page.dart",
+              "line": 11,
+              "kind": "class",
+              "name": "MobileAssistantListPage",
+              "signature": "class MobileAssistantListPage extends StatefulWidget {"
+            }
+          ]
+        },
+        {
+          "path": "lib/features/mobile/mobile_assistant_nav_page.dart",
+          "language": "dart",
+          "symbolCount": 1,
+          "symbols": [
+            {
+              "language": "dart",
+              "path": "lib/features/mobile/mobile_assistant_nav_page.dart",
+              "line": 9,
+              "kind": "class",
+              "name": "MobileAssistantNavPage",
+              "signature": "class MobileAssistantNavPage extends StatefulWidget {"
+            }
+          ]
+        },
+        {
+          "path": "lib/features/mobile/mobile_assistant_page.dart",
+          "language": "dart",
+          "symbolCount": 0,
+          "symbols": []
+        },
+        {
+          "path": "lib/features/mobile/mobile_assistant_page_composer.dart",
+          "language": "dart",
+          "symbolCount": 2,
+          "symbols": [
+            {
+              "language": "dart",
+              "path": "lib/features/mobile/mobile_assistant_page_composer.dart",
+              "line": 12,
+              "kind": "class",
+              "name": "MobileAssistantComposer",
+              "signature": "class MobileAssistantComposer extends StatelessWidget {"
+            },
+            {
+              "language": "dart",
+              "path": "lib/features/mobile/mobile_assistant_page_composer.dart",
+              "line": 259,
+              "kind": "class",
+              "name": "MobileAssistantActionChip",
+              "signature": "class MobileAssistantActionChip extends StatelessWidget {"
+            }
+          ]
+        },
+        {
+          "path": "lib/features/mobile/mobile_assistant_page_conversation.dart",
+          "language": "dart",
+          "symbolCount": 2,
+          "symbols": [
+            {
+              "language": "dart",
+              "path": "lib/features/mobile/mobile_assistant_page_conversation.dart",
+              "line": 9,
+              "kind": "class",
+              "name": "MobileAssistantConversation",
+              "signature": "class MobileAssistantConversation extends StatelessWidget {"
+            },
+            {
+              "language": "dart",
+              "path": "lib/features/mobile/mobile_assistant_page_conversation.dart",
+              "line": 110,
+              "kind": "class",
+              "name": "MobileAssistantEmptyState",
+              "signature": "class MobileAssistantEmptyState extends StatelessWidget {"
+            }
+          ]
+        },
+        {
+          "path": "lib/features/mobile/mobile_assistant_page_core.dart",
+          "language": "dart",
+          "symbolCount": 2,
+          "symbols": [
+            {
+              "language": "dart",
+              "path": "lib/features/mobile/mobile_assistant_page_core.dart",
+              "line": 19,
+              "kind": "class",
+              "name": "MobileAssistantDetailPage",
+              "signature": "class MobileAssistantDetailPage extends StatefulWidget {"
+            },
+            {
+              "language": "dart",
+              "path": "lib/features/mobile/mobile_assistant_page_core.dart",
+              "line": 239,
+              "kind": "class",
+              "name": "MobileAssistantStatusBanner",
+              "signature": "class MobileAssistantStatusBanner extends StatelessWidget {"
+            }
+          ]
+        },
+        {
+          "path": "lib/features/mobile/mobile_assistant_page_sheets.dart",
+          "language": "dart",
+          "symbolCount": 8,
+          "symbols": [
+            {
+              "language": "dart",
+              "path": "lib/features/mobile/mobile_assistant_page_sheets.dart",
+              "line": 10,
+              "kind": "top-level function",
+              "name": "showMobileAssistantTargetSheet",
+              "signature": "Future<void> showMobileAssistantTargetSheet( BuildContext context, { required AppController controller, required Future<void> Function(AssistantExecutionTarget target) onSelected, }) {"
+            },
+            {
+              "language": "dart",
+              "path": "lib/features/mobile/mobile_assistant_page_sheets.dart",
+              "line": 46,
+              "kind": "top-level function",
+              "name": "showMobileAssistantProviderSheet",
+              "signature": "Future<void> showMobileAssistantProviderSheet( BuildContext context, { required AppController controller, required AssistantExecutionTarget target, required SingleAgentProvider selectedProvider, required Future<void> Function(SingleAgentProvider provider) onSelected, }) {"
+            },
+            {
+              "language": "dart",
+              "path": "lib/features/mobile/mobile_assistant_page_sheets.dart",
+              "line": 100,
+              "kind": "top-level function",
+              "name": "showMobileAssistantPermissionSheet",
+              "signature": "Future<void> showMobileAssistantPermissionSheet( BuildContext context, { required AppController controller, }) {"
+            },
+            {
+              "language": "dart",
+              "path": "lib/features/mobile/mobile_assistant_page_sheets.dart",
+              "line": 125,
+              "kind": "top-level function",
+              "name": "showMobileAssistantThinkingSheet",
+              "signature": "Future<void> showMobileAssistantThinkingSheet( BuildContext context, { required String value, required ValueChanged<String> onSelected, }) {"
+            },
+            {
+              "language": "dart",
+              "path": "lib/features/mobile/mobile_assistant_page_sheets.dart",
+              "line": 151,
+              "kind": "top-level function",
+              "name": "showMobileAssistantSheet",
+              "signature": "Future<void> showMobileAssistantSheet( BuildContext context, { required String title, required List<Widget> children, }) {"
+            },
+            {
+              "language": "dart",
+              "path": "lib/features/mobile/mobile_assistant_page_sheets.dart",
+              "line": 196,
+              "kind": "top-level function",
+              "name": "mobileThinkingLabel",
+              "signature": "String mobileThinkingLabel(String value) {"
+            },
+            {
+              "language": "dart",
+              "path": "lib/features/mobile/mobile_assistant_page_sheets.dart",
+              "line": 206,
+              "kind": "top-level function",
+              "name": "mobilePermissionIcon",
+              "signature": "IconData mobilePermissionIcon(AssistantPermissionLevel level) {"
+            },
+            {
+              "language": "dart",
+              "path": "lib/features/mobile/mobile_assistant_page_sheets.dart",
+              "line": 213,
+              "kind": "top-level function",
+              "name": "mobileProviderBadgeLabel",
+              "signature": "String mobileProviderBadgeLabel(SingleAgentProvider provider) {"
+            }
+          ]
+        },
+        {
+          "path": "lib/features/mobile/mobile_settings_page.dart",
+          "language": "dart",
+          "symbolCount": 1,
+          "symbols": [
+            {
+              "language": "dart",
+              "path": "lib/features/mobile/mobile_settings_page.dart",
+              "line": 14,
+              "kind": "class",
+              "name": "MobileSettingsPage",
+              "signature": "class MobileSettingsPage extends StatefulWidget {"
+            }
+          ]
+        },
+        {
+          "path": "lib/features/mobile/mobile_settings_page_widgets.dart",
+          "language": "dart",
+          "symbolCount": 4,
+          "symbols": [
+            {
+              "language": "dart",
+              "path": "lib/features/mobile/mobile_settings_page_widgets.dart",
+              "line": 6,
+              "kind": "class",
+              "name": "MobileSettingsTabSelectorInternal",
+              "signature": "class MobileSettingsTabSelectorInternal extends StatelessWidget {"
+            },
+            {
+              "language": "dart",
+              "path": "lib/features/mobile/mobile_settings_page_widgets.dart",
+              "line": 44,
+              "kind": "class",
+              "name": "MobileSettingsCardInternal",
+              "signature": "class MobileSettingsCardInternal extends StatelessWidget {"
+            },
+            {
+              "language": "dart",
+              "path": "lib/features/mobile/mobile_settings_page_widgets.dart",
+              "line": 109,
+              "kind": "class",
+              "name": "MobileSettingsTextFieldInternal",
+              "signature": "class MobileSettingsTextFieldInternal extends StatelessWidget {"
+            },
+            {
+              "language": "dart",
+              "path": "lib/features/mobile/mobile_settings_page_widgets.dart",
+              "line": 147,
+              "kind": "class",
+              "name": "MobileSettingsMetaRowInternal",
+              "signature": "class MobileSettingsMetaRowInternal extends StatelessWidget {"
             }
           ]
         },
@@ -1572,7 +1950,7 @@
             {
               "language": "dart",
               "path": "lib/features/mobile/mobile_shell_core.dart",
-              "line": 21,
+              "line": 13,
               "kind": "enum",
               "name": "MobileShellTab",
               "signature": "enum MobileShellTab { assistant, settings }"
@@ -1580,7 +1958,7 @@
             {
               "language": "dart",
               "path": "lib/features/mobile/mobile_shell_core.dart",
-              "line": 23,
+              "line": 15,
               "kind": "extension",
               "name": "MobileShellTabPresentationInternal",
               "signature": "extension MobileShellTabPresentationInternal on MobileShellTab {"
@@ -1588,7 +1966,7 @@
             {
               "language": "dart",
               "path": "lib/features/mobile/mobile_shell_core.dart",
-              "line": 35,
+              "line": 27,
               "kind": "class",
               "name": "MobileShell",
               "signature": "class MobileShell extends StatefulWidget {"
@@ -1596,7 +1974,7 @@
             {
               "language": "dart",
               "path": "lib/features/mobile/mobile_shell_core.dart",
-              "line": 44,
+              "line": 36,
               "kind": "class",
               "name": "MobileShellStateInternal",
               "signature": "class MobileShellStateInternal extends State<MobileShell> {"
@@ -1611,10 +1989,25 @@
             {
               "language": "dart",
               "path": "lib/features/mobile/mobile_shell_nav.dart",
-              "line": 19,
+              "line": 6,
               "kind": "class",
               "name": "BottomPillNavInternal",
               "signature": "class BottomPillNavInternal extends StatelessWidget {"
+            }
+          ]
+        },
+        {
+          "path": "lib/features/mobile/mobile_workspace_files_page.dart",
+          "language": "dart",
+          "symbolCount": 1,
+          "symbols": [
+            {
+              "language": "dart",
+              "path": "lib/features/mobile/mobile_workspace_files_page.dart",
+              "line": 9,
+              "kind": "class",
+              "name": "MobileWorkspaceFilesPage",
+              "signature": "class MobileWorkspaceFilesPage extends StatefulWidget {"
             }
           ]
         },
@@ -1652,7 +2045,37 @@
               "line": 6,
               "kind": "class",
               "name": "SettingsAccountPanel",
-              "signature": "class SettingsAccountPanel extends StatelessWidget {"
+              "signature": "class SettingsAccountPanel extends StatefulWidget {"
+            }
+          ]
+        },
+        {
+          "path": "lib/features/settings/settings_archived_tasks_panel.dart",
+          "language": "dart",
+          "symbolCount": 1,
+          "symbols": [
+            {
+              "language": "dart",
+              "path": "lib/features/settings/settings_archived_tasks_panel.dart",
+              "line": 7,
+              "kind": "class",
+              "name": "SettingsArchivedTasksPanel",
+              "signature": "class SettingsArchivedTasksPanel extends StatefulWidget {"
+            }
+          ]
+        },
+        {
+          "path": "lib/features/settings/settings_logs_panel.dart",
+          "language": "dart",
+          "symbolCount": 1,
+          "symbols": [
+            {
+              "language": "dart",
+              "path": "lib/features/settings/settings_logs_panel.dart",
+              "line": 8,
+              "kind": "class",
+              "name": "SettingsLogsPanel",
+              "signature": "class SettingsLogsPanel extends StatefulWidget {"
             }
           ]
         },
@@ -1670,7 +2093,7 @@
             {
               "language": "dart",
               "path": "lib/features/settings/settings_page_core.dart",
-              "line": 19,
+              "line": 23,
               "kind": "top-level function",
               "name": "loadBridgeMetadataForSettingsAbout",
               "signature": "Future<Map<String, dynamic>> loadBridgeMetadataForSettingsAbout({ required Uri bridgeEndpoint, required Future<String?> Function(Uri endpoint) authorizationResolver, HttpClient Function()? clientFactory, }) async {"
@@ -1678,10 +2101,25 @@
             {
               "language": "dart",
               "path": "lib/features/settings/settings_page_core.dart",
-              "line": 109,
+              "line": 124,
               "kind": "class",
               "name": "SettingsPage",
               "signature": "class SettingsPage extends StatefulWidget {"
+            }
+          ]
+        },
+        {
+          "path": "lib/features/settings/settings_remote_desktop_panel.dart",
+          "language": "dart",
+          "symbolCount": 1,
+          "symbols": [
+            {
+              "language": "dart",
+              "path": "lib/features/settings/settings_remote_desktop_panel.dart",
+              "line": 7,
+              "kind": "class",
+              "name": "SettingsRemoteDesktopPanel",
+              "signature": "class SettingsRemoteDesktopPanel extends StatefulWidget {"
             }
           ]
         }
@@ -1783,7 +2221,7 @@
               "line": 152,
               "kind": "enum",
               "name": "SettingsTab",
-              "signature": "enum SettingsTab { gateway }"
+              "signature": "enum SettingsTab { gateway, archivedTasks, remoteDesktop, logs }"
             },
             {
               "language": "dart",
@@ -1796,7 +2234,7 @@
             {
               "language": "dart",
               "path": "lib/models/app_models.dart",
-              "line": 160,
+              "line": 163,
               "kind": "class",
               "name": "QuickAction",
               "signature": "class QuickAction {"
@@ -1804,7 +2242,7 @@
             {
               "language": "dart",
               "path": "lib/models/app_models.dart",
-              "line": 172,
+              "line": 175,
               "kind": "class",
               "name": "RecentSession",
               "signature": "class RecentSession {"
@@ -1812,7 +2250,7 @@
             {
               "language": "dart",
               "path": "lib/models/app_models.dart",
-              "line": 184,
+              "line": 187,
               "kind": "class",
               "name": "MetricSummary",
               "signature": "class MetricSummary {"
@@ -1820,7 +2258,7 @@
             {
               "language": "dart",
               "path": "lib/models/app_models.dart",
-              "line": 200,
+              "line": 203,
               "kind": "class",
               "name": "TaskSummary",
               "signature": "class TaskSummary {"
@@ -1828,7 +2266,7 @@
             {
               "language": "dart",
               "path": "lib/models/app_models.dart",
-              "line": 218,
+              "line": 221,
               "kind": "class",
               "name": "ModuleSummary",
               "signature": "class ModuleSummary {"
@@ -1836,7 +2274,7 @@
             {
               "language": "dart",
               "path": "lib/models/app_models.dart",
-              "line": 234,
+              "line": 237,
               "kind": "class",
               "name": "NodeSummary",
               "signature": "class NodeSummary {"
@@ -1844,7 +2282,7 @@
             {
               "language": "dart",
               "path": "lib/models/app_models.dart",
-              "line": 252,
+              "line": 255,
               "kind": "class",
               "name": "AgentSummary",
               "signature": "class AgentSummary {"
@@ -1852,7 +2290,7 @@
             {
               "language": "dart",
               "path": "lib/models/app_models.dart",
-              "line": 268,
+              "line": 271,
               "kind": "class",
               "name": "SkillSummary",
               "signature": "class SkillSummary {"
@@ -1860,7 +2298,7 @@
             {
               "language": "dart",
               "path": "lib/models/app_models.dart",
-              "line": 286,
+              "line": 289,
               "kind": "class",
               "name": "ConnectorSummary",
               "signature": "class ConnectorSummary {"
@@ -1868,7 +2306,7 @@
             {
               "language": "dart",
               "path": "lib/models/app_models.dart",
-              "line": 302,
+              "line": 305,
               "kind": "class",
               "name": "SecretSummary",
               "signature": "class SecretSummary {"
@@ -1876,7 +2314,7 @@
             {
               "language": "dart",
               "path": "lib/models/app_models.dart",
-              "line": 318,
+              "line": 321,
               "kind": "class",
               "name": "SecretReference",
               "signature": "class SecretReference {"
@@ -1884,7 +2322,7 @@
             {
               "language": "dart",
               "path": "lib/models/app_models.dart",
-              "line": 334,
+              "line": 337,
               "kind": "class",
               "name": "ProviderSummary",
               "signature": "class ProviderSummary {"
@@ -1892,7 +2330,7 @@
             {
               "language": "dart",
               "path": "lib/models/app_models.dart",
-              "line": 348,
+              "line": 351,
               "kind": "class",
               "name": "AuditSummary",
               "signature": "class AuditSummary {"
@@ -1900,7 +2338,7 @@
             {
               "language": "dart",
               "path": "lib/models/app_models.dart",
-              "line": 366,
+              "line": 369,
               "kind": "class",
               "name": "SettingSummary",
               "signature": "class SettingSummary {"
@@ -1908,7 +2346,7 @@
             {
               "language": "dart",
               "path": "lib/models/app_models.dart",
-              "line": 378,
+              "line": 381,
               "kind": "class",
               "name": "WorkspaceProfile",
               "signature": "class WorkspaceProfile {"
@@ -1916,7 +2354,7 @@
             {
               "language": "dart",
               "path": "lib/models/app_models.dart",
-              "line": 392,
+              "line": 395,
               "kind": "class",
               "name": "DetailPanelData",
               "signature": "class DetailPanelData {"
@@ -1924,7 +2362,7 @@
             {
               "language": "dart",
               "path": "lib/models/app_models.dart",
-              "line": 414,
+              "line": 417,
               "kind": "class",
               "name": "DetailSection",
               "signature": "class DetailSection {"
@@ -1932,7 +2370,7 @@
             {
               "language": "dart",
               "path": "lib/models/app_models.dart",
-              "line": 421,
+              "line": 424,
               "kind": "class",
               "name": "DetailItem",
               "signature": "class DetailItem {"
@@ -1940,7 +2378,7 @@
             {
               "language": "dart",
               "path": "lib/models/app_models.dart",
-              "line": 428,
+              "line": 431,
               "kind": "class",
               "name": "CommandEntry",
               "signature": "class CommandEntry {"
@@ -1951,8 +2389,8 @@
     },
     {
       "group": "lib/runtime",
-      "fileCount": 66,
-      "symbolCount": 372,
+      "fileCount": 55,
+      "symbolCount": 333,
       "files": [
         {
           "path": "lib/runtime/account_runtime_client.dart",
@@ -2060,21 +2498,6 @@
               "kind": "class",
               "name": "AgentRegistry",
               "signature": "class AgentRegistry with ChangeNotifier {"
-            }
-          ]
-        },
-        {
-          "path": "lib/runtime/aris_llm_chat_client.dart",
-          "language": "dart",
-          "symbolCount": 1,
-          "symbols": [
-            {
-              "language": "dart",
-              "path": "lib/runtime/aris_llm_chat_client.dart",
-              "line": 3,
-              "kind": "class",
-              "name": "ArisLlmChatClient",
-              "signature": "class ArisLlmChatClient {"
             }
           ]
         },
@@ -2454,7 +2877,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/external_code_agent_acp_desktop_transport.dart",
-              "line": 10,
+              "line": 11,
               "kind": "class",
               "name": "ExternalCodeAgentAcpDesktopTransport",
               "signature": "class ExternalCodeAgentAcpDesktopTransport implements ExternalCodeAgentAcpTransport {"
@@ -2464,7 +2887,7 @@
         {
           "path": "lib/runtime/file_store_support.dart",
           "language": "dart",
-          "symbolCount": 17,
+          "symbolCount": 18,
           "symbols": [
             {
               "language": "dart",
@@ -2533,7 +2956,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/file_store_support.dart",
-              "line": 220,
+              "line": 222,
               "kind": "top-level function",
               "name": "normalizeStoreDirectoryPath",
               "signature": "String normalizeStoreDirectoryPath(String path) {"
@@ -2541,7 +2964,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/file_store_support.dart",
-              "line": 237,
+              "line": 239,
               "kind": "top-level function",
               "name": "ensureDirectory",
               "signature": "Future<Directory> ensureDirectory(String path) async {"
@@ -2549,7 +2972,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/file_store_support.dart",
-              "line": 245,
+              "line": 247,
               "kind": "top-level function",
               "name": "ensureOwnerOnlyDirectory",
               "signature": "Future<void> ensureOwnerOnlyDirectory(Directory directory) async {"
@@ -2557,7 +2980,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/file_store_support.dart",
-              "line": 252,
+              "line": 254,
               "kind": "top-level function",
               "name": "ensureOwnerOnlyFile",
               "signature": "Future<void> ensureOwnerOnlyFile(File file) async {"
@@ -2565,7 +2988,15 @@
             {
               "language": "dart",
               "path": "lib/runtime/file_store_support.dart",
-              "line": 259,
+              "line": 261,
+              "kind": "top-level function",
+              "name": "shouldApplyUnixOwnerOnlyPermissionsInternal",
+              "signature": "bool shouldApplyUnixOwnerOnlyPermissionsInternal({String? operatingSystem}) {"
+            },
+            {
+              "language": "dart",
+              "path": "lib/runtime/file_store_support.dart",
+              "line": 266,
               "kind": "top-level function",
               "name": "encodeStableFileKey",
               "signature": "String encodeStableFileKey(String key) {"
@@ -2573,7 +3004,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/file_store_support.dart",
-              "line": 263,
+              "line": 270,
               "kind": "top-level function",
               "name": "atomicWriteString",
               "signature": "Future<void> atomicWriteString( File file, String contents, { bool ownerOnly = false, }) async {"
@@ -2581,7 +3012,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/file_store_support.dart",
-              "line": 285,
+              "line": 292,
               "kind": "top-level function",
               "name": "deleteIfExists",
               "signature": "Future<void> deleteIfExists(File file) async {"
@@ -2589,7 +3020,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/file_store_support.dart",
-              "line": 291,
+              "line": 298,
               "kind": "top-level function",
               "name": "decodeYamlDocument",
               "signature": "Object? decodeYamlDocument(String raw) {"
@@ -2597,7 +3028,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/file_store_support.dart",
-              "line": 316,
+              "line": 323,
               "kind": "top-level function",
               "name": "encodeYamlDocument",
               "signature": "String encodeYamlDocument(Object? value) {"
@@ -2607,12 +3038,12 @@
         {
           "path": "lib/runtime/gateway_acp_client.dart",
           "language": "dart",
-          "symbolCount": 6,
+          "symbolCount": 5,
           "symbols": [
             {
               "language": "dart",
               "path": "lib/runtime/gateway_acp_client.dart",
-              "line": 16,
+              "line": 18,
               "kind": "class",
               "name": "GatewayAcpException",
               "signature": "class GatewayAcpException implements Exception {"
@@ -2620,7 +3051,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/gateway_acp_client.dart",
-              "line": 33,
+              "line": 35,
               "kind": "class",
               "name": "GatewayAcpCapabilities",
               "signature": "class GatewayAcpCapabilities {"
@@ -2628,15 +3059,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/gateway_acp_client.dart",
-              "line": 91,
-              "kind": "class",
-              "name": "GatewayAcpMultiAgentRequest",
-              "signature": "class GatewayAcpMultiAgentRequest {"
-            },
-            {
-              "language": "dart",
-              "path": "lib/runtime/gateway_acp_client.dart",
-              "line": 111,
+              "line": 113,
               "kind": "class",
               "name": "GatewayAcpClient",
               "signature": "class GatewayAcpClient {"
@@ -2644,18 +3067,18 @@
             {
               "language": "dart",
               "path": "lib/runtime/gateway_acp_client.dart",
-              "line": 1392,
-              "kind": "top-level function",
-              "name": "gatewayAcpHttpResponseTimeoutFor",
-              "signature": "Duration gatewayAcpHttpResponseTimeoutFor( Uri endpoint, String method, [ Map<String, dynamic> params = const <String, dynamic>{}, ]) {"
+              "line": 1384,
+              "kind": "class",
+              "name": "GatewayAcpRuntimeSessionClient",
+              "signature": "class GatewayAcpRuntimeSessionClient implements GatewayRuntimeSessionClient {"
             },
             {
               "language": "dart",
               "path": "lib/runtime/gateway_acp_client.dart",
-              "line": 1412,
+              "line": 1478,
               "kind": "top-level function",
-              "name": "gatewayAcpTaskRuntimeBudgetMinutesForParams",
-              "signature": "int gatewayAcpTaskRuntimeBudgetMinutesForParams(Map<String, dynamic> params) {"
+              "name": "gatewayAcpHttpResponseTimeoutFor",
+              "signature": "Duration gatewayAcpHttpResponseTimeoutFor( Uri endpoint, String method, [ Map<String, dynamic> params = const <String, dynamic>{}, ]) {"
             }
           ]
         },
@@ -2668,7 +3091,7 @@
         {
           "path": "lib/runtime/gateway_runtime_api.dart",
           "language": "dart",
-          "symbolCount": 1,
+          "symbolCount": 2,
           "symbols": [
             {
               "language": "dart",
@@ -2677,6 +3100,14 @@
               "kind": "extension",
               "name": "GatewayRuntimeApiInternal",
               "signature": "extension GatewayRuntimeApiInternal on GatewayRuntime {"
+            },
+            {
+              "language": "dart",
+              "path": "lib/runtime/gateway_runtime_api.dart",
+              "line": 608,
+              "kind": "top-level function",
+              "name": "skillMissingListInternal",
+              "signature": "List<String> skillMissingListInternal( Map<String, dynamic> skill, String nestedKey, String flatKey, ) {"
             }
           ]
         },
@@ -2922,7 +3353,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/gateway_runtime_session_client.dart",
-              "line": 196,
+              "line": 197,
               "kind": "top-level function",
               "name": "gatewayConnectionSnapshotFromJson",
               "signature": "GatewayConnectionSnapshot gatewayConnectionSnapshotFromJson( Map<String, dynamic> json, ) {"
@@ -2930,7 +3361,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/gateway_runtime_session_client.dart",
-              "line": 223,
+              "line": 224,
               "kind": "top-level function",
               "name": "runtimeLogEntryFromJson",
               "signature": "RuntimeLogEntry runtimeLogEntryFromJson(Map<String, dynamic> json) {"
@@ -2977,21 +3408,6 @@
           ]
         },
         {
-          "path": "lib/runtime/go_multi_agent_mount_desktop_client.dart",
-          "language": "dart",
-          "symbolCount": 1,
-          "symbols": [
-            {
-              "language": "dart",
-              "path": "lib/runtime/go_multi_agent_mount_desktop_client.dart",
-              "line": 5,
-              "kind": "class",
-              "name": "GoMultiAgentMountDesktopClient",
-              "signature": "class GoMultiAgentMountDesktopClient implements MultiAgentMountResolver {"
-            }
-          ]
-        },
-        {
           "path": "lib/runtime/go_runtime_dispatch_desktop_client.dart",
           "language": "dart",
           "symbolCount": 1,
@@ -3009,12 +3425,12 @@
         {
           "path": "lib/runtime/go_task_service_client.dart",
           "language": "dart",
-          "symbolCount": 19,
+          "symbolCount": 20,
           "symbols": [
             {
               "language": "dart",
               "path": "lib/runtime/go_task_service_client.dart",
-              "line": 3,
+              "line": 7,
               "kind": "enum",
               "name": "GoTaskServiceRoute",
               "signature": "enum GoTaskServiceRoute { externalAcpSingle, externalAcpMulti }"
@@ -3022,7 +3438,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/go_task_service_client.dart",
-              "line": 5,
+              "line": 9,
               "kind": "enum",
               "name": "GoTaskServiceCollaborationMode",
               "signature": "enum GoTaskServiceCollaborationMode { standard, multiAgent }"
@@ -3030,7 +3446,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/go_task_service_client.dart",
-              "line": 7,
+              "line": 11,
               "kind": "class",
               "name": "ExternalCodeAgentAcpCapabilities",
               "signature": "class ExternalCodeAgentAcpCapabilities {"
@@ -3038,7 +3454,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/go_task_service_client.dart",
-              "line": 33,
+              "line": 37,
               "kind": "class",
               "name": "ExternalCodeAgentAcpRoutingResolution",
               "signature": "class ExternalCodeAgentAcpRoutingResolution {"
@@ -3046,7 +3462,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/go_task_service_client.dart",
-              "line": 82,
+              "line": 86,
               "kind": "enum",
               "name": "ExternalCodeAgentAcpRoutingMode",
               "signature": "enum ExternalCodeAgentAcpRoutingMode { auto, explicit }"
@@ -3054,7 +3470,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/go_task_service_client.dart",
-              "line": 84,
+              "line": 88,
               "kind": "class",
               "name": "ExternalCodeAgentAcpAvailableSkill",
               "signature": "class ExternalCodeAgentAcpAvailableSkill {"
@@ -3062,7 +3478,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/go_task_service_client.dart",
-              "line": 107,
+              "line": 111,
               "kind": "class",
               "name": "ExternalCodeAgentAcpRoutingConfig",
               "signature": "class ExternalCodeAgentAcpRoutingConfig {"
@@ -3070,7 +3486,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/go_task_service_client.dart",
-              "line": 167,
+              "line": 188,
               "kind": "class",
               "name": "ExternalCodeAgentAcpSkillInstallApproval",
               "signature": "class ExternalCodeAgentAcpSkillInstallApproval {"
@@ -3078,7 +3494,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/go_task_service_client.dart",
-              "line": 187,
+              "line": 208,
               "kind": "class",
               "name": "GoTaskServiceRequest",
               "signature": "class GoTaskServiceRequest {"
@@ -3086,7 +3502,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/go_task_service_client.dart",
-              "line": 359,
+              "line": 385,
               "kind": "class",
               "name": "GoTaskServiceUpdate",
               "signature": "class GoTaskServiceUpdate {"
@@ -3094,7 +3510,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/go_task_service_client.dart",
-              "line": 388,
+              "line": 414,
               "kind": "class",
               "name": "GoTaskServiceArtifact",
               "signature": "class GoTaskServiceArtifact {"
@@ -3102,7 +3518,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/go_task_service_client.dart",
-              "line": 443,
+              "line": 469,
               "kind": "class",
               "name": "GoTaskServiceResult",
               "signature": "class GoTaskServiceResult {"
@@ -3110,7 +3526,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/go_task_service_client.dart",
-              "line": 577,
+              "line": 629,
               "kind": "top-level function",
               "name": "goTaskServiceGatewayEntryState",
               "signature": "String? goTaskServiceGatewayEntryState({ required AssistantExecutionTarget requestedTarget, required GoTaskServiceResult result, }) {"
@@ -3118,7 +3534,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/go_task_service_client.dart",
-              "line": 612,
+              "line": 664,
               "kind": "abstract interface",
               "name": "ExternalCodeAgentAcpTransport",
               "signature": "abstract class ExternalCodeAgentAcpTransport {"
@@ -3126,7 +3542,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/go_task_service_client.dart",
-              "line": 644,
+              "line": 703,
               "kind": "abstract interface",
               "name": "GoTaskServiceClient",
               "signature": "abstract class GoTaskServiceClient {"
@@ -3134,7 +3550,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/go_task_service_client.dart",
-              "line": 678,
+              "line": 744,
               "kind": "top-level function",
               "name": "goTaskServiceUpdateFromAcpNotification",
               "signature": "GoTaskServiceUpdate? goTaskServiceUpdateFromAcpNotification( Map<String, dynamic> notification, ) {"
@@ -3142,7 +3558,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/go_task_service_client.dart",
-              "line": 719,
+              "line": 785,
               "kind": "top-level function",
               "name": "goTaskServiceResultFromAcpResponse",
               "signature": "GoTaskServiceResult goTaskServiceResultFromAcpResponse( Map<String, dynamic> response, { required GoTaskServiceRoute route, String streamedText = '', String? completedMessage, }) {"
@@ -3150,7 +3566,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/go_task_service_client.dart",
-              "line": 913,
+              "line": 979,
               "kind": "top-level function",
               "name": "mergeGoTaskServiceResponseResult",
               "signature": "Map<String, dynamic> mergeGoTaskServiceResponseResult( Map<String, dynamic> response, Map<String, dynamic> overlay, ) {"
@@ -3158,10 +3574,18 @@
             {
               "language": "dart",
               "path": "lib/runtime/go_task_service_client.dart",
-              "line": 937,
+              "line": 1003,
               "kind": "top-level function",
               "name": "goTaskServiceBase64Size",
               "signature": "int goTaskServiceBase64Size(String base64) {"
+            },
+            {
+              "language": "dart",
+              "path": "lib/runtime/go_task_service_client.dart",
+              "line": 1014,
+              "kind": "top-level function",
+              "name": "goTaskServiceAttachmentSha256",
+              "signature": "String goTaskServiceAttachmentSha256(GatewayChatAttachmentPayload attachment) {"
             }
           ]
         },
@@ -3224,285 +3648,6 @@
               "kind": "class",
               "name": "ModeSwitcher",
               "signature": "class ModeSwitcher extends ChangeNotifier {"
-            }
-          ]
-        },
-        {
-          "path": "lib/runtime/multi_agent_frameworks.dart",
-          "language": "dart",
-          "symbolCount": 3,
-          "symbols": [
-            {
-              "language": "dart",
-              "path": "lib/runtime/multi_agent_frameworks.dart",
-              "line": 3,
-              "kind": "abstract interface",
-              "name": "FrameworkPreset",
-              "signature": "abstract class FrameworkPreset {"
-            },
-            {
-              "language": "dart",
-              "path": "lib/runtime/multi_agent_frameworks.dart",
-              "line": 16,
-              "kind": "class",
-              "name": "NativeFrameworkPreset",
-              "signature": "class NativeFrameworkPreset extends FrameworkPreset {"
-            },
-            {
-              "language": "dart",
-              "path": "lib/runtime/multi_agent_frameworks.dart",
-              "line": 45,
-              "kind": "class",
-              "name": "ArisFrameworkPreset",
-              "signature": "class ArisFrameworkPreset extends FrameworkPreset {"
-            }
-          ]
-        },
-        {
-          "path": "lib/runtime/multi_agent_mount_resolver.dart",
-          "language": "dart",
-          "symbolCount": 2,
-          "symbols": [
-            {
-              "language": "dart",
-              "path": "lib/runtime/multi_agent_mount_resolver.dart",
-              "line": 3,
-              "kind": "class",
-              "name": "ArisMountProbe",
-              "signature": "class ArisMountProbe {"
-            },
-            {
-              "language": "dart",
-              "path": "lib/runtime/multi_agent_mount_resolver.dart",
-              "line": 39,
-              "kind": "abstract interface",
-              "name": "MultiAgentMountResolver",
-              "signature": "abstract class MultiAgentMountResolver {"
-            }
-          ]
-        },
-        {
-          "path": "lib/runtime/multi_agent_mounts.dart",
-          "language": "dart",
-          "symbolCount": 7,
-          "symbols": [
-            {
-              "language": "dart",
-              "path": "lib/runtime/multi_agent_mounts.dart",
-              "line": 9,
-              "kind": "class",
-              "name": "MultiAgentMountManager",
-              "signature": "class MultiAgentMountManager {"
-            },
-            {
-              "language": "dart",
-              "path": "lib/runtime/multi_agent_mounts.dart",
-              "line": 90,
-              "kind": "abstract interface",
-              "name": "CliMountAdapter",
-              "signature": "abstract class CliMountAdapter {"
-            },
-            {
-              "language": "dart",
-              "path": "lib/runtime/multi_agent_mounts.dart",
-              "line": 112,
-              "kind": "class",
-              "name": "CodexMountAdapter",
-              "signature": "class CodexMountAdapter extends CliMountAdapter {"
-            },
-            {
-              "language": "dart",
-              "path": "lib/runtime/multi_agent_mounts.dart",
-              "line": 154,
-              "kind": "class",
-              "name": "ClaudeMountAdapter",
-              "signature": "class ClaudeMountAdapter extends CliMountAdapter {"
-            },
-            {
-              "language": "dart",
-              "path": "lib/runtime/multi_agent_mounts.dart",
-              "line": 193,
-              "kind": "class",
-              "name": "GeminiMountAdapter",
-              "signature": "class GeminiMountAdapter extends CliMountAdapter {"
-            },
-            {
-              "language": "dart",
-              "path": "lib/runtime/multi_agent_mounts.dart",
-              "line": 232,
-              "kind": "class",
-              "name": "OpencodeMountAdapter",
-              "signature": "class OpencodeMountAdapter extends CliMountAdapter {"
-            },
-            {
-              "language": "dart",
-              "path": "lib/runtime/multi_agent_mounts.dart",
-              "line": 273,
-              "kind": "class",
-              "name": "OpenClawMountAdapter",
-              "signature": "class OpenClawMountAdapter extends CliMountAdapter {"
-            }
-          ]
-        },
-        {
-          "path": "lib/runtime/multi_agent_orchestrator.dart",
-          "language": "dart",
-          "symbolCount": 0,
-          "symbols": []
-        },
-        {
-          "path": "lib/runtime/multi_agent_orchestrator_core.dart",
-          "language": "dart",
-          "symbolCount": 1,
-          "symbols": [
-            {
-              "language": "dart",
-              "path": "lib/runtime/multi_agent_orchestrator_core.dart",
-              "line": 20,
-              "kind": "class",
-              "name": "MultiAgentOrchestrator",
-              "signature": "class MultiAgentOrchestrator extends ChangeNotifier {"
-            }
-          ]
-        },
-        {
-          "path": "lib/runtime/multi_agent_orchestrator_protocol.dart",
-          "language": "dart",
-          "symbolCount": 13,
-          "symbols": [
-            {
-              "language": "dart",
-              "path": "lib/runtime/multi_agent_orchestrator_protocol.dart",
-              "line": 17,
-              "kind": "typedef",
-              "name": "CliProcessStarter",
-              "signature": "typedef CliProcessStarter = Future<Process> Function( String executable, List<String> arguments, { Map<String, String>? environment, String? workingDirectory, });"
-            },
-            {
-              "language": "dart",
-              "path": "lib/runtime/multi_agent_orchestrator_protocol.dart",
-              "line": 26,
-              "kind": "class",
-              "name": "CollaborationLogEntry",
-              "signature": "class CollaborationLogEntry {"
-            },
-            {
-              "language": "dart",
-              "path": "lib/runtime/multi_agent_orchestrator_protocol.dart",
-              "line": 47,
-              "kind": "enum",
-              "name": "CollaborationLogLevel",
-              "signature": "enum CollaborationLogLevel { debug, info, warning, error, success }"
-            },
-            {
-              "language": "dart",
-              "path": "lib/runtime/multi_agent_orchestrator_protocol.dart",
-              "line": 50,
-              "kind": "class",
-              "name": "CliResult",
-              "signature": "class CliResult {"
-            },
-            {
-              "language": "dart",
-              "path": "lib/runtime/multi_agent_orchestrator_protocol.dart",
-              "line": 65,
-              "kind": "class",
-              "name": "ArchitectResult",
-              "signature": "class ArchitectResult {"
-            },
-            {
-              "language": "dart",
-              "path": "lib/runtime/multi_agent_orchestrator_protocol.dart",
-              "line": 78,
-              "kind": "class",
-              "name": "EngineerResult",
-              "signature": "class EngineerResult {"
-            },
-            {
-              "language": "dart",
-              "path": "lib/runtime/multi_agent_orchestrator_protocol.dart",
-              "line": 93,
-              "kind": "class",
-              "name": "TesterResult",
-              "signature": "class TesterResult {"
-            },
-            {
-              "language": "dart",
-              "path": "lib/runtime/multi_agent_orchestrator_protocol.dart",
-              "line": 108,
-              "kind": "class",
-              "name": "CollaborationStep",
-              "signature": "class CollaborationStep {"
-            },
-            {
-              "language": "dart",
-              "path": "lib/runtime/multi_agent_orchestrator_protocol.dart",
-              "line": 137,
-              "kind": "enum",
-              "name": "StepStatus",
-              "signature": "enum StepStatus { pending, running, completed, failed }"
-            },
-            {
-              "language": "dart",
-              "path": "lib/runtime/multi_agent_orchestrator_protocol.dart",
-              "line": 140,
-              "kind": "class",
-              "name": "SubTask",
-              "signature": "class SubTask {"
-            },
-            {
-              "language": "dart",
-              "path": "lib/runtime/multi_agent_orchestrator_protocol.dart",
-              "line": 154,
-              "kind": "enum",
-              "name": "SubTaskType",
-              "signature": "enum SubTaskType { design, implementation, testing, documentation, deployment }"
-            },
-            {
-              "language": "dart",
-              "path": "lib/runtime/multi_agent_orchestrator_protocol.dart",
-              "line": 157,
-              "kind": "class",
-              "name": "CollaborationAttachment",
-              "signature": "class CollaborationAttachment {"
-            },
-            {
-              "language": "dart",
-              "path": "lib/runtime/multi_agent_orchestrator_protocol.dart",
-              "line": 170,
-              "kind": "class",
-              "name": "CollaborationResult",
-              "signature": "class CollaborationResult {"
-            }
-          ]
-        },
-        {
-          "path": "lib/runtime/multi_agent_orchestrator_support.dart",
-          "language": "dart",
-          "symbolCount": 1,
-          "symbols": [
-            {
-              "language": "dart",
-              "path": "lib/runtime/multi_agent_orchestrator_support.dart",
-              "line": 17,
-              "kind": "extension",
-              "name": "MultiAgentOrchestratorSupportInternal",
-              "signature": "extension MultiAgentOrchestratorSupportInternal on MultiAgentOrchestrator {"
-            }
-          ]
-        },
-        {
-          "path": "lib/runtime/multi_agent_orchestrator_workflow.dart",
-          "language": "dart",
-          "symbolCount": 1,
-          "symbols": [
-            {
-              "language": "dart",
-              "path": "lib/runtime/multi_agent_orchestrator_workflow.dart",
-              "line": 17,
-              "kind": "extension",
-              "name": "MultiAgentOrchestratorWorkflowInternal",
-              "signature": "extension MultiAgentOrchestratorWorkflowInternal on MultiAgentOrchestrator {"
             }
           ]
         },
@@ -3676,7 +3821,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_controllers_entities.dart",
-              "line": 48,
+              "line": 97,
               "kind": "class",
               "name": "ModelsController",
               "signature": "class ModelsController extends ChangeNotifier {"
@@ -3684,7 +3829,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_controllers_entities.dart",
-              "line": 121,
+              "line": 170,
               "kind": "class",
               "name": "CronJobsController",
               "signature": "class CronJobsController extends ChangeNotifier {"
@@ -3692,7 +3837,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_controllers_entities.dart",
-              "line": 155,
+              "line": 204,
               "kind": "class",
               "name": "DevicesController",
               "signature": "class DevicesController extends ChangeNotifier {"
@@ -3771,7 +3916,7 @@
         {
           "path": "lib/runtime/runtime_controllers_settings_account_impl.dart",
           "language": "dart",
-          "symbolCount": 9,
+          "symbolCount": 11,
           "symbols": [
             {
               "language": "dart",
@@ -3800,7 +3945,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_controllers_settings_account_impl.dart",
-              "line": 158,
+              "line": 160,
               "kind": "top-level function",
               "name": "restoreAccountSessionSettingsInternal",
               "signature": "Future<void> restoreAccountSessionSettingsInternal( SettingsController controller, { String baseUrl = '', bool quiet = false, }) async {"
@@ -3808,7 +3953,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_controllers_settings_account_impl.dart",
-              "line": 225,
+              "line": 227,
               "kind": "top-level function",
               "name": "syncAccountSettingsInternal",
               "signature": "Future<AccountSyncResult> syncAccountSettingsInternal( SettingsController controller, { String baseUrl = '', bool quiet = false, Map<String, dynamic> profilePayloadOverride = const <String, dynamic>{}, }) async {"
@@ -3816,7 +3961,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_controllers_settings_account_impl.dart",
-              "line": 371,
+              "line": 373,
               "kind": "top-level function",
               "name": "logoutAccountSettingsInternal",
               "signature": "Future<void> logoutAccountSettingsInternal( SettingsController controller, { String statusMessage = 'Signed out', bool quiet = false, }) async {"
@@ -3824,7 +3969,15 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_controllers_settings_account_impl.dart",
-              "line": 424,
+              "line": 426,
+              "kind": "top-level function",
+              "name": "markAccountBridgeRuntimeUnavailableInternal",
+              "signature": "Future<AccountSyncResult> markAccountBridgeRuntimeUnavailableInternal( SettingsController controller, { required String message, }) async {"
+            },
+            {
+              "language": "dart",
+              "path": "lib/runtime/runtime_controllers_settings_account_impl.dart",
+              "line": 444,
               "kind": "top-level function",
               "name": "cancelAccountMfaChallengeSettingsInternal",
               "signature": "Future<void> cancelAccountMfaChallengeSettingsInternal( SettingsController controller, ) async {"
@@ -3832,7 +3985,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_controllers_settings_account_impl.dart",
-              "line": 454,
+              "line": 474,
               "kind": "top-level function",
               "name": "normalizeAccountBaseUrlSettingsInternal",
               "signature": "String normalizeAccountBaseUrlSettingsInternal( String raw, { String fallback = '', }) {"
@@ -3840,10 +3993,18 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_controllers_settings_account_impl.dart",
-              "line": 574,
+              "line": 594,
               "kind": "top-level function",
               "name": "resolveAcpBridgeServerEffectiveConfigInternal",
               "signature": "AcpBridgeServerEffectiveConfig resolveAcpBridgeServerEffectiveConfigInternal( SettingsController controller, { required AcpBridgeServerModeConfig config, }) {"
+            },
+            {
+              "language": "dart",
+              "path": "lib/runtime/runtime_controllers_settings_account_impl.dart",
+              "line": 615,
+              "kind": "top-level function",
+              "name": "buildSavedAccountProfileSettingsInternal",
+              "signature": "Future<SettingsSnapshot> buildSavedAccountProfileSettingsInternal( SettingsController controller, { required SettingsSnapshot settings, required String accountBaseUrl, required String accountIdentifier, required String bridgeServerUrl, required String bridgeToken, required bool isManualBridge, }) async {"
             }
           ]
         },
@@ -4573,7 +4734,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_models_gateway_entities.dart",
-              "line": 36,
+              "line": 39,
               "kind": "class",
               "name": "GatewayInstanceSummary",
               "signature": "class GatewayInstanceSummary {"
@@ -4581,7 +4742,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_models_gateway_entities.dart",
-              "line": 66,
+              "line": 69,
               "kind": "class",
               "name": "GatewaySkillSummary",
               "signature": "class GatewaySkillSummary {"
@@ -4589,7 +4750,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_models_gateway_entities.dart",
-              "line": 92,
+              "line": 95,
               "kind": "class",
               "name": "GatewayConnectorSummary",
               "signature": "class GatewayConnectorSummary {"
@@ -4597,7 +4758,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_models_gateway_entities.dart",
-              "line": 120,
+              "line": 123,
               "kind": "class",
               "name": "GatewayModelSummary",
               "signature": "class GatewayModelSummary {"
@@ -4605,7 +4766,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_models_gateway_entities.dart",
-              "line": 136,
+              "line": 139,
               "kind": "class",
               "name": "GatewayCronJobSummary",
               "signature": "class GatewayCronJobSummary {"
@@ -4613,7 +4774,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_models_gateway_entities.dart",
-              "line": 162,
+              "line": 165,
               "kind": "class",
               "name": "GatewayDevicePairingList",
               "signature": "class GatewayDevicePairingList {"
@@ -4621,7 +4782,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_models_gateway_entities.dart",
-              "line": 173,
+              "line": 176,
               "kind": "class",
               "name": "GatewayPendingDevice",
               "signature": "class GatewayPendingDevice {"
@@ -4629,7 +4790,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_models_gateway_entities.dart",
-              "line": 200,
+              "line": 203,
               "kind": "class",
               "name": "GatewayPairedDevice",
               "signature": "class GatewayPairedDevice {"
@@ -4637,7 +4798,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_models_gateway_entities.dart",
-              "line": 229,
+              "line": 232,
               "kind": "class",
               "name": "GatewayDeviceTokenSummary",
               "signature": "class GatewayDeviceTokenSummary {"
@@ -4645,7 +4806,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_models_gateway_entities.dart",
-              "line": 249,
+              "line": 252,
               "kind": "class",
               "name": "SecretReferenceEntry",
               "signature": "class SecretReferenceEntry {"
@@ -4653,7 +4814,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_models_gateway_entities.dart",
-              "line": 265,
+              "line": 268,
               "kind": "class",
               "name": "SecretAuditEntry",
               "signature": "class SecretAuditEntry {"
@@ -4661,7 +4822,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_models_gateway_entities.dart",
-              "line": 305,
+              "line": 308,
               "kind": "class",
               "name": "DerivedTaskItem",
               "signature": "class DerivedTaskItem {"
@@ -4669,7 +4830,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_models_gateway_entities.dart",
-              "line": 329,
+              "line": 332,
               "kind": "class",
               "name": "LocalDeviceIdentity",
               "signature": "class LocalDeviceIdentity {"
@@ -4679,68 +4840,12 @@
         {
           "path": "lib/runtime/runtime_models_multi_agent.dart",
           "language": "dart",
-          "symbolCount": 12,
+          "symbolCount": 3,
           "symbols": [
             {
               "language": "dart",
               "path": "lib/runtime/runtime_models_multi_agent.dart",
-              "line": 13,
-              "kind": "enum",
-              "name": "MultiAgentRole",
-              "signature": "enum MultiAgentRole {"
-            },
-            {
-              "language": "dart",
-              "path": "lib/runtime/runtime_models_multi_agent.dart",
-              "line": 19,
-              "kind": "enum",
-              "name": "MultiAgentFramework",
-              "signature": "enum MultiAgentFramework { native, aris }"
-            },
-            {
-              "language": "dart",
-              "path": "lib/runtime/runtime_models_multi_agent.dart",
-              "line": 21,
-              "kind": "extension",
-              "name": "MultiAgentFrameworkCopy",
-              "signature": "extension MultiAgentFrameworkCopy on MultiAgentFramework {"
-            },
-            {
-              "language": "dart",
-              "path": "lib/runtime/runtime_models_multi_agent.dart",
-              "line": 35,
-              "kind": "extension",
-              "name": "MultiAgentRoleCopy",
-              "signature": "extension MultiAgentRoleCopy on MultiAgentRole {"
-            },
-            {
-              "language": "dart",
-              "path": "lib/runtime/runtime_models_multi_agent.dart",
-              "line": 49,
-              "kind": "enum",
-              "name": "AiGatewayInjectionPolicy",
-              "signature": "enum AiGatewayInjectionPolicy { disabled, launchScoped, appManagedDefault }"
-            },
-            {
-              "language": "dart",
-              "path": "lib/runtime/runtime_models_multi_agent.dart",
-              "line": 51,
-              "kind": "extension",
-              "name": "AiGatewayInjectionPolicyCopy",
-              "signature": "extension AiGatewayInjectionPolicyCopy on AiGatewayInjectionPolicy {"
-            },
-            {
-              "language": "dart",
-              "path": "lib/runtime/runtime_models_multi_agent.dart",
-              "line": 73,
-              "kind": "class",
-              "name": "AgentWorkerConfig",
-              "signature": "class AgentWorkerConfig {"
-            },
-            {
-              "language": "dart",
-              "path": "lib/runtime/runtime_models_multi_agent.dart",
-              "line": 105,
+              "line": 1,
               "kind": "class",
               "name": "ManagedSkillEntry",
               "signature": "class ManagedSkillEntry {"
@@ -4748,7 +4853,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_models_multi_agent.dart",
-              "line": 146,
+              "line": 42,
               "kind": "class",
               "name": "ManagedMcpServerEntry",
               "signature": "class ManagedMcpServerEntry {"
@@ -4756,26 +4861,10 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_models_multi_agent.dart",
-              "line": 222,
+              "line": 118,
               "kind": "class",
               "name": "ManagedMountTargetState",
               "signature": "class ManagedMountTargetState {"
-            },
-            {
-              "language": "dart",
-              "path": "lib/runtime/runtime_models_multi_agent.dart",
-              "line": 431,
-              "kind": "class",
-              "name": "MultiAgentConfig",
-              "signature": "class MultiAgentConfig {"
-            },
-            {
-              "language": "dart",
-              "path": "lib/runtime/runtime_models_multi_agent.dart",
-              "line": 788,
-              "kind": "class",
-              "name": "MultiAgentRunEvent",
-              "signature": "class MultiAgentRunEvent {"
             }
           ]
         },
@@ -4949,7 +5038,7 @@
         {
           "path": "lib/runtime/runtime_models_runtime_payloads.dart",
           "language": "dart",
-          "symbolCount": 31,
+          "symbolCount": 32,
           "symbols": [
             {
               "language": "dart",
@@ -5010,15 +5099,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_models_runtime_payloads.dart",
-              "line": 391,
-              "kind": "class",
-              "name": "AssistantThreadSkillEntry",
-              "signature": "class AssistantThreadSkillEntry {"
-            },
-            {
-              "language": "dart",
-              "path": "lib/runtime/runtime_models_runtime_payloads.dart",
-              "line": 457,
+              "line": 393,
               "kind": "enum",
               "name": "ThreadRealm",
               "signature": "enum ThreadRealm { local, remote }"
@@ -5026,7 +5107,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_models_runtime_payloads.dart",
-              "line": 459,
+              "line": 395,
               "kind": "extension",
               "name": "ThreadRealmCopy",
               "signature": "extension ThreadRealmCopy on ThreadRealm {"
@@ -5034,7 +5115,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_models_runtime_payloads.dart",
-              "line": 468,
+              "line": 404,
               "kind": "enum",
               "name": "ThreadSubjectType",
               "signature": "enum ThreadSubjectType { tenant, user }"
@@ -5042,7 +5123,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_models_runtime_payloads.dart",
-              "line": 470,
+              "line": 406,
               "kind": "extension",
               "name": "ThreadSubjectTypeCopy",
               "signature": "extension ThreadSubjectTypeCopy on ThreadSubjectType {"
@@ -5050,7 +5131,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_models_runtime_payloads.dart",
-              "line": 479,
+              "line": 415,
               "kind": "enum",
               "name": "WorkspaceKind",
               "signature": "enum WorkspaceKind { localFs, remoteFs }"
@@ -5058,7 +5139,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_models_runtime_payloads.dart",
-              "line": 481,
+              "line": 417,
               "kind": "extension",
               "name": "WorkspaceKindCopy",
               "signature": "extension WorkspaceKindCopy on WorkspaceKind {"
@@ -5066,7 +5147,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_models_runtime_payloads.dart",
-              "line": 500,
+              "line": 436,
               "kind": "top-level function",
               "name": "isLegacyAutoThreadExecutionModeValue",
               "signature": "bool isLegacyAutoThreadExecutionModeValue(String? value) {"
@@ -5074,7 +5155,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_models_runtime_payloads.dart",
-              "line": 504,
+              "line": 440,
               "kind": "enum",
               "name": "ThreadExecutionMode",
               "signature": "enum ThreadExecutionMode { agent, gateway }"
@@ -5082,7 +5163,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_models_runtime_payloads.dart",
-              "line": 506,
+              "line": 442,
               "kind": "extension",
               "name": "ThreadExecutionModeCopy",
               "signature": "extension ThreadExecutionModeCopy on ThreadExecutionMode {"
@@ -5090,7 +5171,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_models_runtime_payloads.dart",
-              "line": 515,
+              "line": 451,
               "kind": "enum",
               "name": "ThreadSelectionSource",
               "signature": "enum ThreadSelectionSource { inherited, explicit }"
@@ -5098,7 +5179,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_models_runtime_payloads.dart",
-              "line": 517,
+              "line": 453,
               "kind": "extension",
               "name": "ThreadSelectionSourceCopy",
               "signature": "extension ThreadSelectionSourceCopy on ThreadSelectionSource {"
@@ -5106,7 +5187,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_models_runtime_payloads.dart",
-              "line": 526,
+              "line": 462,
               "kind": "class",
               "name": "ThreadOwnerScope",
               "signature": "class ThreadOwnerScope {"
@@ -5114,7 +5195,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_models_runtime_payloads.dart",
-              "line": 574,
+              "line": 510,
               "kind": "class",
               "name": "WorkspaceBinding",
               "signature": "class WorkspaceBinding {"
@@ -5122,7 +5203,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_models_runtime_payloads.dart",
-              "line": 638,
+              "line": 574,
               "kind": "class",
               "name": "ExecutionBinding",
               "signature": "class ExecutionBinding {"
@@ -5130,7 +5211,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_models_runtime_payloads.dart",
-              "line": 702,
+              "line": 638,
               "kind": "top-level function",
               "name": "threadExecutionModeFromAssistantExecutionTarget",
               "signature": "ThreadExecutionMode threadExecutionModeFromAssistantExecutionTarget( AssistantExecutionTarget target, ) {"
@@ -5138,7 +5219,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_models_runtime_payloads.dart",
-              "line": 711,
+              "line": 647,
               "kind": "top-level function",
               "name": "assistantExecutionTargetFromExecutionMode",
               "signature": "AssistantExecutionTarget assistantExecutionTargetFromExecutionMode( ThreadExecutionMode mode, ) {"
@@ -5146,7 +5227,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_models_runtime_payloads.dart",
-              "line": 720,
+              "line": 656,
               "kind": "top-level function",
               "name": "workspaceRefKindFromWorkspaceKind",
               "signature": "WorkspaceRefKind workspaceRefKindFromWorkspaceKind(WorkspaceKind kind) {"
@@ -5154,7 +5235,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_models_runtime_payloads.dart",
-              "line": 727,
+              "line": 663,
               "kind": "class",
               "name": "ThreadContextState",
               "signature": "class ThreadContextState {"
@@ -5162,7 +5243,23 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_models_runtime_payloads.dart",
-              "line": 935,
+              "line": 851,
+              "kind": "class",
+              "name": "TaskInputAttachmentRecord",
+              "signature": "class TaskInputAttachmentRecord {"
+            },
+            {
+              "language": "dart",
+              "path": "lib/runtime/runtime_models_runtime_payloads.dart",
+              "line": 915,
+              "kind": "class",
+              "name": "OpenClawTaskAssociation",
+              "signature": "class OpenClawTaskAssociation {"
+            },
+            {
+              "language": "dart",
+              "path": "lib/runtime/runtime_models_runtime_payloads.dart",
+              "line": 1090,
               "kind": "class",
               "name": "ThreadLifecycleState",
               "signature": "class ThreadLifecycleState {"
@@ -5170,7 +5267,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_models_runtime_payloads.dart",
-              "line": 991,
+              "line": 1146,
               "kind": "class",
               "name": "TaskThread",
               "signature": "class TaskThread {"
@@ -5178,7 +5275,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_models_runtime_payloads.dart",
-              "line": 1332,
+              "line": 1496,
               "kind": "top-level function",
               "name": "isNewConversationTaskTitle",
               "signature": "bool isNewConversationTaskTitle(String title) {"
@@ -5186,7 +5283,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_models_runtime_payloads.dart",
-              "line": 1337,
+              "line": 1501,
               "kind": "top-level function",
               "name": "firstUserMessageTaskTitle",
               "signature": "String firstUserMessageTaskTitle( Iterable<GatewayChatMessage> messages, { String fallback = '', }) {"
@@ -5194,7 +5291,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_models_runtime_payloads.dart",
-              "line": 1359,
+              "line": 1523,
               "kind": "top-level function",
               "name": "derivePersistedTaskTitle",
               "signature": "String derivePersistedTaskTitle( String currentTitle, Iterable<GatewayChatMessage> messages, { String fallback = '', bool hasCustomTitle = false, }) {"
@@ -5209,7 +5306,7 @@
             {
               "language": "dart",
               "path": "lib/runtime/runtime_models_settings_snapshot.dart",
-              "line": 17,
+              "line": 16,
               "kind": "class",
               "name": "SettingsSnapshot",
               "signature": "class SettingsSnapshot {"
@@ -5329,61 +5426,6 @@
               "kind": "class",
               "name": "SettingsStore",
               "signature": "class SettingsStore {"
-            }
-          ]
-        },
-        {
-          "path": "lib/runtime/skill_directory_access.dart",
-          "language": "dart",
-          "symbolCount": 6,
-          "symbols": [
-            {
-              "language": "dart",
-              "path": "lib/runtime/skill_directory_access.dart",
-              "line": 10,
-              "kind": "abstract interface",
-              "name": "SkillDirectoryAccessService",
-              "signature": "abstract class SkillDirectoryAccessService {"
-            },
-            {
-              "language": "dart",
-              "path": "lib/runtime/skill_directory_access.dart",
-              "line": 33,
-              "kind": "class",
-              "name": "SkillDirectoryAccessHandle",
-              "signature": "class SkillDirectoryAccessHandle {"
-            },
-            {
-              "language": "dart",
-              "path": "lib/runtime/skill_directory_access.dart",
-              "line": 47,
-              "kind": "top-level function",
-              "name": "createSkillDirectoryAccessService",
-              "signature": "SkillDirectoryAccessService createSkillDirectoryAccessService() {"
-            },
-            {
-              "language": "dart",
-              "path": "lib/runtime/skill_directory_access.dart",
-              "line": 58,
-              "kind": "class",
-              "name": "UnsupportedSkillDirectoryAccessService",
-              "signature": "class UnsupportedSkillDirectoryAccessService implements SkillDirectoryAccessService {"
-            },
-            {
-              "language": "dart",
-              "path": "lib/runtime/skill_directory_access.dart",
-              "line": 90,
-              "kind": "class",
-              "name": "FileSelectorSkillDirectoryAccessService",
-              "signature": "class FileSelectorSkillDirectoryAccessService implements SkillDirectoryAccessService {"
-            },
-            {
-              "language": "dart",
-              "path": "lib/runtime/skill_directory_access.dart",
-              "line": 154,
-              "kind": "class",
-              "name": "MacOsSkillDirectoryAccessService",
-              "signature": "class MacOsSkillDirectoryAccessService implements SkillDirectoryAccessService {"
             }
           ]
         }
