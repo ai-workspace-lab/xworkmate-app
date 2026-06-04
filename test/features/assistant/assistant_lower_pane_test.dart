@@ -64,7 +64,7 @@ void main() {
     testWidgets('shows mode-specific provider catalogs', (tester) async {
       final controller = AppController(
         environmentOverride: const <String, String>{},
-        uiFeatureManifest: _manifestWithDesktopMultiAgentEnabled(),
+        uiFeatureManifest: _defaultDesktopManifest(),
         initialBridgeProviderCatalog: const <SingleAgentProvider>[
           SingleAgentProvider.codex,
           SingleAgentProvider.opencode,
@@ -214,7 +214,7 @@ void main() {
     ) async {
       final controller = AppController(
         environmentOverride: const <String, String>{},
-        uiFeatureManifest: _manifestWithDesktopMultiAgentEnabled(),
+        uiFeatureManifest: _defaultDesktopManifest(),
         initialBridgeProviderCatalog: const <SingleAgentProvider>[
           SingleAgentProvider.codex,
           SingleAgentProvider.opencode,
@@ -264,7 +264,7 @@ void main() {
     ) async {
       final controller = AppController(
         environmentOverride: const <String, String>{},
-        uiFeatureManifest: _manifestWithDesktopMultiAgentEnabled(),
+        uiFeatureManifest: _defaultDesktopManifest(),
         initialBridgeProviderCatalog: const <SingleAgentProvider>[
           SingleAgentProvider.codex,
           SingleAgentProvider.opencode,
@@ -377,7 +377,7 @@ void main() {
       (tester) async {
         final controller = AppController(
           environmentOverride: const <String, String>{},
-          uiFeatureManifest: _manifestWithDesktopMultiAgentEnabled(),
+          uiFeatureManifest: _defaultDesktopManifest(),
           initialBridgeProviderCatalog: const <SingleAgentProvider>[
             SingleAgentProvider.codex,
             SingleAgentProvider.opencode,
@@ -733,19 +733,9 @@ void main() {
   });
 }
 
-UiFeatureManifest _manifestWithDesktopMultiAgentEnabled() {
+UiFeatureManifest _defaultDesktopManifest() {
   return UiFeatureManifest.fromYamlString(
     File(UiFeatureManifest.assetPath).readAsStringSync(),
-  ).copyWithFeature(
-    platform: UiFeaturePlatform.desktop,
-    module: 'assistant',
-    feature: 'multi_agent',
-    enabled: true,
-    buildModes: const <UiFeatureBuildMode>{
-      UiFeatureBuildMode.debug,
-      UiFeatureBuildMode.profile,
-      UiFeatureBuildMode.release,
-    },
   );
 }
 

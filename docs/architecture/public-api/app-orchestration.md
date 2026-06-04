@@ -45,9 +45,7 @@
 | `accountClientFactory` | `AccountRuntimeClient Function(String)?` | No | default impl | account runtime client 构造 |
 | `environmentOverride` | `Map<String, String>?` | No | `null` | 测试/运行时环境覆盖 |
 | `singleAgentSharedSkillScanRootOverrides` | `List<String>?` | No | `null` | 共享 skill 扫描根覆写 |
-| `arisBundleRepository` | `ArisBundleRepository?` | No | default impl | ARIS bundle 发现仓库 |
 | `goTaskServiceClient` | `GoTaskServiceClient?` | No | `DesktopGoTaskService` | 外部 ACP / gateway 任务入口 |
-| `multiAgentMountManager` | `MultiAgentMountManager?` | No | default impl | 多 agent mount 管理器 |
 
 ### Returns
 
@@ -161,9 +159,6 @@
 | --- | --- | --- | --- |
 | `loadAssistantArtifactSnapshot` | `{String? sessionKey}` | `Future<AssistantArtifactSnapshot>` | 加载某会话 artifact 清单快照 |
 | `loadAssistantArtifactPreview` | `AssistantArtifactEntry artifact, {String? sessionKey}` | `Future<AssistantArtifactPreview>` | 读取 artifact 预览内容 |
-| `saveMultiAgentConfig` | `MultiAgentConfig config` | `Future<void>` | 持久化多 agent 配置 |
-| `refreshMultiAgentMounts` | `{bool sync=false}` | `Future<void>` | 刷新或同步 mount |
-| `runMultiAgentCollaboration` | named args | `Future<void>` | 触发多 agent 协作执行 |
 | `openOnlineWorkspace` | none | `Future<void>` | 打开在线工作区入口 |
 
 ## `AppControllerDesktopWorkspaceExecution`

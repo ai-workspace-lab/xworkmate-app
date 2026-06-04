@@ -64,7 +64,7 @@ void main() {
       () async {
         final controller = AppController(
           environmentOverride: const <String, String>{},
-          uiFeatureManifest: _manifestWithDesktopMultiAgentEnabled(),
+          uiFeatureManifest: _defaultDesktopManifest(),
           initialBridgeProviderCatalog: const <SingleAgentProvider>[
             SingleAgentProvider.codex,
             SingleAgentProvider.openclaw,
@@ -110,7 +110,7 @@ void main() {
       () async {
         final controller = AppController(
           environmentOverride: const <String, String>{},
-          uiFeatureManifest: _manifestWithDesktopMultiAgentEnabled(),
+          uiFeatureManifest: _defaultDesktopManifest(),
           initialBridgeProviderCatalog: const <SingleAgentProvider>[
             SingleAgentProvider.codex,
             SingleAgentProvider.opencode,
@@ -4219,26 +4219,16 @@ List<Map<String, dynamic>> _generatedArtifactPayloads() {
   ];
 }
 
-UiFeatureManifest _manifestWithDesktopMultiAgentEnabled() {
+UiFeatureManifest _defaultDesktopManifest() {
   return UiFeatureManifest.fromYamlString(
     File(UiFeatureManifest.assetPath).readAsStringSync(),
-  ).copyWithFeature(
-    platform: UiFeaturePlatform.desktop,
-    module: 'assistant',
-    feature: 'multi_agent',
-    enabled: true,
-    buildModes: const <UiFeatureBuildMode>{
-      UiFeatureBuildMode.debug,
-      UiFeatureBuildMode.profile,
-      UiFeatureBuildMode.release,
-    },
   );
 }
 
 AppController _connectedController(GoTaskServiceClient client) {
   return AppController(
     goTaskServiceClient: client,
-    uiFeatureManifest: _manifestWithDesktopMultiAgentEnabled(),
+    uiFeatureManifest: _defaultDesktopManifest(),
     environmentOverride: const <String, String>{
       'BRIDGE_AUTH_TOKEN': 'bridge-token',
     },
@@ -4254,7 +4244,7 @@ AppController _connectedController(GoTaskServiceClient client) {
 AppController _connectedGatewayController(GoTaskServiceClient client) {
   return AppController(
     goTaskServiceClient: client,
-    uiFeatureManifest: _manifestWithDesktopMultiAgentEnabled(),
+    uiFeatureManifest: _defaultDesktopManifest(),
     environmentOverride: const <String, String>{
       'BRIDGE_AUTH_TOKEN': 'bridge-token',
     },
