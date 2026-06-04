@@ -12,38 +12,85 @@ import 'runtime_controllers_gateway.dart';
 import 'runtime_controllers_derived_tasks.dart';
 
 class SkillsController extends ChangeNotifier {
-  SkillsController(this.runtimeInternal);
+  SkillsController(this.runtimeInternal) {
+    _runtimeListener = () {
+      if (!runtimeInternal.isConnected) {
+        // Reset auto-refresh flag on disconnect so a subsequent reconnect
+        // will trigger a fresh load.
+        _hasAutoRefreshed = false;
+        return;
+      }
+      // Auto-refresh on first gateway connect only when skills are empty,
+      // not already loading, and haven't auto-refreshed this session.
+      if (loadingInternal || itemsInternal.isNotEmpty || _hasAutoRefreshed) {
+        return;
+      }
+      _hasAutoRefreshed = true;
+      refresh();
+    };
+    runtimeInternal.addListener(_runtimeListener!);
+  }
 
   final GatewayRuntime runtimeInternal;
 
   List<GatewaySkillSummary> itemsInternal = const <GatewaySkillSummary>[];
   bool loadingInternal = false;
   String? errorInternal;
+  int _retryCount = 0;
+  static const int _maxRetries = 2;
+  VoidCallback? _runtimeListener;
+  bool _hasAutoRefreshed = false;
 
   List<GatewaySkillSummary> get items => itemsInternal;
   bool get loading => loadingInternal;
   String? get error => errorInternal;
 
+  /// Whether the user can manually retry (non-empty error + not loading).
+  bool get canRetry =>
+      (errorInternal?.isNotEmpty ?? false) && !loadingInternal;
+
   Future<void> refresh({String? agentId}) async {
     if (!runtimeInternal.isConnected) {
-      if (!runtimeInternal.canConnectBridgeSession) {
-        itemsInternal = const <GatewaySkillSummary>[];
-        errorInternal = null;
-        notifyListeners();
-        return;
-      }
+      errorInternal = 'Gateway 未连接，无法加载技能列表。';
+      notifyListeners();
+      return;
     }
     loadingInternal = true;
     errorInternal = null;
+    _retryCount = 0;
     notifyListeners();
+    await _doRefresh(agentId: agentId);
+  }
+
+  Future<void> _doRefresh({String? agentId}) async {
     try {
       itemsInternal = await runtimeInternal.listSkills(agentId: agentId);
+      errorInternal = null;
+      _retryCount = 0;
     } catch (error) {
+      if (_retryCount < _maxRetries && runtimeInternal.isConnected) {
+        _retryCount++;
+        final delay = Duration(seconds: _retryCount * 2);
+        await Future<void>.delayed(delay);
+        if (runtimeInternal.isConnected) {
+          await _doRefresh(agentId: agentId);
+          return;
+        }
+      }
       errorInternal = error.toString();
     } finally {
       loadingInternal = false;
       notifyListeners();
     }
+  }
+
+  @override
+  void dispose() {
+    if (_runtimeListener != null) {
+      runtimeInternal.removeListener(_runtimeListener!);
+      _runtimeListener = null;
+    }
+    super.dispose();
   }
 }
 

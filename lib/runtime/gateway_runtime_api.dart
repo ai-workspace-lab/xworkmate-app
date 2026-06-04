@@ -203,18 +203,62 @@ extension GatewayRuntimeApiInternal on GatewayRuntime {
       if (agentId != null && agentId.trim().isNotEmpty)
         'agentId': agentId.trim(),
     };
+    if (sessionClientInternal == null) {
+      throw GatewayRuntimeException(
+        'skills.status requires bridge session (ACP transport)',
+        code: 'BRIDGE_NOT_CONFIGURED',
+      );
+    }
+    // Use allowErrorPayload so the bridge can return cached skills even when
+    // the upstream OpenClaw gateway is temporarily offline (ok:false + payload).
     final payload = asMap(
-      sessionClientInternal == null
-          ? await request('skills.status', params: params)
-          : await sessionClientInternal!.request(
-              runtimeId: runtimeIdInternal,
-              method: 'skills.status',
-              params: params,
-              allowErrorPayload: true,
-            ),
+      await sessionClientInternal!.request(
+        runtimeId: runtimeIdInternal,
+        method: 'skills.status',
+        params: params,
+        allowErrorPayload: true,
+      ),
     );
-    final statusPayload = skillsStatusPayloadInternal(payload);
-    return asList(statusPayload['skills'])
+    final skillsList = asList(payload['skills']);
+    // When the skills key is entirely absent (not just an empty list), the
+    // gateway may have returned a stub or error payload. Distinguish between
+    // "genuinely no skills" and "gateway responded without skills data".
+    if (!payload.containsKey('skills')) {
+      final hasWorkspaceMeta = payload.containsKey('workspaceDir') ||
+          payload.containsKey('managedSkillsDir');
+      if (!hasWorkspaceMeta) {
+        appendLogInternal(
+          this,
+          'warn',
+          'skills',
+          'skills.status returned payload without skills key and without'
+          ' workspace metadata — likely a gateway error or unimplemented method',
+        );
+        throw GatewayRuntimeException(
+          'OpenClaw gateway did not return skills data.'
+          ' The gateway may not have skills.status implemented.',
+          code: 'SKILLS_STATUS_MISSING',
+        );
+      }
+      // Gateway responded with workspace metadata but no skills key —
+      // genuinely no skills installed. Return empty list.
+      appendLogInternal(
+        this,
+        'debug',
+        'skills',
+        'skills.status returned workspace metadata with zero skills',
+      );
+      return const <GatewaySkillSummary>[];
+    }
+    if (skillsList.isEmpty) {
+      appendLogInternal(
+        this,
+        'debug',
+        'skills',
+        'skills.status returned empty skills list (${payload.length} payload keys)',
+      );
+    }
+    return skillsList
         .map((item) {
           final map = asMap(item);
           return GatewaySkillSummary(
@@ -559,24 +603,6 @@ extension GatewayRuntimeApiInternal on GatewayRuntime {
     );
     return result.payload;
   }
-}
-
-Map<String, dynamic> skillsStatusPayloadInternal(Map<String, dynamic> payload) {
-  if (asList(payload['skills']).isNotEmpty) {
-    return payload;
-  }
-  for (final key in const <String>[
-    'status',
-    'skillStatus',
-    'data',
-    'payload',
-  ]) {
-    final nested = asMap(payload[key]);
-    if (asList(nested['skills']).isNotEmpty) {
-      return nested;
-    }
-  }
-  return payload;
 }
 
 List<String> skillMissingListInternal(

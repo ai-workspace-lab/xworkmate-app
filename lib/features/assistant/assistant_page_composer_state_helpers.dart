@@ -32,7 +32,6 @@ import 'assistant_page_composer_support.dart';
 import 'assistant_page_tooltip_labels.dart';
 import 'assistant_page_message_widgets.dart';
 import 'assistant_page_task_models.dart';
-import 'assistant_page_composer_skill_models.dart';
 import 'assistant_page_composer_skill_picker.dart';
 import 'assistant_page_composer_clipboard.dart';
 import 'assistant_page_components_core.dart';
@@ -99,6 +98,7 @@ Widget buildSkillPickerOverlayForInternal(
           hasQuery: state.skillPickerQueryInternal.trim().isNotEmpty,
           onQueryChanged: state.setSkillPickerQueryInternal,
           onToggleSkill: (skillKey) => state.widget.onToggleSkill(skillKey),
+          onRetry: () => state.widget.controller.skillsController.refresh(),
         ),
       ),
     ],

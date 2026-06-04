@@ -33,7 +33,6 @@ import 'assistant_page_composer_support.dart';
 import 'assistant_page_tooltip_labels.dart';
 import 'assistant_page_message_widgets.dart';
 import 'assistant_page_task_models.dart';
-import 'assistant_page_composer_skill_models.dart';
 import 'assistant_page_composer_clipboard.dart';
 import 'assistant_page_components_core.dart';
 
@@ -79,6 +78,7 @@ class SkillPickerPopoverInternal extends StatelessWidget {
     required this.hasQuery,
     required this.onQueryChanged,
     required this.onToggleSkill,
+    this.onRetry,
   });
 
   final double maxHeight;
@@ -91,6 +91,7 @@ class SkillPickerPopoverInternal extends StatelessWidget {
   final bool hasQuery;
   final ValueChanged<String> onQueryChanged;
   final ValueChanged<String> onToggleSkill;
+  final VoidCallback? onRetry;
 
   @override
   Widget build(BuildContext context) {
@@ -189,6 +190,31 @@ class SkillPickerPopoverInternal extends StatelessWidget {
                                   style: theme.textTheme.bodySmall?.copyWith(
                                     color: palette.textMuted,
                                   ),
+                                ),
+                              ],
+                              if (!hasError && !isLoading && !hasQuery) ...[
+                                const SizedBox(height: 8),
+                                Text(
+                                  appText(
+                                    '技能来源于 Gateway 工作区。请确认 OpenClaw'
+                                    ' Gateway 已连接且安装了技能包。',
+                                    'Skills come from the Gateway workspace.'
+                                    ' Make sure OpenClaw Gateway is connected'
+                                    ' and skills are installed.',
+                                  ),
+                                  textAlign: TextAlign.center,
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: palette.textMuted,
+                                  ),
+                                ),
+                              ],
+                              if ((hasError || (!isLoading && !hasQuery)) &&
+                                  onRetry != null) ...[
+                                const SizedBox(height: 12),
+                                TextButton.icon(
+                                  onPressed: onRetry,
+                                  icon: const Icon(Icons.refresh_rounded, size: 16),
+                                  label: Text(appText('重试', 'Retry')),
                                 ),
                               ],
                             ],
@@ -348,4 +374,90 @@ class SkillPickerTileInternal extends StatelessWidget {
       ),
     );
   }
+}
+
+ComposerSkillOptionInternal skillOptionFromGatewayInternal(
+  GatewaySkillSummary skill,
+) {
+  final key = skill.skillKey.trim().isEmpty
+      ? skill.name.trim().toLowerCase()
+      : skill.skillKey.trim();
+  final label = skill.name.trim().isEmpty ? key : skill.name.trim();
+  final sourceLabel = skill.source.trim().isEmpty ? 'Gateway' : skill.source;
+  final group = skillGroupForSourceInternal(skill.source);
+  final description = skill.description.trim().isEmpty
+      ? appText('可在当前任务中调用的技能。', 'Skill available in the current task.')
+      : skill.description.trim();
+
+  return ComposerSkillOptionInternal(
+    key: key,
+    label: label,
+    description: description,
+    sourceLabel: sourceLabel,
+    groupLabel: group.label,
+    groupSortOrder: group.sortOrder,
+    icon: Icons.key_rounded,
+  );
+}
+
+ComposerSkillGroupInternal skillGroupForSourceInternal(String source) {
+  final normalized = source.trim().toLowerCase();
+  if (normalized == 'openclaw-workspace') {
+    return const ComposerSkillGroupInternal(
+      label: 'Workspace Skills',
+      sortOrder: 0,
+    );
+  }
+  if (normalized.startsWith('agents-skills-') ||
+      normalized == 'agent' ||
+      normalized.startsWith('agent-') ||
+      normalized.contains('personal')) {
+    return const ComposerSkillGroupInternal(
+      label: 'Agent Skills',
+      sortOrder: 1,
+    );
+  }
+  if (normalized == 'bridge' || normalized == 'gateway') {
+    return const ComposerSkillGroupInternal(
+      label: 'Gateway Skills',
+      sortOrder: 2,
+    );
+  }
+  if (normalized.isEmpty) {
+    return const ComposerSkillGroupInternal(
+      label: 'Gateway Skills',
+      sortOrder: 2,
+    );
+  }
+  return const ComposerSkillGroupInternal(label: 'Other Skills', sortOrder: 3);
+}
+
+class ComposerSkillGroupInternal {
+  const ComposerSkillGroupInternal({
+    required this.label,
+    required this.sortOrder,
+  });
+
+  final String label;
+  final int sortOrder;
+}
+
+class ComposerSkillOptionInternal {
+  const ComposerSkillOptionInternal({
+    required this.key,
+    required this.label,
+    required this.description,
+    required this.sourceLabel,
+    required this.groupLabel,
+    required this.groupSortOrder,
+    required this.icon,
+  });
+
+  final String key;
+  final String label;
+  final String description;
+  final String sourceLabel;
+  final String groupLabel;
+  final int groupSortOrder;
+  final IconData icon;
 }

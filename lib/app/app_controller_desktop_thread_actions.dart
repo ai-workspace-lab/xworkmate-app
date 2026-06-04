@@ -179,6 +179,11 @@ extension AppControllerDesktopThreadActions on AppController {
     if (isAppOwnedAssistantSessionKeyInternal(sessionKey)) {
       await chatControllerInternal.loadSession(sessionKey);
     }
+    await skillsControllerInternal.refresh(
+      agentId: agentsControllerInternal.selectedAgentId.isEmpty
+          ? null
+          : agentsControllerInternal.selectedAgentId,
+    );
     recomputeTasksInternal();
   }
 
