@@ -97,6 +97,16 @@ String? desktopKeyName(LogicalKeyboardKey key) {
   if (key == LogicalKeyboardKey.end) return 'End';
   if (key == LogicalKeyboardKey.pageUp) return 'Page_Up';
   if (key == LogicalKeyboardKey.pageDown) return 'Page_Down';
+  
+  if (key == LogicalKeyboardKey.shiftLeft) return 'Shift_L';
+  if (key == LogicalKeyboardKey.shiftRight) return 'Shift_R';
+  if (key == LogicalKeyboardKey.controlLeft) return 'Control_L';
+  if (key == LogicalKeyboardKey.controlRight) return 'Control_R';
+  if (key == LogicalKeyboardKey.altLeft) return 'Alt_L';
+  if (key == LogicalKeyboardKey.altRight) return 'Alt_R';
+  if (key == LogicalKeyboardKey.metaLeft) return 'Super_L';
+  if (key == LogicalKeyboardKey.metaRight) return 'Super_R';
+  if (key == LogicalKeyboardKey.capsLock) return 'Caps_Lock';
 
   final label = key.keyLabel;
   if (label.isEmpty) return null;
@@ -123,6 +133,26 @@ const Map<String, String> _xdotoolPunctuationNames = <String, String>{
   '[': 'bracketleft',
   ']': 'bracketright',
   '\\': 'backslash',
+  '!': 'exclam',
+  '@': 'at',
+  '#': 'numbersign',
+  '\$': 'dollar',
+  '%': 'percent',
+  '^': 'asciicircum',
+  '&': 'ampersand',
+  '*': 'asterisk',
+  '(': 'parenleft',
+  ')': 'parenright',
+  '+': 'plus',
+  '{': 'braceleft',
+  '}': 'braceright',
+  '|': 'bar',
+  ':': 'colon',
+  '"': 'quotedbl',
+  '<': 'less',
+  '>': 'greater',
+  '?': 'question',
+  '~': 'asciitilde',
 };
 
 Offset? desktopContentPosition(

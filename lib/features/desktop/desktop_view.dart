@@ -46,6 +46,7 @@ class _DesktopViewState extends State<DesktopView> {
   );
 
   bool _useGpu = false;
+  bool _adaptiveResolution = true;
   bool _showAdvancedOptions = false;
   String _connectionState = 'disconnected';
   bool _hasStream = false;
@@ -121,8 +122,19 @@ class _DesktopViewState extends State<DesktopView> {
       await _client.disconnect();
     } else {
       final display = _displayController.text.trim();
-      final width = int.tryParse(_widthController.text) ?? 1280;
-      final height = int.tryParse(_heightController.text) ?? 720;
+      int width = int.tryParse(_widthController.text) ?? 1280;
+      int height = int.tryParse(_heightController.text) ?? 720;
+      
+      if (_adaptiveResolution) {
+        final viewportSize = _getViewportSize();
+        if (viewportSize.width > 0 && viewportSize.height > 0) {
+          width = (viewportSize.width.toInt() ~/ 2) * 2;
+          height = (viewportSize.height.toInt() ~/ 2) * 2;
+          _widthController.text = width.toString();
+          _heightController.text = height.toString();
+        }
+      }
+      
       final fps = int.tryParse(_fpsController.text) ?? 30;
       final bitrate = int.tryParse(_bitrateController.text) ?? 2000;
       _remoteDesktopSize = Size(width.toDouble(), height.toDouble());
@@ -312,12 +324,25 @@ class _DesktopViewState extends State<DesktopView> {
                             ),
                           ),
                         ),
+                        // Adaptive Resolution Toggle
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(appText('自适应分辨率', 'Adaptive Resolution')),
+                            Switch(
+                              value: _adaptiveResolution,
+                              onChanged: _connectionState == 'disconnected'
+                                  ? (val) => setState(() => _adaptiveResolution = val)
+                                  : null,
+                            ),
+                          ],
+                        ),
                         // Resolution settings
                         SizedBox(
                           width: 90,
                           child: TextField(
                             controller: _widthController,
-                            enabled: _connectionState == 'disconnected',
+                            enabled: _connectionState == 'disconnected' && !_adaptiveResolution,
                             keyboardType: TextInputType.number,
                             decoration: const InputDecoration(labelText: '宽度'),
                           ),
@@ -326,7 +351,7 @@ class _DesktopViewState extends State<DesktopView> {
                           width: 90,
                           child: TextField(
                             controller: _heightController,
-                            enabled: _connectionState == 'disconnected',
+                            enabled: _connectionState == 'disconnected' && !_adaptiveResolution,
                             keyboardType: TextInputType.number,
                             decoration: const InputDecoration(labelText: '高度'),
                           ),
