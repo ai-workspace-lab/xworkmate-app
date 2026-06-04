@@ -659,6 +659,138 @@ void main() {
       },
     );
 
+    test(
+      'skill picker selection allows multiple skills and independent deselect',
+      () async {
+        final controller = _connectedGatewayController(
+          _RecordingGoTaskServiceClient(),
+        );
+        addTearDown(controller.dispose);
+        controller.skillsControllerInternal.itemsInternal =
+            const <GatewaySkillSummary>[
+              GatewaySkillSummary(
+                name: 'PDF Writer',
+                description: 'Write PDF documents',
+                source: 'openclaw-workspace',
+                skillKey: 'pdf',
+                primaryEnv: null,
+                eligible: true,
+                disabled: false,
+                missingBins: <String>[],
+                missingEnv: <String>[],
+                missingConfig: <String>[],
+              ),
+              GatewaySkillSummary(
+                name: 'Browser Automation',
+                description: 'Use browser automation',
+                source: 'agents-skills-personal',
+                skillKey: 'browser-automation',
+                primaryEnv: null,
+                eligible: true,
+                disabled: false,
+                missingBins: <String>[],
+                missingEnv: <String>[],
+                missingConfig: <String>[],
+              ),
+            ];
+        await _selectGatewaySession(controller, 'unit-skill-multi-select-task');
+
+        await controller.toggleAssistantSkillForSession(
+          'unit-skill-multi-select-task',
+          'pdf',
+        );
+        await controller.toggleAssistantSkillForSession(
+          'unit-skill-multi-select-task',
+          'browser-automation',
+        );
+
+        expect(
+          controller.assistantSelectedSkillKeysForSession(
+            'unit-skill-multi-select-task',
+          ),
+          const <String>['pdf', 'browser-automation'],
+        );
+
+        await controller.toggleAssistantSkillForSession(
+          'unit-skill-multi-select-task',
+          'browser-automation',
+        );
+
+        expect(
+          controller.assistantSelectedSkillKeysForSession(
+            'unit-skill-multi-select-task',
+          ),
+          const <String>['pdf'],
+        );
+      },
+    );
+
+    test('skill selection is isolated across task sessions', () async {
+      final controller = _connectedGatewayController(
+        _RecordingGoTaskServiceClient(),
+      );
+      addTearDown(controller.dispose);
+      controller.skillsControllerInternal.itemsInternal =
+          const <GatewaySkillSummary>[
+            GatewaySkillSummary(
+              name: 'PDF Writer',
+              description: 'Write PDF documents',
+              source: 'openclaw-workspace',
+              skillKey: 'pdf',
+              primaryEnv: null,
+              eligible: true,
+              disabled: false,
+              missingBins: <String>[],
+              missingEnv: <String>[],
+              missingConfig: <String>[],
+            ),
+            GatewaySkillSummary(
+              name: 'Browser Automation',
+              description: 'Use browser automation',
+              source: 'agents-skills-personal',
+              skillKey: 'browser-automation',
+              primaryEnv: null,
+              eligible: true,
+              disabled: false,
+              missingBins: <String>[],
+              missingEnv: <String>[],
+              missingConfig: <String>[],
+            ),
+          ];
+
+      await _selectGatewaySession(controller, 'unit-skill-isolated-a');
+      await controller.toggleAssistantSkillForSession(
+        'unit-skill-isolated-a',
+        'pdf',
+      );
+      await _selectGatewaySession(controller, 'unit-skill-isolated-b');
+
+      expect(
+        controller.assistantSelectedSkillKeysForSession(
+          'unit-skill-isolated-b',
+        ),
+        isEmpty,
+      );
+
+      await controller.toggleAssistantSkillForSession(
+        'unit-skill-isolated-b',
+        'browser-automation',
+      );
+
+      expect(
+        controller
+            .buildExternalAcpRoutingForSessionInternal('unit-skill-isolated-a')
+            .explicitSkills,
+        const <String>['pdf'],
+      );
+      expect(
+        controller
+            .buildExternalAcpRoutingForSessionInternal('unit-skill-isolated-b')
+            .explicitSkills,
+        const <String>['browser-automation'],
+      );
+    });
+
     test('skill selection ignores stale non-bridge skill keys', () {
       final controller = AppController(
         environmentOverride: const <String, String>{},

@@ -186,6 +186,7 @@ abstract class GatewayRuntimeSessionClient {
     required String method,
     Map<String, dynamic>? params,
     Duration timeout = const Duration(seconds: 15),
+    bool allowErrorPayload = false,
   });
 
   Future<void> disconnect({required String runtimeId});
