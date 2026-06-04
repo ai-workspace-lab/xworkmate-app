@@ -6,7 +6,6 @@ export 'assistant_page_composer_support.dart';
 export 'assistant_page_tooltip_labels.dart';
 export 'assistant_page_message_widgets.dart';
 export 'assistant_page_task_models.dart';
-export 'assistant_page_composer_skill_models.dart';
 export 'assistant_page_composer_skill_picker.dart';
 export 'assistant_page_composer_clipboard.dart';
 export 'assistant_page_components_core.dart';

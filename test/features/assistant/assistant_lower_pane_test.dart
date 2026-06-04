@@ -5,7 +5,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:xworkmate/app/app_controller.dart';
 import 'package:xworkmate/app/ui_feature_manifest.dart';
 import 'package:xworkmate/features/assistant/assistant_page_composer_clipboard.dart';
-import 'package:xworkmate/features/assistant/assistant_page_composer_skill_models.dart';
 import 'package:xworkmate/features/assistant/assistant_page_composer_skill_picker.dart';
 import 'package:xworkmate/features/assistant/assistant_page_main.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';

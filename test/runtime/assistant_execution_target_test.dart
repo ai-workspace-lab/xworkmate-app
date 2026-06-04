@@ -8,7 +8,7 @@ import 'package:xworkmate/app/app_controller.dart';
 import 'package:xworkmate/app/app_controller_desktop_external_acp_routing.dart';
 import 'package:xworkmate/app/app_controller_openclaw_task_queue.dart';
 import 'package:xworkmate/app/ui_feature_manifest.dart';
-import 'package:xworkmate/features/assistant/assistant_page_composer_skill_models.dart';
+import 'package:xworkmate/features/assistant/assistant_page_composer_skill_picker.dart';
 import 'package:xworkmate/runtime/gateway_acp_client.dart';
 import 'package:xworkmate/runtime/go_task_service_client.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
