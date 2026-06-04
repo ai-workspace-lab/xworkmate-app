@@ -621,19 +621,15 @@ Object? _firstGoTaskArtifactList(Map<String, dynamic> result) {
   final artifacts = <Object?>[];
   for (final candidate in <Object?>[
     result['artifacts'],
-    result['finalArtifacts'],
     result['files'],
     result['attachments'],
     _castMap(result['payload'])['artifacts'],
-    _castMap(result['payload'])['finalArtifacts'],
     _castMap(result['payload'])['files'],
     _castMap(result['payload'])['attachments'],
     _castMap(result['result'])['artifacts'],
-    _castMap(result['result'])['finalArtifacts'],
     _castMap(result['result'])['files'],
     _castMap(result['result'])['attachments'],
     _castMap(result['data'])['artifacts'],
-    _castMap(result['data'])['finalArtifacts'],
     _castMap(result['data'])['files'],
     _castMap(result['data'])['attachments'],
   ]) {
