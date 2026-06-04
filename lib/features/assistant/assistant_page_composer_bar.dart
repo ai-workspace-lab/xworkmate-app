@@ -188,7 +188,9 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
 
   void refreshSkillsForPickerInternal() {
     final skillsController = widget.controller.skillsController;
-    if (widget.controller.skills.isNotEmpty || skillsController.loading) {
+    if (widget.availableSkills.isNotEmpty ||
+        widget.controller.skills.isNotEmpty ||
+        skillsController.loading) {
       return;
     }
     final selectedAgentId = widget.controller.selectedAgentId.trim();
