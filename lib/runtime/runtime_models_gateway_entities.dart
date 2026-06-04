@@ -360,5 +360,14 @@ class LocalDeviceIdentity {
     );
   }
 }
+class CollaborationAttachment {
+  const CollaborationAttachment({
+    required this.name,
+    required this.description,
+    required this.path,
+  });
 
-/// 多 Agent 协作角色
+  final String name;
+  final String description;
+  final String path;
+}

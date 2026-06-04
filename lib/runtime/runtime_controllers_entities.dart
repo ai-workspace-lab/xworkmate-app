@@ -70,11 +70,11 @@ class SkillsController extends ChangeNotifier {
       errorInternal = null;
       _retryCount = 0;
     } catch (error) {
-      if (_retryCount < _maxRetries && _canRefreshThroughRuntime) {
+      if (_retryCount < _maxRetries && runtimeInternal.isConnected) {
         _retryCount++;
         final delay = Duration(seconds: _retryCount * 2);
         await Future<void>.delayed(delay);
-        if (_canRefreshThroughRuntime) {
+        if (runtimeInternal.isConnected) {
           await _doRefresh(agentId: agentId);
           return;
         }
