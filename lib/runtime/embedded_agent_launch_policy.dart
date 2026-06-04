@@ -14,14 +14,3 @@ bool shouldBlockEmbeddedAgentLaunch({
     enabled: enabled,
   );
 }
-
-/// Helper for Go core launch blocking check.
-bool shouldBlockGoCoreLaunch({
-  required bool isAppleHost,
-  bool? enabled,
-}) {
-  return shouldBlockEmbeddedAgentLaunch(
-    isAppleHost: isAppleHost,
-    enabled: enabled,
-  );
-}

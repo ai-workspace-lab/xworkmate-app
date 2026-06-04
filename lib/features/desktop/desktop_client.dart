@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import '../../app/app_controller.dart';
 
@@ -30,6 +31,22 @@ Map<String, Object?> desktopOfferParams({
   };
 }
 
+Future<MediaStream?> desktopRemoteVideoStreamForTrack(
+  RTCTrackEvent event, {
+  required Future<MediaStream> Function(String label) createFallbackStream,
+}) async {
+  if (event.track.kind != 'video') {
+    return null;
+  }
+  if (event.streams.isNotEmpty) {
+    return event.streams.first;
+  }
+
+  final stream = await createFallbackStream('xworkmate-remote-desktop');
+  await stream.addTrack(event.track, addToNative: false);
+  return stream;
+}
+
 class DesktopClient {
   DesktopClient({required this.controller, required this.sessionId});
 
@@ -38,7 +55,6 @@ class DesktopClient {
 
   RTCPeerConnection? _peerConnection;
   RTCDataChannel? _dataChannel;
-  MediaStream? _remoteStream;
 
   final StreamController<MediaStream> _streamController =
       StreamController<MediaStream>.broadcast();
@@ -76,14 +92,18 @@ class DesktopClient {
 
       _peerConnection = await createPeerConnection(config);
 
-      // Listen for remote streams
+      // Listen for remote video tracks. Some Unified Plan servers send
+      // streamless tracks, so synthesize a stream for RTCVideoView when needed.
       _peerConnection!.onTrack = (event) {
-        if (event.track.kind == 'video') {
-          if (event.streams.isNotEmpty) {
-            _remoteStream = event.streams.first;
-            _streamController.add(_remoteStream!);
+        unawaited(() async {
+          final stream = await desktopRemoteVideoStreamForTrack(
+            event,
+            createFallbackStream: createLocalMediaStream,
+          );
+          if (stream != null) {
+            _streamController.add(stream);
           }
-        }
+        }());
       };
 
       _peerConnection!.onConnectionState = (state) {
@@ -187,7 +207,9 @@ class DesktopClient {
           },
         },
       );
-    } catch (_) {}
+    } catch (error) {
+      debugPrint('Desktop ICE candidate send failed: $error');
+    }
   }
 
   void sendInput(Map<String, dynamic> event) {
@@ -205,13 +227,14 @@ class DesktopClient {
         method: 'xworkmate.desktop.close',
         params: {'sessionId': sessionId},
       );
-    } catch (_) {}
+    } catch (error) {
+      debugPrint('Desktop close request failed: $error');
+    }
 
     await _dataChannel?.close();
     await _peerConnection?.close();
     _dataChannel = null;
     _peerConnection = null;
-    _remoteStream = null;
     _stateController.add('disconnected');
   }
 }

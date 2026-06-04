@@ -12,7 +12,6 @@ import '../i18n/app_language.dart';
 import '../models/app_models.dart';
 import '../runtime/device_identity_store.dart';
 
-import '../runtime/go_core.dart';
 import '../runtime/runtime_bootstrap.dart';
 import '../runtime/desktop_platform_service.dart';
 import '../runtime/gateway_runtime.dart';
@@ -66,7 +65,8 @@ Future<void> openOnlineWorkspaceThreadSessionInternal(
     if (Platform.isLinux) {
       await Process.run('xdg-open', [url]);
     }
-  } catch (_) {
+  } catch (error) {
+    debugPrint('Open collaboration URL failed: $error');
     // Best effort only. Do not surface a blocking error from a convenience link.
   }
 }
