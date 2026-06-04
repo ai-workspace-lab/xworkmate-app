@@ -213,23 +213,35 @@ extension GatewayRuntimeApiInternal on GatewayRuntime {
               allowErrorPayload: true,
             ),
     );
-    return asList(payload['skills'])
+    final statusPayload = skillsStatusPayloadInternal(payload);
+    return asList(statusPayload['skills'])
         .map((item) {
           final map = asMap(item);
           return GatewaySkillSummary(
-            name: stringValue(map['name']) ?? 'Skill',
+            name:
+                stringValue(map['name']) ??
+                stringValue(map['title']) ??
+                stringValue(map['id']) ??
+                'Skill',
             description: stringValue(map['description']) ?? '',
             source: stringValue(map['source']) ?? 'workspace',
             skillKey:
                 stringValue(map['skillKey']) ??
+                stringValue(map['skill_key']) ??
+                stringValue(map['key']) ??
+                stringValue(map['id']) ??
                 stringValue(map['name']) ??
                 'skill',
             primaryEnv: stringValue(map['primaryEnv']),
             eligible: boolValue(map['eligible']) ?? false,
             disabled: boolValue(map['disabled']) ?? false,
-            missingBins: stringList(asMap(map['missing'])['bins']),
-            missingEnv: stringList(asMap(map['missing'])['env']),
-            missingConfig: stringList(asMap(map['missing'])['config']),
+            missingBins: skillMissingListInternal(map, 'bins', 'missingBins'),
+            missingEnv: skillMissingListInternal(map, 'env', 'missingEnv'),
+            missingConfig: skillMissingListInternal(
+              map,
+              'config',
+              'missingConfig',
+            ),
           );
         })
         .toList(growable: false);
@@ -547,4 +559,34 @@ extension GatewayRuntimeApiInternal on GatewayRuntime {
     );
     return result.payload;
   }
+}
+
+Map<String, dynamic> skillsStatusPayloadInternal(Map<String, dynamic> payload) {
+  if (asList(payload['skills']).isNotEmpty) {
+    return payload;
+  }
+  for (final key in const <String>[
+    'status',
+    'skillStatus',
+    'data',
+    'payload',
+  ]) {
+    final nested = asMap(payload[key]);
+    if (asList(nested['skills']).isNotEmpty) {
+      return nested;
+    }
+  }
+  return payload;
+}
+
+List<String> skillMissingListInternal(
+  Map<String, dynamic> skill,
+  String nestedKey,
+  String flatKey,
+) {
+  final flat = stringList(skill[flatKey]);
+  if (flat.isNotEmpty) {
+    return flat;
+  }
+  return stringList(asMap(skill['missing'])[nestedKey]);
 }

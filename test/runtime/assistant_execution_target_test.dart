@@ -3797,7 +3797,7 @@ void main() {
           controller.assistantSessionHasPendingRun('openclaw-failed-task'),
           isFalse,
         );
-        expect(controller.openClawGatewayActiveTasksInternal, 0);
+        await _waitForOpenClawActiveTaskCount(controller, 0);
         expect(
           controller
               .requireTaskThreadForSessionInternal('openclaw-failed-task')
@@ -4381,6 +4381,22 @@ Future<void> _waitForThreadLastResultCode(
       .lastResultCode;
   throw StateError(
     'Timed out waiting for $sessionKey result code $resultCode. Current result code: $currentResultCode.',
+  );
+}
+
+Future<void> _waitForOpenClawActiveTaskCount(
+  AppController controller,
+  int expectedCount,
+) async {
+  final deadline = DateTime.now().add(const Duration(seconds: 15));
+  while (DateTime.now().isBefore(deadline)) {
+    if (controller.openClawGatewayActiveTasksInternal == expectedCount) {
+      return;
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+  }
+  throw StateError(
+    'Timed out waiting for OpenClaw active task count $expectedCount. Current count: ${controller.openClawGatewayActiveTasksInternal}.',
   );
 }
 
