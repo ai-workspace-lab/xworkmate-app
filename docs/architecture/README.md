@@ -18,7 +18,6 @@
 - [任务线程 Session Key 隔离（2026-03-29）](./task-thread-session-key-isolation-20260329.md)
 - [Task Dialog Provider 选择主线](./task-dialog-provider-selection-mainline.md)
 - [跨仓库任务状态工作流](./cross-repo-task-state-workflow.md)
-- [Cloud Session Service 多设备架构（2026-03-30）](./cloud-session-service-multi-device-architecture-2026-03-30.md)
 
 ## 设置与配置
 
@@ -28,7 +27,6 @@
 
 ## 工程实践
 
-- [Stage4 Helper 归属映射（2026-03-28）](./stage4-helper-ownership-20260328.md)
 - [No-part 文件组织 ADR](./refactor-style-no-part-adr.md)
 - [Simple Theme 默认值记录](./simple-theme-default.md)
 
@@ -45,6 +43,12 @@
 ## 归档
 
 已过时的文档移至 [archive/](./archive/)。
+
+已归档的文档：
+
+- [Cloud Session Service 多设备架构（2026-03-30）](./archive/cloud-session-service-multi-device-architecture-2026-03-30.md) — 未实现的目标架构
+- [Stage4 Helper 归属映射（2026-03-28）](./archive/stage4-helper-ownership-20260328.md) — 一次性调研快照
+- [Assistant Thread Working Directory Flow](./archive/assistant-thread-working-directory-flow.md) — workspaceRef/workspaceRefKind/cwd 旧版流转
 
 ---
 

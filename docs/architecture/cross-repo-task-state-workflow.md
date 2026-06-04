@@ -137,11 +137,9 @@ flowchart TD
   ORCH --> PROVIDER{"provider compat"}
   PROVIDER -->|single-agent| SA["codex / opencode / gemini / hermes"]
   PROVIDER -->|gateway| OCG["OpenClaw runtime"]
-  PROVIDER -->|multi-agent via /acp/rpc| MA["multi-agent orchestration"]
 
   SA --> NORM["normalized result"]
   OCG --> NORM
-  MA --> NORM
   NORM --> OUT["success / status / turnId / output / artifacts / resolved*"]
 ```
 

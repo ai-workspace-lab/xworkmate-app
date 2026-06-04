@@ -5,7 +5,7 @@
 > 已过时：本文记录的是 `workspaceRef / workspaceRefKind / cwd fallback` 主导时期的线程目录流转。
 >
 > 当前实现请优先参考：
-> [docs/architecture/task-control-plane-unification.md](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate/docs/architecture/task-control-plane-unification.md)
+> [docs/architecture/task-control-plane-unification.md](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate-app/docs/architecture/task-control-plane-unification.md)
 >
 > 新文档已经把 TaskThread 的主流程图和状态图重画为基于 `workspaceBinding / executionBinding / lifecycleState` 的 Mermaid 版本。
 
@@ -71,8 +71,8 @@ flowchart LR
 - 变量：`currentSessionKey`
 - 作用：决定当前操作命中了哪个任务线程
 - 关键位置：
-  - [runtime_controllers_gateway.dart](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate/lib/runtime/runtime_controllers_gateway.dart:96)
-  - [app_controller_desktop_thread_actions.dart](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate/lib/app/app_controller_desktop_thread_actions.dart:208)
+  - [runtime_controllers_gateway.dart](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate-app/lib/runtime/runtime_controllers_gateway.dart:96)
+  - [app_controller_desktop_thread_actions.dart](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate-app/lib/app/app_controller_desktop_thread_actions.dart:208)
 
 如果 `currentSessionKey` 没切对，后续 `workspaceRef`、`cwd`、右栏路径都会跟着取错。
 
@@ -81,7 +81,7 @@ flowchart LR
 - 变量：`settings.workspacePath`
 - 作用：线程默认目录的根目录
 - 关键位置：
-  - [app_controller_desktop_thread_sessions.dart](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate/lib/app/app_controller_desktop_thread_sessions.dart:571)
+  - [app_controller_desktop_thread_sessions.dart](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate-app/lib/app/app_controller_desktop_thread_sessions.dart:571)
 
 默认线程目录由它派生：
 
@@ -89,15 +89,15 @@ flowchart LR
 
 关键位置：
 
-- [app_controller_desktop_thread_sessions.dart](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate/lib/app/app_controller_desktop_thread_sessions.dart:560)
-- [app_controller_desktop_thread_sessions.dart](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate/lib/app/app_controller_desktop_thread_sessions.dart:576)
+- [app_controller_desktop_thread_sessions.dart](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate-app/lib/app/app_controller_desktop_thread_sessions.dart:560)
+- [app_controller_desktop_thread_sessions.dart](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate-app/lib/app/app_controller_desktop_thread_sessions.dart:576)
 
 ### 3. 线程自己的目录绑定
 
 - 变量：`assistantThreadRecordsInternal[sessionKey].workspaceRef`
 - 作用：线程级工作目录的真实绑定值
 - 关键位置：
-  - [app_controller_desktop_thread_sessions.dart](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate/lib/app/app_controller_desktop_thread_sessions.dart:121)
+  - [app_controller_desktop_thread_sessions.dart](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate-app/lib/app/app_controller_desktop_thread_sessions.dart:121)
 
 读取优先级：
 
@@ -112,7 +112,7 @@ flowchart LR
   - `remotePath`
   - `objectStore`
 - 关键位置：
-  - [app_controller_desktop_thread_sessions.dart](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate/lib/app/app_controller_desktop_thread_sessions.dart:133)
+  - [app_controller_desktop_thread_sessions.dart](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate-app/lib/app/app_controller_desktop_thread_sessions.dart:133)
 
 它决定 `workspaceRef` 后续如何参与 cwd 解析。
 
@@ -125,8 +125,8 @@ flowchart LR
 
 关键位置：
 
-- [app_controller_desktop_thread_sessions.dart](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate/lib/app/app_controller_desktop_thread_sessions.dart:560)
-- [app_controller_desktop_thread_sessions.dart](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate/lib/app/app_controller_desktop_thread_sessions.dart:565)
+- [app_controller_desktop_thread_sessions.dart](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate-app/lib/app/app_controller_desktop_thread_sessions.dart:560)
+- [app_controller_desktop_thread_sessions.dart](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate-app/lib/app/app_controller_desktop_thread_sessions.dart:565)
 
 ### 2. 线程目录名
 
@@ -135,7 +135,7 @@ flowchart LR
 
 关键位置：
 
-- [app_controller_desktop_thread_sessions.dart](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate/lib/app/app_controller_desktop_thread_sessions.dart:581)
+- [app_controller_desktop_thread_sessions.dart](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate-app/lib/app/app_controller_desktop_thread_sessions.dart:581)
 
 ## 线程初始化时的写入
 
@@ -146,7 +146,7 @@ flowchart LR
 
 关键位置：
 
-- [app_controller_desktop_workspace_execution.dart](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate/lib/app/app_controller_desktop_workspace_execution.dart:261)
+- [app_controller_desktop_workspace_execution.dart](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate-app/lib/app/app_controller_desktop_workspace_execution.dart:261)
 
 这意味着：
 
@@ -161,7 +161,7 @@ flowchart LR
 
 关键位置：
 
-- [app_controller_desktop_runtime_coordination_impl.dart](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate/lib/app/app_controller_desktop_runtime_coordination_impl.dart:183)
+- [app_controller_desktop_runtime_coordination_impl.dart](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate-app/lib/app/app_controller_desktop_runtime_coordination_impl.dart:183)
 
 ### 2. 参与变量
 
@@ -181,9 +181,9 @@ flowchart LR
 
 关键位置：
 
-- [app_controller_desktop_runtime_coordination_impl.dart](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate/lib/app/app_controller_desktop_runtime_coordination_impl.dart:151)
-- [app_controller_desktop_runtime_coordination_impl.dart](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate/lib/app/app_controller_desktop_runtime_coordination_impl.dart:160)
-- [app_controller_desktop_runtime_coordination_impl.dart](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate/lib/app/app_controller_desktop_runtime_coordination_impl.dart:183)
+- [app_controller_desktop_runtime_coordination_impl.dart](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate-app/lib/app/app_controller_desktop_runtime_coordination_impl.dart:151)
+- [app_controller_desktop_runtime_coordination_impl.dart](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate-app/lib/app/app_controller_desktop_runtime_coordination_impl.dart:160)
+- [app_controller_desktop_runtime_coordination_impl.dart](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate-app/lib/app/app_controller_desktop_runtime_coordination_impl.dart:183)
 
 ## provider 对 cwd 的影响
 
@@ -193,7 +193,7 @@ flowchart LR
 
 关键位置：
 
-- [app_controller_desktop_runtime_coordination_impl.dart](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate/lib/app/app_controller_desktop_runtime_coordination_impl.dart:206)
+- [app_controller_desktop_runtime_coordination_impl.dart](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate-app/lib/app/app_controller_desktop_runtime_coordination_impl.dart:206)
 
 规则简述：
 
@@ -239,7 +239,7 @@ Single Agent 运行后可能返回：
 
 关键位置：
 
-- [app_controller_desktop_thread_sessions.dart](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate/lib/app/app_controller_desktop_thread_sessions.dart:709)
+- [app_controller_desktop_thread_sessions.dart](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate-app/lib/app/app_controller_desktop_thread_sessions.dart:709)
 
 ### 2. 它什么时候会改目录
 
@@ -253,8 +253,8 @@ Single Agent 运行后可能返回：
 
 关键位置：
 
-- [app_controller_desktop_thread_sessions.dart](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate/lib/app/app_controller_desktop_thread_sessions.dart:649)
-- [app_controller_desktop_thread_sessions.dart](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate/lib/app/app_controller_desktop_thread_sessions.dart:709)
+- [app_controller_desktop_thread_sessions.dart](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate-app/lib/app/app_controller_desktop_thread_sessions.dart:649)
+- [app_controller_desktop_thread_sessions.dart](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate-app/lib/app/app_controller_desktop_thread_sessions.dart:709)
 
 ### 3. 典型迁移触发
 
@@ -272,11 +272,11 @@ Single Agent 运行后可能返回：
 
 传入位置：
 
-- [assistant_page_state_closure.dart](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate/lib/features/assistant/assistant_page_state_closure.dart:317)
+- [assistant_page_state_closure.dart](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate-app/lib/features/assistant/assistant_page_state_closure.dart:317)
 
 渲染位置：
 
-- [assistant_artifact_sidebar.dart](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate/lib/widgets/assistant_artifact_sidebar.dart)
+- [assistant_artifact_sidebar.dart](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate-app/lib/widgets/assistant_artifact_sidebar.dart)
 
 因此右栏显示“未设置”或显示某个路径，本质上反映的是当前线程记录里到底有没有有效 `workspaceRef`。
 
