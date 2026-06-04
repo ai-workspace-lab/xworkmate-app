@@ -78,6 +78,7 @@ class SkillPickerPopoverInternal extends StatelessWidget {
     required this.hasQuery,
     required this.onQueryChanged,
     required this.onToggleSkill,
+    this.onRetry,
   });
 
   final double maxHeight;
@@ -90,6 +91,7 @@ class SkillPickerPopoverInternal extends StatelessWidget {
   final bool hasQuery;
   final ValueChanged<String> onQueryChanged;
   final ValueChanged<String> onToggleSkill;
+  final VoidCallback? onRetry;
 
   @override
   Widget build(BuildContext context) {
@@ -188,6 +190,15 @@ class SkillPickerPopoverInternal extends StatelessWidget {
                                   style: theme.textTheme.bodySmall?.copyWith(
                                     color: palette.textMuted,
                                   ),
+                                ),
+                              ],
+                              if ((hasError || (!isLoading && !hasQuery)) &&
+                                  onRetry != null) ...[
+                                const SizedBox(height: 12),
+                                TextButton.icon(
+                                  onPressed: onRetry,
+                                  icon: const Icon(Icons.refresh_rounded, size: 16),
+                                  label: Text(appText('重试', 'Retry')),
                                 ),
                               ],
                             ],
