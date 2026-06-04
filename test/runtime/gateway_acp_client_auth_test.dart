@@ -251,6 +251,33 @@ void main() {
         'https://xworkmate-bridge.svc.plus/artifacts/summary.pdf',
       );
     });
+
+    test('uses OpenClaw finalArtifacts as required deliverables', () {
+      final result = goTaskServiceResultFromAcpResponse(<String, dynamic>{
+        'jsonrpc': '2.0',
+        'id': 'request-id',
+        'result': <String, dynamic>{
+          'success': true,
+          'message': 'created final deliverable',
+          'finalArtifacts': <Map<String, dynamic>>[
+            <String, dynamic>{
+              'relativePath': 'exports/final.pdf',
+              'downloadUrl':
+                  'https://xworkmate-bridge.svc.plus/artifacts/final.pdf',
+              'contentType': 'application/pdf',
+            },
+          ],
+        },
+      }, route: GoTaskServiceRoute.externalAcpSingle);
+
+      expect(result.success, isTrue);
+      expect(result.artifacts, hasLength(1));
+      expect(result.artifacts.single.relativePath, 'exports/final.pdf');
+      expect(
+        result.artifacts.single.downloadUrl,
+        'https://xworkmate-bridge.svc.plus/artifacts/final.pdf',
+      );
+    });
   });
 
   group('GatewayAcpClient authorization', () {
@@ -2128,8 +2155,6 @@ void main() {
         );
       },
     );
-
-
   });
 }
 
