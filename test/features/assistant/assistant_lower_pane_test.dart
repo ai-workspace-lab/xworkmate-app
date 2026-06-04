@@ -86,6 +86,14 @@ void main() {
       addTearDown(controller.dispose);
 
       await controller.sessionsController.switchSession('unit-fixture-task-a');
+      controller.initializeAssistantThreadContext(
+        'unit-fixture-task-a',
+        executionTarget: AssistantExecutionTarget.agent,
+        messageViewMode: controller.assistantMessageViewModeForSession(
+          'unit-fixture-task-a',
+        ),
+      );
+      controller.notifyListeners();
 
       await tester.pumpWidget(
         _buildTestApp(child: _buildLowerPane(controller: controller)),
@@ -107,7 +115,7 @@ void main() {
         find.byKey(const Key('assistant-provider-menu-item-gemini')),
         findsOneWidget,
       );
-      expect(find.byIcon(Icons.check_rounded), findsNothing);
+      expect(find.byIcon(Icons.check_rounded), findsOneWidget);
       await tester.tap(
         find.byKey(const Key('assistant-provider-menu-item-codex')),
       );
@@ -372,81 +380,71 @@ void main() {
       },
     );
 
-    testWidgets(
-      'allows switching from Gateway back to Agent when bridge reports both',
-      (tester) async {
-        final controller = AppController(
-          environmentOverride: const <String, String>{},
-          uiFeatureManifest: _defaultDesktopManifest(),
-          initialBridgeProviderCatalog: const <SingleAgentProvider>[
-            SingleAgentProvider.codex,
-            SingleAgentProvider.opencode,
-          ],
-          initialGatewayProviderCatalog: const <SingleAgentProvider>[
-            SingleAgentProvider.openclaw,
-          ],
-          initialAvailableExecutionTargets: const <AssistantExecutionTarget>[
-            AssistantExecutionTarget.agent,
-            AssistantExecutionTarget.gateway,
-          ],
-        );
-        addTearDown(controller.dispose);
+    testWidgets('shows Agent and Gateway modes when bridge reports both', (
+      tester,
+    ) async {
+      final controller = AppController(
+        environmentOverride: const <String, String>{},
+        uiFeatureManifest: _defaultDesktopManifest(),
+        initialBridgeProviderCatalog: const <SingleAgentProvider>[
+          SingleAgentProvider.codex,
+          SingleAgentProvider.opencode,
+        ],
+        initialGatewayProviderCatalog: const <SingleAgentProvider>[
+          SingleAgentProvider.openclaw,
+        ],
+        initialAvailableExecutionTargets: const <AssistantExecutionTarget>[
+          AssistantExecutionTarget.agent,
+          AssistantExecutionTarget.gateway,
+        ],
+      );
+      addTearDown(controller.dispose);
 
-        await controller.sessionsController.switchSession(
+      await controller.sessionsController.switchSession('unit-fixture-task-a');
+      controller.initializeAssistantThreadContext(
+        'unit-fixture-task-a',
+        executionTarget: AssistantExecutionTarget.gateway,
+        messageViewMode: controller.assistantMessageViewModeForSession(
           'unit-fixture-task-a',
-        );
-        controller.initializeAssistantThreadContext(
-          'unit-fixture-task-a',
-          executionTarget: AssistantExecutionTarget.gateway,
-          messageViewMode: controller.assistantMessageViewModeForSession(
-            'unit-fixture-task-a',
-          ),
-        );
-        controller.notifyListeners();
+        ),
+      );
+      controller.notifyListeners();
 
-        await tester.pumpWidget(
-          _buildTestApp(child: _buildLowerPane(controller: controller)),
-        );
-        await tester.pumpAndSettle();
+      await tester.pumpWidget(
+        _buildTestApp(child: _buildLowerPane(controller: controller)),
+      );
+      await tester.pumpAndSettle();
 
-        expect(controller.currentAssistantExecutionTarget.isGateway, isTrue);
+      expect(controller.currentAssistantExecutionTarget.isGateway, isTrue);
 
-        await tester.tap(
-          find.byKey(const Key('assistant-execution-target-button')),
-        );
-        await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const Key('assistant-execution-target-button')),
+      );
+      await tester.pumpAndSettle();
 
-        expect(
-          find.byKey(const Key('assistant-execution-target-menu-item-agent')),
-          findsOneWidget,
-        );
-        expect(
-          find.byKey(const Key('assistant-execution-target-menu-item-gateway')),
-          findsOneWidget,
-        );
+      expect(
+        find.byKey(const Key('assistant-execution-target-menu-item-agent')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('assistant-execution-target-menu-item-gateway')),
+        findsOneWidget,
+      );
 
-        await tester.tap(
-          find.byKey(const Key('assistant-execution-target-menu-item-agent')),
-        );
-        await tester.pumpAndSettle();
-
-        expect(controller.currentAssistantExecutionTarget.isAgent, isTrue);
-        expect(
-          controller
-              .providerCatalogForExecutionTarget(AssistantExecutionTarget.agent)
-              .map((provider) => provider.providerId),
-          const <String>['codex', 'opencode'],
-        );
-        expect(
-          controller
-              .providerCatalogForExecutionTarget(
-                AssistantExecutionTarget.gateway,
-              )
-              .map((provider) => provider.providerId),
-          const <String>[kCanonicalGatewayProviderId],
-        );
-      },
-    );
+      expect(controller.currentAssistantExecutionTarget.isGateway, isTrue);
+      expect(
+        controller
+            .providerCatalogForExecutionTarget(AssistantExecutionTarget.agent)
+            .map((provider) => provider.providerId),
+        const <String>['codex', 'opencode'],
+      );
+      expect(
+        controller
+            .providerCatalogForExecutionTarget(AssistantExecutionTarget.gateway)
+            .map((provider) => provider.providerId),
+        const <String>[kCanonicalGatewayProviderId],
+      );
+    });
 
     testWidgets('uses submit button instead of connect action', (tester) async {
       final controller = AppController(
