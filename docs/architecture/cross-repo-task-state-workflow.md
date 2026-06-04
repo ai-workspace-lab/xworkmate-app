@@ -129,6 +129,7 @@ stateDiagram-v2
   Running --> Ready: success
   Running --> Ready: failed / artifact_missing
   Running --> Ready: ACP_HTTP_* / unrecovered SSE interruption
+  Running --> Ready: xworkmate.tasks.get failure after transport recovery
   Running --> Ready: abort
 
   Ready --> Archived: user archives task
@@ -211,6 +212,8 @@ When `session.update` contains `status=running` with `runId` and `artifactScope`
 - `completed` with artifacts -> success path.
 - `failed`, `artifact_missing`, `cancelled`, or `canceled` -> failure path.
 - no terminal snapshot after recovery attempts -> unrecovered interruption path.
+
+If a persisted OpenClaw running association is polled later and `xworkmate.tasks.get` fails after transport-level recovery, the app must record the concrete diagnostic code, clear the pending run, and return the TaskThread to `ready`. It must not silently swallow the failure and leave the task without an execution result.
 
 ## Artifact Rules
 

@@ -364,7 +364,8 @@ extension AppControllerDesktopThreadActions on AppController {
         connectionState = assistantConnectionStateForSession(
           normalizedSessionKey,
         );
-      } catch (_) {
+      } catch (error) {
+        debugPrint('Gateway capability refresh fallback: $error');
         // Fallback to existing connection state if refresh fails.
       }
     }
@@ -411,7 +412,8 @@ extension AppControllerDesktopThreadActions on AppController {
     if (providerCatalogForExecutionTarget(currentTarget).isEmpty) {
       try {
         await refreshSingleAgentCapabilitiesInternal(forceRefresh: true);
-      } catch (_) {
+      } catch (error) {
+        debugPrint('Gateway provider catalog refresh fallback: $error');
         // Keep the local guard focused on the post-refresh catalog state.
       }
       if (providerCatalogForExecutionTarget(currentTarget).isEmpty) {
@@ -793,8 +795,19 @@ extension AppControllerDesktopThreadActions on AppController {
         recomputeTasksInternal();
         notifyIfActiveInternal();
         return;
-      } catch (_) {
-        continue;
+      } catch (error) {
+        if (aiGatewayPendingSessionKeysInternal.contains(sessionKey)) {
+          await applyGatewayChatFailureInternal(
+            sessionKey: sessionKey,
+            target: target,
+            error: error,
+          );
+        }
+        aiGatewayPendingSessionKeysInternal.remove(sessionKey);
+        clearAiGatewayStreamingTextInternal(sessionKey);
+        recomputeTasksInternal();
+        notifyIfActiveInternal();
+        return;
       }
     }
     final nowMs = DateTime.now().millisecondsSinceEpoch.toDouble();
@@ -1572,7 +1585,8 @@ extension AppControllerDesktopThreadActions on AppController {
             sessionKey,
           )?.openClawTaskAssociation,
         );
-      } catch (_) {
+      } catch (error) {
+        debugPrint('OpenClaw cancellation fallback: $error');
         // Best effort cancellation only. Local state must still leave pending.
       }
       removeQueuedOpenClawGatewayTurnsForSessionInternal(sessionKey);
@@ -1586,7 +1600,8 @@ extension AppControllerDesktopThreadActions on AppController {
   Future<void> prepareForExit() async {
     try {
       await abortRun();
-    } catch (_) {
+    } catch (error) {
+      debugPrint('Prepare for exit abort fallback: $error');
       // Best effort only. Native termination still proceeds.
     }
     await flushAssistantThreadPersistenceInternal();

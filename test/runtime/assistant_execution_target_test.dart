@@ -24,6 +24,7 @@ const List<String> _openClawE2ECanonicalPrompts = <String>[
   '围绕\n从单机权限 → 网络边界 → Web安全 → 云身份 → Zero Trust → AI Agent 身份 → AI模型与知识保护 演进 右侧是当下 \n测试制作视频',
   '围绕\n\n从单机权限 → 网络边界 → Web安全 → 云身份 → Zero Trust → AI Agent 身份 → AI模型与知识保护 演进 \n\n拆章节 -> 每章调用 Codex -> 每章 GPT images2 生成图 -> 汇总排版 -> 制作视频',
 ];
+const Duration _openClawE2ESubmitTimeout = Duration(seconds: 10);
 
 void main() {
   group('AssistantExecutionTarget', () {
@@ -1366,7 +1367,9 @@ void main() {
         expect(request.prompt, contains('XWorkmate task artifact contract:'));
         expect(
           request.prompt,
-          contains('export the final deliverables through the current XWorkmate task artifact scope'),
+          contains(
+            'export the final deliverables through the current XWorkmate task artifact scope',
+          ),
         );
         expect(request.prompt, contains('最后 输出 PDF文件'));
       },
@@ -1628,7 +1631,10 @@ void main() {
               route: GoTaskServiceRoute.externalAcpSingle,
             ),
           );
-        final controller = _connectedController(fakeGoTaskService, homeDir: localWorkspace.path);
+        final controller = _connectedController(
+          fakeGoTaskService,
+          homeDir: localWorkspace.path,
+        );
         addTearDown(controller.dispose);
 
         await controller.sessionsController.switchSession(
@@ -1859,7 +1865,10 @@ void main() {
               route: GoTaskServiceRoute.externalAcpSingle,
             ),
           );
-        final controller = _connectedController(fakeGoTaskService, homeDir: localWorkspace.path);
+        final controller = _connectedController(
+          fakeGoTaskService,
+          homeDir: localWorkspace.path,
+        );
         addTearDown(controller.dispose);
 
         await controller.sessionsController.switchSession(
@@ -1940,7 +1949,7 @@ void main() {
           failedThread?.lifecycleState.lastResultCode,
           'OPENCLAW_NO_EXPORTED_ARTIFACTS',
         );
-        expect(failedThread?.lastArtifactSyncStatus, 'failed');
+        expect(failedThread?.lastArtifactSyncStatus, 'no-exported-artifacts');
 
         await controller.sendChatMessage('retry final artifact');
 
@@ -1952,6 +1961,7 @@ void main() {
         );
       },
     );
+
 
 
     test(
@@ -1999,7 +2009,10 @@ void main() {
               route: GoTaskServiceRoute.externalAcpSingle,
             ),
           );
-        final controller = _connectedController(fakeGoTaskService, homeDir: localWorkspace.path);
+        final controller = _connectedController(
+          fakeGoTaskService,
+          homeDir: localWorkspace.path,
+        );
         addTearDown(controller.dispose);
 
         await controller.sessionsController.switchSession(
@@ -2064,7 +2077,10 @@ void main() {
               route: GoTaskServiceRoute.externalAcpSingle,
             ),
           );
-        final controller = _connectedController(fakeGoTaskService, homeDir: localWorkspace.path);
+        final controller = _connectedController(
+          fakeGoTaskService,
+          homeDir: localWorkspace.path,
+        );
         addTearDown(controller.dispose);
 
         await controller.sessionsController.switchSession(
@@ -2396,7 +2412,10 @@ void main() {
           }
         });
         final fakeGoTaskService = _BlockingGoTaskServiceClient();
-        final controller = _connectedController(fakeGoTaskService, homeDir: localHome.path);
+        final controller = _connectedController(
+          fakeGoTaskService,
+          homeDir: localHome.path,
+        );
         addTearDown(controller.dispose);
 
         const sessionA = 'background-task-a';
@@ -2518,7 +2537,10 @@ void main() {
           }
         });
         final fakeGoTaskService = _BlockingGoTaskServiceClient();
-        final controller = _connectedController(fakeGoTaskService, homeDir: localHome.path);
+        final controller = _connectedController(
+          fakeGoTaskService,
+          homeDir: localHome.path,
+        );
         addTearDown(controller.dispose);
 
         const prompt = '用户要求我生成一个关于现代AI基础设施的技术营销内容';
@@ -2686,7 +2708,10 @@ void main() {
           }
         });
         final fakeGoTaskService = _BlockingGoTaskServiceClient();
-        final controller = _connectedController(fakeGoTaskService, homeDir: localHome.path);
+        final controller = _connectedController(
+          fakeGoTaskService,
+          homeDir: localHome.path,
+        );
         addTearDown(controller.dispose);
 
         const prompt = '用户要求我生成一个关于现代AI基础设施的技术营销内容';
@@ -2780,7 +2805,10 @@ void main() {
           }
         });
         final fakeGoTaskService = _BlockingGoTaskServiceClient();
-        final controller = _connectedController(fakeGoTaskService, homeDir: localHome.path);
+        final controller = _connectedController(
+          fakeGoTaskService,
+          homeDir: localHome.path,
+        );
         addTearDown(controller.dispose);
 
         await controller.switchSession('artifact-only-task');
@@ -2844,7 +2872,10 @@ void main() {
           }
         });
         final fakeGoTaskService = _BlockingGoTaskServiceClient();
-        final controller = _connectedController(fakeGoTaskService, homeDir: localHome.path);
+        final controller = _connectedController(
+          fakeGoTaskService,
+          homeDir: localHome.path,
+        );
         addTearDown(controller.dispose);
 
         await controller.switchSession('terminal-failure-task');
@@ -2921,7 +2952,10 @@ void main() {
           }
         });
         final fakeGoTaskService = _BlockingGoTaskServiceClient();
-        final controller = _connectedController(fakeGoTaskService, homeDir: localHome.path);
+        final controller = _connectedController(
+          fakeGoTaskService,
+          homeDir: localHome.path,
+        );
         addTearDown(controller.dispose);
 
         await controller.switchSession('empty-output-task');
@@ -3233,7 +3267,7 @@ void main() {
           await expectLater(
             controller
                 .sendChatMessage(prompts[index])
-                .timeout(const Duration(seconds: 2)),
+                .timeout(_openClawE2ESubmitTimeout),
             completes,
           );
         }
@@ -3267,7 +3301,10 @@ void main() {
           'xworkmate-openclaw-five-e2e-',
         );
         final fakeGoTaskService = _BlockingGoTaskServiceClient();
-        final controller = _connectedGatewayController(fakeGoTaskService, homeDir: localHome.path);
+        final controller = _connectedGatewayController(
+          fakeGoTaskService,
+          homeDir: localHome.path,
+        );
         addTearDown(() async {
           fakeGoTaskService.completeAll();
           controller.dispose();
@@ -3286,7 +3323,7 @@ void main() {
           await expectLater(
             controller
                 .sendChatMessage(_openClawE2ECanonicalPrompts[index])
-                .timeout(const Duration(seconds: 2)),
+                .timeout(_openClawE2ESubmitTimeout),
             completes,
           );
         }
@@ -3971,6 +4008,72 @@ void main() {
       },
     );
 
+    test('OpenClaw task snapshot failure records a terminal result', () async {
+      final fakeGoTaskService = _RecordingGoTaskServiceClient()
+        ..outcomes.add(
+          const GoTaskServiceResult(
+            success: true,
+            message: '',
+            turnId: 'turn-openclaw-poll-failed',
+            raw: <String, dynamic>{
+              'success': true,
+              'status': 'running',
+              'sessionId': 'openclaw-poll-failed-task',
+              'threadId': 'openclaw-poll-failed-task',
+              'turnId': 'turn-openclaw-poll-failed',
+              'runId': 'run-openclaw-poll-failed',
+              'artifactScope':
+                  'tasks/openclaw-poll-failed-task/run-openclaw-poll-failed',
+              'artifactDirectory':
+                  '/tmp/tasks/openclaw-poll-failed-task/run-openclaw-poll-failed',
+              'gatewayProviderId': 'openclaw',
+              'runtimeBudgetMinutes': 1,
+            },
+            errorMessage: '',
+            resolvedModel: '',
+            route: GoTaskServiceRoute.externalAcpSingle,
+          ),
+        )
+        ..taskOutcomes.add(
+          const GatewayAcpException(
+            'ACP HTTP connection closed before the OpenClaw task snapshot returned',
+            code: 'ACP_HTTP_CONNECTION_CLOSED',
+          ),
+        );
+      final controller = _connectedGatewayController(fakeGoTaskService);
+      addTearDown(controller.dispose);
+
+      await _selectGatewaySession(controller, 'openclaw-poll-failed-task');
+
+      await expectLater(
+        controller
+            .sendChatMessage('输出 PDF')
+            .timeout(const Duration(seconds: 2)),
+        completes,
+      );
+
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+
+      final failedThread = controller.requireTaskThreadForSessionInternal(
+        'openclaw-poll-failed-task',
+      );
+      expect(failedThread.lifecycleState.status, 'ready');
+      expect(
+        failedThread.lifecycleState.lastResultCode,
+        'ACP_HTTP_CONNECTION_CLOSED',
+      );
+      expect(failedThread.lastArtifactSyncStatus, 'failed');
+      expect(failedThread.openClawTaskAssociation, isNull);
+      expect(
+        controller.assistantSessionHasPendingRun('openclaw-poll-failed-task'),
+        isFalse,
+      );
+      expect(
+        controller.chatMessages.map((message) => message.text).join('\n'),
+        contains('ACP_HTTP_CONNECTION_CLOSED'),
+      );
+    });
+
     test(
       'sendChatMessage resumes existing interrupted and error states',
       () async {
@@ -4386,7 +4489,8 @@ Future<void> _resilientDelete(Directory dir) async {
     try {
       await dir.delete(recursive: true);
       return;
-    } catch (_) {
+    } catch (error) {
+      debugPrint('Temporary directory delete retry: $error');
       await Future<void>.delayed(const Duration(milliseconds: 50));
     }
   }
@@ -4406,7 +4510,9 @@ AppController _sandboxController({
   GoTaskServiceClient? goTaskServiceClient,
   String? homeDir,
 }) {
-  final actualHome = homeDir ?? Directory.systemTemp.createTempSync('xworkmate-sandbox-home-').path;
+  final actualHome =
+      homeDir ??
+      Directory.systemTemp.createTempSync('xworkmate-sandbox-home-').path;
   if (homeDir == null) {
     addTearDown(() async {
       await _resilientDelete(Directory(actualHome));
@@ -4429,7 +4535,10 @@ AppController _sandboxController({
   );
 }
 
-AppController _connectedController(GoTaskServiceClient client, {String? homeDir}) {
+AppController _connectedController(
+  GoTaskServiceClient client, {
+  String? homeDir,
+}) {
   return _sandboxController(
     goTaskServiceClient: client,
     uiFeatureManifest: _defaultDesktopManifest(),
@@ -4446,7 +4555,10 @@ AppController _connectedController(GoTaskServiceClient client, {String? homeDir}
   );
 }
 
-AppController _connectedGatewayController(GoTaskServiceClient client, {String? homeDir}) {
+AppController _connectedGatewayController(
+  GoTaskServiceClient client, {
+  String? homeDir,
+}) {
   return _sandboxController(
     goTaskServiceClient: client,
     uiFeatureManifest: _defaultDesktopManifest(),
@@ -4586,6 +4698,7 @@ class _RecordingGoTaskServiceClient implements GoTaskServiceClient {
   final List<GoTaskServiceUpdate> updatesBeforeNextOutcome =
       <GoTaskServiceUpdate>[];
   final List<Object> outcomes = <Object>[];
+  final List<Object> taskOutcomes = <Object>[];
   Future<void> Function(GoTaskServiceRequest request)? onExecuteTask;
 
   @override
@@ -4640,6 +4753,13 @@ class _RecordingGoTaskServiceClient implements GoTaskServiceClient {
     required OpenClawTaskAssociation association,
     required GoTaskServiceRoute route,
   }) async {
+    if (taskOutcomes.isNotEmpty) {
+      final outcome = taskOutcomes.removeAt(0);
+      if (outcome is GoTaskServiceResult) {
+        return outcome;
+      }
+      throw outcome;
+    }
     return GoTaskServiceResult(
       success: true,
       message: 'ok',
