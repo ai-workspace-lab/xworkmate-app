@@ -30,7 +30,6 @@ import '../runtime/desktop_thread_artifact_service.dart';
 import '../runtime/go_task_service_client.dart';
 import '../runtime/mode_switcher.dart';
 import '../runtime/agent_registry.dart';
-import '../runtime/multi_agent_orchestrator.dart';
 import '../runtime/platform_environment.dart';
 import 'app_controller_desktop_core.dart';
 import 'app_controller_desktop_thread_sessions.dart';

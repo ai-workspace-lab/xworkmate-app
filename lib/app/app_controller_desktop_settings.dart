@@ -30,7 +30,6 @@ import '../runtime/assistant_artifacts.dart';
 import '../runtime/desktop_thread_artifact_service.dart';
 import '../runtime/mode_switcher.dart';
 import '../runtime/agent_registry.dart';
-import '../runtime/multi_agent_orchestrator.dart';
 import '../runtime/platform_environment.dart';
 import 'app_controller_desktop_core.dart';
 import 'app_controller_desktop_navigation.dart';
@@ -64,10 +63,8 @@ extension AppControllerDesktopSettings on AppController {
       return;
     }
     settingsDraftInternal = sanitizeFeatureFlagSettingsInternal(
-      sanitizeMultiAgentSettingsInternal(
-        sanitizeOllamaCloudSettingsInternal(
-          sanitizeCodeAgentSettingsInternal(snapshot),
-        ),
+      sanitizeOllamaCloudSettingsInternal(
+        sanitizeCodeAgentSettingsInternal(snapshot),
       ),
     );
     settingsDraftInitializedInternal = true;
@@ -304,7 +301,6 @@ extension AppControllerDesktopSettings on AppController {
     openClawGatewayQueuedTurnsInternal.clear();
     openClawGatewayQueuedTurnsBySessionInternal.clear();
     openClawGatewayActiveTurnsInternal.clear();
-    multiAgentRunPendingInternal = false;
     final sessionKey = createAssistantDraftSessionKeyInternal();
     initializeAssistantThreadContext(
       sessionKey,

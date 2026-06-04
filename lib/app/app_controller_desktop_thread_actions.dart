@@ -31,7 +31,6 @@ import '../runtime/desktop_thread_artifact_service.dart';
 import '../runtime/go_task_service_client.dart';
 import '../runtime/mode_switcher.dart';
 import '../runtime/agent_registry.dart';
-import '../runtime/multi_agent_orchestrator.dart';
 import '../runtime/platform_environment.dart';
 import 'app_controller_openclaw_task_queue.dart';
 import 'app_controller_desktop_core.dart';
@@ -74,11 +73,7 @@ extension AppControllerDesktopThreadActions on AppController {
               (turn) => !turn.cancelled,
             ) ==
             true ||
-        (multiAgentRunPendingInternal &&
-            matchesSessionKey(
-              normalized,
-              sessionsControllerInternal.currentSessionKey,
-            ));
+        false;
   }
 
   Future<void> connectSavedGateway() async {
@@ -1505,39 +1500,6 @@ extension AppControllerDesktopThreadActions on AppController {
   }
 
   Future<void> abortRun() async {
-    if (multiAgentRunPendingInternal) {
-      final sessionKey = normalizedAssistantSessionKeyInternal(
-        sessionsControllerInternal.currentSessionKey,
-      );
-      try {
-        await goTaskServiceClientInternal.cancelTask(
-          route: GoTaskServiceRoute.externalAcpMulti,
-          target: assistantExecutionTargetForSession(sessionKey),
-          sessionId: sessionKey,
-          threadId: sessionKey,
-          association: taskThreadForSessionInternal(
-            sessionKey,
-          )?.openClawTaskAssociation,
-        );
-      } catch (_) {
-        // Best effort cancellation only.
-      }
-      multiAgentRunPendingInternal = false;
-      upsertTaskThreadInternal(
-        sessionKey,
-        lifecycleStatus: 'ready',
-        lastRunAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-        lastResultCode: 'aborted',
-        lastRemoteWorkingDirectory: '',
-        lastArtifactSyncAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-        lastArtifactSyncStatus: 'failed',
-        lastTaskArtifactRelativePaths: const <String>[],
-        updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-      );
-      recomputeTasksInternal();
-      notifyIfActiveInternal();
-      return;
-    }
     final sessionKey = normalizedAssistantSessionKeyInternal(
       sessionsControllerInternal.currentSessionKey,
     );

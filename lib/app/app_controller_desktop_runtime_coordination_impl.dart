@@ -29,7 +29,6 @@ import '../runtime/assistant_artifacts.dart';
 import '../runtime/desktop_thread_artifact_service.dart';
 import '../runtime/mode_switcher.dart';
 import '../runtime/agent_registry.dart';
-import '../runtime/multi_agent_orchestrator.dart';
 import '../runtime/platform_environment.dart';
 import 'app_controller_desktop_core.dart';
 import 'app_controller_desktop_navigation.dart';
@@ -73,26 +72,6 @@ Future<void> refreshAcpCapabilitiesRuntimeInternal(
         .toString()
         .trim();
   }
-  if (persistMountTargets && !controller.disposedInternal) {
-    try {
-      final currentConfig = controller.settings.multiAgent;
-      final nextConfig = await controller.multiAgentMountManagerInternal
-          .reconcile(
-            config: currentConfig,
-            aiGatewayUrl: controller.aiGatewayUrl,
-          );
-      if (jsonEncode(nextConfig.toJson()) !=
-          jsonEncode(currentConfig.toJson())) {
-        await controller.settingsControllerInternal.saveSnapshot(
-          controller.settings.copyWith(multiAgent: nextConfig),
-        );
-        controller.multiAgentOrchestratorInternal.updateConfig(nextConfig);
-      }
-    } catch (_) {
-      // Mount reconciliation is an optional bridge capability. A missing or
-      // older remote method must not block assistant startup or task execution.
-    }
-  }
   if (!controller.disposedInternal) {
     controller.notifyListeners();
   }
@@ -120,46 +99,6 @@ Future<void> refreshSingleAgentCapabilitiesRuntimeInternal(
   if (!controller.disposedInternal) {
     controller.notifyListeners();
   }
-}
-
-List<ManagedMountTargetState>
-mergeAcpCapabilitiesIntoMountTargetsRuntimeInternal(
-  AppController controller,
-  List<ManagedMountTargetState> current,
-  GatewayAcpCapabilities capabilities,
-) {
-  final source = current.isEmpty ? ManagedMountTargetState.defaults() : current;
-  final agentProviders = capabilities.providerCatalog
-      .map((item) => item.providerId)
-      .toSet();
-  final gatewayProviders = capabilities.gatewayProviderCatalog
-      .map((item) => item.providerId)
-      .toSet();
-  return source
-      .map((item) {
-        final available = switch (item.targetId) {
-          'codex' => agentProviders.contains('codex'),
-          'opencode' => agentProviders.contains('opencode'),
-          'gemini' => agentProviders.contains('gemini'),
-          'openclaw' => gatewayProviders.contains('openclaw'),
-          _ => false,
-        };
-        return item.copyWith(
-          available: available,
-          discoveryState: available ? 'ready' : 'unavailable',
-          syncState: available ? item.syncState : 'idle',
-          detail: available
-              ? appText(
-                  '来源：Gateway ACP capabilities',
-                  'Source: Gateway ACP capabilities',
-                )
-              : appText(
-                  'Gateway ACP 未报告该能力。',
-                  'Gateway ACP did not report this capability.',
-                ),
-        );
-      })
-      .toList(growable: false);
 }
 
 String? assistantWorkingDirectoryForSessionRuntimeInternal(

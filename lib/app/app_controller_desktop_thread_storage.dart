@@ -29,7 +29,6 @@ import '../runtime/assistant_artifacts.dart';
 import '../runtime/desktop_thread_artifact_service.dart';
 import '../runtime/mode_switcher.dart';
 import '../runtime/agent_registry.dart';
-import '../runtime/multi_agent_orchestrator.dart';
 import '../runtime/platform_environment.dart';
 import 'app_controller_desktop_core.dart';
 import 'app_controller_desktop_navigation.dart';
@@ -166,17 +165,6 @@ extension AppControllerDesktopThreadStorage on AppController {
     }
   }
 
-  SettingsSnapshot sanitizeMultiAgentSettingsInternal(
-    SettingsSnapshot snapshot,
-  ) {
-    final resolved = resolveMultiAgentConfigInternal(snapshot);
-    if (jsonEncode(snapshot.multiAgent.toJson()) ==
-        jsonEncode(resolved.toJson())) {
-      return snapshot;
-    }
-    return snapshot.copyWith(multiAgent: resolved);
-  }
-
   SettingsSnapshot sanitizeFeatureFlagSettingsInternal(
     SettingsSnapshot snapshot,
   ) {
@@ -184,9 +172,6 @@ extension AppControllerDesktopThreadStorage on AppController {
     final sanitizedExecutionTarget = sanitizeExecutionTargetInternal(
       features.sanitizeExecutionTarget(snapshot.assistantExecutionTarget),
     );
-    final multiAgentConfig = features.supportsMultiAgent
-        ? snapshot.multiAgent
-        : snapshot.multiAgent.copyWith(enabled: false);
     final experimentalCanvas =
         features.allowsExperimentalSetting(
           UiFeatureKeys.settingsExperimentalCanvas,
@@ -207,7 +192,6 @@ extension AppControllerDesktopThreadStorage on AppController {
         : false;
     return snapshot.copyWith(
       assistantExecutionTarget: sanitizedExecutionTarget,
-      multiAgent: multiAgentConfig,
       experimentalCanvas: experimentalCanvas,
       experimentalBridge: experimentalBridge,
       experimentalDebug: experimentalDebug,
@@ -269,39 +253,6 @@ extension AppControllerDesktopThreadStorage on AppController {
     AssistantExecutionTarget? target,
   ) {
     return sanitizeExecutionTargetInternal(target);
-  }
-
-  MultiAgentConfig resolveMultiAgentConfigInternal(SettingsSnapshot snapshot) {
-    final defaults = MultiAgentConfig.defaults();
-    final current = snapshot.multiAgent;
-    final ollamaEndpoint = snapshot.ollamaLocal.endpoint.trim().isEmpty
-        ? current.ollamaEndpoint
-        : snapshot.ollamaLocal.endpoint.trim();
-    final engineerModel = current.engineer.model.trim().isNotEmpty
-        ? current.engineer.model.trim()
-        : snapshot.ollamaLocal.defaultModel.trim().isNotEmpty
-        ? snapshot.ollamaLocal.defaultModel.trim()
-        : defaults.engineer.model;
-    final architectModel = current.architect.model.trim().isNotEmpty
-        ? current.architect.model.trim()
-        : defaults.architect.model;
-    final testerModel = current.tester.model.trim().isNotEmpty
-        ? current.tester.model.trim()
-        : defaults.tester.model;
-    return current.copyWith(
-      framework: current.arisEnabled
-          ? MultiAgentFramework.aris
-          : current.framework,
-      arisEnabled:
-          current.framework == MultiAgentFramework.aris || current.arisEnabled,
-      ollamaEndpoint: ollamaEndpoint,
-      architect: current.architect.copyWith(model: architectModel),
-      engineer: current.engineer.copyWith(model: engineerModel),
-      tester: current.tester.copyWith(model: testerModel),
-      mountTargets: current.mountTargets.isEmpty
-          ? MultiAgentConfig.defaults().mountTargets
-          : current.mountTargets,
-    );
   }
 
   void appendAssistantThreadMessageInternal(
