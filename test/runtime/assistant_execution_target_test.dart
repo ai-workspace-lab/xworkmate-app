@@ -13,6 +13,17 @@ import 'package:xworkmate/runtime/gateway_acp_client.dart';
 import 'package:xworkmate/runtime/go_task_service_client.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
 import 'package:xworkmate/runtime/secure_config_store.dart';
+import 'package:xworkmate/runtime/runtime_coordinator.dart';
+import 'package:xworkmate/runtime/desktop_platform_service.dart';
+import 'package:xworkmate/runtime/account_runtime_client.dart';
+
+const List<String> _openClawE2ECanonicalPrompts = <String>[
+  '从单机权限 → 网络边界 → Web安全 → 云身份 → Zero Trust → AI Agent 身份 → AI模型与知识保护 演进 \n制作 使用codex 制作连续制作 7张的一些列图片',
+  '参考附件模版制作 ,围绕\n从单机权限 → 网络边界 → Web安全 → 云身份 → Zero Trust → AI Agent 身份 → AI模型与知识保护 演进 \n连续制作 7张的一些列图片',
+  '拆章节 -> 每章调用 Codex -> 每章 GPT images2 生成图 -> 汇总排版 -> 输出 PDF\n\n右侧 artifact栏 显示的陈旧文件',
+  '围绕\n从单机权限 → 网络边界 → Web安全 → 云身份 → Zero Trust → AI Agent 身份 → AI模型与知识保护 演进 右侧是当下 \n测试制作视频',
+  '围绕\n\n从单机权限 → 网络边界 → Web安全 → 云身份 → Zero Trust → AI Agent 身份 → AI模型与知识保护 演进 \n\n拆章节 -> 每章调用 Codex -> 每章 GPT images2 生成图 -> 汇总排版 -> 制作视频',
+];
 
 void main() {
   group('AssistantExecutionTarget', () {
@@ -62,7 +73,7 @@ void main() {
     test(
       'normalizes OpenClaw from provider catalog into selectable gateway mode',
       () async {
-        final controller = AppController(
+        final controller = _sandboxController(
           environmentOverride: const <String, String>{},
           uiFeatureManifest: _defaultDesktopManifest(),
           initialBridgeProviderCatalog: const <SingleAgentProvider>[
@@ -108,7 +119,7 @@ void main() {
     test(
       'switching a session to gateway uses the bridge-provided gateway catalog',
       () async {
-        final controller = AppController(
+        final controller = _sandboxController(
           environmentOverride: const <String, String>{},
           uiFeatureManifest: _defaultDesktopManifest(),
           initialBridgeProviderCatalog: const <SingleAgentProvider>[
@@ -170,7 +181,7 @@ void main() {
             await localHome.delete(recursive: true);
           }
         });
-        final controller = AppController(
+        final controller = _sandboxController(
           environmentOverride: const <String, String>{},
           initialBridgeProviderCatalog: const <SingleAgentProvider>[
             SingleAgentProvider.codex,
@@ -182,9 +193,9 @@ void main() {
             AssistantExecutionTarget.agent,
             AssistantExecutionTarget.gateway,
           ],
+          homeDir: localHome.path,
         );
         addTearDown(controller.dispose);
-        controller.resolvedUserHomeDirectoryInternal = localHome.path;
 
         expect(
           () => controller.upsertTaskThreadInternal(
@@ -218,7 +229,7 @@ void main() {
     );
 
     test('allocates unique draft session keys for repeated task creation', () {
-      final controller = AppController(
+      final controller = _sandboxController(
         environmentOverride: const <String, String>{},
       );
       addTearDown(controller.dispose);
@@ -245,11 +256,11 @@ void main() {
           await localHome.delete(recursive: true);
         }
       });
-      final controller = AppController(
+      final controller = _sandboxController(
         environmentOverride: const <String, String>{},
+        homeDir: localHome.path,
       );
       addTearDown(controller.dispose);
-      controller.resolvedUserHomeDirectoryInternal = localHome.path;
       controller.runtimeInternal.snapshotInternal = controller
           .runtimeInternal
           .snapshot
@@ -281,11 +292,11 @@ void main() {
             await localHome.delete(recursive: true);
           }
         });
-        final controller = AppController(
+        final controller = _sandboxController(
           environmentOverride: const <String, String>{},
+          homeDir: localHome.path,
         );
         addTearDown(controller.dispose);
-        controller.resolvedUserHomeDirectoryInternal = localHome.path;
         controller.runtimeInternal.snapshotInternal = controller
             .runtimeInternal
             .snapshot
@@ -310,7 +321,7 @@ void main() {
     );
 
     test('assistant task list ignores runtime sessions from the gateway', () {
-      final controller = AppController(
+      final controller = _sandboxController(
         environmentOverride: const <String, String>{},
       );
       addTearDown(controller.dispose);
@@ -362,11 +373,11 @@ void main() {
             await localHome.delete(recursive: true);
           }
         });
-        final controller = AppController(
+        final controller = _sandboxController(
           environmentOverride: const <String, String>{},
+          homeDir: localHome.path,
         );
         addTearDown(controller.dispose);
-        controller.resolvedUserHomeDirectoryInternal = localHome.path;
 
         const firstTask = 'draft:first-task';
         const secondTask = 'draft:second-task';
@@ -410,7 +421,7 @@ void main() {
     test(
       'returns unspecified when a saved provider is no longer in the current catalog',
       () {
-        final controller = AppController(
+        final controller = _sandboxController(
           environmentOverride: const <String, String>{},
         );
         addTearDown(controller.dispose);
@@ -428,7 +439,7 @@ void main() {
     test(
       'does not recover a stale gateway provider from an empty gateway catalog',
       () {
-        final controller = AppController(
+        final controller = _sandboxController(
           environmentOverride: const <String, String>{},
           initialBridgeProviderCatalog: const <SingleAgentProvider>[
             SingleAgentProvider.codex,
@@ -450,7 +461,7 @@ void main() {
     test(
       'switching a session to gateway with an empty gateway catalog keeps provider selection inherited',
       () async {
-        final controller = AppController(
+        final controller = _sandboxController(
           environmentOverride: const <String, String>{},
           initialBridgeProviderCatalog: const <SingleAgentProvider>[
             SingleAgentProvider.codex,
@@ -487,7 +498,7 @@ void main() {
     test(
       'gateway target without a live gateway provider uses explicit gateway routing',
       () async {
-        final controller = AppController(
+        final controller = _sandboxController(
           environmentOverride: const <String, String>{},
           initialAvailableExecutionTargets: const <AssistantExecutionTarget>[
             AssistantExecutionTarget.agent,
@@ -792,7 +803,7 @@ void main() {
     });
 
     test('skill selection ignores stale non-bridge skill keys', () {
-      final controller = AppController(
+      final controller = _sandboxController(
         environmentOverride: const <String, String>{},
       );
       addTearDown(controller.dispose);
@@ -841,7 +852,7 @@ void main() {
     test(
       'locks the gateway provider catalog to the canonical openclaw contract',
       () {
-        final controller = AppController(
+        final controller = _sandboxController(
           environmentOverride: const <String, String>{},
           initialGatewayProviderCatalog: <SingleAgentProvider>[
             SingleAgentProvider.fromJsonValue(
@@ -927,7 +938,7 @@ void main() {
           value: 'bridge-token',
         );
 
-        final controller = AppController(
+        final controller = _sandboxController(
           store: store,
           environmentOverride: <String, String>{},
         );
@@ -980,7 +991,7 @@ void main() {
         );
         await store.initialize();
 
-        final controller = AppController(
+        final controller = _sandboxController(
           store: store,
           goTaskServiceClient: fakeGoTaskService,
           environmentOverride: const <String, String>{},
@@ -1595,9 +1606,8 @@ void main() {
               route: GoTaskServiceRoute.externalAcpSingle,
             ),
           );
-        final controller = _connectedController(fakeGoTaskService);
+        final controller = _connectedController(fakeGoTaskService, homeDir: localWorkspace.path);
         addTearDown(controller.dispose);
-        controller.resolvedUserHomeDirectoryInternal = localWorkspace.path;
 
         await controller.sessionsController.switchSession(
           'unit-fixture-task-a',
@@ -1827,9 +1837,8 @@ void main() {
               route: GoTaskServiceRoute.externalAcpSingle,
             ),
           );
-        final controller = _connectedController(fakeGoTaskService);
+        final controller = _connectedController(fakeGoTaskService, homeDir: localWorkspace.path);
         addTearDown(controller.dispose);
-        controller.resolvedUserHomeDirectoryInternal = localWorkspace.path;
 
         await controller.sessionsController.switchSession(
           'unit-fixture-task-a',
@@ -1967,9 +1976,8 @@ void main() {
               route: GoTaskServiceRoute.externalAcpSingle,
             ),
           );
-        final controller = _connectedController(fakeGoTaskService);
+        final controller = _connectedController(fakeGoTaskService, homeDir: localWorkspace.path);
         addTearDown(controller.dispose);
-        controller.resolvedUserHomeDirectoryInternal = localWorkspace.path;
 
         await controller.sessionsController.switchSession(
           'unit-fixture-task-a',
@@ -2033,9 +2041,8 @@ void main() {
               route: GoTaskServiceRoute.externalAcpSingle,
             ),
           );
-        final controller = _connectedController(fakeGoTaskService);
+        final controller = _connectedController(fakeGoTaskService, homeDir: localWorkspace.path);
         addTearDown(controller.dispose);
-        controller.resolvedUserHomeDirectoryInternal = localWorkspace.path;
 
         await controller.sessionsController.switchSession(
           'unit-fixture-task-a',
@@ -2366,9 +2373,8 @@ void main() {
           }
         });
         final fakeGoTaskService = _BlockingGoTaskServiceClient();
-        final controller = _connectedController(fakeGoTaskService);
+        final controller = _connectedController(fakeGoTaskService, homeDir: localHome.path);
         addTearDown(controller.dispose);
-        controller.resolvedUserHomeDirectoryInternal = localHome.path;
 
         const sessionA = 'background-task-a';
         const sessionB = 'background-task-b';
@@ -2489,9 +2495,8 @@ void main() {
           }
         });
         final fakeGoTaskService = _BlockingGoTaskServiceClient();
-        final controller = _connectedController(fakeGoTaskService);
+        final controller = _connectedController(fakeGoTaskService, homeDir: localHome.path);
         addTearDown(controller.dispose);
-        controller.resolvedUserHomeDirectoryInternal = localHome.path;
 
         const prompt = '用户要求我生成一个关于现代AI基础设施的技术营销内容';
         final uniqueSuffix = DateTime.now().microsecondsSinceEpoch.toString();
@@ -2658,9 +2663,8 @@ void main() {
           }
         });
         final fakeGoTaskService = _BlockingGoTaskServiceClient();
-        final controller = _connectedController(fakeGoTaskService);
+        final controller = _connectedController(fakeGoTaskService, homeDir: localHome.path);
         addTearDown(controller.dispose);
-        controller.resolvedUserHomeDirectoryInternal = localHome.path;
 
         const prompt = '用户要求我生成一个关于现代AI基础设施的技术营销内容';
         final uniqueSuffix = DateTime.now().microsecondsSinceEpoch.toString();
@@ -2753,9 +2757,8 @@ void main() {
           }
         });
         final fakeGoTaskService = _BlockingGoTaskServiceClient();
-        final controller = _connectedController(fakeGoTaskService);
+        final controller = _connectedController(fakeGoTaskService, homeDir: localHome.path);
         addTearDown(controller.dispose);
-        controller.resolvedUserHomeDirectoryInternal = localHome.path;
 
         await controller.switchSession('artifact-only-task');
         final taskFuture = controller.sendChatMessage('create only a file');
@@ -2818,9 +2821,8 @@ void main() {
           }
         });
         final fakeGoTaskService = _BlockingGoTaskServiceClient();
-        final controller = _connectedController(fakeGoTaskService);
+        final controller = _connectedController(fakeGoTaskService, homeDir: localHome.path);
         addTearDown(controller.dispose);
-        controller.resolvedUserHomeDirectoryInternal = localHome.path;
 
         await controller.switchSession('terminal-failure-task');
         final firstFuture = controller.sendChatMessage('create first file');
@@ -2896,9 +2898,8 @@ void main() {
           }
         });
         final fakeGoTaskService = _BlockingGoTaskServiceClient();
-        final controller = _connectedController(fakeGoTaskService);
+        final controller = _connectedController(fakeGoTaskService, homeDir: localHome.path);
         addTearDown(controller.dispose);
-        controller.resolvedUserHomeDirectoryInternal = localHome.path;
 
         await controller.switchSession('empty-output-task');
         final firstFuture = controller.sendChatMessage('create first file');
@@ -3231,6 +3232,125 @@ void main() {
           expect(
             fakeGoTaskService.requests[index].prompt,
             contains(prompts[index]),
+          );
+        }
+      },
+    );
+
+    test(
+      'OpenClaw gateway five E2E tasks complete with isolated results and artifacts',
+      () async {
+        final localHome = await Directory.systemTemp.createTemp(
+          'xworkmate-openclaw-five-e2e-',
+        );
+        final fakeGoTaskService = _BlockingGoTaskServiceClient();
+        final controller = _connectedGatewayController(fakeGoTaskService, homeDir: localHome.path);
+        addTearDown(() async {
+          fakeGoTaskService.completeAll();
+          controller.dispose();
+          if (await localHome.exists()) {
+            await localHome.delete(recursive: true);
+          }
+        });
+
+        for (
+          var index = 0;
+          index < _openClawE2ECanonicalPrompts.length;
+          index += 1
+        ) {
+          final sessionKey = 'openclaw-e2e-result-$index';
+          await _selectGatewaySession(controller, sessionKey);
+          await expectLater(
+            controller
+                .sendChatMessage(_openClawE2ECanonicalPrompts[index])
+                .timeout(const Duration(seconds: 2)),
+            completes,
+          );
+        }
+
+        await fakeGoTaskService.waitForRequestCount(
+          _openClawE2ECanonicalPrompts.length,
+        );
+        expect(
+          controller.openClawGatewayActiveTasksInternal,
+          _openClawE2ECanonicalPrompts.length,
+        );
+
+        for (
+          var index = 0;
+          index < _openClawE2ECanonicalPrompts.length;
+          index += 1
+        ) {
+          final sessionKey = 'openclaw-e2e-result-$index';
+          final relativePath = switch (index) {
+            0 => 'assets/images/security-evolution-01.png',
+            1 => 'assets/images/template-security-evolution-01.png',
+            2 => 'reports/security-evolution.pdf',
+            3 => 'video/security-evolution.mp4',
+            _ => 'video/security-evolution-pipeline.mp4',
+          };
+          fakeGoTaskService.complete(
+            sessionKey,
+            GoTaskServiceResult(
+              success: true,
+              message: 'OPENCLAW-E2E-00${index + 1} done',
+              turnId: 'turn-$sessionKey',
+              raw: <String, dynamic>{
+                'artifacts': <Map<String, dynamic>>[
+                  <String, dynamic>{
+                    'relativePath': relativePath,
+                    'content': 'artifact for $sessionKey',
+                    'contentType': 'application/octet-stream',
+                  },
+                ],
+              },
+              errorMessage: '',
+              resolvedModel: '',
+              route: GoTaskServiceRoute.externalAcpSingle,
+            ),
+          );
+        }
+
+        for (
+          var index = 0;
+          index < _openClawE2ECanonicalPrompts.length;
+          index += 1
+        ) {
+          await _waitForThreadLifecycleStatus(
+            controller,
+            'openclaw-e2e-result-$index',
+            'ready',
+          );
+        }
+        await _waitForOpenClawActiveTaskCount(controller, 0);
+        expect(controller.openClawGatewayQueuedTurnsInternal, isEmpty);
+
+        for (
+          var index = 0;
+          index < _openClawE2ECanonicalPrompts.length;
+          index += 1
+        ) {
+          final sessionKey = 'openclaw-e2e-result-$index';
+          final thread = controller.requireTaskThreadForSessionInternal(
+            sessionKey,
+          );
+          expect(thread.lifecycleState.status, 'ready');
+          expect(thread.lastArtifactSyncStatus, 'synced');
+          expect(thread.lastTaskArtifactRelativePaths, hasLength(1));
+          expect(
+            controller.localSessionMessagesInternal[sessionKey]!.map(
+              (message) => message.text,
+            ),
+            contains('OPENCLAW-E2E-00${index + 1} done'),
+          );
+          final workspacePath = controller.assistantWorkspacePathForSession(
+            sessionKey,
+          );
+          expect(
+            await File(
+              '$workspacePath/${thread.lastTaskArtifactRelativePaths.single}',
+            ).readAsString(),
+            'artifact for $sessionKey',
           );
         }
       },
@@ -4222,11 +4342,60 @@ List<Map<String, dynamic>> _generatedArtifactPayloads() {
 UiFeatureManifest _defaultDesktopManifest() {
   return UiFeatureManifest.fromYamlString(
     File(UiFeatureManifest.assetPath).readAsStringSync(),
+  ).copyWithFeature(
+    platform: UiFeaturePlatform.desktop,
+    module: 'assistant',
+    feature: 'multi_agent',
+    enabled: true,
+    buildModes: const <UiFeatureBuildMode>{
+      UiFeatureBuildMode.debug,
+      UiFeatureBuildMode.profile,
+      UiFeatureBuildMode.release,
+    },
   );
 }
 
-AppController _connectedController(GoTaskServiceClient client) {
+AppController _sandboxController({
+  SecureConfigStore? store,
+  RuntimeCoordinator? runtimeCoordinator,
+  DesktopPlatformService? desktopPlatformService,
+  UiFeatureManifest? uiFeatureManifest,
+  List<SingleAgentProvider>? initialBridgeProviderCatalog,
+  List<SingleAgentProvider>? initialGatewayProviderCatalog,
+  List<AssistantExecutionTarget>? initialAvailableExecutionTargets,
+  AccountRuntimeClient Function(String baseUrl)? accountClientFactory,
+  Map<String, String>? environmentOverride,
+  GoTaskServiceClient? goTaskServiceClient,
+  String? homeDir,
+}) {
+  final actualHome = homeDir ?? Directory.systemTemp.createTempSync('xworkmate-sandbox-home-').path;
+  if (homeDir == null) {
+    addTearDown(() async {
+      final dir = Directory(actualHome);
+      if (await dir.exists()) {
+        await dir.delete(recursive: true);
+      }
+    });
+  }
   return AppController(
+    store: store,
+    runtimeCoordinator: runtimeCoordinator,
+    desktopPlatformService: desktopPlatformService,
+    uiFeatureManifest: uiFeatureManifest,
+    initialBridgeProviderCatalog: initialBridgeProviderCatalog,
+    initialGatewayProviderCatalog: initialGatewayProviderCatalog,
+    initialAvailableExecutionTargets: initialAvailableExecutionTargets,
+    accountClientFactory: accountClientFactory,
+    environmentOverride: <String, String>{
+      ...?environmentOverride,
+      'HOME': actualHome,
+    },
+    goTaskServiceClient: goTaskServiceClient,
+  );
+}
+
+AppController _connectedController(GoTaskServiceClient client, {String? homeDir}) {
+  return _sandboxController(
     goTaskServiceClient: client,
     uiFeatureManifest: _defaultDesktopManifest(),
     environmentOverride: const <String, String>{
@@ -4238,11 +4407,12 @@ AppController _connectedController(GoTaskServiceClient client) {
     initialAvailableExecutionTargets: const <AssistantExecutionTarget>[
       AssistantExecutionTarget.agent,
     ],
+    homeDir: homeDir,
   );
 }
 
-AppController _connectedGatewayController(GoTaskServiceClient client) {
-  return AppController(
+AppController _connectedGatewayController(GoTaskServiceClient client, {String? homeDir}) {
+  return _sandboxController(
     goTaskServiceClient: client,
     uiFeatureManifest: _defaultDesktopManifest(),
     environmentOverride: const <String, String>{
@@ -4258,6 +4428,7 @@ AppController _connectedGatewayController(GoTaskServiceClient client) {
       AssistantExecutionTarget.agent,
       AssistantExecutionTarget.gateway,
     ],
+    homeDir: homeDir,
   );
 }
 
@@ -4373,8 +4544,6 @@ Future<void> _waitForThreadLastResultCode(
     'Timed out waiting for $sessionKey result code $resultCode. Current result code: $currentResultCode.',
   );
 }
-
-
 
 class _RecordingGoTaskServiceClient implements GoTaskServiceClient {
   int executeCount = 0;
