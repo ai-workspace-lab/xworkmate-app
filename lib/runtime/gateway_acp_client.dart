@@ -61,27 +61,6 @@ class GatewayAcpCapabilities {
   final Map<String, dynamic> diagnostics;
 }
 
-class _GatewayAcpSessionUpdate {
-  const _GatewayAcpSessionUpdate({
-    required this.method,
-    required this.sessionId,
-    required this.threadId,
-    required this.turnId,
-    required this.type,
-    required this.textDelta,
-    required this.sequence,
-    required this.payload,
-  });
-
-  final String method;
-  final String sessionId;
-  final String threadId;
-  final String turnId;
-  final String type;
-  final String textDelta;
-  final int? sequence;
-  final Map<String, dynamic> payload;
-}
 
 enum _GatewayAcpHttpRequestPhase {
   connect,
@@ -90,25 +69,6 @@ enum _GatewayAcpHttpRequestPhase {
   bodyRead,
 }
 
-class GatewayAcpMultiAgentRequest {
-  const GatewayAcpMultiAgentRequest({
-    required this.sessionId,
-    required this.threadId,
-    required this.prompt,
-    required this.workingDirectory,
-    required this.attachments,
-    required this.selectedSkills,
-    required this.resumeSession,
-  });
-
-  final String sessionId;
-  final String threadId;
-  final String prompt;
-  final String workingDirectory;
-  final List<CollaborationAttachment> attachments;
-  final List<String> selectedSkills;
-  final bool resumeSession;
-}
 
 class GatewayAcpClient {
   GatewayAcpClient({
@@ -288,94 +248,6 @@ class GatewayAcpClient {
     return <AssistantExecutionTarget>[defaultTarget];
   }
 
-  Stream<MultiAgentRunEvent> runMultiAgent(
-    GatewayAcpMultiAgentRequest request,
-  ) {
-    final controller = StreamController<MultiAgentRunEvent>();
-    unawaited(() async {
-      final capabilities = await loadCapabilities();
-      if (!capabilities.multiAgent) {
-        throw const GatewayAcpException(
-          'Multi-agent capability is unavailable from ACP',
-          code: 'ACP_MULTI_AGENT_UNAVAILABLE',
-        );
-      }
-      final rpcRequest = _GatewayAcpRpcRequest(
-        id: _nextRequestId('multi-agent'),
-        method: request.resumeSession ? 'session.message' : 'session.start',
-        params: <String, dynamic>{
-          'sessionId': request.sessionId,
-          'threadId': request.threadId,
-          'mode': 'multi-agent',
-          'taskPrompt': request.prompt,
-          'workingDirectory': request.workingDirectory,
-          'attachments': request.attachments
-              .map(
-                (item) => <String, dynamic>{
-                  'name': item.name,
-                  'description': item.description,
-                  'path': item.path,
-                },
-              )
-              .toList(growable: false),
-          'selectedSkills': request.selectedSkills,
-        },
-      );
-      var lastSequence = -1;
-      try {
-        final response = await _requestForResolvedEndpoint(
-          rpcRequest,
-          onNotification: (notification) {
-            final event = _multiAgentEventFromNotification(notification);
-            if (event == null) {
-              return;
-            }
-            final seq =
-                (event.data['seq'] as num?)?.toInt() ??
-                (event.data['sequence'] as num?)?.toInt();
-            if (seq != null && seq <= lastSequence) {
-              return;
-            }
-            if (seq != null) {
-              lastSequence = seq;
-            }
-            if (!controller.isClosed) {
-              controller.add(event);
-            }
-          },
-        );
-        final result = asMap(response['result']);
-        if (!controller.isClosed) {
-          controller.add(
-            MultiAgentRunEvent(
-              type: 'result',
-              title: '',
-              message: stringValue(result['summary']) ?? '',
-              pending: false,
-              error: !(boolValue(result['success']) ?? false),
-              data: result,
-            ),
-          );
-        }
-      } catch (error) {
-        if (!controller.isClosed) {
-          controller.add(
-            MultiAgentRunEvent(
-              type: 'result',
-              title: '',
-              message: error.toString(),
-              pending: false,
-              error: true,
-              data: <String, dynamic>{'error': error.toString()},
-            ),
-          );
-        }
-      } finally {
-        await controller.close();
-      }
-    }());
-    return controller.stream;
-  }
 
   Future<void> cancelSession({
     required String sessionId,
@@ -1171,58 +1043,7 @@ class GatewayAcpClient {
     );
   }
 
-  _GatewayAcpSessionUpdate? _sessionUpdateFromNotification(
-    Map<String, dynamic> notification,
-  ) {
-    final method = stringValue(notification['method']) ?? '';
-    if (method != 'session.update' && method != 'acp.session.update') {
-      return null;
-    }
-    final params = asMap(notification['params']);
-    return _GatewayAcpSessionUpdate(
-      method: method,
-      sessionId: stringValue(params['sessionId']) ?? '',
-      threadId: stringValue(params['threadId']) ?? '',
-      turnId: stringValue(params['turnId']) ?? '',
-      type:
-          stringValue(params['type']) ??
-          stringValue(params['event']) ??
-          'status',
-      textDelta:
-          stringValue(params['delta']) ??
-          stringValue(params['text']) ??
-          stringValue(asMap(params['message'])['content']) ??
-          '',
-      sequence: intValue(params['seq']) ?? intValue(notification['seq']),
-      payload: params,
-    );
-  }
 
-  MultiAgentRunEvent? _multiAgentEventFromNotification(
-    Map<String, dynamic> notification,
-  ) {
-    final method = stringValue(notification['method']) ?? '';
-    if (method == 'multi_agent.event' || method == 'acp.multi_agent.event') {
-      return MultiAgentRunEvent.fromJson(asMap(notification['params']));
-    }
-    final update = _sessionUpdateFromNotification(notification);
-    if (update == null || update.payload['mode'] != 'multi-agent') {
-      return null;
-    }
-    return MultiAgentRunEvent(
-      type: update.type,
-      title: stringValue(update.payload['title']) ?? '',
-      message: update.textDelta.isNotEmpty
-          ? update.textDelta
-          : stringValue(update.payload['message']) ?? '',
-      pending: boolValue(update.payload['pending']) ?? false,
-      error: boolValue(update.payload['error']) ?? false,
-      role: stringValue(update.payload['role']),
-      iteration: intValue(update.payload['iteration']),
-      score: intValue(update.payload['score']),
-      data: update.payload,
-    );
-  }
 
   Map<String, dynamic> asMap(Object? raw) {
     if (raw is Map<String, dynamic>) {
