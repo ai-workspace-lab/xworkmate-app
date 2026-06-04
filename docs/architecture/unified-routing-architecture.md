@@ -2,7 +2,7 @@
 
 ## 1. 架构概览 (Unified Routing Architecture)
 
-当前系统采用 `xworkmate-bridge.svc.plus` 作为统一入口。App 侧通过 managed bridge ACP 主入口 `/acp/rpc` 处理能力发现、路由解析、agent / multi-agent 任务、OpenClaw gateway 任务和会话控制。Provider runtime 与 gateway runtime 地址仍由 bridge 后端内部拥有，不暴露为 App-facing public mapping。
+当前系统采用 `xworkmate-bridge.svc.plus` 作为统一入口。App 侧通过 managed bridge ACP 主入口 `/acp/rpc` 处理能力发现、路由解析、agent 任务（含 bridge 多 agent 转发）、OpenClaw gateway 任务和会话控制。Provider runtime 与 gateway runtime 地址仍由 bridge 后端内部拥有，不暴露为 App-facing public mapping。
 
 ```mermaid
 graph TD
@@ -39,7 +39,7 @@ graph TD
 
 | Bridge-owned mapping | App 侧行为 | 备注 |
 | :--- | :--- | :--- |
-| `/acp/rpc` | 直接调用 | 能力发现、路由解析、agent / multi-agent 任务、OpenClaw gateway 任务、cancel、close |
+| `/acp/rpc` | 直接调用 | 能力发现、路由解析、agent 任务（含 bridge 多 agent 转发）、OpenClaw gateway 任务、cancel、close |
 | provider runtime | 不直连 | Bridge 后端内部解析 provider |
 | gateway runtime | 不直连 | Bridge 后端内部解析 gateway provider |
 

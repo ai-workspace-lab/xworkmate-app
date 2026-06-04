@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import '../../app/app_controller.dart';
 
@@ -28,6 +29,22 @@ Map<String, Object?> desktopOfferParams({
     'bitrate': bitrate,
     'useGpu': useGpu,
   };
+}
+
+Future<MediaStream?> desktopRemoteVideoStreamForTrack(
+  RTCTrackEvent event, {
+  required Future<MediaStream> Function(String label) createFallbackStream,
+}) async {
+  if (event.track.kind != 'video') {
+    return null;
+  }
+  if (event.streams.isNotEmpty) {
+    return event.streams.first;
+  }
+
+  final stream = await createFallbackStream('xworkmate-remote-desktop');
+  await stream.addTrack(event.track);
+  return stream;
 }
 
 class DesktopClient {
@@ -75,16 +92,18 @@ class DesktopClient {
 
       _peerConnection = await createPeerConnection(config);
 
-      // Listen for remote streams
-      _peerConnection!.onTrack = (event) async {
-        if (event.track.kind == 'video') {
-          final remoteStream = await desktopRemoteStreamFromTrack(
-            track: event.track,
-            streams: event.streams,
+      // Listen for remote video tracks. Some Unified Plan servers send
+      // streamless tracks, so synthesize a stream for RTCVideoView when needed.
+      _peerConnection!.onTrack = (event) {
+        unawaited(() async {
+          final stream = await desktopRemoteVideoStreamForTrack(
+            event,
+            createFallbackStream: createLocalMediaStream,
           );
-          if (remoteStream == null) return;
-          _streamController.add(remoteStream);
-        }
+          if (stream != null) {
+            _streamController.add(stream);
+          }
+        }());
       };
 
       _peerConnection!.onConnectionState = (state) {
@@ -112,14 +131,21 @@ class DesktopClient {
         }
       };
 
-      // Add transceiver for receiving video (required for unified-plan)
+      // Add transceivers for receiving video and audio
+      await _peerConnection!.addTransceiver(
+        kind: RTCRtpMediaType.RTCRtpMediaTypeAudio,
+        init: RTCRtpTransceiverInit(direction: TransceiverDirection.RecvOnly),
+      );
       await _peerConnection!.addTransceiver(
         kind: RTCRtpMediaType.RTCRtpMediaTypeVideo,
         init: RTCRtpTransceiverInit(direction: TransceiverDirection.RecvOnly),
       );
 
       // Create SDP Offer
-      final offer = await _peerConnection!.createOffer({});
+      final offer = await _peerConnection!.createOffer({
+        'offerToReceiveAudio': 1,
+        'offerToReceiveVideo': 1,
+      });
       await _peerConnection!.setLocalDescription(offer);
 
       // Send SDP Offer to Bridge
@@ -181,7 +207,9 @@ class DesktopClient {
           },
         },
       );
-    } catch (_) {}
+    } catch (error) {
+      debugPrint('Desktop ICE candidate send failed: $error');
+    }
   }
 
   void sendInput(Map<String, dynamic> event) {
@@ -199,7 +227,9 @@ class DesktopClient {
         method: 'xworkmate.desktop.close',
         params: {'sessionId': sessionId},
       );
-    } catch (_) {}
+    } catch (error) {
+      debugPrint('Desktop close request failed: $error');
+    }
 
     await _dataChannel?.close();
     await _peerConnection?.close();
@@ -207,25 +237,4 @@ class DesktopClient {
     _peerConnection = null;
     _stateController.add('disconnected');
   }
-}
-
-Future<MediaStream?> desktopRemoteStreamFromTrack({
-  required MediaStreamTrack track,
-  required List<MediaStream> streams,
-  Future<MediaStream> Function(String streamId)? streamFactory,
-}) async {
-  if (track.kind != 'video') {
-    return null;
-  }
-  if (streams.isNotEmpty) {
-    return streams.first;
-  }
-  final factory = streamFactory ?? createLocalMediaStream;
-  final syntheticStream = await factory(
-    'desktop-remote-${track.id}',
-  );
-  // The bridge may deliver a bare video track without an attached stream.
-  // Wrapping it keeps RTCVideoView rendering instead of leaving the panel blank.
-  syntheticStream.addTrack(track);
-  return syntheticStream;
 }

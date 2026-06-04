@@ -36,6 +36,27 @@ Review and enforcement:
 Scope boundary:
 - Legacy recovery paths explicitly retained by architecture/security baselines (for example secure local persistence legacy recovery) are not auto-deleted, but must not expand into current main flows.
 
+## Fallback and Dead Code Elimination Policy
+
+Forbidden patterns (must be removed on discovery):
+- Cascading fallback chains where A → B → C all resolve to the same underlying call with no added logic.
+- Methods marked "DEPRECATED" that remain in code. Either remove them or justify with a concrete removal plan + date.
+- Dead code paths behind `UnsupportedError` or `throw` guards — the guard is the signal that everything downstream is dead.
+- Swallowing catch blocks (`catch (_) {}`) without at least a debug log. Silent error hiding is not allowed.
+- Redundant method indirection where method A calls method B which calls method C with no transformation, filtering, or side effects.
+- Probing 5+ JSON keys in a cascade for the same field — consolidate to a single well-known schema or document why the schema is loose.
+
+Allowed only with explicit justification:
+- Retry/recovery chains for network protocols (document the error categories handled at each level).
+- JSON field probing when bridging between loosely-typed external responses and strongly-typed Dart models (document the expected schema and fallback order).
+- Process lifecycle escalation (SIGTERM → SIGKILL) as a last resort during shutdown.
+- Legitimate null-coalescing chains for configuration defaults with clear precedence order.
+
+Review and enforcement:
+- When a fallback chain is discovered, default action is simplification or removal.
+- Every retained fallback chain must include a comment explaining WHY each level exists.
+- "Just in case" or "defensive programming" is not sufficient justification.
+
 ## Refactor Workflow Standard
 
 This section defines the reusable refactor workflow for this repo.

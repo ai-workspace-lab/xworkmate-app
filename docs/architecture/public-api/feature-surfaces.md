@@ -120,7 +120,7 @@
 ### Main Call Chain
 
 - `AppShell` / `WorkspacePageSpec` -> `AssistantPage`
-- 页面内部通过 `AppControllerDesktopWorkspaceExecution`、`AppControllerDesktopThreadSessions` 发起执行、切换 provider、加载 artifact、多 agent 协作
+- 页面内部通过 `AppControllerDesktopWorkspaceExecution`、`AppControllerDesktopThreadSessions` 发起执行、切换 provider、加载 artifact、agent 协作
 
 ### Notes
 
