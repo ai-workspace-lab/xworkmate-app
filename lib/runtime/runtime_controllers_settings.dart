@@ -212,7 +212,6 @@ class SettingsController extends ChangeNotifier {
   Future<String> resolveSecretValueInternal({
     String explicitValue = '',
     String refName = '',
-    String fallbackRefName = '',
     String accountTarget = '',
     bool allowVaultLookup = true,
     bool persistExplicitValue = true,
@@ -220,7 +219,6 @@ class SettingsController extends ChangeNotifier {
     this,
     explicitValue: explicitValue,
     refName: refName,
-    fallbackRefName: fallbackRefName,
     accountTarget: accountTarget,
     allowVaultLookup: allowVaultLookup,
     persistExplicitValue: persistExplicitValue,

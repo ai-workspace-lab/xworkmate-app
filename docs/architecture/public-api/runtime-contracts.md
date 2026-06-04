@@ -44,6 +44,7 @@
 | Param | Type | Required | Meaning |
 | --- | --- | --- | --- |
 | `singleAgent` | `bool` | Yes | 是否支持单 agent |
+| `multiAgent` | `bool` | Yes | 是否支持多 agent 协作 |
 | `availableExecutionTargets` | `List<AssistantExecutionTarget>` | Yes | 当前 bridge 允许的执行目标 |
 | `providerCatalog` | `List<SingleAgentProvider>` | Yes | agent 侧 provider catalog |
 | `gatewayProviderCatalog` | `List<SingleAgentProvider>` | Yes | gateway 侧 provider catalog |
@@ -61,7 +62,7 @@
 - Source: `lib/runtime/gateway_acp_client.dart`
 - Type: `class`
 - Responsibility:
-  XWorkmate 对 ACP JSON-RPC 的 app-side client，负责 endpoint 解析、auth header 注入、capability 拉取、多 agent 事件流转发。
+  XWorkmate 对 ACP JSON-RPC 的 app-side client，负责 endpoint 解析、auth header 注入、capability 拉取、agent 事件流转发。
 
 ### Constructor Parameters
 
@@ -93,6 +94,12 @@
 - Type: `class`
 - Responsibility:
   表示 Go task service 视角下的外部 ACP 能力镜像，主要用于任务路由与执行目标可见性判断。
+
+### Constructor Parameters
+
+| Param | Type | Required | Meaning |
+| --- | --- | --- | --- |
+| `multiAgent` | `bool` | Yes | 是否支持多 agent 协作 |
 
 ## `ExternalCodeAgentAcpRoutingResolution`
 
@@ -166,6 +173,9 @@
 | `provider` | `SingleAgentProvider` | No | 当前 provider |
 | `remoteWorkingDirectoryHint` | `String` | No | 远端工作目录 hint |
 | `resumeSession` | `bool` | No | 是否续跑 |
+| `multiAgent` | `bool` | No | 是否多 agent 协作 |
+| `collaborationMode` | `GoTaskServiceCollaborationMode` | No | 协作模式 |
+| `routingHint` | `String` | No | 路由提示 |
 
 ### Returns
 

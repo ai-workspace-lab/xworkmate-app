@@ -34,5 +34,5 @@ This document records the default `simple` theme token set for `XWorkmate.svc.pl
 
 ## Source Of Truth
 
-- theme tokens live in [lib/theme/app_theme.dart](/Users/shenlan/workspaces/cloud-neutral-toolkit/XWorkmate.svc.plus/lib/theme/app_theme.dart)
+- theme tokens live in [lib/theme/app_theme.dart](/Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate-app/lib/theme/app_theme.dart)
 - token family name: `simple`

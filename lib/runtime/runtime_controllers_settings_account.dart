@@ -14,8 +14,6 @@ extension SettingsControllerAccountExtension on SettingsController {
       pendingAccountMfaTicketInternal.trim().isNotEmpty && !accountSignedIn;
   bool get hasEffectiveAiGatewayApiKey =>
       secureRefsInternal.containsKey(aiGatewayApiKeyRefInternal()) ||
-      (aiGatewayApiKeyRefInternal() == 'ai_gateway_api_key' &&
-          secureRefsInternal.containsKey('ai_gateway_api_key')) ||
       secureRefsInternal.containsKey(
         kAccountManagedSecretTargetAIGatewayAccessToken,
       );
@@ -43,7 +41,6 @@ extension SettingsControllerAccountExtension on SettingsController {
   Future<String> loadEffectiveAiGatewayApiKey() async {
     return resolveSecretValueInternal(
       refName: snapshotInternal.aiGateway.apiKeyRef,
-      fallbackRefName: 'ai_gateway_api_key',
       accountTarget: kAccountManagedSecretTargetAIGatewayAccessToken,
     );
   }
@@ -64,7 +61,6 @@ extension SettingsControllerAccountExtension on SettingsController {
 
     return resolveSecretValueInternal(
       refName: gatewayTokenRefForProfileInternal(resolvedProfileIndex),
-      fallbackRefName: SecretStore.gatewayTokenRefKey(resolvedProfileIndex),
       accountTarget: resolvedProfileIndex == kGatewayRemoteProfileIndex
           ? kAccountManagedSecretTargetBridgeAuthToken
           : '',
@@ -77,7 +73,6 @@ extension SettingsControllerAccountExtension on SettingsController {
 
     return resolveSecretValueInternal(
       refName: gatewayPasswordRefForProfileInternal(resolvedProfileIndex),
-      fallbackRefName: SecretStore.gatewayPasswordRefKey(resolvedProfileIndex),
       allowVaultLookup: true,
     );
   }

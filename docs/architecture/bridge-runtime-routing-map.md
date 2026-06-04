@@ -35,7 +35,7 @@ flowchart TD
 
 ## Routing Rules
 
-- App runtime control-plane requests, agent tasks, multi-agent tasks, OpenClaw gateway tasks, `session.cancel`, and `session.close` use `https://xworkmate-bridge.svc.plus/acp/rpc`.
+- App runtime control-plane requests, agent tasks, multi-agent forwarding tasks, OpenClaw gateway tasks, `session.cancel`, and `session.close` use `https://xworkmate-bridge.svc.plus/acp/rpc`.
 - OpenClaw gateway `session.start` and follow-up `session.message` are identified by routing metadata, not by a separate public path.
 - Provider and gateway selection are passed as request params, including `provider`, `routing`, and `requestedExecutionTarget`.
 - Bridge-owned internal routing is opaque to the App; it is not represented as public provider paths.

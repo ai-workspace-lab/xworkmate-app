@@ -58,7 +58,7 @@ Last Updated: 2026-04-14
 
 ## Coverage Summary
 
-当前生成清单覆盖 `129` 个源码文件、`603` 个公开符号。
+当前生成清单覆盖 `132` 个源码文件、`590` 个公开符号。
 
 | Scope | Files | Public Symbols | Detailed Design Entries | Notes |
 | --- | ---: | ---: | ---: | --- |
