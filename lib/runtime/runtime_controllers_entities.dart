@@ -14,14 +14,19 @@ import 'runtime_controllers_derived_tasks.dart';
 class SkillsController extends ChangeNotifier {
   SkillsController(this.runtimeInternal) {
     _runtimeListener = () {
-      if (runtimeInternal.isConnected && loadingInternal) {
-        // Gateway just connected while we were in a loading state
-        // that likely failed — auto-retry.
-        refresh();
-      } else if (runtimeInternal.isConnected && itemsInternal.isEmpty) {
-        // Gateway connected for the first time and skills haven't been loaded.
-        refresh();
+      if (!runtimeInternal.isConnected) {
+        // Reset auto-refresh flag on disconnect so a subsequent reconnect
+        // will trigger a fresh load.
+        _hasAutoRefreshed = false;
+        return;
       }
+      // Auto-refresh on first gateway connect only when skills are empty,
+      // not already loading, and haven't auto-refreshed this session.
+      if (loadingInternal || itemsInternal.isNotEmpty || _hasAutoRefreshed) {
+        return;
+      }
+      _hasAutoRefreshed = true;
+      refresh();
     };
     runtimeInternal.addListener(_runtimeListener!);
   }
@@ -34,6 +39,7 @@ class SkillsController extends ChangeNotifier {
   int _retryCount = 0;
   static const int _maxRetries = 2;
   VoidCallback? _runtimeListener;
+  bool _hasAutoRefreshed = false;
 
   List<GatewaySkillSummary> get items => itemsInternal;
   bool get loading => loadingInternal;

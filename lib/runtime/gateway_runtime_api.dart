@@ -209,6 +209,8 @@ extension GatewayRuntimeApiInternal on GatewayRuntime {
         code: 'BRIDGE_NOT_CONFIGURED',
       );
     }
+    // Use allowErrorPayload so the bridge can return cached skills even when
+    // the upstream OpenClaw gateway is temporarily offline (ok:false + payload).
     final payload = asMap(
       await sessionClientInternal!.request(
         runtimeId: runtimeIdInternal,
@@ -218,17 +220,43 @@ extension GatewayRuntimeApiInternal on GatewayRuntime {
       ),
     );
     final skillsList = asList(payload['skills']);
-    // When allowErrorPayload returns the payload from an ok:false envelope,
-    // the error info is in the payload itself rather than thrown as an exception.
-    if (skillsList.isEmpty) {
-      final errorMsg =
-          stringValue(payload['error']) ?? stringValue(payload['message']);
-      if (errorMsg != null && errorMsg.isNotEmpty) {
+    // When the skills key is entirely absent (not just an empty list), the
+    // gateway may have returned a stub or error payload. Distinguish between
+    // "genuinely no skills" and "gateway responded without skills data".
+    if (!payload.containsKey('skills')) {
+      final hasWorkspaceMeta = payload.containsKey('workspaceDir') ||
+          payload.containsKey('managedSkillsDir');
+      if (!hasWorkspaceMeta) {
+        appendLogInternal(
+          this,
+          'warn',
+          'skills',
+          'skills.status returned payload without skills key and without'
+          ' workspace metadata — likely a gateway error or unimplemented method',
+        );
         throw GatewayRuntimeException(
-          'Failed to load skills: $errorMsg',
-          code: 'SKILLS_STATUS_ERROR',
+          'OpenClaw gateway did not return skills data.'
+          ' The gateway may not have skills.status implemented.',
+          code: 'SKILLS_STATUS_MISSING',
         );
       }
+      // Gateway responded with workspace metadata but no skills key —
+      // genuinely no skills installed. Return empty list.
+      appendLogInternal(
+        this,
+        'debug',
+        'skills',
+        'skills.status returned workspace metadata with zero skills',
+      );
+      return const <GatewaySkillSummary>[];
+    }
+    if (skillsList.isEmpty) {
+      appendLogInternal(
+        this,
+        'debug',
+        'skills',
+        'skills.status returned empty skills list (${payload.length} payload keys)',
+      );
     }
     return skillsList
         .map((item) {
