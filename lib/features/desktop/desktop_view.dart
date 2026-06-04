@@ -6,6 +6,7 @@ import 'desktop_client.dart';
 import 'desktop_input_handler.dart';
 import '../../app/app_controller.dart';
 import '../../widgets/surface_card.dart';
+import '../../i18n/app_language.dart';
 
 class DesktopView extends StatefulWidget {
   const DesktopView({
@@ -48,6 +49,7 @@ class _DesktopViewState extends State<DesktopView> {
   bool _useGpu = false;
   bool _adaptiveResolution = true;
   bool _showAdvancedOptions = false;
+  bool _showControlPanel = true;
   String _connectionState = 'disconnected';
   bool _hasStream = false;
   bool _isFocused = false;
@@ -152,7 +154,9 @@ class _DesktopViewState extends State<DesktopView> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Failed to connect remote desktop: $e'),
+              content: Text(
+                appText('连接AI工作空间失败: $e', 'Failed to connect AI Workspace: $e'),
+              ),
               backgroundColor: Colors.redAccent,
             ),
           );
@@ -178,12 +182,13 @@ class _DesktopViewState extends State<DesktopView> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // Control panel card
-          SurfaceCard(
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
+          if (_showControlPanel)
+            SurfaceCard(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
                   Wrap(
                     spacing: 16,
                     runSpacing: 16,
@@ -214,10 +219,10 @@ class _DesktopViewState extends State<DesktopView> {
                         ),
                         label: Text(
                           _connectionState == 'connected'
-                              ? '断开连接'
+                              ? appText('断开连接', 'Disconnect')
                               : (_connectionState == 'connecting'
-                                    ? '正在连接...'
-                                    : '连接桌面'),
+                                    ? appText('正在连接...', 'Connecting...')
+                                    : appText('连接AI工作空间', 'Connect AI Workspace')),
                           style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
                       ),
@@ -261,10 +266,10 @@ class _DesktopViewState extends State<DesktopView> {
                             const SizedBox(width: 8),
                             Text(
                               _connectionState == 'connected'
-                                  ? '已连接'
+                                  ? appText('已连接', 'Connected')
                                   : (_connectionState == 'connecting'
-                                        ? '连接中'
-                                        : '未连接'),
+                                        ? appText('连接中', 'Connecting')
+                                        : appText('已断开', 'Disconnected')),
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.bold,
@@ -292,19 +297,25 @@ class _DesktopViewState extends State<DesktopView> {
                         ),
                         label: const Text('高级选项'),
                       ),
-                      // Maximize Toggle
-                      if (widget.onToggleMaximize != null)
-                        IconButton(
-                          onPressed: widget.onToggleMaximize,
-                          icon: Icon(
-                            widget.isMaximized
-                                ? Icons.fullscreen_exit_rounded
-                                : Icons.fullscreen_rounded,
+                        // Maximize Toggle
+                        if (widget.onToggleMaximize != null)
+                          IconButton(
+                            onPressed: widget.onToggleMaximize,
+                            icon: Icon(
+                              widget.isMaximized
+                                  ? Icons.fullscreen_exit_rounded
+                                  : Icons.fullscreen_rounded,
+                            ),
+                            tooltip: widget.isMaximized ? '恢复默认大小' : '最大化',
                           ),
-                          tooltip: widget.isMaximized ? '恢复默认大小' : '最大化',
+                        // Collapse Toggle
+                        IconButton(
+                          onPressed: () => setState(() => _showControlPanel = false),
+                          icon: const Icon(Icons.expand_less),
+                          tooltip: '折叠面板',
                         ),
-                    ],
-                  ),
+                      ],
+                    ),
                   if (_showAdvancedOptions) ...[
                     const SizedBox(height: 16),
                     Wrap(
@@ -398,7 +409,21 @@ class _DesktopViewState extends State<DesktopView> {
             ),
           ),
 
-          const SizedBox(height: 16),
+          if (!_showControlPanel)
+            Align(
+              alignment: Alignment.centerRight,
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 8.0),
+                child: FilledButton.tonalIcon(
+                  onPressed: () => setState(() => _showControlPanel = true),
+                  icon: const Icon(Icons.expand_more, size: 18),
+                  label: const Text('展开控制面板'),
+                ),
+              ),
+            ),
+
+          if (_showControlPanel)
+            const SizedBox(height: 16),
 
           // Stream Viewport Card
           Expanded(
@@ -484,10 +509,18 @@ class _DesktopViewState extends State<DesktopView> {
                               _inputHandler!.handleScroll(event);
                             }
                           },
-                          child: RTCVideoView(
-                            _localRenderer,
-                            objectFit: RTCVideoViewObjectFit
-                                .RTCVideoViewObjectFitContain,
+                          child: SizedBox.expand(
+                            child: FittedBox(
+                              fit: BoxFit.fill,
+                              child: SizedBox(
+                                width: _remoteDesktopSize.width > 0 ? _remoteDesktopSize.width : 1280,
+                                height: _remoteDesktopSize.height > 0 ? _remoteDesktopSize.height : 720,
+                                child: RTCVideoView(
+                                  _localRenderer,
+                                  objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitContain,
+                                ),
+                              ),
+                            ),
                           ),
                         ),
                       ),
@@ -511,8 +544,8 @@ class _DesktopViewState extends State<DesktopView> {
                                 const SizedBox(height: 16),
                                 Text(
                                   _connectionState == 'connecting'
-                                      ? '正在建立 WebRTC 连接，请稍候...'
-                                      : '未开启远程桌面流。点击“连接桌面”启动视频流。',
+                                      ? appText('正在建立 WebRTC 连接，请稍候...', 'Establishing WebRTC connection, please wait...')
+                                      : appText('未开启 AI 工作空间流。点击“连接AI工作空间”启动视频流。', 'AI Workspace stream not enabled. Click "Connect AI Workspace" to start the video stream.'),
                                   style: TextStyle(
                                     color: theme.colorScheme.onSurface
                                         .withValues(alpha: 0.6),

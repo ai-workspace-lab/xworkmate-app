@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'top_bar.dart';
 
-class SettingsPageBodyShell extends StatelessWidget {
+class SettingsPageBodyShell extends StatefulWidget {
   const SettingsPageBodyShell({
     super.key,
     required this.padding,
@@ -23,24 +23,58 @@ class SettingsPageBodyShell extends StatelessWidget {
   final List<Widget> bodyChildren;
 
   @override
+  State<SettingsPageBodyShell> createState() => _SettingsPageBodyShellState();
+}
+
+class _SettingsPageBodyShellState extends State<SettingsPageBodyShell> {
+  bool _isHeaderCollapsed = false;
+
+  @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
-      padding: padding,
+      padding: widget.padding,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          TopBar(
-            breadcrumbs: breadcrumbs,
-            title: title,
-            subtitle: subtitle,
-            trailing: trailing,
-          ),
-          const SizedBox(height: 24),
-          if (globalApplyBar != null) ...[
-            globalApplyBar!,
+          if (!_isHeaderCollapsed) ...[
+            TopBar(
+              breadcrumbs: widget.breadcrumbs,
+              title: widget.title,
+              subtitle: widget.subtitle,
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  widget.trailing,
+                  const SizedBox(width: 8),
+                  IconButton.filledTonal(
+                    onPressed: () => setState(() => _isHeaderCollapsed = true),
+                    icon: const Icon(Icons.expand_less),
+                    tooltip: '折叠顶部面板',
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            if (widget.globalApplyBar != null) ...[
+              widget.globalApplyBar!,
+              const SizedBox(height: 16),
+            ],
+          ] else ...[
+            Row(
+              children: [
+                Expanded(
+                  child: AppBreadcrumbs(items: widget.breadcrumbs),
+                ),
+                IconButton.filledTonal(
+                  onPressed: () => setState(() => _isHeaderCollapsed = false),
+                  icon: const Icon(Icons.expand_more),
+                  tooltip: '展开顶部面板',
+                ),
+              ],
+            ),
             const SizedBox(height: 16),
           ],
-          ...bodyChildren,
+          ...widget.bodyChildren,
         ],
       ),
     );
