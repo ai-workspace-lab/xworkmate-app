@@ -102,11 +102,6 @@
   - 若接口返回 `409 bridge_auth_token_unavailable`，问题不在 App 的 bridge 连接逻辑
   - 根因在 `accounts.svc.plus` 的 shared XWorkmate bridge token 供给链路
   - `BRIDGE_AUTH_TOKEN` 需要由 accounts 服务通过 Vault 读取并下发
-- 关联同步规则
-  - 任务 workspace 需要递归同步全部子目录和文件
-  - `dist/账户与身份安全演进史-GPT混排最终版.pdf` 这类深层产物应能回传到当前线程 artifact
-  - 如 skill 或任务已有忽略清单，则中间产物可按清单排除同步，常见对象包括草稿、临时文件、版本号中间稿和可重复生成缓存
-  - 忽略清单建议以约定文件形式维护，例如 `.ignore.md`
 - 恢复条件
   - `GET /api/auth/xworkmate/profile/sync` 返回 `200`
   - 响应包含 `BRIDGE_SERVER_URL` 和 `BRIDGE_AUTH_TOKEN`
@@ -141,29 +136,6 @@
   - 输入提示词
   - 产物路径
   - 截图点：artifact 列表与连续追问结果
-
-### `MANUAL-LOCAL-001A` AI 安全演进多平台内容生产
-
-- 前置条件
-  - 当前线程为空白或新建线程
-  - 当前 workspace 允许写入 Markdown 与 PPTX artifact
-- 操作步骤
-  1. 输入 `docs/cases/ai-security-evolution-content-scenario/README.md` 中的 App 手动测试提示词
-  2. 等待任务完成
-  3. 确认生成 X / XHS / 微信文章三份 Markdown 文件
-  4. 确认生成一份 PPTX 文件
-  5. 在同一线程继续追问“把 X 风格文案压缩到 280 字以内”
-- 期望结果
-  - 四个产物都写回当前线程 workspace
-  - artifact 区显示 3 个 `.md` 文件和 1 个 `.pptx` 文件
-  - 三份 Markdown 共享同一张安全演进对照表，但文体不同
-  - PPTX 至少包含封面、演进总览、当下判断和行动清单
-  - follow-up 基于同一线程上下文修改，不新建孤立线程
-- 建议记录项
-  - 线程 ID 或线程标题
-  - 输入提示词
-  - 四个产物路径
-  - artifact 区截图
 
 ### `MANUAL-LOCAL-002` `word-docx`
 
@@ -520,7 +492,7 @@
   - 连续追问内容
   - 搜索结果摘要
 
-## 5. 通用线程场景
+## 6. 通用线程场景
 
 ### `MANUAL-THREAD-001` 同线程连续追问
 
