@@ -1324,11 +1324,15 @@ extension AppControllerDesktopThreadActions on AppController {
       return;
     }
     if (!result.success) {
-      clearGatewayTaskArtifactStateInternal(
-        sessionKey,
-        completedAtMs: completedAtMs,
-        syncStatus: 'failed',
-      );
+      if (hasCurrentRunArtifacts) {
+        await persistGoTaskArtifactsForSessionInternal(sessionKey, result);
+      } else {
+        clearGatewayTaskArtifactStateInternal(
+          sessionKey,
+          completedAtMs: completedAtMs,
+          syncStatus: 'failed',
+        );
+      }
       appendLocalSessionMessageInternal(
         sessionKey,
         assistantErrorMessageInternal(
