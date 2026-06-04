@@ -162,10 +162,34 @@ Offset? desktopContentPosition(
 }) {
   if (viewportSize.width <= 0 || viewportSize.height <= 0) return null;
 
-  // We are using FittedBox(fit: BoxFit.fill) which stretches the video
-  // to fill the viewport exactly, without any padding/offsets.
+  if (contentSize == null || contentSize.width <= 0 || contentSize.height <= 0) {
+    return Offset(
+      (localPosition.dx / viewportSize.width).clamp(0.0, 1.0),
+      (localPosition.dy / viewportSize.height).clamp(0.0, 1.0),
+    );
+  }
+
+  final double viewportRatio = viewportSize.width / viewportSize.height;
+  final double contentRatio = contentSize.width / contentSize.height;
+
+  double renderedWidth;
+  double renderedHeight;
+
+  if (viewportRatio > contentRatio) {
+    // Viewport is wider, so height is the constraint
+    renderedHeight = viewportSize.height;
+    renderedWidth = renderedHeight * contentRatio;
+  } else {
+    // Viewport is taller, so width is the constraint
+    renderedWidth = viewportSize.width;
+    renderedHeight = renderedWidth / contentRatio;
+  }
+
+  final double dxOffset = (viewportSize.width - renderedWidth) / 2;
+  final double dyOffset = (viewportSize.height - renderedHeight) / 2;
+
   return Offset(
-    (localPosition.dx / viewportSize.width).clamp(0.0, 1.0),
-    (localPosition.dy / viewportSize.height).clamp(0.0, 1.0),
+    ((localPosition.dx - dxOffset) / renderedWidth).clamp(0.0, 1.0),
+    ((localPosition.dy - dyOffset) / renderedHeight).clamp(0.0, 1.0),
   );
 }
