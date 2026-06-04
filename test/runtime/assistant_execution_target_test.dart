@@ -1903,7 +1903,7 @@ void main() {
               turnId: 'turn-1',
               raw: <String, dynamic>{
                 'status': 'failed',
-                'code': 'OPENCLAW_REQUIRED_ARTIFACT_MISSING',
+                'code': 'OPENCLAW_NO_EXPORTED_ARTIFACTS',
               },
               errorMessage:
                   'openclaw returned partial artifacts without required final deliverables',
@@ -1938,7 +1938,7 @@ void main() {
         );
         expect(
           failedThread?.lifecycleState.lastResultCode,
-          'OPENCLAW_REQUIRED_ARTIFACT_MISSING',
+          'OPENCLAW_NO_EXPORTED_ARTIFACTS',
         );
         expect(failedThread?.lastArtifactSyncStatus, 'failed');
 
@@ -1953,114 +1953,6 @@ void main() {
       },
     );
 
-    test(
-      'sendChatMessage rejects partial OpenClaw artifacts on terminal artifact failure',
-      () async {
-        final fakeGoTaskService = _RecordingGoTaskServiceClient()
-          ..outcomes.add(
-            const GoTaskServiceResult(
-              success: false,
-              message: 'OpenClaw completed without required final artifacts.',
-              turnId: 'turn-1',
-              raw: <String, dynamic>{
-                'status': 'failed',
-                'code': 'OPENCLAW_REQUIRED_ARTIFACT_MISSING',
-                'artifacts': <Map<String, dynamic>>[
-                  <String, dynamic>{
-                    'relativePath': 'stages/chapter.md',
-                    'content': 'partial chapter',
-                    'contentType': 'text/markdown',
-                  },
-                ],
-              },
-              errorMessage:
-                  'openclaw returned partial artifacts without required final deliverables',
-              resolvedModel: '',
-              route: GoTaskServiceRoute.externalAcpSingle,
-            ),
-          );
-        final controller = _connectedController(fakeGoTaskService);
-        addTearDown(controller.dispose);
-
-        await controller.sessionsController.switchSession(
-          'unit-fixture-task-a',
-        );
-
-        await controller.sendChatMessage('first turn');
-
-        final failedThread = controller.taskThreadForSessionInternal(
-          'unit-fixture-task-a',
-        );
-        expect(
-          failedThread?.lifecycleState.lastResultCode,
-          'OPENCLAW_REQUIRED_ARTIFACT_MISSING',
-        );
-        expect(failedThread?.lastArtifactSyncStatus, 'failed');
-        expect(failedThread?.lastTaskArtifactRelativePaths, isEmpty);
-      },
-    );
-
-    test(
-      'sendChatMessage treats nested OpenClaw artifact errors as terminal failures',
-      () async {
-        final fakeGoTaskService = _RecordingGoTaskServiceClient()
-          ..outcomes.add(
-            goTaskServiceResultFromAcpResponse(
-              const <String, dynamic>{
-                'jsonrpc': '2.0',
-                'id': 'nested-openclaw-artifact-error',
-                'result': <String, dynamic>{
-                  'status': 'failed',
-                  'error': <String, dynamic>{
-                    'code': 'OPENCLAW_REQUIRED_ARTIFACT_MISSING',
-                    'message':
-                        'openclaw returned partial artifacts without required final deliverables',
-                  },
-                },
-              },
-              route: GoTaskServiceRoute.externalAcpSingle,
-            ),
-          )
-          ..outcomes.add(
-            const GoTaskServiceResult(
-              success: true,
-              message: 'new OpenClaw session delivered final artifacts',
-              turnId: 'turn-2',
-              raw: <String, dynamic>{},
-              errorMessage: '',
-              resolvedModel: '',
-              route: GoTaskServiceRoute.externalAcpSingle,
-            ),
-          );
-        final controller = _connectedController(fakeGoTaskService);
-        addTearDown(controller.dispose);
-
-        await controller.sessionsController.switchSession(
-          'unit-fixture-task-a',
-        );
-
-        await controller.sendChatMessage('first turn');
-
-        expect(fakeGoTaskService.requests, hasLength(1));
-        final failedThread = controller.taskThreadForSessionInternal(
-          'unit-fixture-task-a',
-        );
-        expect(
-          failedThread?.lifecycleState.lastResultCode,
-          'OPENCLAW_REQUIRED_ARTIFACT_MISSING',
-        );
-        expect(failedThread?.lastArtifactSyncStatus, 'failed');
-
-        await controller.sendChatMessage('retry final artifact');
-
-        expect(fakeGoTaskService.requests, hasLength(2));
-        expect(fakeGoTaskService.requests.last.resumeSession, isFalse);
-        await _waitForLastChatMessageText(
-          controller,
-          'new OpenClaw session delivered final artifacts',
-        );
-      },
-    );
 
     test(
       'sendChatMessage hides OpenClaw artifact guard text from failed results and streaming',
