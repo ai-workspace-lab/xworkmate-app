@@ -46,11 +46,13 @@ class SkillsController extends ChangeNotifier {
   String? get error => errorInternal;
 
   /// Whether the user can manually retry (non-empty error + not loading).
-  bool get canRetry =>
-      (errorInternal?.isNotEmpty ?? false) && !loadingInternal;
+  bool get canRetry => (errorInternal?.isNotEmpty ?? false) && !loadingInternal;
+
+  bool get _canRefreshThroughRuntime =>
+      runtimeInternal.isConnected || runtimeInternal.canConnectBridgeSession;
 
   Future<void> refresh({String? agentId}) async {
-    if (!runtimeInternal.isConnected) {
+    if (!_canRefreshThroughRuntime) {
       errorInternal = 'Gateway 未连接，无法加载技能列表。';
       notifyListeners();
       return;
@@ -68,11 +70,11 @@ class SkillsController extends ChangeNotifier {
       errorInternal = null;
       _retryCount = 0;
     } catch (error) {
-      if (_retryCount < _maxRetries && runtimeInternal.isConnected) {
+      if (_retryCount < _maxRetries && _canRefreshThroughRuntime) {
         _retryCount++;
         final delay = Duration(seconds: _retryCount * 2);
         await Future<void>.delayed(delay);
-        if (runtimeInternal.isConnected) {
+        if (_canRefreshThroughRuntime) {
           await _doRefresh(agentId: agentId);
           return;
         }
