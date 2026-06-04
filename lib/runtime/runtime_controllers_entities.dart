@@ -37,6 +37,9 @@ class SkillsController extends ChangeNotifier {
     errorInternal = null;
     notifyListeners();
     try {
+      await runtimeInternal.ensureBridgeSessionConnected(
+        selectedAgentId: agentId?.trim() ?? '',
+      );
       itemsInternal = await runtimeInternal.listSkills(agentId: agentId);
     } catch (error) {
       errorInternal = error.toString();

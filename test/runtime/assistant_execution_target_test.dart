@@ -4384,21 +4384,7 @@ Future<void> _waitForThreadLastResultCode(
   );
 }
 
-Future<void> _waitForOpenClawActiveTaskCount(
-  AppController controller,
-  int expectedCount,
-) async {
-  final deadline = DateTime.now().add(const Duration(seconds: 15));
-  while (DateTime.now().isBefore(deadline)) {
-    if (controller.openClawGatewayActiveTasksInternal == expectedCount) {
-      return;
-    }
-    await Future<void>.delayed(const Duration(milliseconds: 10));
-  }
-  throw StateError(
-    'Timed out waiting for OpenClaw active task count $expectedCount. Current count: ${controller.openClawGatewayActiveTasksInternal}.',
-  );
-}
+
 
 class _RecordingGoTaskServiceClient implements GoTaskServiceClient {
   int executeCount = 0;
