@@ -1954,6 +1954,55 @@ void main() {
     );
 
     test(
+      'sendChatMessage keeps partial OpenClaw artifacts on terminal artifact failure',
+      () async {
+        final fakeGoTaskService = _RecordingGoTaskServiceClient()
+          ..outcomes.add(
+            const GoTaskServiceResult(
+              success: false,
+              message: 'OpenClaw completed without required final artifacts.',
+              turnId: 'turn-1',
+              raw: <String, dynamic>{
+                'status': 'failed',
+                'code': 'OPENCLAW_REQUIRED_ARTIFACT_MISSING',
+                'artifacts': <Map<String, dynamic>>[
+                  <String, dynamic>{
+                    'relativePath': 'stages/chapter.md',
+                    'content': 'partial chapter',
+                    'contentType': 'text/markdown',
+                  },
+                ],
+              },
+              errorMessage:
+                  'openclaw returned partial artifacts without required final deliverables',
+              resolvedModel: '',
+              route: GoTaskServiceRoute.externalAcpSingle,
+            ),
+          );
+        final controller = _connectedController(fakeGoTaskService);
+        addTearDown(controller.dispose);
+
+        await controller.sessionsController.switchSession(
+          'unit-fixture-task-a',
+        );
+
+        await controller.sendChatMessage('first turn');
+
+        final failedThread = controller.taskThreadForSessionInternal(
+          'unit-fixture-task-a',
+        );
+        expect(
+          failedThread?.lifecycleState.lastResultCode,
+          'OPENCLAW_REQUIRED_ARTIFACT_MISSING',
+        );
+        expect(failedThread?.lastArtifactSyncStatus, 'synced');
+        expect(failedThread?.lastTaskArtifactRelativePaths, <String>[
+          'stages/chapter.md',
+        ]);
+      },
+    );
+
+    test(
       'sendChatMessage treats nested OpenClaw artifact errors as terminal failures',
       () async {
         final fakeGoTaskService = _RecordingGoTaskServiceClient()
