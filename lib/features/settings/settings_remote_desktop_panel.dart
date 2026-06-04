@@ -59,7 +59,7 @@ class _SettingsRemoteDesktopPanelState extends State<SettingsRemoteDesktopPanel>
             const SizedBox(width: 10),
             Expanded(
               child: Text(
-                appText('远程桌面', 'Remote Desktop'),
+                appText('AI工作空间', 'AI Workspace'),
                 style: theme.textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w700,
                 ),

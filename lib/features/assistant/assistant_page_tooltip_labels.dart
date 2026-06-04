@@ -32,7 +32,6 @@ import 'assistant_page_composer_state_helpers.dart';
 import 'assistant_page_composer_support.dart';
 import 'assistant_page_message_widgets.dart';
 import 'assistant_page_task_models.dart';
-import 'assistant_page_composer_skill_models.dart';
 import 'assistant_page_composer_skill_picker.dart';
 import 'assistant_page_composer_clipboard.dart';
 import 'assistant_page_components_core.dart';
