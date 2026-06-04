@@ -232,6 +232,11 @@ extension AppControllerDesktopGateway on AppController {
     await refreshGatewayHealth();
     await refreshAgents();
     await refreshSessions();
+    await skillsControllerInternal.refresh(
+      agentId: agentsControllerInternal.selectedAgentId.isEmpty
+          ? null
+          : agentsControllerInternal.selectedAgentId,
+    );
     await modelsControllerInternal.refresh();
     await cronJobsControllerInternal.refresh();
     await devicesControllerInternal.refresh(quiet: true);
