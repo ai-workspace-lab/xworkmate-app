@@ -1,51 +1,50 @@
-# XWorkmate
+# xworkmate-app
 
-XWorkmate is a Flutter-based AI workspace shell for running assistant threads, local or remote gateway tasks, and multi-agent collaboration in one app.
+Flutter-based AI workspace shell for running assistant threads with local and remote gateway task execution via ACP bridge.
 
-## Project
+## Architecture
 
-XWorkmate combines a desktop-first Flutter app, persistent assistant task threads, and optional multi-agent orchestration.
-It is designed for users who want a single workspace for AI chat, gateway-backed execution, and packaged local tooling across macOS, Windows, Linux, iOS, and Android.
+Single execution path: **Flutter → GoTaskServiceClient → ACP Transport → xworkmate-bridge → Remote Provider**
 
-## Companion Repository
+See [docs/architecture/](./docs/architecture/) for the full architecture documentation.
 
-The ACP Bridge Server and embedded Go helper now live in the standalone companion repository:
+## Dependencies
 
-- [`xworkmate-bridge`](https://github.com/x-evor/xworkmate-bridge)
+| Repository | Role |
+| --- | --- |
+| [xworkmate-bridge](https://github.com/x-evor/xworkmate-bridge) | Go-based ACP control plane and bridge backend |
+| [xworkspace-core-skills](https://github.com/x-evor/xworkspace-core-skills) | Core skill bundles (pptx, docx, xlsx, pdf, image, browser automation) |
+| [openclaw-multi-session-plugins](https://github.com/x-evor/openclaw-multi-session-plugins) | OpenClaw Gateway multi-session plugin runtime |
+| [playbooks](https://github.com/x-evor/playbooks) | Deployment playbooks and infrastructure automation |
 
-For local development, keep `xworkmate-bridge` checked out alongside `xworkmate-app`, or set `XWORKMATE_BRIDGE_DIR` explicitly before building the helper.
-
-## TL;DR
+## Quick Start
 
 ```bash
+git clone https://github.com/x-evor/xworkmate-app.git
+cd xworkmate-app
 flutter pub get
 flutter analyze
 flutter test
 flutter run -d macos
 ```
 
-## Xcode Run For macOS
+For local development, keep `xworkmate-bridge` checked out alongside `xworkmate-app`, or set `XWORKMATE_BRIDGE_DIR` explicitly before building.
 
-XWorkmate only supports launching the macOS app from the workspace entrypoint:
+## macOS (Xcode)
 
 ```bash
 open macos/Runner.xcworkspace
-```
-
-If you prefer a repo-native shortcut, run:
-
-```bash
+# or
 make open-macos-xcode
 ```
 
 In Xcode:
+- Select the shared `Runner` scheme
+- Select `My Mac` as the destination
+- Configure signing only on the `Runner` target
+- Leave CocoaPods plugin targets under `Pods` alone
 
-- Select the shared `Runner` scheme.
-- Select `My Mac` as the destination.
-- Configure signing only on the `Runner` target.
-- Leave CocoaPods plugin targets under `Pods` alone. They appear in the workspace by design and are not app signing targets.
-
-For release builds, archives, and packaging, continue to use:
+For release builds:
 
 ```bash
 flutter build macos
@@ -56,26 +55,15 @@ make build-macos
 
 | Platform | Download |
 | --- | --- |
-| macOS | [Latest Release](https://github.com/x-evor/xworkmate.svc.plus/releases/latest) |
-| Windows | [Latest Release](https://github.com/x-evor/xworkmate.svc.plus/releases/latest) |
-| Linux | [Latest Release](https://github.com/x-evor/xworkmate.svc.plus/releases/latest) |
-| iOS | [Latest Release](https://github.com/x-evor/xworkmate.svc.plus/releases/latest) |
-| Android | [Latest Release](https://github.com/x-evor/xworkmate.svc.plus/releases/latest) |
-
-All download buttons currently point to the latest GitHub release page.
-
-## Snapshots
-
-| Mobile | Desktop |
-| --- | --- |
-| ![XWorkmate Mobile](./images/mobile-app.PNG) | ![XWorkmate Desktop](./images/Desktop-APP.png) |
+| macOS | [Latest Release](https://github.com/x-evor/xworkmate-app/releases/latest) |
+| Windows | [Latest Release](https://github.com/x-evor/xworkmate-app/releases/latest) |
+| Linux | [Latest Release](https://github.com/x-evor/xworkmate-app/releases/latest) |
+| iOS | [Latest Release](https://github.com/x-evor/xworkmate-app/releases/latest) |
+| Android | [Latest Release](https://github.com/x-evor/xworkmate-app/releases/latest) |
 
 ## Learn More
 
-- [Release Notes](/Users/shenlan/workspaces/cloud-neutral-toolkit/XWorkmate.svc.plus/docs/releases/xworkmate-release-notes.md)
-- [Changelog](/Users/shenlan/workspaces/cloud-neutral-toolkit/XWorkmate.svc.plus/docs/releases/xworkmate-changelog.md)
-- [Feature Matrix](/Users/shenlan/workspaces/cloud-neutral-toolkit/XWorkmate.svc.plus/docs/plans/xworkmate-ui-feature-matrix.md)
-- [Roadmap](/Users/shenlan/workspaces/cloud-neutral-toolkit/XWorkmate.svc.plus/docs/plans/xworkmate-ui-feature-roadmap.md)
-- [Cross-Repo Task State Workflow](docs/architecture/cross-repo-task-state-workflow.md)
-- [Gateway Dev Runbook](/Users/shenlan/workspaces/cloud-neutral-toolkit/XWorkmate.svc.plus/docs/runbooks/gateway-dev-runbook.md)
-- [Security Rules](/Users/shenlan/workspaces/cloud-neutral-toolkit/XWorkmate.svc.plus/docs/security/secure-development-rules.md)
+- [Architecture Overview](./docs/architecture/README.md)
+- [Core Integration Test Cases](./docs/cases/README.md)
+- [Cross-Repo Task State Workflow](./docs/architecture/cross-repo-task-state-workflow.md)
+- [CHANGELOG](./CHANGELOG.md)
