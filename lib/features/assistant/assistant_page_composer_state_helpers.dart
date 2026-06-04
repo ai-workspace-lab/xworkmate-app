@@ -95,6 +95,7 @@ Widget buildSkillPickerOverlayForInternal(
           selectedSkillKeys: state.widget.selectedSkillKeys,
           filteredSkills: state.filteredSkillOptionsInternal(),
           isLoading: state.widget.controller.skillsController.loading,
+          errorText: state.widget.controller.skillsController.error,
           hasQuery: state.skillPickerQueryInternal.trim().isNotEmpty,
           onQueryChanged: state.setSkillPickerQueryInternal,
           onToggleSkill: (skillKey) => state.widget.onToggleSkill(skillKey),

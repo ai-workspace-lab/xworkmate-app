@@ -635,6 +635,7 @@ void main() {
               ),
             ],
             isLoading: false,
+            errorText: null,
             hasQuery: false,
             onQueryChanged: (_) {},
             onToggleSkill: toggledKeys.add,
@@ -684,6 +685,7 @@ void main() {
               ),
             ],
             isLoading: false,
+            errorText: null,
             hasQuery: true,
             onQueryChanged: (_) {},
             onToggleSkill: (_) {},
@@ -697,6 +699,38 @@ void main() {
       expect(find.text('Workspace Skills'), findsNothing);
       expect(find.text('Agent Skills'), findsNothing);
     });
+
+    testWidgets(
+      'empty skill picker shows refresh error instead of empty state',
+      (tester) async {
+        final searchController = TextEditingController();
+        final focusNode = FocusNode();
+        addTearDown(searchController.dispose);
+        addTearDown(focusNode.dispose);
+
+        await tester.pumpWidget(
+          _buildTestApp(
+            child: SkillPickerPopoverInternal(
+              maxHeight: 360,
+              searchController: searchController,
+              searchFocusNode: focusNode,
+              selectedSkillKeys: const <String>[],
+              filteredSkills: const <ComposerSkillOptionInternal>[],
+              isLoading: false,
+              errorText: 'skills.status request failed',
+              hasQuery: false,
+              onQueryChanged: (_) {},
+              onToggleSkill: (_) {},
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('技能列表加载失败，请稍后重试。'), findsOneWidget);
+        expect(find.text('skills.status request failed'), findsOneWidget);
+        expect(find.text('当前没有已加载技能。'), findsNothing);
+      },
+    );
   });
 }
 

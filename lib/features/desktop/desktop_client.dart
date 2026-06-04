@@ -3,6 +3,33 @@ import 'dart:convert';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import '../../app/app_controller.dart';
 
+String desktopConnectionStateName(RTCPeerConnectionState state) {
+  final value = state.toString().split('.').last;
+  return value.replaceFirst('RTCPeerConnectionState', '').toLowerCase();
+}
+
+Map<String, Object?> desktopOfferParams({
+  required String sessionId,
+  required String? sdpOffer,
+  required String display,
+  required int width,
+  required int height,
+  required int fps,
+  required int bitrate,
+  required bool useGpu,
+}) {
+  return {
+    'sessionId': sessionId,
+    'sdpOffer': sdpOffer,
+    'display': display,
+    'width': width,
+    'height': height,
+    'fps': fps,
+    'bitrate': bitrate,
+    'useGpu': useGpu,
+  };
+}
+
 class DesktopClient {
   DesktopClient({required this.controller, required this.sessionId});
 
@@ -42,7 +69,7 @@ class DesktopClient {
     try {
       final config = {
         'iceServers': [
-          {'url': 'stun:stun.l.google.com:19302'}
+          {'urls': 'stun:stun.l.google.com:19302'},
         ],
         'sdpSemantics': 'unified-plan',
       };
@@ -60,18 +87,27 @@ class DesktopClient {
       };
 
       _peerConnection!.onConnectionState = (state) {
-        _stateController.add(state.toString().split('.').last);
+        _stateController.add(desktopConnectionStateName(state));
       };
 
       // Create data channel for inputs BEFORE creating offer
       final dcConfig = RTCDataChannelInit()..ordered = true;
-      _dataChannel =
-          await _peerConnection!.createDataChannel('input', dcConfig);
+      _dataChannel = await _peerConnection!.createDataChannel(
+        'input',
+        dcConfig,
+      );
 
       // Handle ICE Candidates generated locally
+      final List<RTCIceCandidate> iceQueue = [];
+      bool isRemoteSet = false;
+
       _peerConnection!.onIceCandidate = (RTCIceCandidate? candidate) {
         if (candidate != null) {
-          _sendIceCandidate(candidate);
+          if (isRemoteSet) {
+            unawaited(_sendIceCandidate(candidate));
+          } else {
+            iceQueue.add(candidate);
+          }
         }
       };
 
@@ -88,16 +124,16 @@ class DesktopClient {
       // Send SDP Offer to Bridge
       final response = await controller.gatewayAcpClientInternal.request(
         method: 'xworkmate.desktop.offer',
-        params: {
-          'sessionId': sessionId,
-          'sdpOffer': offer.sdp,
-          'display': display,
-          'width': width.toString(),
-          'height': height.toString(),
-          'fps': fps.toString(),
-          'bitrate': bitrate.toString(),
-          'useGpu': useGpu.toString(),
-        },
+        params: desktopOfferParams(
+          sessionId: sessionId,
+          sdpOffer: offer.sdp,
+          display: display,
+          width: width,
+          height: height,
+          fps: fps,
+          bitrate: bitrate,
+          useGpu: useGpu,
+        ),
       );
 
       final sdpAnswerData = response['result']?['sdpAnswer'];
@@ -116,6 +152,11 @@ class DesktopClient {
         answer = RTCSessionDescription(sdpAnswerData.toString(), 'answer');
       }
       await _peerConnection!.setRemoteDescription(answer);
+      isRemoteSet = true;
+      for (final candidate in iceQueue) {
+        unawaited(_sendIceCandidate(candidate));
+      }
+      iceQueue.clear();
 
       _isConnecting = false;
     } catch (e) {
