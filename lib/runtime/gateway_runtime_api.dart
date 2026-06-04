@@ -199,14 +199,19 @@ extension GatewayRuntimeApiInternal on GatewayRuntime {
   Future<List<GatewaySkillSummary>> _listSkillsInternal({
     String? agentId,
   }) async {
+    final params = <String, dynamic>{
+      if (agentId != null && agentId.trim().isNotEmpty)
+        'agentId': agentId.trim(),
+    };
     final payload = asMap(
-      await request(
-        'skills.status',
-        params: <String, dynamic>{
-          if (agentId != null && agentId.trim().isNotEmpty)
-            'agentId': agentId.trim(),
-        },
-      ),
+      sessionClientInternal == null
+          ? await request('skills.status', params: params)
+          : await sessionClientInternal!.request(
+              runtimeId: runtimeIdInternal,
+              method: 'skills.status',
+              params: params,
+              allowErrorPayload: true,
+            ),
     );
     return asList(payload['skills'])
         .map((item) {

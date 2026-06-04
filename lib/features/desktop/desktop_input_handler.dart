@@ -8,43 +8,39 @@ class DesktopInputHandler {
   final void Function(Map<String, dynamic> event) onSendInput;
   int _lastPressedButton = 1; // Default to left click
 
-  void handlePointerMove(PointerEvent event, Size widgetSize) {
-    if (widgetSize.width == 0 || widgetSize.height == 0) return;
-    
-    final x = event.localPosition.dx / widgetSize.width;
-    final y = event.localPosition.dy / widgetSize.height;
-    
-    final cx = x.clamp(0.0, 1.0);
-    final cy = y.clamp(0.0, 1.0);
+  void handlePointerMove(
+    PointerEvent event,
+    Size widgetSize, {
+    Size? contentSize,
+  }) {
+    final position = desktopContentPosition(
+      event.localPosition,
+      widgetSize,
+      contentSize: contentSize,
+    );
+    if (position == null) return;
 
-    onSendInput({
-      'type': 'mouse_move',
-      'x': cx,
-      'y': cy,
-    });
+    onSendInput({'type': 'mouse_move', 'x': position.dx, 'y': position.dy});
   }
 
-  void handlePointerDown(PointerDownEvent event, Size widgetSize) {
-    if (widgetSize.width == 0 || widgetSize.height == 0) return;
-
-    final x = event.localPosition.dx / widgetSize.width;
-    final y = event.localPosition.dy / widgetSize.height;
-    final cx = x.clamp(0.0, 1.0);
-    final cy = y.clamp(0.0, 1.0);
+  void handlePointerDown(
+    PointerDownEvent event,
+    Size widgetSize, {
+    Size? contentSize,
+  }) {
+    final position = desktopContentPosition(
+      event.localPosition,
+      widgetSize,
+      contentSize: contentSize,
+    );
+    if (position == null) return;
 
     // Send move event first to ensure click hits the exact coordinates
-    onSendInput({
-      'type': 'mouse_move',
-      'x': cx,
-      'y': cy,
-    });
+    onSendInput({'type': 'mouse_move', 'x': position.dx, 'y': position.dy});
 
     _lastPressedButton = _mapPointerButtons(event.buttons);
 
-    onSendInput({
-      'type': 'mouse_down',
-      'button': _lastPressedButton,
-    });
+    onSendInput({'type': 'mouse_down', 'button': _lastPressedButton});
   }
 
   void handlePointerUp(PointerUpEvent event, Size widgetSize) {
@@ -55,29 +51,21 @@ class DesktopInputHandler {
       releasedButton = _mapPointerButtons(event.buttons);
     }
 
-    onSendInput({
-      'type': 'mouse_up',
-      'button': releasedButton,
-    });
+    onSendInput({'type': 'mouse_up', 'button': releasedButton});
   }
 
   void handleScroll(PointerScrollEvent event) {
     // 4 = scroll up, 5 = scroll down in X11/xdotool button maps
     final button = event.scrollDelta.dy < 0 ? 4 : 5;
-    onSendInput({
-      'type': 'scroll',
-      'button': button,
-    });
+    onSendInput({'type': 'scroll', 'button': button});
   }
 
   void handleKeyEvent(KeyEvent event) {
     final isDown = event is KeyDownEvent || event is KeyRepeatEvent;
-    final keyLabel = event.logicalKey.keyLabel;
+    final keyLabel = desktopKeyName(event.logicalKey);
+    if (keyLabel == null) return;
 
-    onSendInput({
-      'type': isDown ? 'key_down' : 'key_up',
-      'key': keyLabel,
-    });
+    onSendInput({'type': isDown ? 'key_down' : 'key_up', 'key': keyLabel});
   }
 
   int _mapPointerButtons(int buttons) {
@@ -91,4 +79,90 @@ class DesktopInputHandler {
     if (buttons & 2 != 0) return 3; // right click
     return 1;
   }
+}
+
+String? desktopKeyName(LogicalKeyboardKey key) {
+  if (key == LogicalKeyboardKey.enter) return 'Return';
+  if (key == LogicalKeyboardKey.numpadEnter) return 'Return';
+  if (key == LogicalKeyboardKey.space) return 'space';
+  if (key == LogicalKeyboardKey.backspace) return 'BackSpace';
+  if (key == LogicalKeyboardKey.tab) return 'Tab';
+  if (key == LogicalKeyboardKey.escape) return 'Escape';
+  if (key == LogicalKeyboardKey.delete) return 'Delete';
+  if (key == LogicalKeyboardKey.arrowLeft) return 'Left';
+  if (key == LogicalKeyboardKey.arrowRight) return 'Right';
+  if (key == LogicalKeyboardKey.arrowUp) return 'Up';
+  if (key == LogicalKeyboardKey.arrowDown) return 'Down';
+  if (key == LogicalKeyboardKey.home) return 'Home';
+  if (key == LogicalKeyboardKey.end) return 'End';
+  if (key == LogicalKeyboardKey.pageUp) return 'Page_Up';
+  if (key == LogicalKeyboardKey.pageDown) return 'Page_Down';
+
+  final label = key.keyLabel;
+  if (label.isEmpty) return null;
+  if (label.length == 1) {
+    final punctuation = _xdotoolPunctuationNames[label];
+    if (punctuation != null) return punctuation;
+    if (RegExp(r'^[A-Z]$').hasMatch(label)) {
+      return label.toLowerCase();
+    }
+  }
+  return label;
+}
+
+const Map<String, String> _xdotoolPunctuationNames = <String, String>{
+  '/': 'slash',
+  '.': 'period',
+  ',': 'comma',
+  '-': 'minus',
+  '_': 'underscore',
+  '=': 'equal',
+  ';': 'semicolon',
+  "'": 'apostrophe',
+  '`': 'grave',
+  '[': 'bracketleft',
+  ']': 'bracketright',
+  '\\': 'backslash',
+};
+
+Offset? desktopContentPosition(
+  Offset localPosition,
+  Size viewportSize, {
+  Size? contentSize,
+}) {
+  if (viewportSize.width <= 0 || viewportSize.height <= 0) return null;
+
+  final resolvedContentSize = contentSize;
+  if (resolvedContentSize == null ||
+      resolvedContentSize.width <= 0 ||
+      resolvedContentSize.height <= 0) {
+    return Offset(
+      (localPosition.dx / viewportSize.width).clamp(0.0, 1.0),
+      (localPosition.dy / viewportSize.height).clamp(0.0, 1.0),
+    );
+  }
+
+  final viewportAspect = viewportSize.width / viewportSize.height;
+  final contentAspect = resolvedContentSize.width / resolvedContentSize.height;
+
+  double drawnWidth;
+  double drawnHeight;
+  double offsetX;
+  double offsetY;
+  if (viewportAspect > contentAspect) {
+    drawnHeight = viewportSize.height;
+    drawnWidth = drawnHeight * contentAspect;
+    offsetX = (viewportSize.width - drawnWidth) / 2;
+    offsetY = 0;
+  } else {
+    drawnWidth = viewportSize.width;
+    drawnHeight = drawnWidth / contentAspect;
+    offsetX = 0;
+    offsetY = (viewportSize.height - drawnHeight) / 2;
+  }
+
+  return Offset(
+    ((localPosition.dx - offsetX) / drawnWidth).clamp(0.0, 1.0),
+    ((localPosition.dy - offsetY) / drawnHeight).clamp(0.0, 1.0),
+  );
 }

@@ -1411,6 +1411,7 @@ class GatewayAcpRuntimeSessionClient implements GatewayRuntimeSessionClient {
     required String method,
     Map<String, dynamic>? params,
     Duration timeout = const Duration(seconds: 15),
+    bool allowErrorPayload = false,
   }) async {
     final envelope = await client.request(
       method: 'xworkmate.gateway.request',
@@ -1423,6 +1424,11 @@ class GatewayAcpRuntimeSessionClient implements GatewayRuntimeSessionClient {
       onNotification: _handleNotification,
     );
     final result = client.asMap(envelope['result']);
+    if (allowErrorPayload &&
+        !(client.boolValue(result['ok']) ?? false) &&
+        result.containsKey('payload')) {
+      return result['payload'];
+    }
     _throwGatewayResultIfNeeded(result, '$method request failed');
     return result['payload'];
   }

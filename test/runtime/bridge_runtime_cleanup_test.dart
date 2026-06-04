@@ -342,6 +342,7 @@ class _CapturingGatewayRuntimeSessionClient
     required String method,
     Map<String, dynamic>? params,
     Duration timeout = const Duration(seconds: 15),
+    bool allowErrorPayload = false,
   }) {
     throw UnimplementedError('request is not used by this cleanup test');
   }

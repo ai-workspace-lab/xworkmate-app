@@ -64,3 +64,6 @@ app.*.map.json
 /rust/Cargo.lock
 /macos/Frameworks/*.dylib
 /macos/Frameworks/*.a
+
+# Gradle artifacts (including third_party)
+**/.gradle/

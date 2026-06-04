@@ -27,20 +27,31 @@ class _DesktopViewState extends State<DesktopView> {
   final RTCVideoRenderer _localRenderer = RTCVideoRenderer();
   late DesktopClient _client;
   DesktopInputHandler? _inputHandler;
-  
+
   // Settings controllers
-  final TextEditingController _displayController = TextEditingController(text: ':0.0');
-  final TextEditingController _widthController = TextEditingController(text: '1280');
-  final TextEditingController _heightController = TextEditingController(text: '720');
-  final TextEditingController _fpsController = TextEditingController(text: '30');
-  final TextEditingController _bitrateController = TextEditingController(text: '2000');
-  
+  final TextEditingController _displayController = TextEditingController(
+    text: ':0.0',
+  );
+  final TextEditingController _widthController = TextEditingController(
+    text: '1280',
+  );
+  final TextEditingController _heightController = TextEditingController(
+    text: '720',
+  );
+  final TextEditingController _fpsController = TextEditingController(
+    text: '30',
+  );
+  final TextEditingController _bitrateController = TextEditingController(
+    text: '2000',
+  );
+
   bool _useGpu = false;
   bool _showAdvancedOptions = false;
   String _connectionState = 'disconnected';
   bool _hasStream = false;
   bool _isFocused = false;
-  
+  Size _remoteDesktopSize = const Size(1280, 720);
+
   final FocusNode _viewportFocusNode = FocusNode();
   final GlobalKey _viewportKey = GlobalKey();
 
@@ -55,11 +66,13 @@ class _DesktopViewState extends State<DesktopView> {
       controller: widget.controller,
       sessionId: 'remote-desktop-session',
     );
-    _inputHandler = DesktopInputHandler(onSendInput: (event) {
-      if (_connectionState == 'connected') {
-        _client.sendInput(event);
-      }
-    });
+    _inputHandler = DesktopInputHandler(
+      onSendInput: (event) {
+        if (_connectionState == 'connected') {
+          _client.sendInput(event);
+        }
+      },
+    );
 
     _streamSubscription = _client.onRemoteStream.listen((stream) {
       if (mounted) {
@@ -74,7 +87,8 @@ class _DesktopViewState extends State<DesktopView> {
       if (mounted) {
         setState(() {
           _connectionState = state.toLowerCase();
-          if (_connectionState == 'disconnected' || _connectionState == 'failed') {
+          if (_connectionState == 'disconnected' ||
+              _connectionState == 'failed') {
             _hasStream = false;
             _localRenderer.srcObject = null;
           }
@@ -111,6 +125,7 @@ class _DesktopViewState extends State<DesktopView> {
       final height = int.tryParse(_heightController.text) ?? 720;
       final fps = int.tryParse(_fpsController.text) ?? 30;
       final bitrate = int.tryParse(_bitrateController.text) ?? 2000;
+      _remoteDesktopSize = Size(width.toDouble(), height.toDouble());
 
       try {
         await _client.connect(
@@ -135,7 +150,8 @@ class _DesktopViewState extends State<DesktopView> {
   }
 
   Size _getViewportSize() {
-    final renderBox = _viewportKey.currentContext?.findRenderObject() as RenderBox?;
+    final renderBox =
+        _viewportKey.currentContext?.findRenderObject() as RenderBox?;
     return renderBox?.size ?? Size.zero;
   }
 
@@ -168,11 +184,16 @@ class _DesktopViewState extends State<DesktopView> {
                           backgroundColor: _connectionState == 'connected'
                               ? Colors.redAccent
                               : (_connectionState == 'connecting'
-                                  ? Colors.orangeAccent
-                                  : theme.colorScheme.primary),
+                                    ? Colors.orangeAccent
+                                    : theme.colorScheme.primary),
                           foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 16,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
                         ),
                         icon: Icon(
                           _connectionState == 'connected'
@@ -182,26 +203,31 @@ class _DesktopViewState extends State<DesktopView> {
                         label: Text(
                           _connectionState == 'connected'
                               ? '断开连接'
-                              : (_connectionState == 'connecting' ? '正在连接...' : '连接桌面'),
+                              : (_connectionState == 'connecting'
+                                    ? '正在连接...'
+                                    : '连接桌面'),
                           style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
                       ),
                       // Status Indicator
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
                         decoration: BoxDecoration(
                           color: _connectionState == 'connected'
                               ? Colors.green.withValues(alpha: 0.15)
                               : (_connectionState == 'connecting'
-                                  ? Colors.orange.withValues(alpha: 0.15)
-                                  : Colors.grey.withValues(alpha: 0.15)),
+                                    ? Colors.orange.withValues(alpha: 0.15)
+                                    : Colors.grey.withValues(alpha: 0.15)),
                           borderRadius: BorderRadius.circular(16),
                           border: Border.all(
                             color: _connectionState == 'connected'
                                 ? Colors.green
                                 : (_connectionState == 'connecting'
-                                    ? Colors.orange
-                                    : Colors.grey),
+                                      ? Colors.orange
+                                      : Colors.grey),
                             width: 1,
                           ),
                         ),
@@ -215,8 +241,8 @@ class _DesktopViewState extends State<DesktopView> {
                                 color: _connectionState == 'connected'
                                     ? Colors.green
                                     : (_connectionState == 'connecting'
-                                        ? Colors.orange
-                                        : Colors.grey),
+                                          ? Colors.orange
+                                          : Colors.grey),
                                 shape: BoxShape.circle,
                               ),
                             ),
@@ -224,15 +250,19 @@ class _DesktopViewState extends State<DesktopView> {
                             Text(
                               _connectionState == 'connected'
                                   ? '已连接'
-                                  : (_connectionState == 'connecting' ? '连接中' : '未连接'),
+                                  : (_connectionState == 'connecting'
+                                        ? '连接中'
+                                        : '未连接'),
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.bold,
                                 color: _connectionState == 'connected'
                                     ? Colors.green
                                     : (_connectionState == 'connecting'
-                                        ? Colors.orange
-                                        : (isDark ? Colors.white70 : Colors.black87)),
+                                          ? Colors.orange
+                                          : (isDark
+                                                ? Colors.white70
+                                                : Colors.black87)),
                               ),
                             ),
                           ],
@@ -240,15 +270,25 @@ class _DesktopViewState extends State<DesktopView> {
                       ),
                       // Advanced Options Toggle
                       TextButton.icon(
-                        onPressed: () => setState(() => _showAdvancedOptions = !_showAdvancedOptions),
-                        icon: Icon(_showAdvancedOptions ? Icons.expand_less : Icons.expand_more),
+                        onPressed: () => setState(
+                          () => _showAdvancedOptions = !_showAdvancedOptions,
+                        ),
+                        icon: Icon(
+                          _showAdvancedOptions
+                              ? Icons.expand_less
+                              : Icons.expand_more,
+                        ),
                         label: const Text('高级选项'),
                       ),
                       // Maximize Toggle
                       if (widget.onToggleMaximize != null)
                         IconButton(
                           onPressed: widget.onToggleMaximize,
-                          icon: Icon(widget.isMaximized ? Icons.fullscreen_exit_rounded : Icons.fullscreen_rounded),
+                          icon: Icon(
+                            widget.isMaximized
+                                ? Icons.fullscreen_exit_rounded
+                                : Icons.fullscreen_rounded,
+                          ),
                           tooltip: widget.isMaximized ? '恢复默认大小' : '最大化',
                         ),
                     ],
@@ -332,7 +372,7 @@ class _DesktopViewState extends State<DesktopView> {
               ),
             ),
           ),
-          
+
           const SizedBox(height: 16),
 
           // Stream Viewport Card
@@ -345,7 +385,9 @@ class _DesktopViewState extends State<DesktopView> {
                 });
               },
               onKeyEvent: (node, event) {
-                if (_isFocused && _connectionState == 'connected' && _inputHandler != null) {
+                if (_isFocused &&
+                    _connectionState == 'connected' &&
+                    _inputHandler != null) {
                   _inputHandler!.handleKeyEvent(event);
                   return KeyEventResult.handled;
                 }
@@ -354,7 +396,9 @@ class _DesktopViewState extends State<DesktopView> {
               child: Container(
                 key: _viewportKey,
                 decoration: BoxDecoration(
-                  color: isDark ? Colors.black26 : Colors.black.withValues(alpha: 0.04),
+                  color: isDark
+                      ? Colors.black26
+                      : Colors.black.withValues(alpha: 0.04),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
                     color: _isFocused
@@ -373,12 +417,20 @@ class _DesktopViewState extends State<DesktopView> {
                           behavior: HitTestBehavior.opaque,
                           onPointerHover: (event) {
                             if (_inputHandler != null) {
-                              _inputHandler!.handlePointerMove(event, _getViewportSize());
+                              _inputHandler!.handlePointerMove(
+                                event,
+                                _getViewportSize(),
+                                contentSize: _remoteDesktopSize,
+                              );
                             }
                           },
                           onPointerMove: (event) {
                             if (_inputHandler != null) {
-                              _inputHandler!.handlePointerMove(event, _getViewportSize());
+                              _inputHandler!.handlePointerMove(
+                                event,
+                                _getViewportSize(),
+                                contentSize: _remoteDesktopSize,
+                              );
                             }
                           },
                           onPointerDown: (event) {
@@ -386,22 +438,31 @@ class _DesktopViewState extends State<DesktopView> {
                               _viewportFocusNode.requestFocus();
                             }
                             if (_inputHandler != null) {
-                              _inputHandler!.handlePointerDown(event, _getViewportSize());
+                              _inputHandler!.handlePointerDown(
+                                event,
+                                _getViewportSize(),
+                                contentSize: _remoteDesktopSize,
+                              );
                             }
                           },
                           onPointerUp: (event) {
                             if (_inputHandler != null) {
-                              _inputHandler!.handlePointerUp(event, _getViewportSize());
+                              _inputHandler!.handlePointerUp(
+                                event,
+                                _getViewportSize(),
+                              );
                             }
                           },
                           onPointerSignal: (event) {
-                            if (event is PointerScrollEvent && _inputHandler != null) {
+                            if (event is PointerScrollEvent &&
+                                _inputHandler != null) {
                               _inputHandler!.handleScroll(event);
                             }
                           },
                           child: RTCVideoView(
                             _localRenderer,
-                            objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitContain,
+                            objectFit: RTCVideoViewObjectFit
+                                .RTCVideoViewObjectFitContain,
                           ),
                         ),
                       ),
@@ -418,7 +479,9 @@ class _DesktopViewState extends State<DesktopView> {
                                 Icon(
                                   Icons.monitor_rounded,
                                   size: 64,
-                                  color: theme.colorScheme.onSurface.withValues(alpha: 0.2),
+                                  color: theme.colorScheme.onSurface.withValues(
+                                    alpha: 0.2,
+                                  ),
                                 ),
                                 const SizedBox(height: 16),
                                 Text(
@@ -426,7 +489,8 @@ class _DesktopViewState extends State<DesktopView> {
                                       ? '正在建立 WebRTC 连接，请稍候...'
                                       : '未开启远程桌面流。点击“连接桌面”启动视频流。',
                                   style: TextStyle(
-                                    color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
+                                    color: theme.colorScheme.onSurface
+                                        .withValues(alpha: 0.6),
                                     fontSize: 14,
                                   ),
                                 ),
@@ -449,7 +513,10 @@ class _DesktopViewState extends State<DesktopView> {
                           opacity: _isFocused ? 0.3 : 0.8,
                           duration: const Duration(milliseconds: 200),
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
                             decoration: BoxDecoration(
                               color: Colors.black.withValues(alpha: 0.6),
                               borderRadius: BorderRadius.circular(4),

@@ -75,6 +75,7 @@ class SkillPickerPopoverInternal extends StatelessWidget {
     required this.selectedSkillKeys,
     required this.filteredSkills,
     required this.isLoading,
+    required this.errorText,
     required this.hasQuery,
     required this.onQueryChanged,
     required this.onToggleSkill,
@@ -86,6 +87,7 @@ class SkillPickerPopoverInternal extends StatelessWidget {
   final List<String> selectedSkillKeys;
   final List<ComposerSkillOptionInternal> filteredSkills;
   final bool isLoading;
+  final String? errorText;
   final bool hasQuery;
   final ValueChanged<String> onQueryChanged;
   final ValueChanged<String> onToggleSkill;
@@ -95,6 +97,7 @@ class SkillPickerPopoverInternal extends StatelessWidget {
     final palette = context.palette;
     final theme = Theme.of(context);
     final groupedSkills = skillPickerSectionsInternal(filteredSkills);
+    final hasError = !isLoading && (errorText?.trim().isNotEmpty ?? false);
     return Material(
       key: const Key('assistant-skill-picker-popover'),
       color: Colors.transparent,
@@ -160,6 +163,11 @@ class SkillPickerPopoverInternal extends StatelessWidget {
                               Text(
                                 isLoading
                                     ? appText('正在加载技能…', 'Loading skills…')
+                                    : hasError
+                                    ? appText(
+                                        '技能列表加载失败，请稍后重试。',
+                                        'Could not load skills. Please try again.',
+                                      )
                                     : hasQuery
                                     ? appText('没有匹配的技能。', 'No matching skills.')
                                     : appText(
@@ -171,6 +179,18 @@ class SkillPickerPopoverInternal extends StatelessWidget {
                                   color: palette.textSecondary,
                                 ),
                               ),
+                              if (hasError) ...[
+                                const SizedBox(height: 8),
+                                Text(
+                                  errorText!.trim(),
+                                  textAlign: TextAlign.center,
+                                  maxLines: 3,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: palette.textMuted,
+                                  ),
+                                ),
+                              ],
                             ],
                           ),
                         ),
