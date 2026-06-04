@@ -38,7 +38,6 @@ class DesktopClient {
 
   RTCPeerConnection? _peerConnection;
   RTCDataChannel? _dataChannel;
-  MediaStream? _remoteStream;
 
   final StreamController<MediaStream> _streamController =
       StreamController<MediaStream>.broadcast();
@@ -77,12 +76,14 @@ class DesktopClient {
       _peerConnection = await createPeerConnection(config);
 
       // Listen for remote streams
-      _peerConnection!.onTrack = (event) {
+      _peerConnection!.onTrack = (event) async {
         if (event.track.kind == 'video') {
-          if (event.streams.isNotEmpty) {
-            _remoteStream = event.streams.first;
-            _streamController.add(_remoteStream!);
-          }
+          final remoteStream = await desktopRemoteStreamFromTrack(
+            track: event.track,
+            streams: event.streams,
+          );
+          if (remoteStream == null) return;
+          _streamController.add(remoteStream);
         }
       };
 
@@ -204,7 +205,27 @@ class DesktopClient {
     await _peerConnection?.close();
     _dataChannel = null;
     _peerConnection = null;
-    _remoteStream = null;
     _stateController.add('disconnected');
   }
+}
+
+Future<MediaStream?> desktopRemoteStreamFromTrack({
+  required MediaStreamTrack track,
+  required List<MediaStream> streams,
+  Future<MediaStream> Function(String streamId)? streamFactory,
+}) async {
+  if (track.kind != 'video') {
+    return null;
+  }
+  if (streams.isNotEmpty) {
+    return streams.first;
+  }
+  final factory = streamFactory ?? createLocalMediaStream;
+  final syntheticStream = await factory(
+    'desktop-remote-${track.id}',
+  );
+  // The bridge may deliver a bare video track without an attached stream.
+  // Wrapping it keeps RTCVideoView rendering instead of leaving the panel blank.
+  syntheticStream.addTrack(track);
+  return syntheticStream;
 }
