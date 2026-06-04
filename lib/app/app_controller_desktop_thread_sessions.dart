@@ -29,7 +29,6 @@ import '../runtime/assistant_artifacts.dart';
 import '../runtime/desktop_thread_artifact_service.dart';
 import '../runtime/mode_switcher.dart';
 import '../runtime/agent_registry.dart';
-import '../runtime/multi_agent_orchestrator.dart';
 import '../runtime/platform_environment.dart';
 import 'app_controller_desktop_core.dart';
 import 'app_controller_desktop_navigation.dart';
@@ -481,22 +480,6 @@ extension AppControllerDesktopThreadSessions on AppController {
 
   Future<String> loadAiGatewayApiKey() =>
       loadAiGatewayApiKeyThreadSessionInternal(this);
-  Future<void> saveMultiAgentConfig(MultiAgentConfig config) =>
-      saveMultiAgentConfigThreadSessionInternal(this, config);
-  Future<void> refreshMultiAgentMounts({bool sync = false}) =>
-      refreshMultiAgentMountsThreadSessionInternal(this, sync: sync);
-  Future<void> runMultiAgentCollaboration({
-    required String rawPrompt,
-    required String composedPrompt,
-    required List<CollaborationAttachment> attachments,
-    required List<String> selectedSkillLabels,
-  }) => runMultiAgentCollaborationThreadSessionInternal(
-    this,
-    rawPrompt: rawPrompt,
-    composedPrompt: composedPrompt,
-    attachments: attachments,
-    selectedSkillLabels: selectedSkillLabels,
-  );
   Future<void> openOnlineWorkspace() =>
       openOnlineWorkspaceThreadSessionInternal(this);
   List<String> get aiGatewayModelChoices =>

@@ -31,7 +31,6 @@ import '../runtime/assistant_artifacts.dart';
 import '../runtime/desktop_thread_artifact_service.dart';
 import '../runtime/mode_switcher.dart';
 import '../runtime/agent_registry.dart';
-import '../runtime/multi_agent_orchestrator.dart';
 import '../runtime/platform_environment.dart';
 import 'app_controller_desktop_core.dart';
 import 'app_controller_desktop_navigation.dart';
@@ -434,11 +433,9 @@ extension AppControllerDesktopSettingsRuntime on AppController {
         }
       }
       final normalized = sanitizeFeatureFlagSettingsInternal(
-        sanitizeMultiAgentSettingsInternal(
-          sanitizeOllamaCloudSettingsInternal(
-            sanitizeCodeAgentSettingsInternal(
-              settingsControllerInternal.snapshot,
-            ),
+        sanitizeOllamaCloudSettingsInternal(
+          sanitizeCodeAgentSettingsInternal(
+            settingsControllerInternal.snapshot,
           ),
         ),
       );
@@ -460,7 +457,6 @@ extension AppControllerDesktopSettingsRuntime on AppController {
       }
       lastObservedSettingsSnapshotInternal = settings;
       modelsControllerInternal.restoreFromSettings(settings.aiGateway);
-      multiAgentOrchestratorInternal.updateConfig(settings.multiAgent);
       setActiveAppLanguage(settings.appLanguage);
       await desktopPlatformServiceInternal.initialize(settings.linuxDesktop);
       await desktopPlatformServiceInternal.setLaunchAtLogin(
@@ -670,10 +666,8 @@ extension AppControllerDesktopSettingsRuntime on AppController {
     SettingsSnapshot snapshot,
   ) async {
     final sanitized = sanitizeFeatureFlagSettingsInternal(
-      sanitizeMultiAgentSettingsInternal(
-        sanitizeOllamaCloudSettingsInternal(
-          sanitizeCodeAgentSettingsInternal(snapshot),
-        ),
+      sanitizeOllamaCloudSettingsInternal(
+        sanitizeCodeAgentSettingsInternal(snapshot),
       ),
     );
     lastObservedSettingsSnapshotInternal = sanitized;
@@ -688,7 +682,6 @@ extension AppControllerDesktopSettingsRuntime on AppController {
     required bool refreshAfterSave,
   }) async {
     setActiveAppLanguage(current.appLanguage);
-    multiAgentOrchestratorInternal.updateConfig(current.multiAgent);
     agentsControllerInternal.restoreSelection(
       current
               .gatewayProfileForExecutionTarget(
