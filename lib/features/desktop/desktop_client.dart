@@ -111,14 +111,21 @@ class DesktopClient {
         }
       };
 
-      // Add transceiver for receiving video (required for unified-plan)
+      // Add transceivers for receiving video and audio
+      await _peerConnection!.addTransceiver(
+        kind: RTCRtpMediaType.RTCRtpMediaTypeAudio,
+        init: RTCRtpTransceiverInit(direction: TransceiverDirection.RecvOnly),
+      );
       await _peerConnection!.addTransceiver(
         kind: RTCRtpMediaType.RTCRtpMediaTypeVideo,
         init: RTCRtpTransceiverInit(direction: TransceiverDirection.RecvOnly),
       );
 
       // Create SDP Offer
-      final offer = await _peerConnection!.createOffer({});
+      final offer = await _peerConnection!.createOffer({
+        'offerToReceiveAudio': 1,
+        'offerToReceiveVideo': 1,
+      });
       await _peerConnection!.setLocalDescription(offer);
 
       // Send SDP Offer to Bridge
