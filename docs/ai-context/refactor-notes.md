@@ -8,7 +8,7 @@
 
 三个仓库形成了一个**清晰的 3 层架构**：App → Bridge → (Providers + Gateway + Plugins)。架构在职责拆分上是合理的，但在以下几个方面存在可改进的空间：
 
-1. **循环依赖**: Plugin → Bridge (HTTP) + Bridge → Plugin (Gateway RPC) 形成调用环
+1. **循环依赖已收敛**: Plugin → Bridge (HTTP) 反向调用已从目标架构中移除，Plugin 只保留被 Gateway 调用的 artifact adapter 职责
 2. **协议层过多**: Chain 2 经过 4 层跳转 (App → Bridge → Gateway → Plugin)
 3. **容错不足**: 多处依赖未处理的状态丢失场景
 4. **配置分散**: App/Bridge/Plugin 各自维护连接配置，缺乏统一管理
@@ -27,20 +27,20 @@ Plugin → (HTTP JSON-RPC) → Bridge (session.start, multiAgent)
 ### 问题
 
 - 两个方向使用不同协议 (Gateway RPC vs HTTP JSON-RPC)，增加调试难度
-- 循环引用导致: Bridge 故障 → Plugin 不可用 → Bridge 的 agent 调用失败 → Plugin 的 bridgeAgents 也无法工作
+- 循环引用导致: Bridge 故障 → Plugin 不可用 → Bridge 的 agent 调用失败 → Plugin 的 bridge agent 反向调用也无法工作
 - 版本升级需要同步两个方向
 
 ### 建议
 
 **方案 A (推荐): 统一为单向调用**
 
-将 Plugin 中的 `bridgeAgents.ts` 功能移到 Bridge 内部:
+删除 Plugin 中的 `bridgeAgents.ts` 反向 HTTP 客户端；多 agent 编排归 Bridge 或 OpenClaw 原生 runtime：
 
 ```
 Bridge
   internal/
     acp/
-      orchestrator.go      ← 集成当前 bridgeAgents 逻辑
+      orchestrator.go      ← 拥有 bridge 侧编排逻辑
       gateway.go            ← 保留 xworkmate.artifacts.* 调用
 ```
 
@@ -49,7 +49,7 @@ Plugin 变为纯工件管理 (只被调，不反向调用):
 ```
 Plugin (简化后)
   src/exportArtifacts.ts   ← 只保留 prepare/export/list/read
-  删除 src/bridgeAgents.ts  ← 移到 Bridge
+  删除 src/bridgeAgents.ts  ← 不再从插件反向调用 Bridge
 ```
 
 **方案 B: 统一协议方向**
@@ -61,7 +61,7 @@ Plugin ↔ Bridge 全部走 Gateway RPC (去掉 Plugin 中的 HTTP 调用):
 
 ### 影响范围
 
-- 方案 A: 改动 Bridge 内部 + 删除 Plugin 的 bridgeAgents.ts
+- 方案 A: 删除 Plugin 的 bridgeAgents.ts；Bridge/OpenClaw 原生 runtime 拥有编排
 - 方案 B: 改动 Bridge (新增网关方法) + Plugin (改用网关调用)
 
 ---
@@ -180,7 +180,7 @@ func (pm *ProcessManager) Start() {
 
 ### 问题
 
-- `bridgeUrl` 和 `bridgeToken` 在 App/Bridge/Plugin 三处独立配置
+- 旧版 Plugin 的 `bridgeUrl` 和 `bridgeToken` 已从目标架构中移除；剩余连接配置集中在 App/Bridge/Gateway
 - 配置不一致导致调试困难
 - 无版本化配置管理
 
@@ -191,7 +191,7 @@ func (pm *ProcessManager) Start() {
 ```
 accounts.svc.plus
   GET /api/config/bridge → { serverUrl, authToken, providers... }
-  GET /api/config/plugin → { bridgeUrl, bridgeToken, workspaceDir... }
+  GET /api/config/plugin → { workspaceDir, artifact policy... }
 ```
 
 **本地配置缓存**:
@@ -244,7 +244,7 @@ if (!isCompatible(caps.minCompatibleVersion)) {
 
 | 优先级 | 问题 | 改动量 | 影响 | 建议时序 |
 |--------|------|--------|------|---------|
-| **P0** | Plugin↔Bridge 循环依赖 | 中 (移动 bridgeAgents) | 消除循环 + 简化协议 | 本周 |
+| **P0** | Plugin↔Bridge 循环依赖 | 中 (删除 bridgeAgents) | 消除循环 + 简化协议 | 已落实为目标架构 |
 | **P0** | Gateway 断连任务丢失 | 小 (增加持久化) | 核心可靠性 | 本周 |
 | **P1** | Gemini/Hermes 进程崩溃 | 小 (增加重启) | 提供商可用性 | 本周 |
 | **P1** | 配置管理分散 | 大 (集中配置) | 运维效率 | 本月 |
@@ -265,7 +265,7 @@ if (!isCompatible(caps.minCompatibleVersion)) {
 
 ### xworkmate-bridge
 
-- [ ] `internal/acp/orchestrator.go`: 集成 bridgeAgents 逻辑（方案A）
+- [ ] `internal/acp/orchestrator.go`: 保持 Bridge 侧编排归属，不从 Plugin 反向调用 Bridge
 - [ ] `internal/gatewayruntime/runtime.go`: 增加连接池 + 任务状态持久化
 - [ ] `internal/gatewayruntime/pool.go`: 新增连接池
 - [ ] `internal/acp/artifact_cache.go`: 新增工件缓存
@@ -274,7 +274,7 @@ if (!isCompatible(caps.minCompatibleVersion)) {
 
 ### openclaw-multi-session-plugins
 
-- [ ] `src/bridgeAgents.ts`: 删除或重构为单向网关调用（方案B）
+- [x] `src/bridgeAgents.ts`: 删除反向 HTTP 调用边界
 - [ ] `openclaw.plugin.json`: 简化配置（从网关继承 bridge 信息）
 - [ ] `src/exportArtifacts.ts`: 增加 artifactRef TTL 可配置
 

@@ -49,11 +49,11 @@
 │                          │  (TypeScript, npm 插件)          │
 │                          │                                 │
 │                          │  网关方法:                       │
+│                          │  xworkmate.tasks.get             │
 │                          │  xworkmate.artifacts.*           │
-│                          │  xworkmate.agents.run            │
 │                          │                                 │
 │                          │  Agent 工具:                     │
-│                          │  openclaw_multi_session_*        │
+│                          │  openclaw_multi_session_artifacts│
 │                          └─────────────────────────────────┘
 │                                                             │
 └─────────────────────────────────────────────────────────────┘
@@ -111,8 +111,8 @@
 | 属性 | 值 |
 |------|-----|
 | 协议 | OpenClaw Plugin SDK (内存调用) |
-| 方法 | `xworkmate.artifacts.prepare/export/list/read`, `xworkmate.agents.run` |
-| 工具 | `openclaw_multi_session_artifacts`, `openclaw_multi_session_agents` |
+| 方法 | `xworkmate.tasks.get`, `xworkmate.artifacts.prepare/export/collect-and-snapshot/list/read` |
+| 工具 | `openclaw_multi_session_artifacts` |
 
 ---
 
@@ -184,15 +184,14 @@ distributed_nodes:
 ```json
 {
   "gatewayMethods": [
+    "xworkmate.tasks.get",
     "xworkmate.artifacts.prepare",
     "xworkmate.artifacts.export",
+    "xworkmate.artifacts.collect-and-snapshot",
     "xworkmate.artifacts.list",
-    "xworkmate.artifacts.read",
-    "xworkmate.agents.run"
+    "xworkmate.artifacts.read"
   ],
   "config": {
-    "bridgeUrl": "",
-    "bridgeToken": "",
     "workspaceDir": "~/.openclaw/workspace",
     "maxFiles": 1000,
     "artifactRefSigningSecret": ""
