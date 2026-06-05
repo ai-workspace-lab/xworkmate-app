@@ -33,6 +33,7 @@ The bridge owns the public protocol boundary:
 - Expose the unified `/acp/rpc` entrypoint.
 - Resolve routing for agent providers and gateway/OpenClaw.
 - Normalize provider/OpenClaw results into a stable result shape.
+- Map app `threadId` to an explicit OpenClaw `sessionKey`; do not pass app draft keys directly to OpenClaw.
 - Stream `session.update` events.
 - Serve `xworkmate.tasks.get` snapshots for asynchronous recovery and terminal result lookup.
 - Serve `xworkmate.tasks.cancel` for OpenClaw task cancellation.
@@ -47,6 +48,7 @@ OpenClaw plugins own execution-time artifact scope:
 - Allocate `runId`.
 - Prepare `artifactScope = tasks/<session>/<run>`.
 - Execute the user task.
+- Collect OpenClaw media/tmp tool outputs into the current task artifact scope after `agent.wait`.
 - Export real final deliverables into the current task artifact scope.
 - Validate that artifact scope matches the current session and run.
 - Return artifact refs/files to the bridge.
@@ -247,7 +249,8 @@ flowchart TD
   PREP --> SCOPE["artifactScope = tasks/<session>/<run>"]
   SCOPE --> DIR["artifactDirectory"]
   DIR --> RUN["OpenClaw writes files"]
-  RUN --> EXPORT["exportXWorkmateArtifacts"]
+  RUN --> COLLECT["collectAndSnapshotXWorkmateArtifacts"]
+  COLLECT --> EXPORT["exportXWorkmateArtifacts"]
   EXPORT --> VALIDATE{"scope matches session/run?"}
   VALIDATE -->|No| ERR["Reject cross-session / cross-run artifact"]
   VALIDATE -->|Yes| MANIFEST["manifest + artifact refs/files"]

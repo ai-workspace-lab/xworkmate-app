@@ -135,14 +135,23 @@ openclaw-multi-session-plugins
       ├─ signArtifactRef(sessionKey, runId, relativePath)
       └─ Return manifest + base64 file contents
 
+  Receives gateway RPC: xworkmate.artifacts.collect-and-snapshot
+    collectAndSnapshotXWorkmateArtifacts()
+      ├─ Scan ~/.openclaw/media/ and /tmp/openclaw/ for files changed since task start
+      ├─ Copy regular files into tasks/<session>/<run>/artifacts/
+      ├─ Preserve source grouping such as artifacts/media/... and artifacts/tmp-openclaw/...
+      └─ Reject symlinks and paths outside the fixed source roots
+
 ───────────────────────────────────────────────────────────
-CRITICAL GAP: Tool outputs in ~/.openclaw/media/* or /tmp/*
-are NOT in tasks/<session>/<run>/ → NOT exported → NOT visible
-to bridge → NOT synced to app.
+FIXED GAP: Bridge calls collect-and-snapshot after agent.wait
+terminal completion and before xworkmate.artifacts.export.
+Tool outputs in ~/.openclaw/media/* or /tmp/openclaw/* are
+now copied into tasks/<session>/<run>/artifacts/ before export.
 ───────────────────────────────────────────────────────────
 
   Back to xworkmate-bridge:
     completeOpenClawTask()
+      ├─ Call xworkmate.artifacts.collect-and-snapshot via gateway
       ├─ Call xworkmate.artifacts.export via gateway
       ├─ Collect artifact manifest
       ├─ Build terminal snapshot with:
@@ -203,7 +212,7 @@ to bridge → NOT synced to app.
 ## Fragile Points
 
 1. **F1: Tool output path mismatch** — Tools save to media/, plugin exports from tasks/ → gap
-2. **F2: Session key mismatch** — App/Bridge/Plugin must agree on sessionKey format
+2. **F2: Session key mismatch** — Bridge maps App threadId to an explicit OpenClaw sessionKey before prepare/chat/export
 3. **F3: Prepare timing** — If prepare fails after send, no scope directory exists
 4. **F4: Admission gate rejection** — Queue full → OPENCLAW_GATEWAY_BUSY → app must handle
 5. **F5: Bridge restart** — In-memory sessions lost → app must detect and recover
