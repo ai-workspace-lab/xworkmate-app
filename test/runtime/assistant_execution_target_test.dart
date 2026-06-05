@@ -87,7 +87,11 @@ void main() {
         params['openclawSessionKey'],
         'agent:main:draft:1780658097668838-1',
       );
+      expect(params['runId'], 'run-1');
       expect(params, isNot(contains('sessionKey')));
+      expect(params, isNot(contains('sessionId')));
+      expect(params, isNot(contains('threadId')));
+      expect(params, isNot(contains('artifactScope')));
     });
 
     test('recognizes openclaw as the canonical gateway provider', () {
