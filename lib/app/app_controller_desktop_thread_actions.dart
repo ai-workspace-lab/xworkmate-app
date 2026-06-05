@@ -1303,6 +1303,10 @@ extension AppControllerDesktopThreadActions on AppController {
         : gatewayTerminalResultCodeInternal(result);
     final remoteWorkingDirectory = result.remoteWorkingDirectory.trim();
     clearAiGatewayStreamingTextInternal(sessionKey);
+    clearPendingToolCallsForGatewaySessionInternal(
+      sessionKey,
+      hasError: !result.success,
+    );
     upsertTaskThreadInternal(
       sessionKey,
       gatewayEntryState: goTaskServiceGatewayEntryState(
@@ -1411,6 +1415,10 @@ extension AppControllerDesktopThreadActions on AppController {
     required Object error,
   }) async {
     clearAiGatewayStreamingTextInternal(sessionKey);
+    clearPendingToolCallsForGatewaySessionInternal(
+      sessionKey,
+      hasError: true,
+    );
     final completedAtMs = DateTime.now().millisecondsSinceEpoch.toDouble();
     final recoveredArtifactPaths =
         await recoverGatewayFailureArtifactPathsInternal(sessionKey, error);

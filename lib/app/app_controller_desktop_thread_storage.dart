@@ -285,6 +285,66 @@ extension AppControllerDesktopThreadStorage on AppController {
     await taskThreadRepositoryInternal.flush();
   }
 
+  void clearPendingToolCallsForGatewaySessionInternal(
+    String sessionKey, {
+    bool hasError = false,
+  }) {
+    final key = normalizedAssistantSessionKeyInternal(sessionKey);
+    var modified = false;
+
+    final localMessages = localSessionMessagesInternal[key];
+    if (localMessages != null && localMessages.isNotEmpty) {
+      var changed = false;
+      final next = localMessages.map((msg) {
+        if (msg.pending && msg.toolCallId != null) {
+          changed = true;
+          return msg.copyWith(pending: false, error: hasError || msg.error);
+        }
+        return msg;
+      }).toList(growable: false);
+      if (changed) {
+        localSessionMessagesInternal[key] = next;
+        modified = true;
+      }
+    }
+
+    final threadMessages = assistantThreadMessagesInternal[key];
+    if (threadMessages != null && threadMessages.isNotEmpty) {
+      var changed = false;
+      final next = threadMessages.map((msg) {
+        if (msg.pending && msg.toolCallId != null) {
+          changed = true;
+          return msg.copyWith(pending: false, error: hasError || msg.error);
+        }
+        return msg;
+      }).toList(growable: false);
+      if (changed) {
+        assistantThreadMessagesInternal[key] = next;
+        modified = true;
+      }
+    }
+
+    final record = assistantThreadRecordsInternal[key];
+    if (record != null && record.messages.isNotEmpty) {
+      var changed = false;
+      final next = record.messages.map((msg) {
+        if (msg.pending && msg.toolCallId != null) {
+          changed = true;
+          return msg.copyWith(pending: false, error: hasError || msg.error);
+        }
+        return msg;
+      }).toList(growable: false);
+      if (changed) {
+        upsertTaskThreadInternal(key, messages: next);
+        modified = true;
+      }
+    }
+
+    if (modified) {
+      notifyIfActiveInternal();
+    }
+  }
+
   void appendLocalSessionMessageInternal(
     String sessionKey,
     GatewayChatMessage message, {
