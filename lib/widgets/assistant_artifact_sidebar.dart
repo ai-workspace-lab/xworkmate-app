@@ -399,6 +399,12 @@ class _AssistantArtifactSidebarState extends State<AssistantArtifactSidebar> {
   }
 
   String _filesEmptyMessage(AssistantArtifactSnapshot snapshot) {
+    if (widget.artifactSyncStatus.trim().toLowerCase() == 'failed') {
+      return appText(
+        '本轮没有检测到实际生成的文件。请重新执行，并要求 OpenClaw 在当前 workspace 中创建文件。',
+        'No files were generated for this run. Try again and ask OpenClaw to create files in the current workspace.',
+      );
+    }
     final filesMessage = snapshot.filesMessage.trim();
     if (filesMessage.isNotEmpty) {
       return filesMessage;

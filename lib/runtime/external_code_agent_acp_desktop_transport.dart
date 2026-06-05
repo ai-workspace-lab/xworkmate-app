@@ -62,9 +62,7 @@ class ExternalCodeAgentAcpDesktopTransport implements GoTaskServiceClient {
           if (update.isDone && update.message.trim().isNotEmpty) {
             completedMessage = update.message.trim();
           }
-          if (update.payload['status']?.toString().trim().toLowerCase() ==
-                  'running' &&
-              (update.payload['runId']?.toString().trim().isNotEmpty == true)) {
+          if (OpenClawTaskAssociation.fromJsonOrNull(update.payload) != null) {
             runningTaskSnapshot = <String, dynamic>{...update.payload};
           }
           onUpdate(update);
@@ -130,6 +128,9 @@ class ExternalCodeAgentAcpDesktopTransport implements GoTaskServiceClient {
     final association = OpenClawTaskAssociation.fromJsonOrNull(
       runningTaskSnapshot,
     );
+    if (association == null) {
+      return null;
+    }
     final attempts = _recoveryAttemptsForRequest(request);
     for (var attempt = 0; attempt < attempts; attempt += 1) {
       if (attempt > 0) {
@@ -139,12 +140,7 @@ class ExternalCodeAgentAcpDesktopTransport implements GoTaskServiceClient {
       try {
         response = await _client.request(
           method: 'xworkmate.tasks.get',
-          params:
-              association?.toTaskGetParams() ??
-              <String, dynamic>{
-                'sessionId': request.sessionId,
-                'threadId': request.threadId,
-              },
+          params: association.toTaskGetParams(),
           endpointOverride: endpoint,
         );
       } on GatewayAcpException {
@@ -177,9 +173,11 @@ class ExternalCodeAgentAcpDesktopTransport implements GoTaskServiceClient {
       final result = _recoveredResultFromTaskSnapshot(snapshot);
       final resultArtifacts = _castMap(result['artifacts']);
       final artifactItems = resultArtifacts['items'] ?? resultArtifacts;
-      final hasArtifacts = result.isNotEmpty &&
+      final hasArtifacts =
+          result.isNotEmpty &&
           (artifactItems is List && artifactItems.isNotEmpty ||
-           result['artifacts'] is List && (result['artifacts'] as List).isNotEmpty);
+              result['artifacts'] is List &&
+                  (result['artifacts'] as List).isNotEmpty);
       if (!hasArtifacts && status == 'completed' && attempt < attempts - 1) {
         continue;
       }
