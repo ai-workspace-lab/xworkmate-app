@@ -899,8 +899,7 @@ void main() {
             try {
               await storeRoot.delete(recursive: true);
             } on FileSystemException {
-              // Temp cleanup is best effort here. The controller may still be
-              // releasing files when teardown starts.
+              // The controller may still be releasing files when teardown starts.
             }
           }
         });
@@ -980,7 +979,7 @@ void main() {
             try {
               await storeRoot.delete(recursive: true);
             } on FileSystemException {
-              // Temp cleanup is best effort here.
+              // Ignore temp cleanup failure during teardown.
             }
           }
         });
@@ -1047,8 +1046,7 @@ void main() {
             try {
               await storeRoot.delete(recursive: true);
             } on FileSystemException {
-              // Temp cleanup is best effort here. The controller may still be
-              // releasing files when teardown starts.
+              // The controller may still be releasing files when teardown starts.
             }
           }
         });
@@ -1961,8 +1959,6 @@ void main() {
         );
       },
     );
-
-
 
     test(
       'sendChatMessage hides OpenClaw artifact guard text from failed results and streaming',
@@ -3274,7 +3270,10 @@ void main() {
 
         await fakeGoTaskService.waitForRequestCount(prompts.length);
         expect(fakeGoTaskService.requests, hasLength(prompts.length));
-        expect(controller.openClawGatewayActiveTurnsInternal.length, prompts.length);
+        expect(
+          controller.openClawGatewayActiveTurnsInternal.length,
+          prompts.length,
+        );
         expect(controller.openClawGatewayQueuedTurnsInternal, isEmpty);
         for (var index = 0; index < prompts.length; index += 1) {
           final sessionKey = 'openclaw-e2e-$index';
@@ -4115,6 +4114,92 @@ void main() {
     });
 
     test(
+      'OpenClaw terminal snapshot without required artifacts does not stay running',
+      () async {
+        final fakeGoTaskService = _RecordingGoTaskServiceClient()
+          ..outcomes.add(
+            const GoTaskServiceResult(
+              success: true,
+              message: '',
+              turnId: 'turn-openclaw-missing-screenshot',
+              raw: <String, dynamic>{
+                'success': true,
+                'status': 'running',
+                'sessionId': 'openclaw-missing-screenshot',
+                'threadId': 'openclaw-missing-screenshot',
+                'turnId': 'turn-openclaw-missing-screenshot',
+                'runId': 'run-openclaw-missing-screenshot',
+                'artifactScope':
+                    'tasks/openclaw-missing-screenshot/run-openclaw-missing-screenshot',
+                'artifactDirectory':
+                    '/tmp/tasks/openclaw-missing-screenshot/run-openclaw-missing-screenshot',
+                'gatewayProviderId': 'openclaw',
+                'runtimeBudgetMinutes': 1,
+                'requiredArtifactExtensions': <String>['.png'],
+              },
+              errorMessage: '',
+              resolvedModel: '',
+              route: GoTaskServiceRoute.externalAcpSingle,
+            ),
+          )
+          ..taskOutcomes.add(
+            const GoTaskServiceResult(
+              success: true,
+              message: 'gateway completed the screenshot task',
+              turnId: 'turn-openclaw-missing-screenshot',
+              raw: <String, dynamic>{
+                'success': true,
+                'status': 'completed',
+                'turnId': 'turn-openclaw-missing-screenshot',
+                'runId': 'run-openclaw-missing-screenshot',
+                'output': 'gateway completed the screenshot task',
+              },
+              errorMessage: '',
+              resolvedModel: '',
+              route: GoTaskServiceRoute.externalAcpSingle,
+            ),
+          );
+        final controller = _connectedGatewayController(fakeGoTaskService);
+        addTearDown(controller.dispose);
+
+        await _selectGatewaySession(controller, 'openclaw-missing-screenshot');
+
+        await expectLater(
+          controller
+              .sendChatMessage('执行截图并导出 PNG')
+              .timeout(const Duration(milliseconds: 500)),
+          completes,
+        );
+        await _waitForThreadLifecycleStatusWithin(
+          controller,
+          'openclaw-missing-screenshot',
+          'ready',
+          const Duration(milliseconds: 500),
+        );
+        await _waitForThreadArtifactSyncStatusWithin(
+          controller,
+          'openclaw-missing-screenshot',
+          'no-exported-artifacts',
+          const Duration(milliseconds: 500),
+        );
+
+        final thread = controller.requireTaskThreadForSessionInternal(
+          'openclaw-missing-screenshot',
+        );
+        expect(thread.lifecycleState.status, 'ready');
+        expect(thread.lifecycleState.lastResultCode, 'success');
+        expect(thread.lastArtifactSyncStatus, 'no-exported-artifacts');
+        expect(thread.openClawTaskAssociation, isNull);
+        expect(
+          controller.assistantSessionHasPendingRun(
+            'openclaw-missing-screenshot',
+          ),
+          isFalse,
+        );
+      },
+    );
+
+    test(
       'sendChatMessage resumes existing interrupted and error states',
       () async {
         late final AppController controller;
@@ -4687,7 +4772,21 @@ Future<void> _waitForThreadLifecycleStatus(
   String sessionKey,
   String status,
 ) async {
-  final deadline = DateTime.now().add(const Duration(seconds: 15));
+  await _waitForThreadLifecycleStatusWithin(
+    controller,
+    sessionKey,
+    status,
+    const Duration(seconds: 15),
+  );
+}
+
+Future<void> _waitForThreadLifecycleStatusWithin(
+  AppController controller,
+  String sessionKey,
+  String status,
+  Duration timeout,
+) async {
+  final deadline = DateTime.now().add(timeout);
   while (DateTime.now().isBefore(deadline)) {
     final currentStatus = controller
         .taskThreadForSessionInternal(sessionKey)
@@ -4704,6 +4803,30 @@ Future<void> _waitForThreadLifecycleStatus(
       .status;
   throw StateError(
     'Timed out waiting for $sessionKey status $status. Current status: $currentStatus.',
+  );
+}
+
+Future<void> _waitForThreadArtifactSyncStatusWithin(
+  AppController controller,
+  String sessionKey,
+  String status,
+  Duration timeout,
+) async {
+  final deadline = DateTime.now().add(timeout);
+  while (DateTime.now().isBefore(deadline)) {
+    final currentStatus = controller
+        .taskThreadForSessionInternal(sessionKey)
+        ?.lastArtifactSyncStatus;
+    if (currentStatus == status) {
+      return;
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+  }
+  final currentStatus = controller
+      .taskThreadForSessionInternal(sessionKey)
+      ?.lastArtifactSyncStatus;
+  throw StateError(
+    'Timed out waiting for $sessionKey artifact sync status $status. Current status: $currentStatus.',
   );
 }
 
@@ -4740,8 +4863,6 @@ class _RecordingGoTaskServiceClient implements GoTaskServiceClient {
   final List<Object> outcomes = <Object>[];
   final List<Object> taskOutcomes = <Object>[];
   Future<void> Function(GoTaskServiceRequest request)? onExecuteTask;
-
-
 
   @override
   Future<GoTaskServiceResult> executeTask(
@@ -4814,8 +4935,6 @@ class _RecordingGoTaskServiceClient implements GoTaskServiceClient {
     OpenClawTaskAssociation? association,
   }) async {}
 
-
-
   @override
   Future<void> dispose() async {}
 }
@@ -4830,8 +4949,6 @@ class _BlockingGoTaskServiceClient implements GoTaskServiceClient {
       <String, Completer<GoTaskServiceResult>>{};
   final Map<String, void Function(GoTaskServiceUpdate)> _updates =
       <String, void Function(GoTaskServiceUpdate)>{};
-
-
 
   @override
   Future<GoTaskServiceResult> executeTask(
@@ -4936,8 +5053,6 @@ class _BlockingGoTaskServiceClient implements GoTaskServiceClient {
   }) async {
     cancelledSessionIds.add(sessionId);
   }
-
-
 
   @override
   Future<void> dispose() async {}

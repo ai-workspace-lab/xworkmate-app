@@ -67,7 +67,7 @@ void main() {
       expect(result.message, 'content list response');
     });
 
-    test('uses bridge failure text instead of empty output fallback', () {
+    test('uses bridge failure text when output is empty', () {
       final result = goTaskServiceResultFromAcpResponse(<String, dynamic>{
         'jsonrpc': '2.0',
         'id': 'request-id',
@@ -251,7 +251,6 @@ void main() {
         'https://xworkmate-bridge.svc.plus/artifacts/summary.pdf',
       );
     });
-
   });
 
   group('GatewayAcpClient authorization', () {
@@ -559,7 +558,7 @@ void main() {
     );
 
     test(
-      'recovers OpenClaw task result from completed session update when final SSE envelope is lost',
+      'does not synthesize OpenClaw result from completed session update when final SSE envelope is lost',
       () async {
         final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
         addTearDown(() => server.close(force: true));
@@ -614,29 +613,33 @@ void main() {
         );
         addTearDown(transport.dispose);
 
-        final result = await transport.executeTask(
-          const GoTaskServiceRequest(
-            sessionId: 'unit-fixture-task-a',
-            threadId: 'unit-fixture-task-a',
-            target: AssistantExecutionTarget.gateway,
-            provider: SingleAgentProvider.openclaw,
-            prompt: 'create files',
-            workingDirectory: '/tmp/workspace',
-            model: '',
-            thinking: 'off',
-            selectedSkills: <String>[],
-            inlineAttachments: <GatewayChatAttachmentPayload>[],
-            localAttachments: <CollaborationAttachment>[],
-            agentId: '',
-            metadata: <String, dynamic>{},
+        await expectLater(
+          transport.executeTask(
+            const GoTaskServiceRequest(
+              sessionId: 'unit-fixture-task-a',
+              threadId: 'unit-fixture-task-a',
+              target: AssistantExecutionTarget.gateway,
+              provider: SingleAgentProvider.openclaw,
+              prompt: 'create files',
+              workingDirectory: '/tmp/workspace',
+              model: '',
+              thinking: 'off',
+              selectedSkills: <String>[],
+              inlineAttachments: <GatewayChatAttachmentPayload>[],
+              localAttachments: <CollaborationAttachment>[],
+              agentId: '',
+              metadata: <String, dynamic>{},
+            ),
+            onUpdate: (_) {},
           ),
-          onUpdate: (_) {},
+          throwsA(
+            isA<GatewayAcpException>().having(
+              (error) => error.code,
+              'code',
+              'ACP_HTTP_CONNECTION_CLOSED',
+            ),
+          ),
         );
-
-        expect(result.success, isTrue);
-        expect(result.message, 'stable completed output');
-        expect(result.artifacts, hasLength(1));
-        expect(result.artifacts.single.relativePath, 'exports/final.md');
       },
     );
 
@@ -1010,7 +1013,8 @@ void main() {
                       'items': <Map<String, dynamic>>[
                         <String, dynamic>{
                           'relativePath': 'exports/snapshot.md',
-                          'downloadUrl': 'https://xworkmate-bridge.svc.plus/artifacts/openclaw/download?sessionKey=unit-fixture-task-b&runId=turn-recovered-running&relativePath=exports%2Fsnapshot.md',
+                          'downloadUrl':
+                              'https://xworkmate-bridge.svc.plus/artifacts/openclaw/download?sessionKey=unit-fixture-task-b&runId=turn-recovered-running&relativePath=exports%2Fsnapshot.md',
                           'contentType': 'text/markdown',
                           'sizeBytes': 64,
                         },
@@ -1084,8 +1088,7 @@ void main() {
                 'event': 'running',
                 'status': 'running',
                 'runId': 'run-running',
-                'artifactScope':
-                    'tasks/unit-fixture-task-handle/run-running',
+                'artifactScope': 'tasks/unit-fixture-task-handle/run-running',
                 'artifactDirectory':
                     '/home/ubuntu/.openclaw/workspace/tasks/unit-fixture-task-handle/run-running',
                 'gatewayProviderId': 'openclaw',
@@ -1461,8 +1464,7 @@ void main() {
             try {
               await storeRoot.delete(recursive: true);
             } on FileSystemException {
-              // Temp cleanup is best effort here. The controller does not own
-              // the lifecycle of the OS temp directory.
+              // The controller does not own the OS temp directory lifecycle.
             }
           }
         });
@@ -1518,8 +1520,7 @@ void main() {
             try {
               await storeRoot.delete(recursive: true);
             } on FileSystemException {
-              // Temp cleanup is best effort here. The client may still be
-              // releasing files when teardown starts.
+              // The client may still be releasing files when teardown starts.
             }
           }
         });
@@ -1561,8 +1562,7 @@ void main() {
             try {
               await storeRoot.delete(recursive: true);
             } on FileSystemException {
-              // Temp cleanup is best effort here. The controller may still be
-              // releasing files when teardown starts.
+              // The controller may still be releasing files when teardown starts.
             }
           }
         });
@@ -1617,18 +1617,17 @@ void main() {
     );
 
     test(
-      'desktop bridge auth resolver does not fallback to the remote gateway token for bridge ACP',
+      'desktop bridge auth resolver rejects the remote gateway token for bridge ACP',
       () async {
         final storeRoot = await Directory.systemTemp.createTemp(
-          'xworkmate-acp-auth-bridge-fallback-',
+          'xworkmate-acp-auth-bridge-reject-',
         );
         addTearDown(() async {
           if (await storeRoot.exists()) {
             try {
               await storeRoot.delete(recursive: true);
             } on FileSystemException {
-              // Temp cleanup is best effort here. The controller may still be
-              // releasing files when teardown starts.
+              // The controller may still be releasing files when teardown starts.
             }
           }
         });
