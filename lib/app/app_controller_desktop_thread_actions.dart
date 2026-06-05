@@ -919,7 +919,7 @@ extension AppControllerDesktopThreadActions on AppController {
     final resolvedWorkspace = executionWorkspace.isNotEmpty
         ? executionWorkspace
         : target.isGateway
-        ? '(Use the runtime-provided default workspace)'
+        ? r'$XWORKMATE_ARTIFACT_DIRECTORY'
         : workingDirectory.trim();
     buffer.writeln('- currentTaskWorkspace: $resolvedWorkspace');
     final visibleTaskInputAttachments = taskInputAttachments
