@@ -2,6 +2,18 @@
 
 这个 case 固化 5 个真实 OpenClaw Gateway 提示词，用于验证 XWorkmate App -> XWorkmate Bridge -> OpenClaw Gateway 的 5 并发稳定性、任务隔离和 artifact 同步。
 
+Related key-mapping regression:
+
+- App thread: `~/.xworkmate/threads/draft-1780658097668838-1`
+- `appThreadKey`: `draft:1780658097668838-1`
+- `openclawSessionKey`: `agent:main:draft:1780658097668838-1`
+- OpenClaw URL: `https://openclaw.svc.plus/chat?session=agent%3Amain%3Adraft%3A1780658097668838-1`
+
+The durable source of truth is
+`SessionEntry.pluginExtensions["openclaw-multi-session-plugins"]["xworkmate.sessionMapping"]`.
+Bridge/App must not recover this mapping by replacing `agent:main:` or by using a
+legacy `sessionKey` compatibility field.
+
 ## 覆盖目标
 
 - 连续出图：7 张连续风格 PNG。
@@ -15,8 +27,9 @@
 | 仓库 | 文件 | 覆盖点 |
 | --- | --- | --- |
 | `xworkmate-bridge` | `internal/acp/web_contract_test.go` | `TestHTTPHandlerGatewayOpenClawHandlesFiveConcurrentE2ECases` 通过 HTTP SSE 同时提交 5 个 OpenClaw Gateway 请求，断言不出现 queued、invalid handshake、socket closed、ACP_HTTP_CONNECTION_CLOSED、GATEWAY_CONNECT_FAILED。 |
-| `xworkmate-app` | `test/runtime/assistant_execution_target_test.dart` | `OpenClaw gateway admits five representative E2E tasks without queueing` 断言 App 侧 5 个代表任务同时进入 running，复用各自 session/thread，不进入 queued。 |
-| `openclaw-multi-session-plugins` | `src/exportArtifacts.test.ts` | 同线程 `assets/images/**/*.png`、manifest、视频/PDF 交付物能被 export 到当前 task artifact scope，不串到旧线程或旧 run。 |
+| `xworkmate-app` | `test/runtime/assistant_execution_target_test.dart` | `OpenClaw gateway admits five representative E2E tasks without queueing` 断言 App 侧 5 个代表任务同时进入 running，复用各自 session/thread，不进入 queued，并且 artifact contract 使用 `schemaVersion/appThreadKey/expectedArtifactDirs`，不再写 `sessionKey` 兼容字段。 |
+| `openclaw-multi-session-plugins` | `src/taskState.test.ts` | `appThreadKey -> openclawSessionKey` 写入 `pluginExtensions`，`xworkmate.tasks.get` 通过 mapping 查询 OpenClaw native task-registry，查不到时返回 `no_native_task_record`。 |
+| `openclaw-multi-session-plugins` | `src/exportArtifacts.test.ts` | 同线程 `assets/images/**/*.png`、manifest、视频/PDF 交付物能被 export 到当前 task artifact scope，不串到旧线程或旧 run，`expectedArtifactDirs` 不存在也保留字段，路径 traversal 被拒绝。 |
 
 ## 5 个提示词
 
@@ -119,6 +132,9 @@
 - 不出现 `ACP_HTTP_CONNECTION_CLOSED`。
 - 当前任务没有 artifact 时显示明确空态，不显示旧 run 文件。
 - 当前任务生成 PNG/PDF/视频文件时，右侧 artifact 自动同步并只显示当前任务本轮文件。
+- `xworkmate.session.prepare` 写入的 mapping 同时包含 `appThreadKey` 和 `openclawSessionKey`。
+- `xworkmate.tasks.get` 使用 `appThreadKey/openclawSessionKey/runId`，不发送旧 `sessionKey` lookup 参数。
+- `expectedArtifactDirs` 从 App metadata 到 Bridge prepare/export/snapshot 到 Plugin artifact resolver 全链路保留。
 
 ## 回归命令
 

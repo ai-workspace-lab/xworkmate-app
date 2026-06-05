@@ -64,6 +64,32 @@ void main() {
       );
     });
 
+    test('OpenClaw task lookup params use typed session mapping keys', () {
+      const association = OpenClawTaskAssociation(
+        sessionId: 'draft:1780658097668838-1',
+        threadId: 'draft:1780658097668838-1',
+        turnId: 'turn-1',
+        runId: 'run-1',
+        artifactScope: 'tasks/agent:main:draft:1780658097668838-1/run-1',
+        artifactDirectory:
+            '/tmp/tasks/agent:main:draft:1780658097668838-1/run-1',
+        gatewayProviderId: 'openclaw',
+        startedAtMs: 0,
+        status: 'running',
+        appThreadKey: 'draft:1780658097668838-1',
+        openclawSessionKey: 'agent:main:draft:1780658097668838-1',
+      );
+
+      final params = association.toTaskGetParams();
+
+      expect(params['appThreadKey'], 'draft:1780658097668838-1');
+      expect(
+        params['openclawSessionKey'],
+        'agent:main:draft:1780658097668838-1',
+      );
+      expect(params, isNot(contains('sessionKey')));
+    });
+
     test('recognizes openclaw as the canonical gateway provider', () {
       final provider = SingleAgentProvider.fromJsonValue('openclaw');
 
@@ -1310,19 +1336,19 @@ void main() {
         final artifactContract =
             (request.metadata['xworkmateTaskArtifactContract'] as Map)
                 .cast<String, dynamic>();
+        expect(artifactContract['schemaVersion'], 1);
+        expect(artifactContract['appThreadKey'], request.sessionId);
+        expect(artifactContract, isNot(contains('sessionKey')));
         expect(artifactContract['finalDeliverableDetection'], 'remote-runtime');
         expect(artifactContract['requiresExportBeforeFinalResponse'], isTrue);
-        expect(
-          artifactContract['expectedArtifactDirs'],
-          const <String>[
-            'artifacts/',
-            'reports/',
-            'exports/',
-            'assets/',
-            'assets/images/',
-            'dist/',
-          ],
-        );
+        expect(artifactContract['expectedArtifactDirs'], const <String>[
+          'artifacts/',
+          'reports/',
+          'exports/',
+          'assets/',
+          'assets/images/',
+          'dist/',
+        ]);
         expect(artifactContract, isNot(contains('expectedArtifactExtensions')));
         expect(request.prompt, isNot(contains('Task load classification:')));
         expect(
@@ -1366,19 +1392,19 @@ void main() {
         final artifactContract =
             (request.metadata['xworkmateTaskArtifactContract'] as Map)
                 .cast<String, dynamic>();
+        expect(artifactContract['schemaVersion'], 1);
+        expect(artifactContract['appThreadKey'], request.sessionId);
+        expect(artifactContract, isNot(contains('sessionKey')));
         expect(artifactContract['scopeKind'], 'task');
         expect(artifactContract['rejectTextOnlyFileClaims'], isTrue);
-        expect(
-          artifactContract['expectedArtifactDirs'],
-          const <String>[
-            'artifacts/',
-            'reports/',
-            'exports/',
-            'assets/',
-            'assets/images/',
-            'dist/',
-          ],
-        );
+        expect(artifactContract['expectedArtifactDirs'], const <String>[
+          'artifacts/',
+          'reports/',
+          'exports/',
+          'assets/',
+          'assets/images/',
+          'dist/',
+        ]);
         expect(
           artifactContract['currentTaskWorkspace'],
           request.workingDirectory,
@@ -3930,12 +3956,14 @@ void main() {
               'status': 'running',
               'sessionId': 'openclaw-poll-failed-task',
               'threadId': 'openclaw-poll-failed-task',
+              'appThreadKey': 'openclaw-poll-failed-task',
+              'openclawSessionKey': 'agent:main:openclaw-poll-failed-task',
               'turnId': 'turn-openclaw-poll-failed',
               'runId': 'run-openclaw-poll-failed',
               'artifactScope':
-                  'tasks/openclaw-poll-failed-task/run-openclaw-poll-failed',
+                  'tasks/agent:main:openclaw-poll-failed-task/run-openclaw-poll-failed',
               'artifactDirectory':
-                  '/tmp/tasks/openclaw-poll-failed-task/run-openclaw-poll-failed',
+                  '/tmp/tasks/agent:main:openclaw-poll-failed-task/run-openclaw-poll-failed',
               'gatewayProviderId': 'openclaw',
               'runtimeBudgetMinutes': 1,
             },
@@ -3998,12 +4026,14 @@ void main() {
                 'status': 'running',
                 'sessionId': 'openclaw-missing-screenshot',
                 'threadId': 'openclaw-missing-screenshot',
+                'appThreadKey': 'openclaw-missing-screenshot',
+                'openclawSessionKey': 'agent:main:openclaw-missing-screenshot',
                 'turnId': 'turn-openclaw-missing-screenshot',
                 'runId': 'run-openclaw-missing-screenshot',
                 'artifactScope':
-                    'tasks/openclaw-missing-screenshot/run-openclaw-missing-screenshot',
+                    'tasks/agent:main:openclaw-missing-screenshot/run-openclaw-missing-screenshot',
                 'artifactDirectory':
-                    '/tmp/tasks/openclaw-missing-screenshot/run-openclaw-missing-screenshot',
+                    '/tmp/tasks/agent:main:openclaw-missing-screenshot/run-openclaw-missing-screenshot',
                 'gatewayProviderId': 'openclaw',
                 'runtimeBudgetMinutes': 1,
                 'requiredArtifactExtensions': <String>['.png'],
@@ -4623,7 +4653,7 @@ Future<List<String>> _startOpenClawActiveTasks(
     await expectLater(
       controller
           .sendChatMessage('active task $index')
-          .timeout(const Duration(seconds: 2)),
+          .timeout(_openClawE2ESubmitTimeout),
       completes,
     );
     await fakeGoTaskService.waitForRequestCount(index + 1);
