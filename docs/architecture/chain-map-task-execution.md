@@ -76,7 +76,8 @@ xworkmate-bridge
              │       └─ scope: tasks/<sessionKey>/<runId>/
              │
              ├─ gateway.request('chat.send')
-             │   └─ payload: message, attachments, artifactSince, workingDirectory
+             │   └─ payload: sessionKey, message, attachments, idempotencyKey
+             │      (no expectedArtifactDirs root field)
              │
              ├─ Create OpenClawTaskRecord
              │   ├─ SessionID, ThreadID, TurnID, RunID
@@ -134,6 +135,17 @@ openclaw-multi-session-plugins
       ├─ Read each candidate file, compute SHA-256
       ├─ signArtifactRef(sessionKey, runId, relativePath)
       └─ Return manifest + base64 file contents
+
+  `expectedArtifactDirs` source:
+    session.start.metadata.xworkmateTaskArtifactContract.expectedArtifactDirs
+      → bridge artifact contract
+      → xworkmate.artifacts.collect-and-snapshot / export only
+
+  Forbidden compatibility paths:
+    session.start.expectedArtifactDirs
+    session.start.metadata.expectedArtifactDirs
+    chat.send.expectedArtifactDirs
+    xworkmate.tasks.get.expectedArtifactDirs
 
   Receives gateway RPC: xworkmate.artifacts.collect-and-snapshot
     collectAndSnapshotXWorkmateArtifacts()
@@ -207,8 +219,8 @@ etc.), not by extending the task execution lifecycle.
 
 ### openclaw-multi-session-plugins
 - `src/exportArtifacts.ts` — artifact prepare/export/read (963 lines)
+- `src/taskState.ts` — task snapshot adapter + SessionEntry.pluginExtensions mapping
 - `index.ts` — plugin entry + gateway method registration
-- `src/bridgeAgents.ts` — bridge agent orchestration
 
 ### openclaw.svc.plus (reference)
 - `src/config/paths.ts` — ~/.openclaw/ state directory
