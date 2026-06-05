@@ -784,6 +784,16 @@ extension AppControllerDesktopThreadActions on AppController {
           continue;
         }
         if (aiGatewayPendingSessionKeysInternal.contains(sessionKey)) {
+          final hasRequiredExts = current.requiredArtifactExtensions.isNotEmpty;
+          final hasEnoughArtifacts = !hasRequiredExts ||
+              current.requiredArtifactExtensions.every((ext) {
+                return result.artifacts.any(
+                  (a) => a.relativePath.toLowerCase().endsWith(ext.toLowerCase()),
+                );
+              });
+          if (!hasEnoughArtifacts && attempt < maxAttempts - 1) {
+            continue;
+          }
           await applyGatewayChatResultInternal(
             sessionKey: sessionKey,
             target: target,

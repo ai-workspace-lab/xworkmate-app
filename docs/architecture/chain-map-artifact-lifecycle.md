@@ -5,10 +5,11 @@ Repo chain: openclaw-multi-session-plugins ↔ xworkmate-bridge ↔ xworkmate-ap
 ## Lifecycle States
 
 ```
-[prepare] → [execute] → [export] → [snapshot] → [download] → [sync]
+[prepare] → [execute] → [collect-and-snapshot] → [export] → [snapshot] → [download] → [sync]
 
   prepare:  mkdir tasks/<session>/<run>/          (multi-session-plugins)
   execute:  tools write files                      (openclaw.svc.plus)
+  collect:  copy media/tmp outputs into task scope (multi-session-plugins)
   export:   scan + manifest + sign                 (multi-session-plugins)
   snapshot: assemble terminal result               (xworkmate-bridge)
   download: signed URL proxy                       (xworkmate-bridge)
@@ -85,7 +86,34 @@ The artifact export below will NOT find these files.
 ═══════════════════════════════════════════════════════════
 ```
 
-## State 3: Export
+## State 3: Collect And Snapshot
+
+```
+Caller:   xworkmate-bridge → gateway.request('xworkmate.artifacts.collect-and-snapshot')
+Handler:  openclaw-multi-session-plugins → collectAndSnapshotXWorkmateArtifacts()
+
+Inputs:
+  sessionKey:    mapped OpenClaw session key
+  runId:         OpenClaw run id
+  artifactScope: tasks/<session>/<run>/
+  sinceUnixMs:   task start timestamp
+
+Process:
+  1. Validate artifactScope matches sessionKey/runId.
+  2. Scan fixed OpenClaw output roots:
+     - ~/.openclaw/media/
+     - /tmp/openclaw/
+  3. Copy changed regular files into:
+     - tasks/<session>/<run>/artifacts/media/...
+     - tasks/<session>/<run>/artifacts/tmp-openclaw/...
+  4. Skip symlinks and any path that escapes the fixed source roots.
+
+Output:
+  copiedFiles: relative paths under the current task scope
+  warnings: skipped paths or unavailable source roots
+```
+
+## State 4: Export
 
 ```
 Caller:   xworkmate-bridge → gateway.request('xworkmate.artifacts.export')
@@ -136,29 +164,32 @@ Output:
   Each file: { relativePath, displayPath, size, contentType, sha256, inline?, ref }
 
 Fragile:
-  - Only scans tasks/<session>/<run>/ — misses media/browser/ etc.
+  - Export only scans tasks/<session>/<run>/; collect-and-snapshot must run first for global tool outputs
   - symlinks rejected even if pointing within workspace
   - maxFiles=200, maxInlineBytes=512KB — large files silently omitted
   - signing secret rotation invalidates all existing refs
 ```
 
-## State 4: Snapshot (Bridge)
+## State 5: Snapshot (Bridge)
 
 ```
 Caller:   completeOpenClawTask() in openclaw_async_tasks.go
           triggered by probeOpenClawTask() detecting completion
 
 Process:
-  1. Call gateway.request('xworkmate.artifacts.export')
+  1. Call gateway.request('xworkmate.artifacts.collect-and-snapshot')
+     → Copy OpenClaw media/tmp outputs into the task scope
+
+  2. Call gateway.request('xworkmate.artifacts.export')
      → Get manifest from plugin
 
-  2. openClawArtifactExport()
+  3. openClawArtifactExport()
      → Transform manifest files into stable result shape
      → decorateOpenClawArtifactDownloadURLs()
        → Replace each file.ref with signed download URL:
          /artifacts/openclaw/download?ref=<signed>&t=<expiry>
 
-  3. Build terminal snapshot:
+  4. Build terminal snapshot:
      {
        success: true,
        status: "completed",
@@ -173,9 +204,9 @@ Process:
        }
      }
 
-  4. Store snapshot for xworkmate.tasks.get queries
+  5. Store snapshot for xworkmate.tasks.get queries
 
-  5. Send SSE session.update to app
+  6. Send SSE session.update to app
 
 Fragile:
   - If export returns empty manifest, snapshot has no artifacts
@@ -183,7 +214,7 @@ Fragile:
   - Snapshot stored only in memory (lost on bridge restart)
 ```
 
-## State 5: Download (Bridge Proxy)
+## State 6: Download (Bridge Proxy)
 
 ```
 Endpoint: GET /artifacts/openclaw/download?ref=<signed>&t=<expiry>
@@ -222,7 +253,7 @@ Fragile:
   - 3 retry attempts only — persistent gateway failure = permanent 502
 ```
 
-## State 6: Sync (App)
+## State 7: Sync (App)
 
 ```
 Location: xworkmate-app

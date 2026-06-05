@@ -265,6 +265,14 @@ class ExternalCodeAgentAcpDesktopTransport
         );
       }
       final result = _recoveredResultFromTaskSnapshot(snapshot);
+      final resultArtifacts = _castMap(result['artifacts']);
+      final artifactItems = resultArtifacts['items'] ?? resultArtifacts;
+      final hasArtifacts = result.isNotEmpty &&
+          (artifactItems is List && artifactItems.isNotEmpty ||
+           result['artifacts'] is List && (result['artifacts'] as List).isNotEmpty);
+      if (!hasArtifacts && status == 'completed' && attempt < attempts - 1) {
+        continue;
+      }
       if (result.isNotEmpty) {
         return goTaskServiceResultFromAcpResponse(
           <String, dynamic>{
@@ -402,8 +410,14 @@ class ExternalCodeAgentAcpDesktopTransport
     };
     final artifactRecord = _castMap(snapshot['artifacts']);
     final artifactItems = artifactRecord['items'];
-    if (artifactItems is List && result['artifacts'] == artifactRecord) {
-      result['artifacts'] = artifactItems;
+    if (artifactItems is List && artifactItems.isNotEmpty) {
+      result['artifacts'] = List<Map<String, dynamic>>.from(artifactItems);
+    } else if (result['artifacts'] is Map) {
+      final nestedArtifacts = _castMap(result['artifacts']);
+      final nestedItems = nestedArtifacts['items'];
+      if (nestedItems is List && nestedItems.isNotEmpty) {
+        result['artifacts'] = List<Map<String, dynamic>>.from(nestedItems);
+      }
     }
     for (final entry in <String, String>{
       'remoteWorkingDirectory': 'remoteWorkingDirectory',
