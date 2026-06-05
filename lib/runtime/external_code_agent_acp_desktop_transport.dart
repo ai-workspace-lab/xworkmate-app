@@ -175,6 +175,14 @@ class ExternalCodeAgentAcpDesktopTransport implements GoTaskServiceClient {
         );
       }
       final result = _recoveredResultFromTaskSnapshot(snapshot);
+      final resultArtifacts = _castMap(result['artifacts']);
+      final artifactItems = resultArtifacts['items'] ?? resultArtifacts;
+      final hasArtifacts = result.isNotEmpty &&
+          (artifactItems is List && artifactItems.isNotEmpty ||
+           result['artifacts'] is List && (result['artifacts'] as List).isNotEmpty);
+      if (!hasArtifacts && status == 'completed' && attempt < attempts - 1) {
+        continue;
+      }
       if (result.isNotEmpty) {
         return goTaskServiceResultFromAcpResponse(
           <String, dynamic>{
@@ -295,14 +303,14 @@ class ExternalCodeAgentAcpDesktopTransport implements GoTaskServiceClient {
     String status,
   ) {
     final error = _castMap(snapshot['error']);
-    final message = _firstNonEmptyDisplayText(
-      <String, dynamic>{...error, ...snapshot},
-      const <String>['message', 'error', 'errorMessage', 'reason', 'code'],
-    );
-    final code = _firstNonEmptyDisplayText(
-      <String, dynamic>{...error, ...snapshot},
-      const <String>['code', 'errorCode'],
-    );
+    final rawMessage =
+        error['message'] ??
+        error['error'] ??
+        snapshot['message'] ??
+        snapshot['error'];
+    final message = rawMessage?.toString().trim() ?? '';
+    final rawCode = error['code'] ?? snapshot['code'];
+    final code = rawCode?.toString().trim() ?? '';
     final result = <String, dynamic>{
       'success': false,
       'status': status,
@@ -314,68 +322,6 @@ class ExternalCodeAgentAcpDesktopTransport implements GoTaskServiceClient {
       result['code'] = code;
     }
     return result;
-  }
-
-  String _firstNonEmptyDisplayText(
-    Map<String, dynamic> values,
-    List<String> keys,
-  ) {
-    for (final key in keys) {
-      final value = _displayText(values[key]).trim();
-      if (value.isNotEmpty) {
-        return value;
-      }
-    }
-    return '';
-  }
-
-  String _displayText(Object? value, [Set<Object>? visited]) {
-    final seen = visited ?? <Object>{};
-    if (value == null) {
-      return '';
-    }
-    if (value is String) {
-      return value.trim();
-    }
-    if (value is Map) {
-      if (!seen.add(value)) {
-        return '';
-      }
-      final map = value.cast<String, dynamic>();
-      for (final key in const <String>[
-        'output',
-        'summary',
-        'resultSummary',
-        'message',
-        'content',
-        'text',
-        'delta',
-        'output_text',
-      ]) {
-        final extracted = _displayText(map[key], seen);
-        if (extracted.isNotEmpty) {
-          return extracted;
-        }
-      }
-      for (final key in const <String>['result', 'payload', 'data']) {
-        final extracted = _displayText(map[key], seen);
-        if (extracted.isNotEmpty) {
-          return extracted;
-        }
-      }
-      return '';
-    }
-    if (value is List) {
-      if (!seen.add(value)) {
-        return '';
-      }
-      return value
-          .map((item) => _displayText(item, seen))
-          .where((item) => item.isNotEmpty)
-          .join('\n')
-          .trim();
-    }
-    return value.toString().trim();
   }
 
   Map<String, dynamic> _castMap(Object? value) {
