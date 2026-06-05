@@ -1005,6 +1005,17 @@ void main() {
                       'output': 'recovered after running snapshot',
                       'turnId': 'turn-recovered-running',
                     },
+                  if (completed)
+                    'artifacts': <String, dynamic>{
+                      'items': <Map<String, dynamic>>[
+                        <String, dynamic>{
+                          'relativePath': 'exports/snapshot.md',
+                          'downloadUrl': 'https://xworkmate-bridge.svc.plus/artifacts/openclaw/download?sessionKey=unit-fixture-task-b&runId=turn-recovered-running&relativePath=exports%2Fsnapshot.md',
+                          'contentType': 'text/markdown',
+                          'sizeBytes': 64,
+                        },
+                      ],
+                    },
                 },
               }),
             );
