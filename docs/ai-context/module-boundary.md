@@ -162,7 +162,7 @@ App → Bridge → Gateway: device.pair.approve / device.pair.reject
 | 方法 | 方向 | 描述 |
 |------|------|------|
 | `connect` | Bridge→Gateway | 认证连接 |
-| `chat.send` | Bridge→Gateway | 发送 agent 执行请求 |
+| `chat.send` | Bridge→Gateway | 发送 agent 执行请求；不得携带 `expectedArtifactDirs` |
 | `agent.wait` | Bridge→Gateway | 等待 agent 完成 |
 | `health` | Bridge→Gateway | 健康检查 |
 | `skills.status` | Bridge→Gateway | 技能状态 |
@@ -199,24 +199,21 @@ App → Bridge → Gateway: device.pair.approve / device.pair.reject
     "extensions": ["./dist/index.js"]
   },
   "gatewayMethods": [
+    "xworkmate.tasks.get",
     "xworkmate.artifacts.prepare",
     "xworkmate.artifacts.export",
+    "xworkmate.artifacts.collect-and-snapshot",
     "xworkmate.artifacts.list",
-    "xworkmate.artifacts.read",
-    "xworkmate.agents.run"
+    "xworkmate.artifacts.read"
   ],
   "tools": {
-    "openclaw_multi_session_artifacts": { "sessionScoped": true },
-    "openclaw_multi_session_agents": { "sessionScoped": true }
+    "openclaw_multi_session_artifacts": { "sessionScoped": true }
   },
   "config": {
     "workspaceDir": "~/.openclaw/workspace",
     "maxFiles": 1000,
     "maxInlineBytes": 1048576,
-    "artifactRefSigningSecret": "",
-    "bridgeUrl": "",
-    "bridgeToken": "",
-    "bridgeTimeoutMs": 120000
+    "artifactRefSigningSecret": ""
   }
 }
 ```
@@ -226,10 +223,16 @@ App → Bridge → Gateway: device.pair.approve / device.pair.reject
 | 方法 | 输入 | 输出 |
 |------|------|------|
 | `xworkmate.artifacts.prepare` | `{sessionKey, runId, workspaceDir?}` | `{artifactScope, artifactDirectory, scopeKind}` |
-| `xworkmate.artifacts.export` | `{sessionKey, runId, artifactScope?, sinceUnixMs?, ...}` | `{artifacts[], manifestMarkdown, warnings[]}` |
+| `xworkmate.artifacts.export` | `{sessionKey, runId, artifactScope?, sinceUnixMs?, expectedArtifactDirs?}` | `{artifacts[], manifestMarkdown, warnings[]}` |
+| `xworkmate.artifacts.collect-and-snapshot` | `{sessionKey, runId, artifactScope?, sinceUnixMs?, expectedArtifactDirs?}` | `{artifacts[], warnings[]}` |
 | `xworkmate.artifacts.list` | `{sessionKey, runId, ...}` | `{artifacts[] (不含内容), manifestMarkdown}` |
 | `xworkmate.artifacts.read` | `{sessionKey, runId, artifactScope?, relativePath?, artifactRef?}` | `{artifacts[0], manifestMarkdown}` |
-| `xworkmate.agents.run` | `{sessionKey, runId, taskPrompt, mode, steps?, participants?, ...}` | `{bridgeResult, artifacts[]}` |
+| `xworkmate.tasks.get` | `{sessionKey, runId}` | `{taskStatus, status, artifacts[], warnings[]}` |
+
+`expectedArtifactDirs` has a single upstream source:
+`session.start.metadata.xworkmateTaskArtifactContract.expectedArtifactDirs`.
+Bridge may pass it to artifact export/snapshot RPCs only. It is not accepted at
+`session.start` root, metadata root, `chat.send`, or `xworkmate.tasks.get`.
 
 ### 安全边界
 
@@ -255,57 +258,16 @@ artifactRef = HMAC-SHA256(workspaceRoot, sessionKey, runId, relativePath, size, 
   输出: { artifacts[]|manifestMarkdown }
   安全: sessionKey/runId 由 OpenClaw 运行时注入,
         Agent 无法覆盖 (在 tool factory 中解构排除)
-
-工具: openclaw_multi_session_agents
-  输入: { taskPrompt, mode, steps?, participants?, maxTurns? }
-  输出: { result, artifacts[] }
-  安全: sessionKey/runId 同样由运行时注入
 ```
 
 ---
 
 ## 5. Plugin → Bridge 反向调用边界
 
-### HTTP JSON-RPC 调用
-
-```
-Plugin (bridgeAgents.ts)
-  → POST {bridgeUrl}/acp/rpc
-    Headers:
-      Authorization: Bearer <bridgeToken>
-      Content-Type: application/json
-    Body:
-      {
-        "jsonrpc": "2.0",
-        "id": "openclaw-<timestamp>",
-        "method": "session.start",
-        "params": {
-          "sessionId": "openclaw:<sessionKey>",
-          "threadId": "<sessionKey>",
-          "taskPrompt": "...",
-          "workingDirectory": "<artifactDirectory>",
-          "multiAgent": true,
-          "mode": "multi-agent",
-          "routing": {
-            "orchestrationMode": "...",
-            "steps": [...]
-          }
-        }
-      }
-```
-
-### 配置
-
-```
-环境变量:
-  XWORKMATE_BRIDGE_URL     — bridge 基础 URL (自动追加 /acp/rpc)
-  XWORKMATE_BRIDGE_TOKEN   — bridge 认证 token
-
-插件配置 (openclaw.plugin.json):
-  bridgeUrl: "https://xworkmate-bridge.svc.plus"
-  bridgeToken: "..."
-  bridgeTimeoutMs: 120000
-```
+该边界已移除。插件不得通过 HTTP 调用 xworkmate-bridge，也不再暴露
+`xworkmate.agents.run` 或 `openclaw_multi_session_agents`。多 agent 编排由
+OpenClaw 原生 runtime 或 xworkmate-bridge 自身拥有，插件只保留 artifact
+scope、artifact manifest/read、task snapshot adapter 和 session key mapping。
 
 ---
 
@@ -322,6 +284,5 @@ Plugin (bridgeAgents.ts)
 | Bridge↔Gateway | Ed25519 密钥轮换无自动化 | **低** |
 | Gateway↔Plugin | artifactRef 签名密钥不一致 | **高** |
 | Gateway↔Plugin | 24h 签名过期 → 历史工件不可读 | **中** |
-| Plugin→Bridge | bridgeUrl/bridgeToken 配置错误 | **高** |
-| Plugin→Bridge | 循环依赖 (plugin 调 bridge, bridge 调 plugin) | **高** |
+| Plugin→Bridge | 已移除；旧插件版本若残留会恢复循环依赖 | **高** |
 | 全部 | 多仓库版本耦合 (app 1.1.4 + bridge latest + plugins 0.1.15) | **中** |

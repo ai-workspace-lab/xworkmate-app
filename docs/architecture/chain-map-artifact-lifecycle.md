@@ -131,6 +131,7 @@ Inputs:
   artifactRef?:   string   // alternative: read single artifact
   maxFiles?:      number   // default: 200
   maxInlineBytes?: number  // default: 512KB, files larger are omitted
+  expectedArtifactDirs?: string[] // from session.start metadata.xworkmateTaskArtifactContract only
 
 Process:
   1. resolveScopeRoot(workspaceRoot, artifactScope)
@@ -143,6 +144,16 @@ Process:
              .next, .turbo, node_modules
      → Skip: symlinks (security measure)
      → Apply: artifact-ignore.md rules
+
+  2b. If the task scope has no candidates and `expectedArtifactDirs` is present:
+     → Scan only those explicit workspace-root subdirectories
+     → Keep exported entries bound to the current task artifactScope
+     → Do not scan the workspace root broadly and do not borrow older task scopes
+
+Protocol boundary:
+  `expectedArtifactDirs` is bridge artifact-contract data, not agent execution
+  data. Bridge must not put it in `chat.send` params. Bridge must not probe old
+  root-level or metadata-root compatibility keys.
 
   3. For each file under maxFiles limit:
      → Read content (up to maxInlineBytes)
