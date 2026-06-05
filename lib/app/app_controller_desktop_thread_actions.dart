@@ -955,8 +955,8 @@ extension AppControllerDesktopThreadActions on AppController {
     return <String, dynamic>{
       ...baseMetadata,
       'xworkmateTaskArtifactContract': <String, dynamic>{
-        'version': 1,
-        'sessionKey': sessionKey,
+        'schemaVersion': 1,
+        'appThreadKey': sessionKey,
         'scopeKind': 'task',
         'finalDeliverableDetection': 'remote-runtime',
         'requiresExportBeforeFinalResponse': true,

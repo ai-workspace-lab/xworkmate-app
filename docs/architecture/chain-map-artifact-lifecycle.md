@@ -7,7 +7,7 @@ Repo chain: openclaw-multi-session-plugins ↔ xworkmate-bridge ↔ xworkmate-ap
 ```
 [prepare] → [execute] → [collect-and-snapshot] → [export] → [snapshot] → [download] → [sync]
 
-  prepare:  mkdir tasks/<session>/<run>/          (multi-session-plugins)
+  prepare:  map session + mkdir tasks/<session>/<run>/ (multi-session-plugins)
   execute:  tools write files                      (openclaw.svc.plus)
   collect:  copy media/tmp outputs into task scope (multi-session-plugins)
   export:   scan + manifest + sign                 (multi-session-plugins)
@@ -25,32 +25,42 @@ App terminal rule:
 ## State 1: Prepare
 
 ```
-Caller:   xworkmate-bridge → gateway.request('xworkmate.artifacts.prepare')
-Handler:  openclaw-multi-session-plugins → prepareXWorkmateArtifacts()
+Caller:   xworkmate-bridge → gateway.request('xworkmate.session.prepare')
+Handler:  openclaw-multi-session-plugins → recordXWorkmateSessionMapping() + prepareXWorkmateArtifacts()
 
 Inputs:
-  sessionKey:  string    // "agent:default:abc123"
-  runId:       string    // "20260605-001"
-  workspaceDir?: string  // optional explicit path
+  schemaVersion:       1
+  appThreadKey:        string    // "draft:1780658097668838-1"
+  openclawSessionKey:  string    // "agent:main:draft:1780658097668838-1"
+  runId:               string    // "20260605-001"
+  expectedArtifactDirs?: string[]
+  workspaceDir?:       string
 
 Process:
-  1. resolveWorkspaceDir({ sessionKey, params, pluginConfig, config })
+  1. Validate typed mapping metadata.
+
+  2. Patch SessionEntry.pluginExtensions:
+     ["openclaw-multi-session-plugins"]["xworkmate.sessionMapping"]
+     → schemaVersion, appThreadKey, openclawSessionKey, expectedArtifactDirs
+
+  3. resolveWorkspaceDir({ openclawSessionKey, params, pluginConfig, config })
      → Falls back through: explicit → pluginConfig → agent config
        → profile env → ~/.openclaw/workspace
 
-  2. safeScopeSegment(sessionKey)
+  4. safeScopeSegment(openclawSessionKey)
      → replace [/\\:*?"<>|] with "-", truncate to 96 chars
 
-  3. safeScopeSegment(runId) → same rules
+  5. safeScopeSegment(runId) → same rules
 
-  4. scopeRoot = <workspace>/tasks/<safeSessionKey>/<safeRunId>/
+  6. scopeRoot = <workspace>/tasks/<safeSessionKey>/<safeRunId>/
      → fs.mkdir(scopeRoot, { recursive: true })
 
-  5. Validate: isWithinRoot(workspaceRoot, scopeRoot)
+  7. Validate: isWithinRoot(workspaceRoot, scopeRoot)
 
 Output:
   artifactScope:  "tasks/<safeSessionKey>/<safeRunId>/"
   artifactDirectory: "<workspace>/tasks/<safeSessionKey>/<safeRunId>/"
+  mapping: { appThreadKey, openclawSessionKey, expectedArtifactDirs }
 
 Fragile:
   - workspace resolution chain has 5 ordered sources
@@ -99,13 +109,13 @@ Caller:   xworkmate-bridge → gateway.request('xworkmate.artifacts.collect-and-
 Handler:  openclaw-multi-session-plugins → collectAndSnapshotXWorkmateArtifacts()
 
 Inputs:
-  sessionKey:    mapped OpenClaw session key
+  openclawSessionKey: mapped OpenClaw session key
   runId:         OpenClaw run id
   artifactScope: tasks/<session>/<run>/
   sinceUnixMs:   task start timestamp
 
 Process:
-  1. Validate artifactScope matches sessionKey/runId.
+  1. Validate artifactScope matches openclawSessionKey/runId.
   2. Scan fixed OpenClaw output roots:
      - ~/.openclaw/media/
      - /tmp/openclaw/
@@ -127,11 +137,12 @@ Handler:  openclaw-multi-session-plugins → exportXWorkmateArtifacts()
 
 Inputs:
   artifactScope: "tasks/<session>/<run>/"
+  openclawSessionKey?: string
   workspaceDir?: string
   artifactRef?:   string   // alternative: read single artifact
   maxFiles?:      number   // default: 200
   maxInlineBytes?: number  // default: 512KB, files larger are omitted
-  expectedArtifactDirs?: string[] // from session.start metadata.xworkmateTaskArtifactContract only
+  expectedArtifactDirs?: string[] // from typed mapping/session.prepare only
 
 Process:
   1. resolveScopeRoot(workspaceRoot, artifactScope)
@@ -153,7 +164,7 @@ Process:
 Protocol boundary:
   `expectedArtifactDirs` is bridge artifact-contract data, not agent execution
   data. Bridge must not put it in `chat.send` params. Bridge must not probe old
-  root-level or metadata-root compatibility keys.
+  root-level, metadata-root, prompt-text, or `sessionKey` compatibility keys.
 
   3. For each file under maxFiles limit:
      → Read content (up to maxInlineBytes)
