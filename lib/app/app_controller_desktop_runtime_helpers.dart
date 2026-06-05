@@ -873,8 +873,19 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
       wroteArtifact = true;
     }
 
+    final thread = taskThreadForSessionInternal(normalizedSessionKey);
+    final requiredExts = thread?.openClawTaskAssociation
+        ?.requiredArtifactExtensions ?? const <String>[];
+    final missingRequired = requiredExts.where((ext) {
+      return !currentTaskArtifactPaths.any(
+        (p) => p.toLowerCase().endsWith(ext.toLowerCase()),
+      );
+    }).toList(growable: false);
+
     final syncStatus = wroteArtifact
-        ? (failedArtifact || skippedArtifact ? 'partial' : 'synced')
+        ? (failedArtifact || skippedArtifact || missingRequired.isNotEmpty
+            ? 'partial'
+            : 'synced')
         : failedArtifact
         ? 'download-failed'
         : rejectedArtifact
@@ -915,10 +926,13 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
       return const _ArtifactBytesResult.skipped();
     }
     final bridgeEndpoint = resolveBridgeAcpEndpointInternal();
-    final sameBridgeHost =
-        bridgeEndpoint != null &&
-        uri.host.trim().toLowerCase() ==
-            bridgeEndpoint.host.trim().toLowerCase();
+    final bridgeHost = bridgeEndpoint?.host.trim().toLowerCase() ?? '';
+    final downloadHost = uri.host.trim().toLowerCase();
+    final isLoopback = downloadHost == '127.0.0.1' ||
+        downloadHost == 'localhost' ||
+        downloadHost == '::1';
+    final sameBridgeHost = bridgeEndpoint != null &&
+        (downloadHost == bridgeHost || isLoopback);
     if (!sameBridgeHost) {
       return const _ArtifactBytesResult.skipped();
     }

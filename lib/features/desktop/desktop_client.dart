@@ -38,12 +38,8 @@ Future<MediaStream?> desktopRemoteVideoStreamForTrack(
   if (event.track.kind != 'video') {
     return null;
   }
-  if (event.streams.isNotEmpty) {
-    return event.streams.first;
-  }
-
   final stream = await createFallbackStream('xworkmate-remote-desktop');
-  await stream.addTrack(event.track, addToNative: false);
+  await stream.addTrack(event.track);
   return stream;
 }
 
@@ -142,10 +138,7 @@ class DesktopClient {
       );
 
       // Create SDP Offer
-      final offer = await _peerConnection!.createOffer({
-        'offerToReceiveAudio': 1,
-        'offerToReceiveVideo': 1,
-      });
+      final offer = await _peerConnection!.createOffer({});
       await _peerConnection!.setLocalDescription(offer);
 
       // Send SDP Offer to Bridge
