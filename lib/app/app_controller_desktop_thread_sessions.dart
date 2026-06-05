@@ -197,9 +197,6 @@ extension AppControllerDesktopThreadSessions on AppController {
     if (normalizedSessionKey == 'main') {
       return true;
     }
-    if (normalizedSessionKey.startsWith('agent:')) {
-      return true;
-    }
     return _runtimeSessionKeyPatternInternal.hasMatch(normalizedSessionKey);
   }
 
