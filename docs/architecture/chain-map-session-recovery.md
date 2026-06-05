@@ -165,9 +165,9 @@ No persistence:
 
 | Method | Params | Returns |
 |--------|--------|---------|
-| `xworkmate.tasks.get` | sessionId, threadId, turnId (optional) | Terminal snapshot or running status |
-| `xworkmate.tasks.cancel` | sessionId, threadId, turnId | Cancel confirmation |
-| `reassociateOpenClawTask` | taskHandle (from stored params) | Reconnected session |
+| `xworkmate.tasks.get` | appThreadKey, openclawSessionKey, runId/taskId | Native task-registry snapshot or structured lookup error |
+| `xworkmate.tasks.cancel` | appThreadKey, openclawSessionKey, runId/taskId | Cancel confirmation |
+| Removed: Bridge task reassociation | artifactScope/runId-derived taskHandle | No longer supported; route through native task registry |
 
 ## App Recovery Flow (Detailed)
 

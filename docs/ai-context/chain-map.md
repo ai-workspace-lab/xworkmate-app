@@ -97,7 +97,8 @@ lib/runtime/external_code_agent_acp_desktop_transport.dart
 lib/app/app_controller_openclaw_task_queue.dart
   OpenClawTaskQueue
     → 本地队列管理 (max 5 active, 20 queued)
-    → 持久化 & 恢复 (pollOpenClawTaskAssociationInternal)
+    → 持久化 typed association
+    → 恢复查询只发送 appThreadKey/openclawSessionKey/runId 到 native task-registry
 ```
 
 Protocol boundary:
@@ -124,7 +125,9 @@ Protocol boundary:
 ### 断点风险:
 - 网关 WebSocket 断连 → 任务丢失
 - 分布式转发 hop=3 限制 → 深层拓扑不可达
-- 任务轮询恢复依赖 `xworkmate.tasks.get` → 非实时
+- 任务轮询恢复依赖 `xworkmate.tasks.get` → Bridge 只转发 typed lookup，
+  terminal state 以 OpenClaw native task-registry 为准；缺少 native task
+  record 时返回 `no_native_task_record`，不从 artifactScope/runId 重建任务。
 
 ---
 
