@@ -23,8 +23,9 @@ xworkmate-app
     └─ AppController.sendChatMessage()
        ├─ Resolve/create TaskThread by sessionKey/threadId
        ├─ Prepare local workspace: ~/.xworkmate/threads/<session>/
-       ├─ Build task context prompt (sessionKey, workspace, contract)
+       ├─ Build task context prompt (TaskThread.sessionKey, workspace, contract)
        ├─ Attach metadata.xworkmateTaskArtifactContract
+       │  └─ schemaVersion, appThreadKey, expectedArtifactDirs
        └─ Select execution path:
           ├─ Agent providers (codex/opencode/gemini/hermes)
           │   └─ DesktopGoTaskService.startSession()
@@ -72,11 +73,16 @@ xworkmate-bridge
           └─ startOpenClawGatewayTask()
              ├─ ensureProductionGatewayConnected()
              ├─ openClawArtifactPrepare()
-             │   └─ gateway.request('xworkmate.artifacts.prepare')
-             │       └─ scope: tasks/<sessionKey>/<runId>/
+             │   └─ gateway.request('xworkmate.session.prepare')
+             │       ├─ schemaVersion: 1
+             │       ├─ appThreadKey: App TaskThread key
+             │       ├─ openclawSessionKey: OpenClaw SessionEntry key
+             │       ├─ expectedArtifactDirs: typed artifact contract
+             │       └─ scope: tasks/<openclawSessionKey>/<runId>/
              │
              ├─ gateway.request('chat.send')
              │   └─ payload: sessionKey, message, attachments, idempotencyKey
+             │      sessionKey is the OpenClaw native field and equals openclawSessionKey
              │      (no expectedArtifactDirs root field)
              │
              ├─ Create OpenClawTaskRecord
@@ -116,10 +122,17 @@ openclaw.svc.plus
           └─ tasks/<session>/<run>/output.md        ← MAY be written here
 
 openclaw-multi-session-plugins
-  Receives gateway RPC: xworkmate.artifacts.prepare
+  Receives gateway RPC: xworkmate.session.prepare
+    recordXWorkmateSessionMapping()
+      ├─ Validate schemaVersion=1 typed metadata
+      ├─ Require appThreadKey and openclawSessionKey
+      ├─ Write SessionEntry.pluginExtensions
+      │   └─ ["openclaw-multi-session-plugins"]["xworkmate.sessionMapping"]
+      └─ Fail closed on appThreadKey/openclawSessionKey conflicts
+
     prepareXWorkmateArtifacts()
       ├─ resolveWorkspaceDir() → workspace root
-      ├─ safeScopeSegment(sessionKey) → sanitize
+      ├─ safeScopeSegment(openclawSessionKey) → sanitize
       ├─ safeScopeSegment(runId) → sanitize
       └─ mkdir <workspace>/tasks/<safeSessionKey>/<safeRunId>/
 
@@ -139,13 +152,15 @@ openclaw-multi-session-plugins
   `expectedArtifactDirs` source:
     session.start.metadata.xworkmateTaskArtifactContract.expectedArtifactDirs
       → bridge artifact contract
+      → xworkmate.session.prepare mapping
       → xworkmate.artifacts.collect-and-snapshot / export only
 
   Forbidden compatibility paths:
+    session.start.metadata.xworkmateTaskArtifactContract.sessionKey
     session.start.expectedArtifactDirs
     session.start.metadata.expectedArtifactDirs
     chat.send.expectedArtifactDirs
-    xworkmate.tasks.get.expectedArtifactDirs
+    xworkmate.tasks.get.sessionKey
 
   Receives gateway RPC: xworkmate.artifacts.collect-and-snapshot
     collectAndSnapshotXWorkmateArtifacts()
@@ -230,7 +245,7 @@ etc.), not by extending the task execution lifecycle.
 ## Fragile Points
 
 1. **F1: Tool output path mismatch** — Tools save to media/, plugin exports from tasks/ → gap
-2. **F2: Session key mismatch** — Bridge maps App threadId to an explicit OpenClaw sessionKey before prepare/chat/export
+2. **F2: Session key mismatch** — Bridge maps App `appThreadKey` to an explicit `openclawSessionKey` before prepare/chat/export and the plugin persists that mapping in SessionEntry.pluginExtensions
 3. **F3: Prepare timing** — If prepare fails after send, no scope directory exists
 4. **F4: Admission gate rejection** — Queue full → OPENCLAW_GATEWAY_BUSY → app must handle
 5. **F5: Bridge restart** — In-memory sessions lost → app must detect and recover
