@@ -771,10 +771,12 @@ extension AppControllerDesktopThreadActions on AppController {
         }
         if (aiGatewayPendingSessionKeysInternal.contains(sessionKey)) {
           final hasRequiredExts = current.requiredArtifactExtensions.isNotEmpty;
-          final hasEnoughArtifacts = !hasRequiredExts ||
+          final hasEnoughArtifacts =
+              !hasRequiredExts ||
               current.requiredArtifactExtensions.every((ext) {
                 return result.artifacts.any(
-                  (a) => a.relativePath.toLowerCase().endsWith(ext.toLowerCase()),
+                  (a) =>
+                      a.relativePath.toLowerCase().endsWith(ext.toLowerCase()),
                 );
               });
           if (!hasEnoughArtifacts && artifactRetries < 3) {
@@ -959,6 +961,7 @@ extension AppControllerDesktopThreadActions on AppController {
         'finalDeliverableDetection': 'remote-runtime',
         'requiresExportBeforeFinalResponse': true,
         'rejectTextOnlyFileClaims': true,
+        'expectedArtifactDirs': const <String>['artifacts/'],
         'currentTaskWorkspace': executionWorkspace.isNotEmpty
             ? executionWorkspace
             : (remoteHint.isNotEmpty ? remoteHint : localWorkspace),
@@ -1373,10 +1376,7 @@ extension AppControllerDesktopThreadActions on AppController {
     required Object error,
   }) async {
     clearAiGatewayStreamingTextInternal(sessionKey);
-    clearPendingToolCallsForGatewaySessionInternal(
-      sessionKey,
-      hasError: true,
-    );
+    clearPendingToolCallsForGatewaySessionInternal(sessionKey, hasError: true);
     final completedAtMs = DateTime.now().millisecondsSinceEpoch.toDouble();
     final recoveredArtifactPaths =
         await recoverGatewayFailureArtifactPathsInternal(sessionKey, error);

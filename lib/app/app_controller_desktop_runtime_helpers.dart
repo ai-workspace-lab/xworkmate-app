@@ -750,9 +750,6 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     );
     final artifacts = result.artifacts;
     if (artifacts.isEmpty) {
-      final requiredExts =
-          existingThread.openClawTaskAssociation?.requiredArtifactExtensions ??
-          const <String>[];
       final currentTaskArtifactRelativePaths =
           await _workspaceArtifactPathsModifiedSinceInternal(
               root,
@@ -782,7 +779,6 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     var wroteArtifact = false;
     var failedArtifact = false;
     var skippedArtifact = false;
-    var rejectedArtifact = false;
     final currentTaskArtifactPaths = <String>{};
     for (final artifact in artifacts) {
       final relativePath = _sanitizeArtifactRelativePathInternal(
@@ -813,7 +809,6 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
         continue;
       }
       if (artifactSyncPolicy.rejects(artifact, relativePath, bytes)) {
-        rejectedArtifact = true;
         continue;
       }
       final target = await _nextArtifactTargetFileInternal(root, relativePath);
