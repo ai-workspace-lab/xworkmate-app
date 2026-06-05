@@ -16,19 +16,16 @@ class AssistantTaskProgressState {
     required this.phase,
     required this.label,
     this.value,
-    this.runtimeBudgetMinutes,
   });
 
   const AssistantTaskProgressState.idle()
     : phase = AssistantTaskProgressPhase.idle,
       label = '',
-      value = null,
-      runtimeBudgetMinutes = null;
+      value = null;
 
   final AssistantTaskProgressPhase phase;
   final String label;
   final double? value;
-  final int? runtimeBudgetMinutes;
 
   bool get visible => phase != AssistantTaskProgressPhase.idle;
   bool get interrupted => phase == AssistantTaskProgressPhase.interrupted;
@@ -171,20 +168,15 @@ AssistantTaskProgressState assistantTaskProgressState({
   required String lifecycleStatus,
   required String lastResultCode,
   required String artifactSyncStatus,
-  int? runtimeBudgetMinutes,
 }) {
   final syncStatus = artifactSyncStatus.trim().toLowerCase();
   final status = lifecycleStatus.trim().toLowerCase();
-  final budget = runtimeBudgetMinutes == null || runtimeBudgetMinutes <= 0
-      ? null
-      : runtimeBudgetMinutes;
   final result = lastResultCode.trim().toUpperCase();
   if (status == 'queued' || syncStatus == 'queued' || result == 'QUEUED') {
     return AssistantTaskProgressState(
       phase: AssistantTaskProgressPhase.queued,
       label: appText('任务已排队，等待执行...', 'Task queued, waiting to run...'),
       value: 0.18,
-      runtimeBudgetMinutes: budget,
     );
   }
   if (pending && syncStatus == 'syncing') {
@@ -192,14 +184,12 @@ AssistantTaskProgressState assistantTaskProgressState({
       phase: AssistantTaskProgressPhase.syncingArtifacts,
       label: appText('正在同步生成文件...', 'Syncing generated files...'),
       value: 0.82,
-      runtimeBudgetMinutes: budget,
     );
   }
   if (pending) {
     return AssistantTaskProgressState(
       phase: AssistantTaskProgressPhase.running,
-      label: _budgetedProgressLabel(appText('任务运行中', 'Task running'), budget),
-      runtimeBudgetMinutes: budget,
+      label: appText('任务运行中...', 'Task running...'),
     );
   }
   if (status == 'interrupted' || syncStatus == 'interrupted') {
@@ -222,12 +212,7 @@ AssistantTaskProgressState assistantTaskProgressState({
   return const AssistantTaskProgressState.idle();
 }
 
-String _budgetedProgressLabel(String base, int? minutes) {
-  if (minutes == null || minutes <= 0) {
-    return '$base...';
-  }
-  return appText('$base，预计最长 $minutes 分钟...', '$base, up to $minutes min...');
-}
+
 
 String _interruptedTaskProgressLabel(String result) {
   if (result == 'ACP_HTTP_HANDSHAKE_INTERRUPTED') {

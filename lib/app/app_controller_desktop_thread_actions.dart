@@ -735,24 +735,19 @@ extension AppControllerDesktopThreadActions on AppController {
     required OpenClawTaskAssociation association,
   }) async {
     var current = association;
-    final pollDelay = _openClawAssociationPollDelayInternal(current);
-    final maxAttempts = math.max(
-      1,
-      ((math.max(1, current.runtimeBudgetMinutes) * 60) /
-              math.max(1, pollDelay.inSeconds))
-          .ceil(),
-    );
     var artifactRetries = 0;
-    for (var attempt = 0; attempt < maxAttempts; attempt += 1) {
+    var firstAttempt = true;
+    while (true) {
       if (disposedInternal) {
         return;
       }
       if (!aiGatewayPendingSessionKeysInternal.contains(sessionKey)) {
         return;
       }
-      if (attempt > 0) {
-        await Future<void>.delayed(pollDelay);
+      if (!firstAttempt) {
+        await Future<void>.delayed(const Duration(seconds: 2));
       }
+      firstAttempt = false;
       try {
         final result = await goTaskServiceClientInternal.getTask(
           route: GoTaskServiceRoute.externalAcpSingle,
@@ -812,34 +807,6 @@ extension AppControllerDesktopThreadActions on AppController {
         return;
       }
     }
-    final nowMs = DateTime.now().millisecondsSinceEpoch.toDouble();
-    upsertTaskThreadInternal(
-      sessionKey,
-      lifecycleStatus: 'ready',
-      lastRunAtMs: nowMs,
-      lastResultCode: 'TASK_SLA_EXPIRED',
-      lastArtifactSyncAtMs: nowMs,
-      lastArtifactSyncStatus: 'failed',
-      openClawTaskAssociation: current.copyWith(status: 'failed'),
-      updatedAtMs: nowMs,
-    );
-    aiGatewayPendingSessionKeysInternal.remove(sessionKey);
-    clearAiGatewayStreamingTextInternal(sessionKey);
-    recomputeTasksInternal();
-    notifyIfActiveInternal();
-  }
-
-  Duration _openClawAssociationPollDelayInternal(
-    OpenClawTaskAssociation association,
-  ) {
-    final budget = association.runtimeBudgetMinutes;
-    if (budget >= 60) {
-      return const Duration(seconds: 5);
-    }
-    if (budget >= 30) {
-      return const Duration(seconds: 3);
-    }
-    return const Duration(seconds: 2);
   }
 
   void resumeOpenClawTaskAssociationsInternal({String? onlySessionKey}) {
@@ -1323,15 +1290,6 @@ extension AppControllerDesktopThreadActions on AppController {
       lastResultCode: terminalResultCode,
       updatedAtMs: completedAtMs,
     );
-    if (isOpenClawNoExportedArtifactsGuardResultInternal(result)) {
-      await persistGoTaskArtifactsForSessionInternal(sessionKey, result);
-      upsertTaskThreadInternal(
-        sessionKey,
-        clearOpenClawTaskAssociation: true,
-        updatedAtMs: completedAtMs,
-      );
-      return;
-    }
     if (!result.success) {
       upsertTaskThreadInternal(
         sessionKey,
