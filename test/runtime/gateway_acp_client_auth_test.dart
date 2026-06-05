@@ -658,8 +658,19 @@ void main() {
           if (method == 'session.start') {
             final event = jsonEncode(<String, dynamic>{
               'jsonrpc': '2.0',
-              'method': 'xworkmate.bridge.accepted',
-              'params': <String, dynamic>{'sessionId': 'unit-fixture-task-a'},
+              'method': 'session.update',
+              'params': <String, dynamic>{
+                'sessionId': 'unit-fixture-task-a',
+                'threadId': 'unit-fixture-task-a',
+                'turnId': 'turn-recovered',
+                'type': 'status',
+                'event': 'running',
+                'status': 'running',
+                'runId': 'turn-recovered',
+                'appThreadKey': 'unit-fixture-task-a',
+                'openclawSessionKey': 'agent:main:unit-fixture-task-a',
+                'gatewayProviderId': 'openclaw',
+              },
             });
             final eventBytes = utf8.encode('data: $event\n\n');
             request.response.headers.set(
@@ -774,6 +785,10 @@ void main() {
                 'turnId': 'turn-final',
                 'type': 'status',
                 'event': 'completed',
+                'status': 'completed',
+                'runId': 'turn-final',
+                'appThreadKey': 'unit-fixture-task-final',
+                'openclawSessionKey': 'agent:main:unit-fixture-task-final',
                 'message': 'early completed output without artifacts',
                 'success': true,
               },
@@ -882,8 +897,19 @@ void main() {
           if (method == 'session.message') {
             final event = jsonEncode(<String, dynamic>{
               'jsonrpc': '2.0',
-              'method': 'xworkmate.bridge.accepted',
-              'params': <String, dynamic>{'sessionId': 'unit-fixture-task-sse'},
+              'method': 'session.update',
+              'params': <String, dynamic>{
+                'sessionId': 'unit-fixture-task-sse',
+                'threadId': 'unit-fixture-task-sse',
+                'turnId': 'turn-recovered-sse',
+                'type': 'status',
+                'event': 'running',
+                'status': 'running',
+                'runId': 'turn-recovered-sse',
+                'appThreadKey': 'unit-fixture-task-sse',
+                'openclawSessionKey': 'agent:main:unit-fixture-task-sse',
+                'gatewayProviderId': 'openclaw',
+              },
             });
             request.response.headers.set(
               HttpHeaders.contentTypeHeader,
@@ -971,8 +997,19 @@ void main() {
           if (method == 'session.start') {
             final event = jsonEncode(<String, dynamic>{
               'jsonrpc': '2.0',
-              'method': 'xworkmate.bridge.accepted',
-              'params': <String, dynamic>{'sessionId': 'unit-fixture-task-b'},
+              'method': 'session.update',
+              'params': <String, dynamic>{
+                'sessionId': 'unit-fixture-task-b',
+                'threadId': 'unit-fixture-task-b',
+                'turnId': 'turn-recovered-running',
+                'type': 'status',
+                'event': 'running',
+                'status': 'running',
+                'runId': 'turn-recovered-running',
+                'appThreadKey': 'unit-fixture-task-b',
+                'openclawSessionKey': 'agent:main:unit-fixture-task-b',
+                'gatewayProviderId': 'openclaw',
+              },
             });
             final eventBytes = utf8.encode('data: $event\n\n');
             request.response.headers.set(
@@ -1092,6 +1129,8 @@ void main() {
                 'artifactDirectory':
                     '/home/ubuntu/.openclaw/workspace/tasks/unit-fixture-task-handle/run-running',
                 'gatewayProviderId': 'openclaw',
+                'appThreadKey': 'unit-fixture-task-handle',
+                'openclawSessionKey': 'agent:main:unit-fixture-task-handle',
               },
             });
             final eventBytes = utf8.encode('data: $event\n\n');
@@ -1178,9 +1217,15 @@ void main() {
         expect(snapshotPolls, 1);
         expect(taskGetParams.single['runId'], 'run-running');
         expect(
-          taskGetParams.single['artifactScope'],
-          'tasks/unit-fixture-task-handle/run-running',
+          taskGetParams.single['appThreadKey'],
+          'unit-fixture-task-handle',
         );
+        expect(
+          taskGetParams.single['openclawSessionKey'],
+          'agent:main:unit-fixture-task-handle',
+        );
+        expect(taskGetParams.single, isNot(contains('sessionKey')));
+        expect(taskGetParams.single, isNot(contains('artifactScope')));
         expect(result.success, isTrue);
         expect(result.message, 'completed after task handle');
         expect(result.artifacts.single.relativePath, 'reports/final.md');
@@ -1200,8 +1245,19 @@ void main() {
           if (method == 'session.start') {
             final event = jsonEncode(<String, dynamic>{
               'jsonrpc': '2.0',
-              'method': 'xworkmate.bridge.accepted',
-              'params': <String, dynamic>{'sessionId': 'unit-fixture-task-c'},
+              'method': 'session.update',
+              'params': <String, dynamic>{
+                'sessionId': 'unit-fixture-task-c',
+                'threadId': 'unit-fixture-task-c',
+                'turnId': 'turn-failed',
+                'type': 'status',
+                'event': 'running',
+                'status': 'running',
+                'runId': 'turn-failed',
+                'appThreadKey': 'unit-fixture-task-c',
+                'openclawSessionKey': 'agent:main:unit-fixture-task-c',
+                'gatewayProviderId': 'openclaw',
+              },
             });
             final eventBytes = utf8.encode('data: $event\n\n');
             request.response.headers.set(
