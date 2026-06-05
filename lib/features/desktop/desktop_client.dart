@@ -38,6 +38,9 @@ Future<MediaStream?> desktopRemoteVideoStreamForTrack(
   if (event.track.kind != 'video') {
     return null;
   }
+  if (event.streams.isNotEmpty) {
+    return event.streams.first;
+  }
   final stream = await createFallbackStream('xworkmate-remote-desktop');
   await stream.addTrack(event.track);
   return stream;
