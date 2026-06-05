@@ -961,7 +961,14 @@ extension AppControllerDesktopThreadActions on AppController {
         'finalDeliverableDetection': 'remote-runtime',
         'requiresExportBeforeFinalResponse': true,
         'rejectTextOnlyFileClaims': true,
-        'expectedArtifactDirs': const <String>['artifacts/'],
+        'expectedArtifactDirs': const <String>[
+          'artifacts/',
+          'reports/',
+          'exports/',
+          'assets/',
+          'assets/images/',
+          'dist/',
+        ],
         'currentTaskWorkspace': executionWorkspace.isNotEmpty
             ? executionWorkspace
             : (remoteHint.isNotEmpty ? remoteHint : localWorkspace),
