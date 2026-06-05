@@ -1573,25 +1573,31 @@ extension AppControllerDesktopThreadActions on AppController {
       return;
     }
     if (aiGatewayPendingSessionKeysInternal.contains(sessionKey)) {
-      try {
-        await goTaskServiceClientInternal.cancelTask(
-          route: GoTaskServiceRoute.externalAcpSingle,
-          target: assistantExecutionTargetForSession(sessionKey),
-          sessionId: sessionKey,
-          threadId: sessionKey,
-          association: taskThreadForSessionInternal(
-            sessionKey,
-          )?.openClawTaskAssociation,
-        );
-      } catch (error) {
-        debugPrint('OpenClaw cancellation fallback: $error');
-        // Best effort cancellation only. Local state must still leave pending.
-      }
+      await cancelAssistantTaskForSessionInternal(sessionKey);
       removeQueuedOpenClawGatewayTurnsForSessionInternal(sessionKey);
       removeActiveOpenClawGatewayTurnsForSessionInternal(sessionKey);
       markOpenClawGatewayTurnAbortedInternal(sessionKey);
       drainOpenClawGatewayQueueInternal();
       return;
+    }
+  }
+
+  Future<void> cancelAssistantTaskForSessionInternal(String sessionKey) async {
+    final normalized = normalizedAssistantSessionKeyInternal(sessionKey);
+    final association = taskThreadForSessionInternal(
+      normalized,
+    )?.openClawTaskAssociation;
+    try {
+      await goTaskServiceClientInternal.cancelTask(
+        route: GoTaskServiceRoute.externalAcpSingle,
+        target: assistantExecutionTargetForSession(normalized),
+        sessionId: normalized,
+        threadId: normalized,
+        association: association,
+      );
+    } catch (error) {
+      debugPrint('OpenClaw cancellation fallback: $error');
+      // Best effort cancellation only. Local state must still leave pending.
     }
   }
 

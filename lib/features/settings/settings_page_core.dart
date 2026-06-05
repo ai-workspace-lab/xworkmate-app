@@ -345,6 +345,10 @@ class _SettingsPageState extends State<SettingsPage> {
     await widget.controller.deleteArchivedAssistantTask(sessionKey);
   }
 
+  Future<void> _stopArchivedTask(String sessionKey) async {
+    await widget.controller.cancelAssistantTaskForSessionInternal(sessionKey);
+  }
+
   Future<SettingsAboutSnapshot> _loadAboutSnapshot() async {
     final bridgeEndpoint =
         widget.controller.resolveGatewayAcpEndpointInternal() ??
@@ -523,6 +527,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   sessions: controller.archivedAssistantSessions,
                   onRestore: _restoreArchivedTask,
                   onDelete: _deleteArchivedTask,
+                  onStop: (sessionKey) => _stopArchivedTask(sessionKey),
                 ),
               ),
             ] else if (currentTab == SettingsTab.remoteDesktop) ...[
