@@ -359,15 +359,10 @@ extension AppControllerDesktopThreadActions on AppController {
         bridgeCapabilityRefreshNeededForAssistantTargetInternal(
           currentTarget,
         )) {
-      try {
-        await refreshAcpCapabilitiesInternal(forceRefresh: true);
-        connectionState = assistantConnectionStateForSession(
-          normalizedSessionKey,
-        );
-      } catch (error) {
-        debugPrint('Gateway capability refresh fallback: $error');
-        // Fallback to existing connection state if refresh fails.
-      }
+      await refreshAcpCapabilitiesInternal(forceRefresh: true);
+      connectionState = assistantConnectionStateForSession(
+        normalizedSessionKey,
+      );
     }
     if (!connectionState.connected) {
       final error = StateError(connectionState.detailLabel);
@@ -410,12 +405,7 @@ extension AppControllerDesktopThreadActions on AppController {
       throw error;
     }
     if (providerCatalogForExecutionTarget(currentTarget).isEmpty) {
-      try {
-        await refreshSingleAgentCapabilitiesInternal(forceRefresh: true);
-      } catch (error) {
-        debugPrint('Gateway provider catalog refresh fallback: $error');
-        // Keep the local guard focused on the post-refresh catalog state.
-      }
+      await refreshSingleAgentCapabilitiesInternal(forceRefresh: true);
       if (providerCatalogForExecutionTarget(currentTarget).isEmpty) {
         upsertTaskThreadInternal(
           normalizedSessionKey,
@@ -784,16 +774,6 @@ extension AppControllerDesktopThreadActions on AppController {
           continue;
         }
         if (aiGatewayPendingSessionKeysInternal.contains(sessionKey)) {
-          final hasRequiredExts = current.requiredArtifactExtensions.isNotEmpty;
-          final hasEnoughArtifacts = !hasRequiredExts ||
-              current.requiredArtifactExtensions.every((ext) {
-                return result.artifacts.any(
-                  (a) => a.relativePath.toLowerCase().endsWith(ext.toLowerCase()),
-                );
-              });
-          if (!hasEnoughArtifacts && attempt < maxAttempts - 1) {
-            continue;
-          }
           await applyGatewayChatResultInternal(
             sessionKey: sessionKey,
             target: target,
@@ -1296,8 +1276,6 @@ extension AppControllerDesktopThreadActions on AppController {
     notifyIfActiveInternal();
   }
 
-
-
   Future<void> applyGatewayChatResultInternal({
     required String sessionKey,
     required AssistantExecutionTarget target,
@@ -1327,11 +1305,15 @@ extension AppControllerDesktopThreadActions on AppController {
       lifecycleStatus: 'ready',
       lastRunAtMs: completedAtMs,
       lastResultCode: terminalResultCode,
-      clearOpenClawTaskAssociation: true,
       updatedAtMs: completedAtMs,
     );
     if (isOpenClawNoExportedArtifactsGuardResultInternal(result)) {
       await persistGoTaskArtifactsForSessionInternal(sessionKey, result);
+      upsertTaskThreadInternal(
+        sessionKey,
+        clearOpenClawTaskAssociation: true,
+        updatedAtMs: completedAtMs,
+      );
       return;
     }
     if (!result.success) {
@@ -1340,6 +1322,7 @@ extension AppControllerDesktopThreadActions on AppController {
         lastArtifactSyncAtMs: completedAtMs,
         lastArtifactSyncStatus: 'failed',
         lastTaskArtifactRelativePaths: const <String>[],
+        clearOpenClawTaskAssociation: true,
         updatedAtMs: completedAtMs,
       );
       appendLocalSessionMessageInternal(
@@ -1365,6 +1348,7 @@ extension AppControllerDesktopThreadActions on AppController {
         lastArtifactSyncAtMs: completedAtMs,
         lastArtifactSyncStatus: 'failed',
         lastTaskArtifactRelativePaths: const <String>[],
+        clearOpenClawTaskAssociation: true,
         updatedAtMs: completedAtMs,
       );
       appendLocalSessionMessageInternal(
@@ -1404,6 +1388,7 @@ extension AppControllerDesktopThreadActions on AppController {
       lifecycleStatus: 'ready',
       lastRunAtMs: completedAtMs,
       lastResultCode: terminalResultCode,
+      clearOpenClawTaskAssociation: true,
       updatedAtMs: completedAtMs,
     );
   }
@@ -1546,23 +1531,28 @@ extension AppControllerDesktopThreadActions on AppController {
 
   bool gatewayResultCodeRequiresNewSessionInternal(String code) {
     final normalized = code.trim().toUpperCase();
-    if (normalized.isEmpty ||
-        normalized == 'ACP_HTTP_CONNECTION_CLOSED') {
+    if (normalized.isEmpty || normalized == 'ACP_HTTP_CONNECTION_CLOSED') {
       return false;
     }
-    if (normalized == 'RUNNING' ||
-        normalized == 'QUEUED' ||
-        normalized == 'ABORTED' ||
-        normalized == 'BRIDGE_NOT_CONNECTED' ||
-        normalized == 'ARTIFACT_MISSING') {
-      return true;
-    }
-    if (normalized.startsWith('OPENCLAW_') ||
-        normalized.startsWith('ACP_HTTP_') ||
-        normalized.startsWith('GATEWAY_')) {
-      return true; // Conservative fallback for unrecognized infrastructure/gateway errors
-    }
-    return false;
+    return const <String>{
+      'RUNNING',
+      'QUEUED',
+      'ABORTED',
+      'BRIDGE_NOT_CONNECTED',
+      'ARTIFACT_MISSING',
+      'OPENCLAW_ARTIFACT_MISSING',
+      'OPENCLAW_GATEWAY_QUEUE_FULL',
+      'OPENCLAW_GATEWAY_SOCKET_CLOSED',
+      'OPENCLAW_NO_DISPLAYABLE_OUTPUT',
+      'OPENCLAW_NO_EXPORTED_ARTIFACTS',
+      'OPENCLAW_WAIT_FAILED',
+      'ACP_HTTP_401',
+      'ACP_HTTP_502',
+      'ACP_HTTP_CONNECT_FAILED',
+      'ACP_HTTP_CONNECT_TIMEOUT',
+      'ACP_HTTP_HANDSHAKE_INTERRUPTED',
+      'GATEWAY_TASK_REJECTED',
+    }.contains(normalized);
   }
 
   Future<void> abortRun() async {
@@ -1587,27 +1577,17 @@ extension AppControllerDesktopThreadActions on AppController {
     final association = taskThreadForSessionInternal(
       normalized,
     )?.openClawTaskAssociation;
-    try {
-      await goTaskServiceClientInternal.cancelTask(
-        route: GoTaskServiceRoute.externalAcpSingle,
-        target: assistantExecutionTargetForSession(normalized),
-        sessionId: normalized,
-        threadId: normalized,
-        association: association,
-      );
-    } catch (error) {
-      debugPrint('OpenClaw cancellation fallback: $error');
-      // Best effort cancellation only. Local state must still leave pending.
-    }
+    await goTaskServiceClientInternal.cancelTask(
+      route: GoTaskServiceRoute.externalAcpSingle,
+      target: assistantExecutionTargetForSession(normalized),
+      sessionId: normalized,
+      threadId: normalized,
+      association: association,
+    );
   }
 
   Future<void> prepareForExit() async {
-    try {
-      await abortRun();
-    } catch (error) {
-      debugPrint('Prepare for exit abort fallback: $error');
-      // Best effort only. Native termination still proceeds.
-    }
+    await abortRun();
     await flushAssistantThreadPersistenceInternal();
   }
 
