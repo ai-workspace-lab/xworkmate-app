@@ -6,8 +6,7 @@ import 'gateway_acp_client.dart';
 import 'go_task_service_client.dart';
 import 'runtime_models.dart';
 
-class ExternalCodeAgentAcpDesktopTransport
-    implements GoTaskServiceClient {
+class ExternalCodeAgentAcpDesktopTransport implements GoTaskServiceClient {
   ExternalCodeAgentAcpDesktopTransport({
     required GatewayAcpClient client,
     required Uri? Function(AssistantExecutionTarget target) endpointResolver,
@@ -26,8 +25,6 @@ class ExternalCodeAgentAcpDesktopTransport
   final Duration _recoveryPollDelay;
   final int? _recoveryMaxAttempts;
 
-
-
   @override
   Future<GoTaskServiceResult> executeTask(
     GoTaskServiceRequest request, {
@@ -35,7 +32,6 @@ class ExternalCodeAgentAcpDesktopTransport
   }) async {
     var streamedText = '';
     String? completedMessage;
-    Map<String, dynamic>? completedResultSnapshot;
     Map<String, dynamic>? runningTaskSnapshot;
     try {
       final endpointOverride = _taskEndpointResolver == null
@@ -65,9 +61,6 @@ class ExternalCodeAgentAcpDesktopTransport
           }
           if (update.isDone && update.message.trim().isNotEmpty) {
             completedMessage = update.message.trim();
-            completedResultSnapshot = _completedResultSnapshotFromUpdate(
-              update,
-            );
           }
           if (update.payload['status']?.toString().trim().toLowerCase() ==
                   'running' &&
@@ -92,23 +85,10 @@ class ExternalCodeAgentAcpDesktopTransport
               : _taskEndpointResolver.call(request),
           streamedText: streamedText,
           completedMessage: completedMessage,
-          fallbackAvailable: completedResultSnapshot != null,
           runningTaskSnapshot: runningTaskSnapshot,
         );
         if (recovered != null) {
           return recovered;
-        }
-        if (completedResultSnapshot != null) {
-          return goTaskServiceResultFromAcpResponse(
-            <String, dynamic>{
-              'jsonrpc': '2.0',
-              'id': 'recovered-from-completed-session-update',
-              'result': completedResultSnapshot,
-            },
-            route: request.route,
-            streamedText: streamedText,
-            completedMessage: completedMessage,
-          );
         }
       }
       rethrow;
@@ -141,7 +121,6 @@ class ExternalCodeAgentAcpDesktopTransport
     required Uri? taskEndpoint,
     required String streamedText,
     required String? completedMessage,
-    bool fallbackAvailable = false,
     Map<String, dynamic>? runningTaskSnapshot,
   }) async {
     final endpoint = _sessionSnapshotEndpoint(taskEndpoint);
@@ -160,7 +139,8 @@ class ExternalCodeAgentAcpDesktopTransport
       try {
         response = await _client.request(
           method: 'xworkmate.tasks.get',
-          params: association?.toTaskGetParams() ??
+          params:
+              association?.toTaskGetParams() ??
               <String, dynamic>{
                 'sessionId': request.sessionId,
                 'threadId': request.threadId,
@@ -168,9 +148,6 @@ class ExternalCodeAgentAcpDesktopTransport
           endpointOverride: endpoint,
         );
       } on GatewayAcpException {
-        if (fallbackAvailable) {
-          return null;
-        }
         continue;
       } on SocketException {
         continue;
@@ -198,14 +175,6 @@ class ExternalCodeAgentAcpDesktopTransport
         );
       }
       final result = _recoveredResultFromTaskSnapshot(snapshot);
-      final resultArtifacts = _castMap(result['artifacts']);
-      final artifactItems = resultArtifacts['items'] ?? resultArtifacts;
-      final hasArtifacts = result.isNotEmpty &&
-          (artifactItems is List && artifactItems.isNotEmpty ||
-           result['artifacts'] is List && (result['artifacts'] as List).isNotEmpty);
-      if (!hasArtifacts && status == 'completed' && attempt < attempts - 1) {
-        continue;
-      }
       if (result.isNotEmpty) {
         return goTaskServiceResultFromAcpResponse(
           <String, dynamic>{
@@ -287,43 +256,8 @@ class ExternalCodeAgentAcpDesktopTransport
     );
   }
 
-
-
   @override
   Future<void> dispose() => _client.dispose();
-
-  Map<String, dynamic>? _completedResultSnapshotFromUpdate(
-    GoTaskServiceUpdate update,
-  ) {
-    if (!update.isDone) {
-      return null;
-    }
-    final payload = update.payload;
-    final embeddedResult = _castMap(payload['result']);
-    final snapshot = <String, dynamic>{...embeddedResult, ...payload};
-    snapshot.remove('sessionId');
-    snapshot.remove('threadId');
-    snapshot.remove('type');
-    snapshot.remove('event');
-    snapshot.remove('pending');
-    snapshot.remove('result');
-    snapshot['turnId'] = update.turnId;
-    snapshot['success'] = !update.error;
-    final text = _firstNonEmptyDisplayText(snapshot, const <String>[
-      'output',
-      'message',
-      'summary',
-      'text',
-      'delta',
-    ]);
-    if (text.isNotEmpty) {
-      snapshot['output'] = text;
-      snapshot['message'] = text;
-      snapshot['summary'] = text;
-    }
-    return snapshot;
-  }
-
   Map<String, dynamic> _recoveredResultFromTaskSnapshot(
     Map<String, dynamic> snapshot,
   ) {

@@ -62,7 +62,7 @@ xworkmate-bridge
           ├─ Routing engine: Resolve(params, prompt, memory)
           │   ├─ Heuristic: looksLocal() / looksOnline()
           │   ├─ Memory preferences
-          │   └─ LLM classifier fallback
+          │   └─ LLM classifier path
           │
           ├─ openClawGatewayAdmissionGate.acquire()
           │   ├─ maxActive: 5, maxQueued: 20
@@ -169,6 +169,7 @@ now copied into tasks/<session>/<run>/artifacts/ before export.
     ExternalCodeAgentAcpDesktopTransport
       ├─ Receive terminal snapshot via SSE or xworkmate.tasks.get
       ├─ applyGatewayChatResult()
+      │   ├─ Terminal snapshot → lifecycleStatus=ready
       │   ├─ success=true && artifacts present → syncArtifactsFromBridge()
       │   ├─ success=false → lastResultCode=failed
       │   └─ no-exported-artifacts → lastArtifactSyncStatus=no-exported-artifacts
@@ -176,6 +177,11 @@ now copied into tasks/<session>/<run>/artifacts/ before export.
       └─ syncArtifactsFromBridge()
          └─ Download each artifact via /artifacts/openclaw/download
             → Save to ~/.xworkmate/threads/<session>/
+
+Rule: the app must not keep an OpenClaw task in `running` after a bridge
+terminal snapshot. Missing or incomplete artifacts are represented only through
+`lastArtifactSyncStatus` (`no-exported-artifacts`, `partial`, `download-failed`,
+etc.), not by extending the task execution lifecycle.
 ```
 
 ## Key Files by Repo
@@ -217,4 +223,4 @@ now copied into tasks/<session>/<run>/artifacts/ before export.
 4. **F4: Admission gate rejection** — Queue full → OPENCLAW_GATEWAY_BUSY → app must handle
 5. **F5: Bridge restart** — In-memory sessions lost → app must detect and recover
 6. **F6: Artifact ref key rotation** — Secret change invalidates all signed refs
-7. **F7: SSE stream interruption** — Polling fallback must have correct timeout/retry
+7. **F7: SSE stream interruption** — Recovery polling must align with bridge task deadlines and must apply terminal snapshots immediately
