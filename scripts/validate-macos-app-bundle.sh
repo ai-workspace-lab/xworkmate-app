@@ -68,6 +68,20 @@ is_macho_file() {
   otool -L "$path" >/dev/null 2>&1
 }
 
+validate_no_test_only_frameworks() {
+  local app_path="$1"
+  local frameworks_dir="$app_path/Contents/Frameworks"
+  [[ -d "$frameworks_dir" ]] || return 0
+
+  local forbidden_framework
+  for forbidden_framework in patrol.framework; do
+    if [[ -e "$frameworks_dir/$forbidden_framework" ]]; then
+      echo "Test-only framework must not be bundled in packaged app: $frameworks_dir/$forbidden_framework" >&2
+      return 1
+    fi
+  done
+}
+
 resolve_dependency() {
   local dependency="$1"
   local binary_path="$2"
@@ -177,6 +191,8 @@ validate_binary() {
 }
 
 echo "Validating macOS app bundle dynamic dependencies: $APP_PATH"
+
+validate_no_test_only_frameworks "$APP_PATH"
 
 EXECUTABLE_DIR="$(cd "$APP_PATH/Contents/MacOS" && pwd)"
 declare -a macho_files=("$MAIN_EXECUTABLE")

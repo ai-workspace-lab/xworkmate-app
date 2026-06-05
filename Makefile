@@ -62,8 +62,7 @@ test-api-scenario-contract: ## Run the scenario-oriented API script against exte
 check-api-external: test-api-contract test-api-scenario-contract ## Run both external API validation scripts
 
 test-patrol: ## Run Patrol end-to-end tests
-	dart pub global activate patrol_cli
-	patrol test
+	bash scripts/ci/run_patrol_suite.sh
 
 test-go: ## Run xworkmate-bridge Go unit tests
 	cd ../xworkmate-bridge && go test ./...
