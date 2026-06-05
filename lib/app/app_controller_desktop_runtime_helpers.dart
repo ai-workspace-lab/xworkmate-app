@@ -334,31 +334,7 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
         : null;
   }
 
-  bool isOpenClawNoExportedArtifactsGuardResultInternal(
-    GoTaskServiceResult result,
-  ) {
-    if (result.artifacts.isNotEmpty) {
-      return false;
-    }
-    final status = result.status.trim().toLowerCase();
-    if (status == 'artifact_missing') {
-      return true;
-    }
-    final code = result.code.trim().toUpperCase();
-    if (code == 'OPENCLAW_ARTIFACT_MISSING' ||
-        code == 'OPENCLAW_NO_EXPORTED_ARTIFACTS') {
-      return true;
-    }
-    final warnings = result.raw['artifactWarnings'];
-    if (warnings is List) {
-      return warnings.any((item) {
-        final text = item?.toString().toLowerCase() ?? '';
-        return text.contains('openclaw artifact export returned no files') ||
-            text.contains('no files for a file-delivery request');
-      });
-    }
-    return false;
-  }
+
 
   Future<List<String>> recoverGatewayFailureArtifactPathsInternal(
     String sessionKey,
@@ -778,9 +754,7 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
           existingThread.openClawTaskAssociation?.requiredArtifactExtensions ??
           const <String>[];
       final currentTaskArtifactRelativePaths =
-          isOpenClawNoExportedArtifactsGuardResultInternal(result)
-          ? const <String>[]
-          : await _workspaceArtifactPathsModifiedSinceInternal(
+          await _workspaceArtifactPathsModifiedSinceInternal(
               root,
               existingThread.lifecycleState.lastRunAtMs,
               artifactSyncPolicy,
@@ -798,11 +772,7 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
       upsertTaskThreadInternal(
         normalizedSessionKey,
         lastArtifactSyncAtMs: syncedAtMs,
-        lastArtifactSyncStatus:
-            isOpenClawNoExportedArtifactsGuardResultInternal(result) ||
-                requiredExts.isNotEmpty
-            ? 'no-exported-artifacts'
-            : 'no-artifacts',
+        lastArtifactSyncStatus: 'no-artifacts',
         updatedAtMs: syncedAtMs,
       );
       return;
@@ -888,8 +858,6 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
               : 'synced')
         : failedArtifact
         ? 'download-failed'
-        : rejectedArtifact
-        ? 'no-exported-artifacts'
         : 'no-artifacts';
     final currentTaskArtifactRelativePaths = wroteArtifact
         ? (currentTaskArtifactPaths.toList(growable: false)..sort())

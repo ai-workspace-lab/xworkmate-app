@@ -1350,7 +1350,7 @@ void main() {
       final thread = controller.requireTaskThreadForSessionInternal(
         'unit-fixture-task-a',
       );
-      expect(thread.lastArtifactSyncStatus, 'no-exported-artifacts');
+      expect(thread.lastArtifactSyncStatus, 'no-artifacts');
       expect(thread.lastArtifactSyncAtMs, greaterThan(0));
     },
   );
@@ -1432,7 +1432,7 @@ void main() {
     final thread = controller.requireTaskThreadForSessionInternal(
       'unit-fixture-task-a',
     );
-    expect(thread.lastArtifactSyncStatus, 'no-exported-artifacts');
+    expect(thread.lastArtifactSyncStatus, 'no-artifacts');
     expect(thread.lastTaskArtifactRelativePaths, isEmpty);
   });
 

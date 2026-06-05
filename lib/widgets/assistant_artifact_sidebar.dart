@@ -399,13 +399,6 @@ class _AssistantArtifactSidebarState extends State<AssistantArtifactSidebar> {
   }
 
   String _filesEmptyMessage(AssistantArtifactSnapshot snapshot) {
-    if (widget.artifactSyncStatus.trim().toLowerCase() ==
-        'no-exported-artifacts') {
-      return appText(
-        '本轮没有检测到实际生成的文件。请重新执行，并要求 OpenClaw 在当前 workspace 中创建文件。',
-        'No exported files were detected for this run. Run it again and ask OpenClaw to create files in the current workspace.',
-      );
-    }
     final filesMessage = snapshot.filesMessage.trim();
     if (filesMessage.isNotEmpty) {
       return filesMessage;
