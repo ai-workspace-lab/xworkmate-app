@@ -4,6 +4,22 @@
 - For any change that touches gateway auth, `.env`, secure storage, tokens, passwords, TLS, file upload, native entitlements, packaging, or release-sensitive settings, follow the security rules in this file and [docs/security/secure-development-rules.md](docs/security/secure-development-rules.md).
 - For non-trivial implementation work, default to the worktree-first execution flow in this file without asking the user to restate that preference each time.
 
+## Cross-Repo Architecture Chain Maps
+
+When modifying code that crosses repo boundaries (app ↔ bridge ↔ OpenClaw ↔ plugins), consult the corresponding chain map first. Each map documents the full call flow, protocol boundaries, data structures, and known fragile points across all participating repositories.
+
+Required reading before modifying:
+- **Task execution**: [chain-map-task-execution.md](docs/architecture/chain-map-task-execution.md) — full path from `sendChatMessage()` through bridge routing, OpenClaw gateway, to plugin artifact export.
+- **Artifact lifecycle**: [chain-map-artifact-lifecycle.md](docs/architecture/chain-map-artifact-lifecycle.md) — prepare → execute → export → snapshot → download → sync. Documents the critical path gap where OpenClaw tools save to `~/.openclaw/media/` or `/tmp/` instead of `tasks/<session>/<run>/`.
+- **Session recovery**: [chain-map-session-recovery.md](docs/architecture/chain-map-session-recovery.md) — app restart, bridge restart, network interruption, gateway unreachable scenarios and their state machines.
+- **Bridge distributed**: [chain-map-bridge-distributed.md](docs/architecture/chain-map-bridge-distributed.md) — primary→edge forwarding topology, session stickiness, VPN transport, hop limits.
+- **Overview**: [cross-repo-call-analysis-2026-06-05.md](docs/architecture/cross-repo-call-analysis-2026-06-05.md) — complete cross-repo module relationship map, protocol boundaries, key data structures, and top-10 fragile points.
+
+When any change touches the bridge protocol, artifact paths, session state, or routing/recovery logic:
+- Verify the change against each affected chain map.
+- If the change introduces a new call path, data field, or protocol behavior, update the corresponding chain map in the same PR.
+- Pay special attention to the artifact path gap: OpenClaw tools produce output in `~/.openclaw/media/` and `/tmp/openclaw/` but the export plugin only scans `tasks/<session>/<run>/`. Any feature that adds OpenClaw tool usage must ensure outputs land in the task-scoped directory.
+
 ## Default Task Mode
 
 - Default to an isolated `git worktree` for non-trivial tasks. Create the worktree from `main`, do the work there, merge back to `main`, then remove the temporary worktree when done.

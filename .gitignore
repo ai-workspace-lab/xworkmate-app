@@ -67,3 +67,6 @@ app.*.map.json
 
 # Gradle artifacts (including third_party)
 **/.gradle/
+
+# Repomix — dynamically generated, not committed
+repomix-output.xml
