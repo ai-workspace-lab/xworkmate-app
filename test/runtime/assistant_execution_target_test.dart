@@ -1312,6 +1312,17 @@ void main() {
                 .cast<String, dynamic>();
         expect(artifactContract['finalDeliverableDetection'], 'remote-runtime');
         expect(artifactContract['requiresExportBeforeFinalResponse'], isTrue);
+        expect(
+          artifactContract['expectedArtifactDirs'],
+          const <String>[
+            'artifacts/',
+            'reports/',
+            'exports/',
+            'assets/',
+            'assets/images/',
+            'dist/',
+          ],
+        );
         expect(artifactContract, isNot(contains('expectedArtifactExtensions')));
         expect(request.prompt, isNot(contains('Task load classification:')));
         expect(
@@ -1357,6 +1368,17 @@ void main() {
                 .cast<String, dynamic>();
         expect(artifactContract['scopeKind'], 'task');
         expect(artifactContract['rejectTextOnlyFileClaims'], isTrue);
+        expect(
+          artifactContract['expectedArtifactDirs'],
+          const <String>[
+            'artifacts/',
+            'reports/',
+            'exports/',
+            'assets/',
+            'assets/images/',
+            'dist/',
+          ],
+        );
         expect(
           artifactContract['currentTaskWorkspace'],
           request.workingDirectory,
