@@ -156,6 +156,7 @@ class AppController extends ChangeNotifier {
           client: gatewayAcpClientInternal,
           endpointResolver: resolveExternalAcpEndpointForTargetInternal,
           taskEndpointResolver: resolveExternalAcpEndpointForRequestInternal,
+          recoveryMaxAttempts: 1800,
         );
     bridgeAgentProviderCatalogInternal = normalizeSingleAgentProviderList(
       initialBridgeProviderCatalog ?? const <SingleAgentProvider>[],
