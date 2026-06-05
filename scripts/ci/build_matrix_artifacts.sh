@@ -26,10 +26,30 @@ case "$platform" in
     pwsh -File ./scripts/package-windows-msi.ps1 -Arch "$arch"
     ;;
   ios)
-    if [[ "$should_release" == "true" ]]; then
-      bash ./scripts/package-ios-ipa.sh
+    ios_signing_secrets=(
+      APPLE_CERT_P12_BASE64
+      APPLE_CERT_PASSWORD
+      APPLE_PROVISION_PROFILE_BASE64
+      APPLE_KEYCHAIN_PASSWORD
+    )
+    ios_missing=()
+    for var_name in "${ios_signing_secrets[@]}"; do
+      if [[ -z "${!var_name:-}" ]]; then
+        ios_missing+=("$var_name")
+      fi
+    done
+
+    if [[ "${#ios_missing[@]}" -gt 0 ]]; then
+      echo "Apple signing secrets unavailable (missing: ${ios_missing[*]}); building unsigned iOS app bundle."
+      build_unsigned_ios_bundle=1
+    elif [[ "$should_release" == "true" ]]; then
+      build_unsigned_ios_bundle=0
     else
-      echo "Release secrets not required for non-release runs; building unsigned iOS app bundle."
+      echo "Release not requested; building unsigned iOS app bundle."
+      build_unsigned_ios_bundle=1
+    fi
+
+    if [[ "$build_unsigned_ios_bundle" -eq 1 ]]; then
       flutter build ios --release --no-codesign \
         --build-name="$PLATFORM_RELEASE_VERSION" \
         --build-number="$BUILD_NUMBER" \
@@ -42,6 +62,8 @@ case "$platform" in
         zip -qry XWorkmate.app.zip Runner.app
         mv XWorkmate.app.zip ../../../dist/ios/
       )
+    else
+      bash ./scripts/package-ios-ipa.sh
     fi
     ;;
   android)
