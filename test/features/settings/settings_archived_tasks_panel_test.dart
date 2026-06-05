@@ -18,6 +18,7 @@ void main() {
           sessions: const <GatewaySessionSummary>[],
           onRestore: (_) async {},
           onDelete: (_) async {},
+          onStop: null,
         ),
       ),
     );
@@ -66,6 +67,9 @@ void main() {
           onDelete: (sessionKey) async {
             calls.add('delete:$sessionKey');
           },
+          onStop: (sessionKey) async {
+            calls.add('stop:$sessionKey');
+          },
         ),
       ),
     );
@@ -81,6 +85,14 @@ void main() {
     await tester.pump();
 
     expect(calls, contains('restore:draft:archived-task'));
+
+    await tester.tap(
+      find.byKey(
+        const ValueKey('settings-archived-task-stop-draft:archived-task'),
+      ),
+    );
+    await tester.pump();
+    expect(calls, contains('stop:draft:archived-task'));
 
     await tester.tap(
       find.byKey(
@@ -132,6 +144,9 @@ void main() {
           onDelete: (sessionKey) async {
             calls.add('delete:$sessionKey');
           },
+          onStop: (sessionKey) async {
+            calls.add('stop:$sessionKey');
+          },
         ),
       ),
     );
@@ -173,6 +188,9 @@ void main() {
           },
           onDelete: (sessionKey) async {
             calls.add('delete:$sessionKey');
+          },
+          onStop: (sessionKey) async {
+            calls.add('stop:$sessionKey');
           },
         ),
       ),
