@@ -99,7 +99,7 @@ post_install do |installer|
     target.build_configurations.each do |config|
       config.build_settings['MACOSX_DEPLOYMENT_TARGET'] = '11.5'
 
-      next unless ['patrol', 'CocoaAsyncSocket', 'Pods-Runner', 'Pods-RunnerTests', 'WebRTC-SDK', 'flutter_webrtc'].include?(target.name)
+      next unless ['Pods-Runner', 'Pods-RunnerTests', 'WebRTC-SDK', 'flutter_webrtc'].include?(target.name)
 
       append_ignored_attributes_suppression.call(config.build_settings)
       append_deprecation_suppression.call(config.build_settings)
