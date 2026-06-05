@@ -60,11 +60,12 @@ xworkmate-app                                    xworkmate-bridge
 ─────────────                                    ────────────────
 lib/runtime/external_code_agent_acp_desktop_transport.dart
   ExternalCodeAgentAcpTransport
-    → session.start(provider="gateway")
+    → session.start(routing: gateway/openclaw,
+                    metadata.xworkmateTaskArtifactContract.expectedArtifactDirs)
       └─ lib/runtime/gateway_acp_client.dart
-           → POST /gateway/openclaw ────────────────► internal/acp/http_handler.go
-           │                                            HandleOpenClawRPC()
-           │                                              └─ internal/acp/gateway.go
+           → WebSocket /acp or POST /acp/rpc ───────► internal/acp/http_handler.go
+           │                                            HandleWebSocket()/HandleRPC()
+           │                                              └─ internal/acp/rpc_handler.go
            │                                                   Orchestrator.Process()
            │                                                     │
            │                                                     ├─ 本地 gateway
@@ -99,6 +100,12 @@ lib/app/app_controller_openclaw_task_queue.dart
     → 持久化 & 恢复 (pollOpenClawTaskAssociationInternal)
 ```
 
+Protocol boundary:
+- `expectedArtifactDirs` is not a `chat.send` root parameter.
+- App sends it only as `metadata.xworkmateTaskArtifactContract.expectedArtifactDirs` on `session.start`.
+- Bridge maps it only into `xworkmate.artifacts.export` and `xworkmate.artifacts.collect-and-snapshot`.
+- Bridge must reject old root/metadata compatibility paths instead of probing fallback keys.
+
 ### 涉及的 key files:
 | 层 | 文件 | 作用 |
 |----|------|------|
@@ -107,7 +114,7 @@ lib/app/app_controller_openclaw_task_queue.dart
 | app | `lib/runtime/go_task_service_desktop_service.dart` | 桌面任务服务 |
 | app | `lib/app/app_controller_openclaw_task_queue.dart` | 客户端任务队列 |
 | bridge | `internal/acp/gateway.go` | OpenClaw 集成 |
-| bridge | `internal/acp/http_handler.go` | `/gateway/openclaw` 端点 |
+| bridge | `internal/acp/http_handler.go` | `/acp` / `/acp/rpc` 端点 |
 | bridge | `internal/gatewayruntime/runtime.go` | 网关 WS 客户端 |
 | bridge | `internal/acp/distributed_forwarder.go` | 分布式转发 |
 | plugins | `index.ts` | 插件入口 |
@@ -198,49 +205,28 @@ lib/runtime/opencode_config_bridge.dart
 
 ---
 
-## Chain 5: 多 Agent 编排 (Plugin → Bridge 反向调用)
+## Chain 5: 已移除的 Plugin → Bridge 反向调用
 
 ```
-openclaw-multi-session-plugins                   xworkmate-bridge
-─────────────────────────────                    ────────────────
-src/bridgeAgents.ts
-  run(input)
-    → fetch(bridgeUrl, {
-        method: "POST",
-        body: { jsonrpc: "2.0",
-                method: "session.start",
-                params: {
-                  sessionId: "openclaw:<sessionKey>",
-                  multiAgent: true,
-                  mode: "multi-agent",
-                  routing: { orchestrationMode, steps, ... }
-                }
-              }
-      })
-      → HTTP POST /acp/rpc ──────────────────────► internal/acp/rpc_handler.go
-                                                      handleRequest("session.start", ...)
-                                                        └─ internal/router/
-                                                             → Orchestrator.Process()
-                                                               → 多 agent 协作
-                                                               → 结果返回插件
+旧链路:
+  openclaw-multi-session-plugins/src/bridgeAgents.ts
+    → HTTP POST xworkmate-bridge /acp/rpc
+    → session.start(multiAgent=true)
 
-src/exportArtifacts.ts
-  → 结果写入 artifactDirectory
-    → multi-agent-result.json
-    → multi-agent-result.md
+当前链路:
+  xworkmate-bridge → OpenClaw Gateway → openclaw-multi-session-plugins
+    → xworkmate.artifacts.*
 ```
 
 ### 涉及的 key files:
 | 层 | 文件 | 作用 |
 |----|------|------|
-| plugins | `src/bridgeAgents.ts` | Bridge HTTP 调用 |
-| bridge | `internal/acp/rpc_handler.go` | RPC 分发 |
-| bridge | `internal/acp/orchestrator.go` | 多 agent 编排 |
+| plugins | `index.ts` / `src/exportArtifacts.ts` | artifact scope adapter |
+| bridge | `internal/acp/orchestrator.go` | OpenClaw gateway orchestration |
 
-### 协议: HTTP JSON-RPC (插件 → Bridge)
+### 协议: 无 Plugin→Bridge 运行时协议
 ### 断点风险:
-- 插件配置中 bridgeUrl 指向错误 → 调用失败
-- 双向循环依赖: plugins 调 bridge, bridge 调 plugins
+- 旧版本插件若仍暴露 bridge agents 工具，会恢复循环依赖，应从 manifest 和 dist 中删除
 
 ---
 
@@ -251,12 +237,11 @@ src/exportArtifacts.ts
                 app    bridge    plugins
               ┌───────┬───────┬───────┐
       app     │   -   │ ACP   │   -   │
-被调   bridge  │   -   │  -    │ HTTP  │
+被调   bridge  │   -   │  -    │  -    │
 方    plugins │   -   │ GW    │   -   │
               └───────┴───────┴───────┘
 
 ACP  = JSON-RPC 2.0 over WebSocket/HTTP SSE
-HTTP = JSON-RPC 2.0 over HTTP POST
 GW   = OpenClaw Gateway RPC over WebSocket (Ed25519)
 ```
 
