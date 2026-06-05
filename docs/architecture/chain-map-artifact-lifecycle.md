@@ -16,6 +16,12 @@ Repo chain: openclaw-multi-session-plugins ↔ xworkmate-bridge ↔ xworkmate-ap
   sync:     save to ~/.xworkmate/threads/<session>/ (xworkmate-app)
 ```
 
+App terminal rule:
+- `completed`, `failed`, `cancelled`, and `canceled` snapshots end task
+  execution immediately.
+- Artifact presence controls only `lastArtifactSyncStatus`; it is not a reason
+  to keep `lifecycleStatus=running`.
+
 ## State 1: Prepare
 
 ```
@@ -47,7 +53,7 @@ Output:
   artifactDirectory: "<workspace>/tasks/<safeSessionKey>/<safeRunId>/"
 
 Fragile:
-  - workspace resolution chain has 5 fallback levels
+  - workspace resolution chain has 5 ordered sources
   - session key format must match across bridge and plugin
   - no cleanup of old scope directories
 ```
@@ -212,6 +218,9 @@ Fragile:
   - If export returns empty manifest, snapshot has no artifacts
   - Artifact download URLs expire after 24h
   - Snapshot stored only in memory (lost on bridge restart)
+  - App execution state must still transition to ready for any terminal
+    snapshot. Empty or incomplete artifact manifests update only artifact sync
+    status; they must not keep the task lifecycle running.
 ```
 
 ## State 6: Download (Bridge Proxy)
