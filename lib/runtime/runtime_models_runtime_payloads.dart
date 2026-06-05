@@ -923,8 +923,9 @@ class OpenClawTaskAssociation {
     required this.gatewayProviderId,
     required this.startedAtMs,
     required this.status,
+    required this.appThreadKey,
+    required this.openclawSessionKey,
     this.taskLoadClass = '',
-    this.sessionKey = '',
     this.requiredArtifactExtensions = const <String>[],
     this.expectedArtifactExtensions = const <String>[],
   });
@@ -938,8 +939,9 @@ class OpenClawTaskAssociation {
   final String gatewayProviderId;
   final double startedAtMs;
   final String status;
+  final String appThreadKey;
+  final String openclawSessionKey;
   final String taskLoadClass;
-  final String sessionKey;
   final List<String> requiredArtifactExtensions;
   final List<String> expectedArtifactExtensions;
 
@@ -962,8 +964,9 @@ class OpenClawTaskAssociation {
       gatewayProviderId: gatewayProviderId,
       startedAtMs: startedAtMs,
       status: status ?? this.status,
+      appThreadKey: appThreadKey,
+      openclawSessionKey: openclawSessionKey,
       taskLoadClass: taskLoadClass,
-      sessionKey: sessionKey,
       requiredArtifactExtensions: requiredArtifactExtensions,
       expectedArtifactExtensions: expectedArtifactExtensions,
     );
@@ -980,8 +983,9 @@ class OpenClawTaskAssociation {
       'gatewayProviderId': gatewayProviderId,
       'startedAtMs': startedAtMs,
       'status': status,
+      'appThreadKey': appThreadKey,
+      'openclawSessionKey': openclawSessionKey,
       'taskLoadClass': taskLoadClass,
-      'sessionKey': sessionKey,
       'requiredArtifactExtensions': requiredArtifactExtensions,
       'expectedArtifactExtensions': expectedArtifactExtensions,
     };
@@ -997,7 +1001,9 @@ class OpenClawTaskAssociation {
       'artifactDirectory': artifactDirectory,
       'gatewayProviderId': gatewayProviderId,
       'taskLoadClass': taskLoadClass,
-      'sessionKey': sessionKey,
+      'appThreadKey': appThreadKey,
+      'openclawSessionKey': openclawSessionKey,
+      'includeArtifacts': true,
       'requiredArtifactExtensions': requiredArtifactExtensions,
       'expectedArtifactExtensions': expectedArtifactExtensions,
     };
@@ -1010,7 +1016,13 @@ class OpenClawTaskAssociation {
     final json = value.cast<String, dynamic>();
     final runId = json['runId']?.toString().trim() ?? '';
     final artifactScope = json['artifactScope']?.toString().trim() ?? '';
-    if (runId.isEmpty || artifactScope.isEmpty) {
+    final appThreadKey = json['appThreadKey']?.toString().trim() ?? '';
+    final openclawSessionKey =
+        json['openclawSessionKey']?.toString().trim() ?? '';
+    if (runId.isEmpty ||
+        artifactScope.isEmpty ||
+        appThreadKey.isEmpty ||
+        openclawSessionKey.isEmpty) {
       return null;
     }
     double asDouble(Object? raw) {
@@ -1038,8 +1050,9 @@ class OpenClawTaskAssociation {
       status: json['status']?.toString().trim().isNotEmpty == true
           ? json['status'].toString().trim()
           : 'running',
+      appThreadKey: appThreadKey,
+      openclawSessionKey: openclawSessionKey,
       taskLoadClass: json['taskLoadClass']?.toString().trim() ?? '',
-      sessionKey: json['sessionKey']?.toString().trim() ?? '',
       requiredArtifactExtensions: _stringListFromJson(
         json['requiredArtifactExtensions'],
       ),
