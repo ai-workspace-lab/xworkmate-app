@@ -4174,13 +4174,13 @@ void main() {
           controller,
           'openclaw-missing-screenshot',
           'ready',
-          const Duration(milliseconds: 500),
+          const Duration(seconds: 10),
         );
         await _waitForThreadArtifactSyncStatusWithin(
           controller,
           'openclaw-missing-screenshot',
           'no-exported-artifacts',
-          const Duration(milliseconds: 500),
+          const Duration(seconds: 10),
         );
 
         final thread = controller.requireTaskThreadForSessionInternal(

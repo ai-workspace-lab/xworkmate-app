@@ -742,6 +742,7 @@ extension AppControllerDesktopThreadActions on AppController {
               math.max(1, pollDelay.inSeconds))
           .ceil(),
     );
+    var artifactRetries = 0;
     for (var attempt = 0; attempt < maxAttempts; attempt += 1) {
       if (disposedInternal) {
         return;
@@ -774,6 +775,17 @@ extension AppControllerDesktopThreadActions on AppController {
           continue;
         }
         if (aiGatewayPendingSessionKeysInternal.contains(sessionKey)) {
+          final hasRequiredExts = current.requiredArtifactExtensions.isNotEmpty;
+          final hasEnoughArtifacts = !hasRequiredExts ||
+              current.requiredArtifactExtensions.every((ext) {
+                return result.artifacts.any(
+                  (a) => a.relativePath.toLowerCase().endsWith(ext.toLowerCase()),
+                );
+              });
+          if (!hasEnoughArtifacts && artifactRetries < 3) {
+            artifactRetries += 1;
+            continue;
+          }
           await applyGatewayChatResultInternal(
             sessionKey: sessionKey,
             target: target,
