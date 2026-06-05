@@ -921,7 +921,6 @@ class OpenClawTaskAssociation {
     required this.artifactScope,
     required this.artifactDirectory,
     required this.gatewayProviderId,
-    required this.runtimeBudgetMinutes,
     required this.startedAtMs,
     required this.status,
     this.taskLoadClass = '',
@@ -937,7 +936,6 @@ class OpenClawTaskAssociation {
   final String artifactScope;
   final String artifactDirectory;
   final String gatewayProviderId;
-  final int runtimeBudgetMinutes;
   final double startedAtMs;
   final String status;
   final String taskLoadClass;
@@ -962,7 +960,6 @@ class OpenClawTaskAssociation {
       artifactScope: artifactScope,
       artifactDirectory: artifactDirectory,
       gatewayProviderId: gatewayProviderId,
-      runtimeBudgetMinutes: runtimeBudgetMinutes,
       startedAtMs: startedAtMs,
       status: status ?? this.status,
       taskLoadClass: taskLoadClass,
@@ -981,7 +978,6 @@ class OpenClawTaskAssociation {
       'artifactScope': artifactScope,
       'artifactDirectory': artifactDirectory,
       'gatewayProviderId': gatewayProviderId,
-      'runtimeBudgetMinutes': runtimeBudgetMinutes,
       'startedAtMs': startedAtMs,
       'status': status,
       'taskLoadClass': taskLoadClass,
@@ -1000,7 +996,6 @@ class OpenClawTaskAssociation {
       'artifactScope': artifactScope,
       'artifactDirectory': artifactDirectory,
       'gatewayProviderId': gatewayProviderId,
-      'runtimeBudgetMinutes': runtimeBudgetMinutes,
       'taskLoadClass': taskLoadClass,
       'sessionKey': sessionKey,
       'requiredArtifactExtensions': requiredArtifactExtensions,
@@ -1049,7 +1044,6 @@ class OpenClawTaskAssociation {
                     true
                 ? json['resolvedGatewayProviderId'].toString().trim()
                 : 'openclaw'),
-      runtimeBudgetMinutes: asInt(json['runtimeBudgetMinutes']),
       startedAtMs: asDouble(json['startedAtMs']),
       status: json['status']?.toString().trim().isNotEmpty == true
           ? json['status'].toString().trim()
