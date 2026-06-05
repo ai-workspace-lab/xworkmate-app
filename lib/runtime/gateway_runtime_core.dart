@@ -88,21 +88,7 @@ class GatewayRuntime extends ChangeNotifier with GatewayRuntimeHelpersInternal {
     notifyListeners();
   }
 
-  @visibleForTesting
-  void addRuntimeLogForTest({
-    required String level,
-    required String category,
-    required String message,
-  }) {
-    appendLogInternal(this, level, category, message);
-  }
 
-  @visibleForTesting
-  bool get usesSessionClient => sessionClientInternal != null;
-
-  @visibleForTesting
-  GatewayRuntimeSessionClient? get sessionClientForTest =>
-      sessionClientInternal;
 
   bool get canConnectBridgeSession => sessionClientInternal != null;
 

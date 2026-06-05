@@ -1296,19 +1296,7 @@ extension AppControllerDesktopThreadActions on AppController {
     notifyIfActiveInternal();
   }
 
-  void clearGatewayTaskArtifactStateInternal(
-    String sessionKey, {
-    required double completedAtMs,
-    required String syncStatus,
-  }) {
-    upsertTaskThreadInternal(
-      sessionKey,
-      lastArtifactSyncAtMs: completedAtMs,
-      lastArtifactSyncStatus: syncStatus,
-      lastTaskArtifactRelativePaths: const <String>[],
-      updatedAtMs: completedAtMs,
-    );
-  }
+
 
   Future<void> applyGatewayChatResultInternal({
     required String sessionKey,
@@ -1347,10 +1335,12 @@ extension AppControllerDesktopThreadActions on AppController {
       return;
     }
     if (!result.success) {
-      clearGatewayTaskArtifactStateInternal(
+      upsertTaskThreadInternal(
         sessionKey,
-        completedAtMs: completedAtMs,
-        syncStatus: 'failed',
+        lastArtifactSyncAtMs: completedAtMs,
+        lastArtifactSyncStatus: 'failed',
+        lastTaskArtifactRelativePaths: const <String>[],
+        updatedAtMs: completedAtMs,
       );
       appendLocalSessionMessageInternal(
         sessionKey,
@@ -1370,10 +1360,12 @@ extension AppControllerDesktopThreadActions on AppController {
       return;
     }
     if (noDisplayableOutput) {
-      clearGatewayTaskArtifactStateInternal(
+      upsertTaskThreadInternal(
         sessionKey,
-        completedAtMs: completedAtMs,
-        syncStatus: 'failed',
+        lastArtifactSyncAtMs: completedAtMs,
+        lastArtifactSyncStatus: 'failed',
+        lastTaskArtifactRelativePaths: const <String>[],
+        updatedAtMs: completedAtMs,
       );
       appendLocalSessionMessageInternal(
         sessionKey,
@@ -1554,7 +1546,10 @@ extension AppControllerDesktopThreadActions on AppController {
 
   bool gatewayResultCodeRequiresNewSessionInternal(String code) {
     final normalized = code.trim().toUpperCase();
-    if (normalized.isEmpty) {
+    if (normalized.isEmpty ||
+        normalized == 'SUCCESS' ||
+        normalized == 'COMPLETED' ||
+        normalized == 'READY') {
       return false;
     }
     if (normalized == 'RUNNING' ||
@@ -1566,6 +1561,7 @@ extension AppControllerDesktopThreadActions on AppController {
         normalized == 'BRIDGE_NOT_CONNECTED' ||
         normalized == 'ACP_HTTP_401' ||
         normalized == 'ACP_HTTP_403' ||
+        normalized == 'OPENCLAW_GATEWAY_SOCKET_CLOSED' ||
         normalized == 'OPENCLAW_GATEWAY_QUEUE_FULL' ||
         normalized == 'OPENCLAW_AGENT_FAILED_BEFORE_REPLY' ||
         normalized == 'OPENCLAW_NO_DISPLAYABLE_OUTPUT' ||
@@ -1574,7 +1570,7 @@ extension AppControllerDesktopThreadActions on AppController {
         normalized == 'ARTIFACT_MISSING') {
       return true;
     }
-    return false;
+    return true;
   }
 
   Future<void> abortRun() async {

@@ -1,15 +1,13 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:flutter/foundation.dart';
-
 import 'acp_endpoint_paths.dart';
 import 'gateway_acp_client.dart';
 import 'go_task_service_client.dart';
 import 'runtime_models.dart';
 
 class ExternalCodeAgentAcpDesktopTransport
-    implements ExternalCodeAgentAcpTransport {
+    implements GoTaskServiceClient {
   ExternalCodeAgentAcpDesktopTransport({
     required GatewayAcpClient client,
     required Uri? Function(AssistantExecutionTarget target) endpointResolver,
@@ -28,72 +26,7 @@ class ExternalCodeAgentAcpDesktopTransport
   final Duration _recoveryPollDelay;
   final int? _recoveryMaxAttempts;
 
-  @visibleForTesting
-  GatewayAcpClient get clientForTest => _client;
 
-  @override
-  Future<ExternalCodeAgentAcpCapabilities> loadExternalAcpCapabilities({
-    required AssistantExecutionTarget target,
-    bool forceRefresh = false,
-  }) async {
-    final response = await _client.request(
-      method: 'acp.capabilities',
-      params: const <String, dynamic>{},
-      endpointOverride: _endpointResolver(target),
-    );
-    final result = _castMap(response['result']);
-    final caps = _castMap(result['capabilities']);
-    final providerCatalog = _parseProviderCatalog(
-      result['providerCatalog'] ?? caps['providerCatalog'],
-      defaultTarget: AssistantExecutionTarget.agent,
-    );
-    final gatewayProviders = _parseProviderCatalog(
-      result['gatewayProviders'] ?? caps['gatewayProviders'],
-      defaultTarget: AssistantExecutionTarget.gateway,
-    );
-    return ExternalCodeAgentAcpCapabilities(
-      singleAgent:
-          _boolValue(result['singleAgent']) ??
-          _boolValue(caps['single_agent']) ??
-          providerCatalog.isNotEmpty,
-      multiAgent:
-          _boolValue(result['multiAgent']) ??
-          _boolValue(caps['multi_agent']) ??
-          true,
-      availableExecutionTargets: _parseAvailableExecutionTargets(
-        result['availableExecutionTargets'] ??
-            caps['availableExecutionTargets'],
-        singleAgent:
-            _boolValue(result['singleAgent']) ??
-            _boolValue(caps['single_agent']) ??
-            providerCatalog.isNotEmpty,
-        gatewayProviders: gatewayProviders,
-      ),
-      providerCatalog: providerCatalog,
-      gatewayProviders: gatewayProviders,
-      raw: result,
-    );
-  }
-
-  @override
-  Future<ExternalCodeAgentAcpRoutingResolution> resolveExternalAcpRouting({
-    required String taskPrompt,
-    required String workingDirectory,
-    required ExternalCodeAgentAcpRoutingConfig routing,
-  }) async {
-    final response = await _client.request(
-      method: 'xworkmate.routing.resolve',
-      params: <String, dynamic>{
-        'taskPrompt': taskPrompt,
-        'workingDirectory': workingDirectory.trim(),
-        'routing': routing.toJson(),
-      },
-      endpointOverride: _endpointResolver(AssistantExecutionTarget.gateway),
-    );
-    return ExternalCodeAgentAcpRoutingResolution(
-      raw: _castMap(response['result']),
-    );
-  }
 
   @override
   Future<GoTaskServiceResult> executeTask(
@@ -330,6 +263,7 @@ class ExternalCodeAgentAcpDesktopTransport
 
   @override
   Future<void> cancelTask({
+    required GoTaskServiceRoute route,
     required AssistantExecutionTarget target,
     required String sessionId,
     required String threadId,
@@ -353,18 +287,7 @@ class ExternalCodeAgentAcpDesktopTransport
     );
   }
 
-  @override
-  Future<void> closeTask({
-    required AssistantExecutionTarget target,
-    required String sessionId,
-    required String threadId,
-  }) async {
-    await _client.closeSession(
-      sessionId: sessionId,
-      threadId: threadId,
-      endpointOverride: _endpointResolver(target),
-    );
-  }
+
 
   @override
   Future<void> dispose() => _client.dispose();
@@ -529,130 +452,6 @@ class ExternalCodeAgentAcpDesktopTransport
       return value.cast<String, dynamic>();
     }
     return const <String, dynamic>{};
-  }
-
-  List<Object?> _asList(Object? raw) {
-    if (raw is List<Object?>) {
-      return raw;
-    }
-    if (raw is List) {
-      return raw.cast<Object?>();
-    }
-    return const <Object?>[];
-  }
-
-  bool? _boolValue(Object? raw) {
-    if (raw is bool) {
-      return raw;
-    }
-    if (raw is num) {
-      return raw != 0;
-    }
-    final text = raw?.toString().trim().toLowerCase();
-    if (text == null || text.isEmpty) {
-      return null;
-    }
-    if (text == 'true' || text == '1' || text == 'yes') {
-      return true;
-    }
-    if (text == 'false' || text == '0' || text == 'no') {
-      return false;
-    }
-    return null;
-  }
-
-  List<SingleAgentProvider> _parseProviderCatalog(
-    Object? raw, {
-    required AssistantExecutionTarget defaultTarget,
-  }) {
-    final providers = <SingleAgentProvider>[];
-    for (final item in _asList(raw)) {
-      final entry = _castMap(item);
-      final providerId = entry['providerId']?.toString().trim() ?? '';
-      if (providerId.isEmpty) {
-        continue;
-      }
-      final label = entry['label']?.toString().trim();
-      final providerDisplay = _castMap(entry['providerDisplay']);
-      final targets = _parseProviderTargets(
-        entry['targets'] ?? entry['executionTarget'],
-        defaultTarget: defaultTarget,
-      );
-      final provider = SingleAgentProviderCopy.fromJsonValue(
-        providerId,
-        label: label?.isNotEmpty == true ? label : null,
-        badge: entry['badge']?.toString().trim().isNotEmpty == true
-            ? entry['badge']?.toString().trim()
-            : providerDisplay['badge']?.toString().trim(),
-        logoEmoji: entry['logoEmoji']?.toString().trim().isNotEmpty == true
-            ? entry['logoEmoji']?.toString().trim()
-            : providerDisplay['logoEmoji']?.toString().trim(),
-        supportedTargets: targets,
-        enabled: _boolValue(entry['enabled']) ?? true,
-        unavailableReason:
-            entry['unavailableReason']?.toString().trim().isNotEmpty == true
-            ? entry['unavailableReason']?.toString().trim()
-            : '',
-      );
-      if (!provider.isUnspecified) {
-        providers.add(provider);
-      }
-    }
-    return normalizeSingleAgentProviderList(providers);
-  }
-
-  List<AssistantExecutionTarget> _parseAvailableExecutionTargets(
-    Object? raw, {
-    required bool singleAgent,
-    required List<SingleAgentProvider> gatewayProviders,
-  }) {
-    final parsed = <AssistantExecutionTarget>[];
-    for (final item in _asList(raw)) {
-      final normalized = item?.toString().trim().toLowerCase() ?? '';
-      if (normalized == 'agent' || normalized == 'single-agent') {
-        if (!parsed.contains(AssistantExecutionTarget.agent)) {
-          parsed.add(AssistantExecutionTarget.agent);
-        }
-      } else if (normalized == 'gateway') {
-        if (!parsed.contains(AssistantExecutionTarget.gateway)) {
-          parsed.add(AssistantExecutionTarget.gateway);
-        }
-      }
-    }
-    if (parsed.isNotEmpty) {
-      return parsed;
-    }
-    if (singleAgent) {
-      parsed.add(AssistantExecutionTarget.agent);
-    }
-    if (gatewayProviders.isNotEmpty) {
-      parsed.add(AssistantExecutionTarget.gateway);
-    }
-    return parsed;
-  }
-
-  List<AssistantExecutionTarget> _parseProviderTargets(
-    Object? raw, {
-    required AssistantExecutionTarget defaultTarget,
-  }) {
-    final parsed = <AssistantExecutionTarget>[];
-    final items = raw is List ? raw : <Object?>[raw];
-    for (final item in items) {
-      final normalized = item?.toString().trim().toLowerCase() ?? '';
-      if (normalized == 'agent' || normalized == 'single-agent') {
-        if (!parsed.contains(AssistantExecutionTarget.agent)) {
-          parsed.add(AssistantExecutionTarget.agent);
-        }
-      } else if (normalized == 'gateway') {
-        if (!parsed.contains(AssistantExecutionTarget.gateway)) {
-          parsed.add(AssistantExecutionTarget.gateway);
-        }
-      }
-    }
-    if (parsed.isNotEmpty) {
-      return parsed;
-    }
-    return <AssistantExecutionTarget>[defaultTarget];
   }
 
   bool _socketExceptionLooksLikeConnectTimeout(SocketException error) {
