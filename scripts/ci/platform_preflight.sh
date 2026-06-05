@@ -24,10 +24,20 @@ set_build_state() {
   emit_output "skip_reason" "$reason"
 
   if [[ "$should_build" == "true" ]]; then
-    echo "Preflight passed for $platform."
+    if [[ -n "$reason" ]]; then
+      echo "Preflight passed for $platform with warning: $reason"
+    else
+      echo "Preflight passed for $platform."
+    fi
   else
     echo "Skipping $platform lane: $reason"
   fi
+}
+
+warn_unsigned_build() {
+  local missing="$1"
+  echo "::warning::$platform build will run without Apple signing secrets (missing: $missing)." \
+    "Output artifacts will be unsigned/ad-hoc. Configure the Apple signing secrets to enable signed packaging."
 }
 
 case "$platform" in
@@ -52,18 +62,14 @@ case "$platform" in
     done
 
     if [[ "${#missing[@]}" -gt 0 ]]; then
-      set_build_state "false" "missing macOS signing secrets: ${missing[*]}"
+      warn_unsigned_build "${missing[*]}"
+      set_build_state "true" "missing macOS signing secrets: ${missing[*]}; will produce unsigned DMG"
       exit 0
     fi
 
     set_build_state "true" ""
     ;;
   ios)
-    if [[ "$should_release" != "true" ]]; then
-      set_build_state "true" ""
-      exit 0
-    fi
-
     required_vars=(
       APPLE_CERT_P12_BASE64
       APPLE_CERT_PASSWORD
@@ -79,7 +85,8 @@ case "$platform" in
     done
 
     if [[ "${#missing[@]}" -gt 0 ]]; then
-      set_build_state "false" "missing iOS signing secrets: ${missing[*]}"
+      warn_unsigned_build "${missing[*]}"
+      set_build_state "true" "missing iOS signing secrets: ${missing[*]}; will produce unsigned app bundle"
       exit 0
     fi
 
