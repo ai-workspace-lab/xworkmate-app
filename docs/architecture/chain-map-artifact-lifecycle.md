@@ -198,26 +198,32 @@ Fragile:
   - signing secret rotation invalidates all existing refs
 ```
 
-## State 5: Snapshot (Bridge)
+## State 5: Native Task Lookup And Artifact Snapshot
 
 ```
-Caller:   completeOpenClawTask() in openclaw_async_tasks.go
-          triggered by probeOpenClawTask() detecting completion
+Caller:   App polling/recovery via xworkmate.tasks.get
+          Bridge forwards typed appThreadKey/openclawSessionKey/runId to Plugin
 
 Process:
-  1. Call gateway.request('xworkmate.artifacts.collect-and-snapshot')
+  1. Plugin resolves task state from OpenClaw native task-registry
+     → api.runtime.tasks.runs.bindSession({sessionKey: openclawSessionKey})
+     → resolve(runId) or findLatest()
+
+  2. Call gateway.request('xworkmate.artifacts.collect-and-snapshot')
      → Copy OpenClaw media/tmp outputs into the task scope
 
-  2. Call gateway.request('xworkmate.artifacts.export')
+  3. Call gateway.request('xworkmate.artifacts.export')
      → Get manifest from plugin
 
-  3. openClawArtifactExport()
+  4. openClawArtifactExport()
      → Transform manifest files into stable result shape
      → decorateOpenClawArtifactDownloadURLs()
        → Replace each file.ref with signed download URL:
          /artifacts/openclaw/download?ref=<signed>&t=<expiry>
 
-  4. Build terminal snapshot:
+  5. Return task-registry-backed snapshot:
+     → Terminal success/failure is not decided by Bridge state
+     → Missing native task record returns no_native_task_record
      {
        success: true,
        status: "completed",
@@ -232,9 +238,15 @@ Process:
        }
      }
 
-  5. Store snapshot for xworkmate.tasks.get queries
+  5. Do not store terminal task truth for xworkmate.tasks.get queries.
+     The query path forwards to OpenClaw native task-registry through the plugin.
 
   6. Send SSE session.update to app
+
+Removed compatibility paths:
+  - Bridge no longer falls back when xworkmate.session.prepare is unsupported.
+  - Bridge no longer reassociates OpenClaw tasks from artifactScope/runId.
+  - Bridge no longer treats artifact export as terminal task-state evidence.
 
 Fragile:
   - If export returns empty manifest, snapshot has no artifacts
@@ -339,7 +351,7 @@ stateDiagram-v2
 | Plugin workspace | resolveWorkspaceDir() | `~/.openclaw/workspace` |
 | Plugin scope | tasks/<session>/<run>/ | `<workspace>/tasks/<s>/<r>/` |
 | Plugin export | exportXWorkmateArtifacts() | Scans only scope dir |
-| Bridge snapshot | completeOpenClawTask() | In-memory, 24h signed URLs |
+| Bridge snapshot | xworkmate.tasks.get proxy | Native task-registry + plugin artifact manifest |
 | Bridge download | /artifacts/openclaw/download | Proxied from plugin read |
 | App sync | syncArtifactsFromBridge() | `~/.xworkmate/threads/<s>/` |
 | OpenClaw media | saveMediaBuffer(subdir) | `~/.openclaw/media/<subdir>/` |

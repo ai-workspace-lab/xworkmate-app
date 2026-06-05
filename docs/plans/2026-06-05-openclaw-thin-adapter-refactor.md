@@ -14,8 +14,8 @@
 
 - Do not modify `/Users/shenlan/workspaces/cloud-neutral-toolkit/openclaw.svc.plus`.
 - Do not rely on prompt text parsing for metadata.
-- Do not use `agent:main:${appThreadKey}` or `replace("agent:main:", "")` as the new-path session mapping.
-- Legacy string derivation is allowed only as one-time migration that writes a durable mapping.
+- Do not reverse-map session keys from string conventions. The deterministic `agent:main:<appThreadKey>` form is allowed only for initial native session creation before prepare persists the mapping.
+- Legacy string derivation and migration-only mapping fields are removed from the current flow.
 - Do not restore plugin-owned task DB, session DB, or event bus.
 - Validation must reference `docs/cases/`, especially `docs/cases/openclaw-gateway-e2e-regression/README.md`.
 
@@ -48,8 +48,7 @@ type XWorkmateSessionMappingV1 = {
   expectedArtifactDirs: string[];
   createdAt: string;
   updatedAt: string;
-  source: "session_start" | "bridge_prepare" | "legacy_migration";
-  legacyDerived?: boolean;
+  source: "session_start" | "bridge_prepare";
 };
 ```
 
@@ -69,7 +68,7 @@ Add tests for:
 - Mapping is written to `SessionEntry.pluginExtensions`.
 - Idempotent same mapping updates `updatedAt`.
 - Conflicting existing mapping fails closed.
-- Legacy derivation, if needed, writes `legacyDerived: true` and persists the mapping.
+- Missing typed mapping returns `mapping_not_found` / `invalid_lookup`; current flow does not derive replacement keys.
 
 **Step 2: Run failing test**
 
@@ -133,7 +132,7 @@ In `index.ts`, register `xworkmate.session.prepare`. It should:
 - call `prepareXWorkmateArtifacts`;
 - return `{ ok: true, mapping, artifactScope, artifactDirectory, expectedArtifactDirs }`.
 
-Keep `xworkmate.artifacts.prepare/export/collect-and-snapshot` as thin artifact operations. Remove in-memory `createXWorkmateTaskStore()` as a required source of truth.
+Keep `xworkmate.artifacts.prepare/export/collect-and-snapshot` as thin artifact operations. The in-memory plugin task store is removed and must not be reintroduced as a task source of truth.
 
 **Step 4: Run plugin suite**
 
@@ -322,7 +321,7 @@ Retain only transport/reconciliation caches that have clear owner, scope, and in
 Run:
 
 ```bash
-rg -n "agent:main:\\$|replace\\(|ThreadSessionMapper|createXWorkmateTaskStore|sessionMappingsBy|records = new Map|bridgeAgents" \
+rg -n "ThreadSessionMapper|sessionMappingsBy|records = new Map|bridgeAgents" \
   /Users/shenlan/workspaces/cloud-neutral-toolkit/openclaw-multi-session-plugins \
   /Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate-bridge \
   /Users/shenlan/workspaces/cloud-neutral-toolkit/xworkmate-app
