@@ -3628,6 +3628,46 @@ void main() {
     );
 
     test(
+      'cancelAssistantTaskForSessionInternal stops an archived OpenClaw task by session key',
+      () async {
+        final fakeGoTaskService = _BlockingGoTaskServiceClient();
+        final controller = _connectedGatewayController(fakeGoTaskService);
+        addTearDown(() {
+          fakeGoTaskService.completeAll();
+          controller.dispose();
+        });
+
+        const sessionKey = 'archived-running-openclaw';
+        await _selectGatewaySession(controller, sessionKey);
+        final pendingFuture = controller.sendChatMessage('stop me');
+        await _waitForThreadLifecycleStatus(controller, sessionKey, 'running');
+        await controller.saveAssistantTaskArchived(sessionKey, true);
+
+        await controller.cancelAssistantTaskForSessionInternal(sessionKey);
+
+        expect(fakeGoTaskService.cancelledSessionIds, <String>[sessionKey]);
+        expect(
+          controller.archivedAssistantSessions.map((item) => item.key),
+          <String>[sessionKey],
+        );
+
+        fakeGoTaskService.complete(
+          sessionKey,
+          const GoTaskServiceResult(
+            success: true,
+            message: 'stopped',
+            turnId: 'turn-archived-running-openclaw',
+            raw: <String, dynamic>{},
+            errorMessage: '',
+            resolvedModel: '',
+            route: GoTaskServiceRoute.externalAcpSingle,
+          ),
+        );
+        await pendingFuture;
+      },
+    );
+
+    test(
       'continueAssistantTaskInternal requeues a stopped OpenClaw task without clearing queued work',
       () async {
         final fakeGoTaskService = _BlockingGoTaskServiceClient();
