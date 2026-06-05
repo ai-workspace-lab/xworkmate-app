@@ -496,28 +496,22 @@ class GoTaskServiceResult {
       ? raw['resultSummary'].toString().trim()
       : raw['summary']?.toString().trim() ?? '';
 
-  String get status => _firstNestedGoTaskString(
-    raw,
-    const <List<String>>[
-      <String>['status'],
-      <String>['error', 'status'],
-      <String>['details', 'status'],
-      <String>['payload', 'status'],
-      <String>['result', 'status'],
-    ],
-  );
+  String get status => _firstNestedGoTaskString(raw, const <List<String>>[
+    <String>['status'],
+    <String>['error', 'status'],
+    <String>['details', 'status'],
+    <String>['payload', 'status'],
+    <String>['result', 'status'],
+  ]);
 
-  String get code => _firstNestedGoTaskString(
-    raw,
-    const <List<String>>[
-      <String>['code'],
-      <String>['error', 'code'],
-      <String>['error', 'details', 'code'],
-      <String>['details', 'code'],
-      <String>['payload', 'code'],
-      <String>['result', 'code'],
-    ],
-  );
+  String get code => _firstNestedGoTaskString(raw, const <List<String>>[
+    <String>['code'],
+    <String>['error', 'code'],
+    <String>['error', 'details', 'code'],
+    <String>['details', 'code'],
+    <String>['payload', 'code'],
+    <String>['result', 'code'],
+  ]);
 
   bool get isOpenClawRunningTaskHandle {
     final normalizedStatus = status.trim().toLowerCase();
@@ -755,9 +749,8 @@ GoTaskServiceResult goTaskServiceResultFromAcpResponse(
       .map((item) => item['id']?.toString().trim() ?? '')
       .where((item) => item.isNotEmpty)
       .toList(growable: false);
-  final success =
-      _boolValue(result['success']) ?? _inferGoTaskSuccess(result);
-  final fallbackFailureText = () {
+  final success = _boolValue(result['success']) ?? _inferGoTaskSuccess(result);
+  final structuredFailureText = () {
     if (success) {
       return '';
     }
@@ -778,8 +771,8 @@ GoTaskServiceResult goTaskServiceResultFromAcpResponse(
               ? responseText
               : completedMessage?.trim().isNotEmpty == true
               ? completedMessage!.trim()
-              : fallbackFailureText.isNotEmpty
-              ? fallbackFailureText
+              : structuredFailureText.isNotEmpty
+              ? structuredFailureText
               : streamedText.trim().isNotEmpty
               ? streamedText.trim()
               : '')
@@ -787,8 +780,8 @@ GoTaskServiceResult goTaskServiceResultFromAcpResponse(
   final directErrorMessage = _extractGoTaskDisplayText(result['error']);
   final effectiveErrorMessage = success
       ? directErrorMessage
-      : fallbackFailureText.isNotEmpty
-      ? fallbackFailureText
+      : structuredFailureText.isNotEmpty
+      ? structuredFailureText
       : primaryText.isNotEmpty
       ? primaryText
       : directErrorMessage;
@@ -810,15 +803,12 @@ bool _inferGoTaskSuccess(Map<String, dynamic> result) {
   if (result.containsKey('error')) {
     return false;
   }
-  final status = _firstNestedGoTaskString(
-    result,
-    const <List<String>>[
-      <String>['status'],
-      <String>['details', 'status'],
-      <String>['payload', 'status'],
-      <String>['result', 'status'],
-    ],
-  ).toLowerCase();
+  final status = _firstNestedGoTaskString(result, const <List<String>>[
+    <String>['status'],
+    <String>['details', 'status'],
+    <String>['payload', 'status'],
+    <String>['result', 'status'],
+  ]).toLowerCase();
   if (status == 'failed' ||
       status == 'error' ||
       status == 'artifact_missing' ||
@@ -826,15 +816,12 @@ bool _inferGoTaskSuccess(Map<String, dynamic> result) {
       status == 'canceled') {
     return false;
   }
-  final code = _firstNestedGoTaskString(
-    result,
-    const <List<String>>[
-      <String>['code'],
-      <String>['details', 'code'],
-      <String>['payload', 'code'],
-      <String>['result', 'code'],
-    ],
-  ).toUpperCase();
+  final code = _firstNestedGoTaskString(result, const <List<String>>[
+    <String>['code'],
+    <String>['details', 'code'],
+    <String>['payload', 'code'],
+    <String>['result', 'code'],
+  ]).toUpperCase();
   if (code == 'OPENCLAW_ARTIFACT_MISSING' ||
       code == 'OPENCLAW_NO_EXPORTED_ARTIFACTS' ||
       code == 'ARTIFACT_MISSING') {

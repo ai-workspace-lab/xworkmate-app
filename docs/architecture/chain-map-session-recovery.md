@@ -15,7 +15,7 @@ App starts
               ├─ thread has pendingTurnId?
               │   ├─ Yes → pollBridgeTaskSnapshot(turnId)
               │   │   └─ xworkmate.tasks.get({ sessionId, threadId, turnId })
-              │   │       ├─ Terminal snapshot found → apply result
+              │   │       ├─ Terminal snapshot found → apply result and mark ready
               │   │       ├─ Session not found → mark failed
               │   │       └─ No response → mark unrecovered
               │   └─ No → mark ready (no pending turn)
@@ -56,7 +56,7 @@ SSE stream interrupted (network flap)
   └─ App: Transport detects stream close without terminal
      └─ Enter polling mode
         └─ Every N seconds: xworkmate.tasks.get({ sessionId, threadId, turnId })
-           ├─ Terminal snapshot → apply result, stop polling
+           ├─ Terminal snapshot → apply result, mark ready, stop polling
            ├─ Still running → continue polling
            ├─ Session not found → mark failed
            └─ Max poll attempts reached → mark unrecovered
@@ -128,7 +128,7 @@ stateDiagram-v2
   Polling --> Session_Not_Found: bridge restarted
   Polling --> Max_Retries: exceeded
 
-  Recovered --> Ready: result applied
+  Recovered --> Ready: result applied; artifact sync status records missing outputs
   Session_Not_Found --> Failed: ACP_BRIDGE_RESTART
   Max_Retries --> Failed: ACP_UNRECOVERABLE
 
@@ -180,7 +180,7 @@ resolveGatewayThreadConnectionState(thread)
   │   ├─ thread.lastTurnId exists?
   │   │   ├─ Yes → transport.pollBridgeTaskSnapshot(turnId)
   │   │   │   └─ xworkmate.tasks.get:
-  │   │   │       ├─ completed/failed → applyGatewayChatResult()
+  │   │   │       ├─ completed/failed → applyGatewayChatResult() and mark ready
   │   │   │       ├─ running → leave as running, continue SSE
   │   │   │       └─ not found / error:
   │   │   │          ├─ isBridgeAvailable()
