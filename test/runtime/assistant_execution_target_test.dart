@@ -3274,7 +3274,7 @@ void main() {
 
         await fakeGoTaskService.waitForRequestCount(prompts.length);
         expect(fakeGoTaskService.requests, hasLength(prompts.length));
-        expect(controller.openClawGatewayActiveTasksInternal, prompts.length);
+        expect(controller.openClawGatewayActiveTurnsInternal.length, prompts.length);
         expect(controller.openClawGatewayQueuedTurnsInternal, isEmpty);
         for (var index = 0; index < prompts.length; index += 1) {
           final sessionKey = 'openclaw-e2e-$index';
@@ -3332,7 +3332,7 @@ void main() {
           _openClawE2ECanonicalPrompts.length,
         );
         expect(
-          controller.openClawGatewayActiveTasksInternal,
+          controller.openClawGatewayActiveTurnsInternal.length,
           _openClawE2ECanonicalPrompts.length,
         );
 
@@ -3855,7 +3855,7 @@ void main() {
               .status,
           'running',
         );
-        expect(controller.openClawGatewayActiveTasksInternal, 1);
+        expect(controller.openClawGatewayActiveTurnsInternal.length, 1);
       },
     );
 
@@ -4602,12 +4602,12 @@ Future<void> _waitForOpenClawActiveTaskCount(
 ) async {
   final deadline = DateTime.now().add(const Duration(seconds: 5));
   while (DateTime.now().isBefore(deadline)) {
-    if (controller.openClawGatewayActiveTasksInternal == expected) {
+    if (controller.openClawGatewayActiveTurnsInternal.length == expected) {
       return;
     }
     await Future<void>.delayed(const Duration(milliseconds: 10));
   }
-  expect(controller.openClawGatewayActiveTasksInternal, expected);
+  expect(controller.openClawGatewayActiveTurnsInternal.length, expected);
 }
 
 Future<List<String>> _startOpenClawActiveTasks(
@@ -4701,19 +4701,7 @@ class _RecordingGoTaskServiceClient implements GoTaskServiceClient {
   final List<Object> taskOutcomes = <Object>[];
   Future<void> Function(GoTaskServiceRequest request)? onExecuteTask;
 
-  @override
-  Future<ExternalCodeAgentAcpCapabilities> loadExternalAcpCapabilities({
-    required AssistantExecutionTarget target,
-    bool forceRefresh = false,
-  }) async => const ExternalCodeAgentAcpCapabilities.empty();
 
-  @override
-  Future<ExternalCodeAgentAcpRoutingResolution> resolveExternalAcpRouting({
-    required String taskPrompt,
-    required String workingDirectory,
-    required ExternalCodeAgentAcpRoutingConfig routing,
-  }) async =>
-      const ExternalCodeAgentAcpRoutingResolution(raw: <String, dynamic>{});
 
   @override
   Future<GoTaskServiceResult> executeTask(
@@ -4786,13 +4774,7 @@ class _RecordingGoTaskServiceClient implements GoTaskServiceClient {
     OpenClawTaskAssociation? association,
   }) async {}
 
-  @override
-  Future<void> closeTask({
-    required GoTaskServiceRoute route,
-    required AssistantExecutionTarget target,
-    required String sessionId,
-    required String threadId,
-  }) async {}
+
 
   @override
   Future<void> dispose() async {}
@@ -4809,19 +4791,7 @@ class _BlockingGoTaskServiceClient implements GoTaskServiceClient {
   final Map<String, void Function(GoTaskServiceUpdate)> _updates =
       <String, void Function(GoTaskServiceUpdate)>{};
 
-  @override
-  Future<ExternalCodeAgentAcpCapabilities> loadExternalAcpCapabilities({
-    required AssistantExecutionTarget target,
-    bool forceRefresh = false,
-  }) async => const ExternalCodeAgentAcpCapabilities.empty();
 
-  @override
-  Future<ExternalCodeAgentAcpRoutingResolution> resolveExternalAcpRouting({
-    required String taskPrompt,
-    required String workingDirectory,
-    required ExternalCodeAgentAcpRoutingConfig routing,
-  }) async =>
-      const ExternalCodeAgentAcpRoutingResolution(raw: <String, dynamic>{});
 
   @override
   Future<GoTaskServiceResult> executeTask(
@@ -4927,13 +4897,7 @@ class _BlockingGoTaskServiceClient implements GoTaskServiceClient {
     cancelledSessionIds.add(sessionId);
   }
 
-  @override
-  Future<void> closeTask({
-    required GoTaskServiceRoute route,
-    required AssistantExecutionTarget target,
-    required String sessionId,
-    required String threadId,
-  }) async {}
+
 
   @override
   Future<void> dispose() async {}

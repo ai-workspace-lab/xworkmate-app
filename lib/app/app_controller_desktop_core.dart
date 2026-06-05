@@ -31,7 +31,7 @@ import '../runtime/assistant_artifacts.dart';
 import '../runtime/desktop_thread_artifact_service.dart';
 import '../runtime/external_code_agent_acp_desktop_transport.dart';
 import '../runtime/go_task_service_client.dart';
-import '../runtime/go_task_service_desktop_service.dart';
+
 import '../runtime/go_runtime_dispatch_desktop_client.dart';
 import '../runtime/mode_switcher.dart';
 import '../runtime/agent_registry.dart';
@@ -152,13 +152,10 @@ class AppController extends ChangeNotifier {
     );
     goTaskServiceClientInternal =
         goTaskServiceClient ??
-        DesktopGoTaskService(
-          gateway: runtimeCoordinatorInternal.gateway,
-          acpTransport: ExternalCodeAgentAcpDesktopTransport(
-            client: gatewayAcpClientInternal,
-            endpointResolver: resolveExternalAcpEndpointForTargetInternal,
-            taskEndpointResolver: resolveExternalAcpEndpointForRequestInternal,
-          ),
+        ExternalCodeAgentAcpDesktopTransport(
+          client: gatewayAcpClientInternal,
+          endpointResolver: resolveExternalAcpEndpointForTargetInternal,
+          taskEndpointResolver: resolveExternalAcpEndpointForRequestInternal,
         );
     bridgeAgentProviderCatalogInternal = normalizeSingleAgentProviderList(
       initialBridgeProviderCatalog ?? const <SingleAgentProvider>[],
@@ -267,8 +264,7 @@ class AppController extends ChangeNotifier {
   final Map<String, OpenClawGatewayQueuedTurnInternal>
   openClawGatewayActiveTurnsInternal =
       <String, OpenClawGatewayQueuedTurnInternal>{};
-  int get openClawGatewayActiveTasksInternal =>
-      openClawGatewayActiveTurnsInternal.length;
+
   int localMessageCounterInternal = 0;
   int assistantDraftSessionCounterInternal = 0;
 
