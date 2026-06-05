@@ -680,57 +680,7 @@ String? goTaskServiceGatewayEntryState({
   }
 }
 
-abstract class ExternalCodeAgentAcpTransport {
-  Future<ExternalCodeAgentAcpCapabilities> loadExternalAcpCapabilities({
-    required AssistantExecutionTarget target,
-    bool forceRefresh = false,
-  });
-
-  Future<ExternalCodeAgentAcpRoutingResolution> resolveExternalAcpRouting({
-    required String taskPrompt,
-    required String workingDirectory,
-    required ExternalCodeAgentAcpRoutingConfig routing,
-  });
-
-  Future<GoTaskServiceResult> executeTask(
-    GoTaskServiceRequest request, {
-    required void Function(GoTaskServiceUpdate update) onUpdate,
-  });
-
-  Future<GoTaskServiceResult> getTask({
-    required AssistantExecutionTarget target,
-    required OpenClawTaskAssociation association,
-    required GoTaskServiceRoute route,
-  });
-
-  Future<void> cancelTask({
-    required AssistantExecutionTarget target,
-    required String sessionId,
-    required String threadId,
-    OpenClawTaskAssociation? association,
-  });
-
-  Future<void> closeTask({
-    required AssistantExecutionTarget target,
-    required String sessionId,
-    required String threadId,
-  });
-
-  Future<void> dispose();
-}
-
 abstract class GoTaskServiceClient {
-  Future<ExternalCodeAgentAcpCapabilities> loadExternalAcpCapabilities({
-    required AssistantExecutionTarget target,
-    bool forceRefresh = false,
-  });
-
-  Future<ExternalCodeAgentAcpRoutingResolution> resolveExternalAcpRouting({
-    required String taskPrompt,
-    required String workingDirectory,
-    required ExternalCodeAgentAcpRoutingConfig routing,
-  });
-
   Future<GoTaskServiceResult> executeTask(
     GoTaskServiceRequest request, {
     required void Function(GoTaskServiceUpdate update) onUpdate,
@@ -748,13 +698,6 @@ abstract class GoTaskServiceClient {
     required String sessionId,
     required String threadId,
     OpenClawTaskAssociation? association,
-  });
-
-  Future<void> closeTask({
-    required GoTaskServiceRoute route,
-    required AssistantExecutionTarget target,
-    required String sessionId,
-    required String threadId,
   });
 
   Future<void> dispose();

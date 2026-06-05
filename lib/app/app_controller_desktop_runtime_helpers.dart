@@ -939,7 +939,7 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     final authorization =
         await resolveBridgeArtifactAuthorizationHeaderInternal(uri);
     if (authorization == null || authorization.trim().isEmpty) {
-      return const _ArtifactBytesResult.skipped();
+      return const _ArtifactBytesResult.failed();
     }
     final bytes = await _downloadBridgeArtifactBytesInternal(
       uri,
