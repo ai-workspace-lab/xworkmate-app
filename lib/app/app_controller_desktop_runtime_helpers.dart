@@ -70,13 +70,9 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
         appUiState.assistantLastSessionKey == normalizedSessionKey) {
       return;
     }
-    try {
-      await saveAppUiStateInternal(
-        appUiState.copyWith(assistantLastSessionKey: normalizedSessionKey),
-      );
-    } catch (_) {
-      // Best effort only during teardown-sensitive transitions.
-    }
+    await saveAppUiStateInternal(
+      appUiState.copyWith(assistantLastSessionKey: normalizedSessionKey),
+    );
   }
 
   void setAiGatewayStreamingTextInternal(String sessionKey, String text) {
@@ -381,25 +377,22 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
       return const <String>[];
     }
     final root = Directory(thread.workspaceBinding.workspacePath);
-    try {
-      final policy = await _loadArtifactSyncPolicyInternal(
-        root,
-        thread.selectedSkillKeys,
-      );
-      return _workspaceArtifactPathsModifiedSinceInternal(
-        root,
-        thread.lifecycleState.lastRunAtMs,
-        policy,
-      );
-    } catch (_) {
-      return const <String>[];
-    }
+    final policy = await _loadArtifactSyncPolicyInternal(
+      root,
+      thread.selectedSkillKeys,
+    );
+    return _workspaceArtifactPathsModifiedSinceInternal(
+      root,
+      thread.lifecycleState.lastRunAtMs,
+      policy,
+    );
   }
 
   String jsonLikeTextForDiagnosticsInternal(Object? value) {
     try {
       return jsonEncode(value);
-    } catch (_) {
+    } catch (error) {
+      debugPrint('JSON diagnostic encoding failed: $error');
       return value.toString();
     }
   }
@@ -781,6 +774,9 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     );
     final artifacts = result.artifacts;
     if (artifacts.isEmpty) {
+      final requiredExts =
+          existingThread.openClawTaskAssociation?.requiredArtifactExtensions ??
+          const <String>[];
       final currentTaskArtifactRelativePaths =
           isOpenClawNoExportedArtifactsGuardResultInternal(result)
           ? const <String>[]
@@ -803,7 +799,8 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
         normalizedSessionKey,
         lastArtifactSyncAtMs: syncedAtMs,
         lastArtifactSyncStatus:
-            isOpenClawNoExportedArtifactsGuardResultInternal(result)
+            isOpenClawNoExportedArtifactsGuardResultInternal(result) ||
+                requiredExts.isNotEmpty
             ? 'no-exported-artifacts'
             : 'no-artifacts',
         updatedAtMs: syncedAtMs,
@@ -874,18 +871,21 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     }
 
     final thread = taskThreadForSessionInternal(normalizedSessionKey);
-    final requiredExts = thread?.openClawTaskAssociation
-        ?.requiredArtifactExtensions ?? const <String>[];
-    final missingRequired = requiredExts.where((ext) {
-      return !currentTaskArtifactPaths.any(
-        (p) => p.toLowerCase().endsWith(ext.toLowerCase()),
-      );
-    }).toList(growable: false);
+    final requiredExts =
+        thread?.openClawTaskAssociation?.requiredArtifactExtensions ??
+        const <String>[];
+    final missingRequired = requiredExts
+        .where((ext) {
+          return !currentTaskArtifactPaths.any(
+            (p) => p.toLowerCase().endsWith(ext.toLowerCase()),
+          );
+        })
+        .toList(growable: false);
 
     final syncStatus = wroteArtifact
         ? (failedArtifact || skippedArtifact || missingRequired.isNotEmpty
-            ? 'partial'
-            : 'synced')
+              ? 'partial'
+              : 'synced')
         : failedArtifact
         ? 'download-failed'
         : rejectedArtifact
@@ -928,11 +928,12 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     final bridgeEndpoint = resolveBridgeAcpEndpointInternal();
     final bridgeHost = bridgeEndpoint?.host.trim().toLowerCase() ?? '';
     final downloadHost = uri.host.trim().toLowerCase();
-    final isLoopback = downloadHost == '127.0.0.1' ||
+    final isLoopback =
+        downloadHost == '127.0.0.1' ||
         downloadHost == 'localhost' ||
         downloadHost == '::1';
-    final sameBridgeHost = bridgeEndpoint != null &&
-        (downloadHost == bridgeHost || isLoopback);
+    final sameBridgeHost =
+        bridgeEndpoint != null && (downloadHost == bridgeHost || isLoopback);
     if (!sameBridgeHost) {
       return const _ArtifactBytesResult.skipped();
     }
@@ -1066,7 +1067,8 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
       }
       await temp.rename(target.path);
       return true;
-    } catch (_) {
+    } catch (error) {
+      debugPrint('Artifact write failed for ${target.path}: $error');
       if (await temp.exists()) {
         await temp.delete();
       }
