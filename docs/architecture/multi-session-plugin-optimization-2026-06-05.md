@@ -20,7 +20,7 @@ APP 侧 polling → xworkmate.tasks.get → Bridge → ??? → OpenClaw
 
 **具体原因**：
 
-1. **openclaw-multi-session-plugins 没有注册 `xworkmate.tasks.get` gateway method**。插件注册的方法只有 `xworkmate.artifacts.*` 和 `xworkmate.agents.run`，没有 task 查询接口。
+1. **openclaw-multi-session-plugins 必须注册 `xworkmate.tasks.get` gateway method**。插件的目标接口只保留 `xworkmate.tasks.get` 和 `xworkmate.artifacts.*`，不再暴露 bridge-backed `xworkmate.agents.run`。
 
 2. **插件没有在 OpenClaw 原生 task-registry 中创建 TaskRecord**。OpenClaw 的 `task-registry.ts` 是任务状态的唯一权威来源（`TaskRecord { taskId, runId, status, requesterSessionKey, ... }`），但插件完全绕过了它，自己管理制品作用域，没有任何原生任务记录。
 
@@ -37,7 +37,7 @@ APP (metadata.xworkmateTaskArtifactContract) → session.start params
 
 - `scopedGatewayParams()` 只映射 `sessionKey`, `runId`, `workspaceDir`, `artifactScope`
 - `expectedArtifactDirs` 不在映射中
-- `bridgeAgents.ts` 的 `runXWorkmateBridgeAgents()` 调用 `exportXWorkmateArtifacts` 时也没传这个参数
+- 旧 `bridgeAgents.ts` 反向 HTTP 路径已移除，不能再作为参数补偿路径
 - 虽然 Fix 0 在 `exportXWorkmateArtifacts` 中加了回退扫描逻辑（行 263-283），但这个逻辑永远不会被触发，因为参数从未到达
 
 ### 2.3 会话 Key 映射没有双向约定
@@ -51,7 +51,7 @@ APP (metadata.xworkmateTaskArtifactContract) → session.start params
 
 当前插件的职责混合了：
 - 制品作用域管理（合理的独特价值）
-- 通过 bridgeAgents 做 HTTP RPC 调用（应该委托给 Gateway 原生能力）
+- 旧版通过 bridgeAgents 做 HTTP RPC 调用（已移除，避免 Plugin→Bridge 循环依赖）
 - 隐式的任务状态追踪（没有利用原生 task-registry）
 - 会话上下文传递（绕过了原生 session store）
 
@@ -60,7 +60,7 @@ APP (metadata.xworkmateTaskArtifactContract) → session.start params
 | 原生能力 | 位置 | 可以替代的当前实现 |
 |---------|------|-----------------|
 | Task 注册与状态机 | `src/tasks/task-registry.ts` | APP 侧的 polling 循环、恢复逻辑 |
-| Task Flow 编排 | `src/tasks/task-flow-registry.ts` | bridgeAgents 的多代理编排 |
+| Task Flow 编排 | `src/tasks/task-flow-registry.ts` | Bridge/OpenClaw 原生多代理编排 |
 | Session 持久化 | `src/config/sessions/store.ts` | 会话 key 映射、上下文存储 |
 | Plugin Extensions | `SessionEntry.pluginExtensions` | 零散的上下文传递 |
 | Session Key 解析 | `src/sessions/session-key-utils.ts` | `safeScopeSegment()` 字符串处理 |
@@ -192,7 +192,7 @@ const params = {
   sessionId: sessionKey,
   threadId: threadKey,
   taskPrompt: prompt,
-  expectedArtifactDirs: artifactContract?.expectedArtifactDirs ?? ["assets/images", "reports", "video"],
+  expectedArtifactDirs: artifactContract?.expectedArtifactDirs ?? ["artifacts/", "reports/", "exports/", "assets/", "assets/images/", "dist/"],
   // ...其他参数
 };
 ```
@@ -203,7 +203,7 @@ const params = {
 'xworkmateTaskArtifactContract': {
   'version': 1,
   'sessionKey': sessionKey,
-  'expectedArtifactDirs': ['assets/images', 'reports', 'video'],
+  'expectedArtifactDirs': ['artifacts/', 'reports/', 'exports/', 'assets/', 'assets/images/', 'dist/'],
   // ...existing fields
 },
 ```
@@ -237,50 +237,17 @@ api.registerHook("session.start", async (event: any) => {
 - 任意方向查询 O(1)
 - 利用 OpenClaw 原生的 session store 持久化
 
-### 4.4 简化 bridgeAgents 为纯 plugin 内部调用
+### 4.4 删除 bridgeAgents 反向 HTTP 客户端
 
-当前 `bridgeAgents.ts` 通过 HTTP fetch 调用外部 bridge：
-
-```typescript
-const bridgeResult = await callBridgeRPC({
-  bridgeUrl,
-  bridgeToken,
-  body: { jsonrpc: "2.0", method: "session.start", params: {...} },
-});
-```
-
-这导致 bridgeAgents 成为 HTTP 客户端而非插件逻辑。建议改为：
-
-```typescript
-// 方案 A: 通过 OpenClaw 原生 subagent.run() 调度
-const result = await api.runtime.subagent.run({
-  agentId: providerId,
-  prompt: step.prompt,
-  sessionKey: prepared.artifactScope,
-  workspaceDir: prepared.artifactDirectory,
-});
-```
-
-或
-
-```typescript
-// 方案 B: 注册为原生 TaskFlow
-const flow = await api.taskFlows.create({
-  syncMode: "managed",
-  ownerKey: sessionKey,
-  goal: taskPrompt,
-  steps: steps.map(s => ({
-    providerId: s.providerId,
-    prompt: s.prompt,
-    outputAs: s.outputAs,
-  })),
-});
-```
+`bridgeAgents.ts`、`xworkmate.agents.run` 和 `openclaw_multi_session_agents`
+不再属于插件边界。多 agent 编排归 Bridge 或 OpenClaw 原生 task/subagent
+runtime，插件只负责 artifact scope、task snapshot adapter 和 session key
+mapping。
 
 **收益**：
-- bridgeAgents 不再需要独立的 HTTP 客户端
-- 复用 OpenClaw 的 subagent 调度和 task flow 编排
-- 状态同步自动由 task-registry 管理
+- 消除 Plugin→Bridge→Plugin 循环依赖
+- 发布包不再需要 bridgeUrl/bridgeToken 配置
+- 状态同步继续由 task-registry 管理
 
 ### 4.5 用 Transcript Events 替代 SSE 流管理
 
@@ -309,7 +276,7 @@ api.session.onTranscriptUpdate(params.sessionKey, (update) => {
 | **P0** | 打通 expectedArtifactDirs 全链路 | Plugin + Bridge + APP | 低 | 解决制品遗漏问题 |
 | **P1** | 利用 pluginExtensions 做 Key 映射 | Plugin | 低 | 消除会话 key 歧义 |
 | **P1** | session.start hook 中创建 TaskRecord | Plugin | 低 | 任务状态有权威来源 |
-| **P2** | bridgeAgents 使用原生 subagent.run | Plugin | 高 | 消除 HTTP 客户端依赖 |
+| **P2** | 删除 bridgeAgents 反向 HTTP 客户端 | Plugin | 已完成 | 消除 HTTP 客户端依赖 |
 | **P2** | 用 Transcript Events 替代 SSE 管理 | Plugin + Bridge | 高 | 简化流管理 |
 
 ## 六、简化后的架构全景
