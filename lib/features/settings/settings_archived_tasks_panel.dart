@@ -10,11 +10,13 @@ class SettingsArchivedTasksPanel extends StatefulWidget {
     required this.sessions,
     required this.onRestore,
     required this.onDelete,
+    required this.onStop,
   });
 
   final List<GatewaySessionSummary> sessions;
   final Future<void> Function(String sessionKey) onRestore;
   final Future<void> Function(String sessionKey) onDelete;
+  final Future<void> Function(String sessionKey)? onStop;
 
   @override
   State<SettingsArchivedTasksPanel> createState() =>
@@ -152,6 +154,9 @@ class _SettingsArchivedTasksPanelState
                   onSelectionChanged: (selected) =>
                       _toggleSessionSelection(session.key, selected),
                   onRestore: () => widget.onRestore(session.key),
+                  onStop: widget.onStop == null
+                      ? null
+                      : () => widget.onStop!(session.key),
                   onDelete: () async {
                     final confirmed = await _confirmDelete(context, session);
                     if (confirmed) {
@@ -460,6 +465,7 @@ class _ArchivedTaskTile extends StatelessWidget {
     required this.selected,
     required this.onSelectionChanged,
     required this.onRestore,
+    required this.onStop,
     required this.onDelete,
   });
 
@@ -467,6 +473,7 @@ class _ArchivedTaskTile extends StatelessWidget {
   final bool selected;
   final ValueChanged<bool> onSelectionChanged;
   final Future<void> Function() onRestore;
+  final Future<void> Function()? onStop;
   final Future<void> Function() onDelete;
 
   @override
@@ -551,6 +558,17 @@ class _ArchivedTaskTile extends StatelessWidget {
                 icon: const Icon(Icons.unarchive_outlined),
                 label: Text(appText('解除归档', 'Restore')),
               ),
+              if (onStop != null)
+                FilledButton.tonalIcon(
+                  key: ValueKey<String>(
+                    'settings-archived-task-stop-${session.key}',
+                  ),
+                  onPressed: () async {
+                    await onStop!();
+                  },
+                  icon: const Icon(Icons.stop_rounded),
+                  label: Text(appText('停止', 'Stop')),
+                ),
               IconButton(
                 key: ValueKey<String>(
                   'settings-archived-task-delete-${session.key}',
