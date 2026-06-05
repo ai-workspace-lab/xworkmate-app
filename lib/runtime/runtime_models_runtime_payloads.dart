@@ -1013,16 +1013,6 @@ class OpenClawTaskAssociation {
     if (runId.isEmpty || artifactScope.isEmpty) {
       return null;
     }
-    int asInt(Object? raw) {
-      if (raw is int) {
-        return raw;
-      }
-      if (raw is num) {
-        return raw.toInt();
-      }
-      return int.tryParse(raw?.toString() ?? '') ?? 60;
-    }
-
     double asDouble(Object? raw) {
       if (raw is num) {
         return raw.toDouble();
