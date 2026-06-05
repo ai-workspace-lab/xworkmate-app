@@ -1,6 +1,5 @@
 ## Skills
 
-- Use `xworkmate-acceptance` before claiming build, packaging, installation, or release readiness for this repo.
 - For any change that touches gateway auth, `.env`, secure storage, tokens, passwords, TLS, file upload, native entitlements, packaging, or release-sensitive settings, follow the security rules in this file and [docs/security/secure-development-rules.md](docs/security/secure-development-rules.md).
 - For non-trivial implementation work, default to the worktree-first execution flow in this file without asking the user to restate that preference each time.
 
@@ -127,7 +126,6 @@ Soft triggers (recommended execution):
 
 `Phase 5 - SECURITY/ACCEPTANCE`
 - If change scope touches auth/secrets/network/entitlements/release-sensitive settings, apply security baseline checks.
-- Before any build/package/install/release readiness claim, run `xworkmate-acceptance`.
 
 Baseline commands:
 - `flutter analyze`

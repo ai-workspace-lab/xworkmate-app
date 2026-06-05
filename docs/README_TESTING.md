@@ -16,10 +16,10 @@ flutter test integration_test
 
 ## Patrol
 
-Run Patrol tests:
+Run Patrol tests when `patrol_test/` exists and contains `*_test.dart` files:
 
 ```bash
-patrol test
+make test-patrol
 ```
 
 ## Go
@@ -38,4 +38,4 @@ go test ./...
 - Widget, integration, and Patrol suites are owned by their dedicated commands and release validation flows, not by the lightweight `verify` gate.
 - Pushes to `main`, version tags, and manual workflow runs publish build artifacts and update the GitHub Release entry for that release mode.
 - `xworkmate-bridge` Go tests run in the companion repository.
-- `release/*` branches run Patrol tests in addition to the PR chain.
+- `release/*` branches run Patrol tests in addition to the PR chain when Patrol tests are present.
