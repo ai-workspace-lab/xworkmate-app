@@ -993,19 +993,10 @@ class OpenClawTaskAssociation {
 
   Map<String, dynamic> toTaskGetParams() {
     return <String, dynamic>{
-      'sessionId': sessionId,
-      'threadId': threadId,
-      'turnId': turnId,
       'runId': runId,
-      'artifactScope': artifactScope,
-      'artifactDirectory': artifactDirectory,
-      'gatewayProviderId': gatewayProviderId,
-      'taskLoadClass': taskLoadClass,
       'appThreadKey': appThreadKey,
       'openclawSessionKey': openclawSessionKey,
       'includeArtifacts': true,
-      'requiredArtifactExtensions': requiredArtifactExtensions,
-      'expectedArtifactExtensions': expectedArtifactExtensions,
     };
   }
 
@@ -1015,14 +1006,10 @@ class OpenClawTaskAssociation {
     }
     final json = value.cast<String, dynamic>();
     final runId = json['runId']?.toString().trim() ?? '';
-    final artifactScope = json['artifactScope']?.toString().trim() ?? '';
     final appThreadKey = json['appThreadKey']?.toString().trim() ?? '';
     final openclawSessionKey =
         json['openclawSessionKey']?.toString().trim() ?? '';
-    if (runId.isEmpty ||
-        artifactScope.isEmpty ||
-        appThreadKey.isEmpty ||
-        openclawSessionKey.isEmpty) {
+    if (runId.isEmpty || appThreadKey.isEmpty || openclawSessionKey.isEmpty) {
       return null;
     }
     double asDouble(Object? raw) {
@@ -1037,7 +1024,7 @@ class OpenClawTaskAssociation {
       threadId: json['threadId']?.toString().trim() ?? '',
       turnId: json['turnId']?.toString().trim() ?? '',
       runId: runId,
-      artifactScope: artifactScope,
+      artifactScope: json['artifactScope']?.toString().trim() ?? '',
       artifactDirectory: json['artifactDirectory']?.toString().trim() ?? '',
       gatewayProviderId:
           json['gatewayProviderId']?.toString().trim().isNotEmpty == true

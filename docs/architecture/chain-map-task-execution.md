@@ -70,7 +70,7 @@ xworkmate-bridge
           │   ├─ queueTimeout: 10 min
           │   └─ Returns: admission slot or OPENCLAW_GATEWAY_BUSY
           │
-          └─ startOpenClawGatewayTask()
+             └─ startOpenClawGatewayTask()
              ├─ ensureProductionGatewayConnected()
              ├─ openClawArtifactPrepare()
              │   └─ gateway.request('xworkmate.session.prepare')
@@ -85,20 +85,18 @@ xworkmate-bridge
              │      sessionKey is the OpenClaw native field and equals openclawSessionKey
              │      (no expectedArtifactDirs root field)
              │
-             ├─ Create OpenClawTaskRecord
+             ├─ Keep OpenClawTaskRecord only as live transport context
              │   ├─ SessionID, ThreadID, TurnID, RunID
              │   ├─ SessionKey (from gateway response)
              │   ├─ TaskLoadClass (short_task/long_task/complex_chain_task)
              │   ├─ RuntimeBudgetMinutes (10/30/60)
              │   └─ PreparedArtifact scope ref
              │
-             └─ startOpenClawTaskMonitor()
-                └─ Every 1s: probeOpenClawTask()
-                   └─ gateway.request('agent.wait', timeout=1s)
-                      ├─ completed → completeOpenClawTask()
-                      ├─ failed    → failOpenClawTask()
-                      ├─ SLA expired → TASK_SLA_EXPIRED
-                      └─ silent failure >10min → cleanup
+             └─ Native task status lookup
+                └─ xworkmate.tasks.get forwards typed
+                   {appThreadKey, openclawSessionKey, runId/taskId}
+                   to OpenClaw native task-registry via the plugin.
+                   Bridge no longer rebuilds task state from artifactScope/runId.
 
 ───────────────────────────────────────────────────────────
 Protocol: Custom JSON-RPC v4 over WebSocket
@@ -177,11 +175,11 @@ now copied into tasks/<session>/<run>/artifacts/ before export.
 ───────────────────────────────────────────────────────────
 
   Back to xworkmate-bridge:
-    completeOpenClawTask()
+    terminal transport handling
       ├─ Call xworkmate.artifacts.collect-and-snapshot via gateway
       ├─ Call xworkmate.artifacts.export via gateway
       ├─ Collect artifact manifest
-      ├─ Build terminal snapshot with:
+      ├─ Build App transport payload with:
       │   ├─ status: completed/failed/cancelled
       │   ├─ artifacts: { items: [...], scope: "..." }
       │   └─ text: final output
@@ -191,6 +189,12 @@ now copied into tasks/<session>/<run>/artifacts/ before export.
       │       Format: /artifacts/openclaw/download?ref=<signed>&t=<expiry>
       │
       └─ Send SSE session.update to app
+
+  xworkmate.tasks.get:
+    Bridge forwards typed lookup to the plugin/native task-registry.
+    Terminal state comes from native task records only. Missing native records
+    return structured errors such as no_native_task_record instead of inferring
+    success from artifacts or reconstructing a Bridge task dictionary.
 
   Back to xworkmate-app:
     ExternalCodeAgentAcpDesktopTransport
