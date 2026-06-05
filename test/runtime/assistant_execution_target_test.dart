@@ -1820,85 +1820,6 @@ void main() {
 
     test(
       'sendChatMessage restarts before handling OpenClaw artifact guard results',
-      () async {
-        final localWorkspace = await Directory.systemTemp.createTemp(
-          'xworkmate-acp-interrupt-guard-',
-        );
-        addTearDown(() async {
-          if (await localWorkspace.exists()) {
-            await localWorkspace.delete(recursive: true);
-          }
-        });
-        const guardMessage =
-            '未检测到 OpenClaw 本轮导出的实际文件。已阻止口头下载声明进入 artifacts 面板；请重新执行并要求 OpenClaw 在 workspace 中真实生成文件。';
-        final fakeGoTaskService = _RecordingGoTaskServiceClient()
-          ..updatesBeforeNextOutcome.add(
-            const GoTaskServiceUpdate(
-              sessionId: 'unit-fixture-task-a',
-              threadId: 'unit-fixture-task-a',
-              turnId: 'turn-1',
-              type: 'delta',
-              text: 'guard partial output must not persist',
-              message: '',
-              pending: true,
-              error: false,
-              route: GoTaskServiceRoute.externalAcpSingle,
-              payload: <String, dynamic>{},
-            ),
-          )
-          ..outcomes.add(
-            const GatewayAcpException(
-              'ACP HTTP connection closed before the response finished arriving',
-              code: 'ACP_HTTP_CONNECTION_CLOSED',
-            ),
-          )
-          ..outcomes.add(
-            const GoTaskServiceResult(
-              success: true,
-              message: guardMessage,
-              turnId: 'turn-2',
-              raw: <String, dynamic>{'code': 'OPENCLAW_NO_EXPORTED_ARTIFACTS'},
-              errorMessage: '',
-              resolvedModel: '',
-              route: GoTaskServiceRoute.externalAcpSingle,
-            ),
-          );
-        final controller = _connectedController(
-          fakeGoTaskService,
-          homeDir: localWorkspace.path,
-        );
-        addTearDown(controller.dispose);
-
-        await controller.sessionsController.switchSession(
-          'unit-fixture-task-a',
-        );
-
-        await controller.sendChatMessage('first turn');
-        await controller.sendChatMessage('follow up');
-
-        expect(fakeGoTaskService.requests, hasLength(2));
-        expect(fakeGoTaskService.requests.first.resumeSession, isFalse);
-        expect(fakeGoTaskService.requests.last.resumeSession, isTrue);
-
-        final transcript = controller.chatMessages
-            .map((message) => message.text)
-            .join('\n');
-        expect(transcript, isNot(contains('未检测到 OpenClaw 本轮导出的实际文件')));
-        expect(transcript, isNot(contains('口头下载声明')));
-        expect(
-          transcript,
-          isNot(contains('guard partial output must not persist')),
-        );
-
-        final thread = controller.taskThreadForSessionInternal(
-          'unit-fixture-task-a',
-        );
-        expect(thread?.lifecycleState.status, 'ready');
-        expect(thread?.lastArtifactSyncStatus, 'no-exported-artifacts');
-        expect(thread?.lastArtifactSyncAtMs, greaterThan(0));
-      },
-    );
-
     test(
       'sendChatMessage starts a new session after OpenClaw terminal artifact failure',
       () async {
@@ -1947,7 +1868,7 @@ void main() {
           failedThread?.lifecycleState.lastResultCode,
           'OPENCLAW_NO_EXPORTED_ARTIFACTS',
         );
-        expect(failedThread?.lastArtifactSyncStatus, 'no-exported-artifacts');
+        expect(failedThread?.lastArtifactSyncStatus, 'failed');
 
         await controller.sendChatMessage('retry final artifact');
 
@@ -1957,76 +1878,6 @@ void main() {
           controller,
           'final artifact delivered',
         );
-      },
-    );
-
-    test(
-      'sendChatMessage hides OpenClaw artifact guard text from failed results and streaming',
-      () async {
-        final localWorkspace = await Directory.systemTemp.createTemp(
-          'xworkmate-acp-guard-failure-',
-        );
-        addTearDown(() async {
-          if (await localWorkspace.exists()) {
-            await localWorkspace.delete(recursive: true);
-          }
-        });
-        const guardMessage =
-            '未检测到 OpenClaw 本轮导出的实际文件。已阻止口头下载声明进入 artifacts 面板；请重新执行并要求 OpenClaw 在 workspace 中真实生成文件。';
-        final fakeGoTaskService = _RecordingGoTaskServiceClient()
-          ..updatesBeforeNextOutcome.add(
-            const GoTaskServiceUpdate(
-              sessionId: 'unit-fixture-task-a',
-              threadId: 'unit-fixture-task-a',
-              turnId: 'turn-1',
-              type: 'delta',
-              text: guardMessage,
-              message: '',
-              pending: true,
-              error: false,
-              route: GoTaskServiceRoute.externalAcpSingle,
-              payload: <String, dynamic>{},
-            ),
-          )
-          ..outcomes.add(
-            const GoTaskServiceResult(
-              success: false,
-              message: '',
-              turnId: 'turn-1',
-              raw: <String, dynamic>{
-                'status': 'artifact_missing',
-                'code': 'OPENCLAW_ARTIFACT_MISSING',
-                'artifactWarnings': <String>[
-                  'OpenClaw artifact export returned no files for a file-delivery request.',
-                ],
-              },
-              errorMessage: guardMessage,
-              resolvedModel: '',
-              route: GoTaskServiceRoute.externalAcpSingle,
-            ),
-          );
-        final controller = _connectedController(
-          fakeGoTaskService,
-          homeDir: localWorkspace.path,
-        );
-        addTearDown(controller.dispose);
-
-        await controller.sessionsController.switchSession(
-          'unit-fixture-task-a',
-        );
-        await controller.sendChatMessage('create files');
-
-        final transcript = controller.chatMessages
-            .map((message) => message.text)
-            .join('\n');
-        expect(transcript, isNot(contains('未检测到 OpenClaw 本轮导出的实际文件')));
-        expect(transcript, isNot(contains('口头下载声明')));
-        final thread = controller.taskThreadForSessionInternal(
-          'unit-fixture-task-a',
-        );
-        expect(thread?.lifecycleState.lastResultCode, 'artifact_missing');
-        expect(thread?.lastArtifactSyncStatus, 'no-exported-artifacts');
-        expect(thread?.lastArtifactSyncAtMs, greaterThan(0));
       },
     );
 
@@ -4179,7 +4030,7 @@ void main() {
         await _waitForThreadArtifactSyncStatusWithin(
           controller,
           'openclaw-missing-screenshot',
-          'no-exported-artifacts',
+          'no-artifacts',
           const Duration(seconds: 10),
         );
 
@@ -4188,7 +4039,7 @@ void main() {
         );
         expect(thread.lifecycleState.status, 'ready');
         expect(thread.lifecycleState.lastResultCode, 'success');
-        expect(thread.lastArtifactSyncStatus, 'no-exported-artifacts');
+        expect(thread.lastArtifactSyncStatus, 'no-artifacts');
         expect(thread.openClawTaskAssociation, isNull);
         expect(
           controller.assistantSessionHasPendingRun(

@@ -52,7 +52,7 @@ void main() {
     await tester.pumpWidget(
       _buildTestApp(
         artifactSyncAtMs: 1,
-        artifactSyncStatus: 'no-exported-artifacts',
+        artifactSyncStatus: 'failed',
         loadSnapshot: () async => const AssistantArtifactSnapshot(
           workspacePath: '/tmp/thread',
           workspaceKind: WorkspaceRefKind.localPath,

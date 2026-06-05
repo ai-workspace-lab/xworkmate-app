@@ -811,20 +811,8 @@ bool _inferGoTaskSuccess(Map<String, dynamic> result) {
   ]).toLowerCase();
   if (status == 'failed' ||
       status == 'error' ||
-      status == 'artifact_missing' ||
       status == 'cancelled' ||
       status == 'canceled') {
-    return false;
-  }
-  final code = _firstNestedGoTaskString(result, const <List<String>>[
-    <String>['code'],
-    <String>['details', 'code'],
-    <String>['payload', 'code'],
-    <String>['result', 'code'],
-  ]).toUpperCase();
-  if (code == 'OPENCLAW_ARTIFACT_MISSING' ||
-      code == 'OPENCLAW_NO_EXPORTED_ARTIFACTS' ||
-      code == 'ARTIFACT_MISSING') {
     return false;
   }
   return true;

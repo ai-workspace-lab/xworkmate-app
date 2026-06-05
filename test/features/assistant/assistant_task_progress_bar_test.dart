@@ -15,7 +15,6 @@ void main() {
           lifecycleStatus: 'running',
           lastResultCode: 'running',
           artifactSyncStatus: '',
-          runtimeBudgetMinutes: 30,
         ),
         onStop: () {},
       ),
@@ -25,7 +24,7 @@ void main() {
       find.byKey(const Key('assistant-task-progress-bar')),
       findsOneWidget,
     );
-    expect(find.text('任务运行中，预计最长 30 分钟...'), findsOneWidget);
+    expect(find.text('任务运行中...'), findsOneWidget);
     expect(
       find.byKey(const Key('assistant-task-progress-stop-button')),
       findsOneWidget,

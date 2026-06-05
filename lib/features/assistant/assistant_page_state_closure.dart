@@ -122,8 +122,6 @@ extension AssistantPageStateClosureInternal on AssistantPageStateInternal {
           lifecycleStatus: thread?.lifecycleState.status ?? '',
           lastResultCode: thread?.lifecycleState.lastResultCode ?? '',
           artifactSyncStatus: thread?.lastArtifactSyncStatus ?? '',
-          runtimeBudgetMinutes:
-              thread?.openClawTaskAssociation?.runtimeBudgetMinutes ?? 10,
         );
 
         return SurfaceCard(
