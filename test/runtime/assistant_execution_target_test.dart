@@ -1819,8 +1819,6 @@ void main() {
     );
 
     test(
-      'sendChatMessage restarts before handling OpenClaw artifact guard results',
-    test(
       'sendChatMessage starts a new session after OpenClaw terminal artifact failure',
       () async {
         final fakeGoTaskService = _RecordingGoTaskServiceClient()
