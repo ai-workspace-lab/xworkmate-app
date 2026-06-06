@@ -79,6 +79,12 @@ xworkmate-bridge
              │       ├─ openclawSessionKey: OpenClaw SessionEntry key
              │       ├─ expectedArtifactDirs: typed artifact contract
              │       └─ scope: tasks/<openclawSessionKey>/<runId>/
+             ├─ Rewrite OpenClaw turn workspace references
+             │   ├─ `/owners/...` and other app owner-scoped hints are not
+             │   │  plugin workspace roots
+             │   ├─ workingDirectory / remoteWorkingDirectoryHint for chat.send
+             │   │  become prepared.artifactDirectory
+             │   └─ prompt `currentTaskWorkspace` points at artifactDirectory
              │
              ├─ gateway.request('chat.send')
              │   └─ payload: sessionKey, message, attachments, idempotencyKey
