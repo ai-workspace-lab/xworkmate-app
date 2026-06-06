@@ -273,7 +273,7 @@ Future<AccountSyncResult> syncAccountSettingsInternal(
     final syncPayload = await client.loadXWorkmateProfileSync(
       token: sessionToken,
     );
-    final bridgeToken = _stringValue(syncPayload['BRIDGE_AUTH_TOKEN']);
+    final bridgeToken = _extractBridgeAuthTokenMetadata(syncPayload);
     if (bridgeToken.isEmpty) {
       return _persistAccountSyncContractFailureInternal(
         controller,
@@ -589,6 +589,14 @@ String _extractBridgeServerUrlMetadata(Map<String, dynamic> payload) {
     return camelCase;
   }
   return '';
+}
+
+String _extractBridgeAuthTokenMetadata(Map<String, dynamic> payload) {
+  final reviewToken = _stringValue(payload['BRIDGE_REVIEW_AUTH_TOKEN']);
+  if (reviewToken.isNotEmpty) {
+    return reviewToken;
+  }
+  return _stringValue(payload['BRIDGE_AUTH_TOKEN']);
 }
 
 AcpBridgeServerEffectiveConfig resolveAcpBridgeServerEffectiveConfigInternal(
