@@ -876,6 +876,71 @@ void main() {
   );
 
   test(
+    'refreshing an empty artifact snapshot backfills OpenClaw task artifacts from the remote workspace hint',
+    () async {
+      late OpenClawTaskAssociation observedAssociation;
+      final goTaskClient = _ArtifactBackfillGoTaskServiceClient(
+        onGetTask: (association) {
+          observedAssociation = association;
+        },
+      );
+      final controller = AppController(
+        environmentOverride: const <String, String>{},
+        goTaskServiceClient: goTaskClient,
+      );
+      addTearDown(controller.dispose);
+
+      final taskWorkspace = await Directory.systemTemp.createTemp(
+        'xworkmate-remote-backfill-workspace-',
+      );
+      addTearDown(() async {
+        if (await taskWorkspace.exists()) {
+          await taskWorkspace.delete(recursive: true);
+        }
+      });
+
+      const sessionKey = 'draft-sample-sync';
+      controller.upsertTaskThreadInternal(
+        sessionKey,
+        workspaceBinding: WorkspaceBinding(
+          workspaceId: sessionKey,
+          workspaceKind: WorkspaceKind.localFs,
+          workspacePath: taskWorkspace.path,
+          displayPath: taskWorkspace.path,
+          writable: true,
+        ),
+        lastRemoteWorkingDirectory:
+            '/home/ubuntu/.openclaw/workspace/tasks/'
+            'agent_main_draft_sample-sync/turn-sample',
+        lastArtifactSyncStatus: 'no-artifacts',
+        lastTaskArtifactRelativePaths: const <String>[],
+      );
+
+      final snapshot = await controller.loadAssistantArtifactSnapshot(
+        sessionKey: sessionKey,
+      );
+
+      expect(observedAssociation.appThreadKey, 'draft:sample-sync');
+      expect(
+        observedAssociation.openclawSessionKey,
+        'agent:main:draft:sample-sync',
+      );
+      expect(observedAssociation.runId, 'turn-sample');
+      expect(
+        snapshot.fileEntries.map((entry) => entry.relativePath),
+        contains('ai-news-report.md'),
+      );
+      expect(
+        await File('${taskWorkspace.path}/ai-news-report.md').readAsString(),
+        '# AI news\n',
+      );
+      final thread = controller.requireTaskThreadForSessionInternal(sessionKey);
+      expect(thread.lastArtifactSyncStatus, 'synced');
+      expect(thread.openClawTaskAssociation?.runId, 'turn-sample');
+    },
+  );
+
+  test(
     'resumes bridge artifact downloads after a weak network disconnect',
     () async {
       final body = <int>[0x41, 0x52, 0x54, 0x49, 0x46, 0x41, 0x43, 0x54];
@@ -1796,6 +1861,63 @@ class _RecordingSecureConfigStore extends SecureConfigStore {
     clearAssistantLocalStateCalled = true;
     await super.clearAssistantLocalState();
   }
+}
+
+class _ArtifactBackfillGoTaskServiceClient implements GoTaskServiceClient {
+  _ArtifactBackfillGoTaskServiceClient({required this.onGetTask});
+
+  final void Function(OpenClawTaskAssociation association) onGetTask;
+
+  @override
+  Future<GoTaskServiceResult> executeTask(
+    GoTaskServiceRequest request, {
+    required void Function(GoTaskServiceUpdate update) onUpdate,
+  }) async {
+    throw UnimplementedError('executeTask is not used by this test');
+  }
+
+  @override
+  Future<GoTaskServiceResult> getTask({
+    required AssistantExecutionTarget target,
+    required OpenClawTaskAssociation association,
+    required GoTaskServiceRoute route,
+  }) async {
+    onGetTask(association);
+    return GoTaskServiceResult(
+      success: true,
+      message: 'done',
+      turnId: association.turnId,
+      raw: <String, dynamic>{
+        'success': true,
+        'status': 'completed',
+        'runId': association.runId,
+        'remoteWorkingDirectory': association.artifactDirectory,
+        'remoteWorkspaceRefKind': 'remotePath',
+        'artifacts': <Map<String, dynamic>>[
+          <String, dynamic>{
+            'relativePath': 'ai-news-report.md',
+            'content': '# AI news\n',
+            'contentType': 'text/markdown',
+          },
+        ],
+      },
+      errorMessage: '',
+      resolvedModel: '',
+      route: route,
+    );
+  }
+
+  @override
+  Future<void> cancelTask({
+    required GoTaskServiceRoute route,
+    required AssistantExecutionTarget target,
+    required String sessionId,
+    required String threadId,
+    OpenClawTaskAssociation? association,
+  }) async {}
+
+  @override
+  Future<void> dispose() async {}
 }
 
 Future<void> _waitForControllerInitialization(AppController controller) async {
