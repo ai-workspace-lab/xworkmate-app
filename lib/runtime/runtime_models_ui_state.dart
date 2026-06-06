@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 import 'dart:convert';
 
 import '../models/app_models.dart';
@@ -97,7 +99,7 @@ class AppUiState {
         return AppUiState.defaults();
       }
       return AppUiState.fromJson(decoded);
-    } catch (_) {
+    } catch (e, stackTrace) { debugPrint('Error: $e\n$stackTrace');
       return AppUiState.defaults();
     }
   }

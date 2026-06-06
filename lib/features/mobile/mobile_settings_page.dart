@@ -185,12 +185,12 @@ class _MobileSettingsPageState extends State<MobileSettingsPage> {
       await controller.refreshSingleAgentCapabilitiesInternal(
         forceRefresh: true,
       );
-    } catch (_) {
+    } catch (e, stackTrace) { debugPrint('Error: $e\n$stackTrace');
       // Account login should not fail only because runtime refresh is transient.
     }
     try {
       await controller.refreshAcpCapabilitiesInternal(forceRefresh: true);
-    } catch (_) {
+    } catch (e, stackTrace) { debugPrint('Error: $e\n$stackTrace');
       // Runtime capabilities can be refreshed again from Assistant.
     }
   }

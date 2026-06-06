@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 import 'dart:convert';
 import 'dart:io';
 
@@ -134,7 +136,7 @@ class SecureConfigStore {
     }
     try {
       return AppUiState.fromJson(payload);
-    } catch (_) {
+    } catch (e, stackTrace) { debugPrint('Error: $e\n$stackTrace');
       return AppUiState.defaults();
     }
   }
