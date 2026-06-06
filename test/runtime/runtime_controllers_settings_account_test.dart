@@ -11,6 +11,78 @@ import 'package:xworkmate/runtime/secure_config_store.dart';
 void main() {
   group('SettingsController account sync', () {
     test(
+      'prefers managed bridge token over stale profile token for remote gateway auth',
+      () async {
+        final storeRoot = await Directory.systemTemp.createTemp(
+          'xworkmate-account-sync-token-precedence-',
+        );
+        addTearDown(() async {
+          if (await storeRoot.exists()) {
+            await storeRoot.delete(recursive: true);
+          }
+        });
+
+        final store = SecureConfigStore(
+          secretRootPathResolver: () async => '${storeRoot.path}/secrets',
+          appDataRootPathResolver: () async => '${storeRoot.path}/app-data',
+          supportRootPathResolver: () async => '${storeRoot.path}/support',
+          enableSecureStorage: false,
+        );
+        await store.initialize();
+        await store.saveSettingsSnapshot(
+          SettingsSnapshot.defaults().copyWith(
+            acpBridgeServerModeConfig: AcpBridgeServerModeConfig.defaults()
+                .copyWith(
+                  selfHosted: const AcpBridgeServerSelfHostedConfig(
+                    serverUrl: 'https://xworkmate-bridge.svc.plus',
+                    username: 'ubuntu',
+                    passwordRef: 'legacy.bridge.token',
+                  ),
+                ),
+          ),
+        );
+        await store.saveSecretValueByRef('legacy.bridge.token', 'stale-token');
+        await store.saveAccountManagedSecret(
+          target: kAccountManagedSecretTargetBridgeAuthToken,
+          value: 'managed-token',
+        );
+        await store.saveAccountSessionToken('session-token');
+        await store.saveAccountSessionSummary(
+          const AccountSessionSummary(
+            userId: 'user-1',
+            email: 'review@svc.plus',
+            name: 'Review User',
+            role: 'reviewer',
+            mfaEnabled: true,
+          ),
+        );
+        await store.saveAccountSyncState(
+          AccountSyncState.defaults().copyWith(
+            syncState: 'ready',
+            tokenConfigured: const AccountTokenConfigured(
+              bridge: true,
+              vault: false,
+            ),
+          ),
+        );
+
+        final controller = AppController(
+          store: store,
+          environmentOverride: const <String, String>{},
+        );
+        addTearDown(controller.dispose);
+        await controller.settingsControllerInternal.initialize();
+
+        final token = await controller.settingsControllerInternal
+            .loadEffectiveGatewayToken(
+              profileIndex: kGatewayRemoteProfileIndex,
+            );
+
+        expect(token, 'managed-token');
+      },
+    );
+
+    test(
       'updates in-memory blocked state when bridge authorization is unavailable',
       () async {
         final storeRoot = await Directory.systemTemp.createTemp(
@@ -495,7 +567,7 @@ void main() {
 
         await controller.settingsControllerInternal
             .markAccountBridgeRuntimeUnavailable(
-              'Bridge authorization rejected',
+              'Bridge token expired or rejected. Please re-sync the account token.',
             );
 
         expect(controller.isBridgeAcpRuntimeConfiguredInternal(), isFalse);

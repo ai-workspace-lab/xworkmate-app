@@ -50,6 +50,13 @@ extension SettingsControllerAccountExtension on SettingsController {
         .clamp(0, kGatewayProfileListLength - 1);
 
     if (resolvedProfileIndex == kGatewayRemoteProfileIndex) {
+      final managedBridgeToken = (await storeInternal.loadAccountManagedSecret(
+        target: kAccountManagedSecretTargetBridgeAuthToken,
+      ))?.trim();
+      if (managedBridgeToken?.isNotEmpty == true) {
+        return managedBridgeToken!;
+      }
+
       final effective = snapshotInternal.acpBridgeServerModeConfig.effective;
       if (effective.tokenRef.isNotEmpty) {
         final token = await loadSecretValueByRef(effective.tokenRef);

@@ -64,7 +64,8 @@ Future<Map<String, dynamic>> loadBridgeMetadataForSettingsAbout({
           response.statusCode == HttpStatus.forbidden) {
         return const <String, dynamic>{
           'status': 'unauthorized',
-          'message': 'Bridge authorization rejected',
+          'message':
+              'Bridge authorization rejected. Please re-sync the account token.',
           'version': '',
           'commit': '',
           'image': '',
@@ -86,7 +87,8 @@ Future<Map<String, dynamic>> loadBridgeMetadataForSettingsAbout({
     if (decoded is Map) {
       return decoded.cast<String, dynamic>();
     }
-  } catch (e, stackTrace) { debugPrint('Error: $e\n$stackTrace');
+  } catch (e, stackTrace) {
+    debugPrint('Error: $e\n$stackTrace');
     return const <String, dynamic>{
       'status': 'unavailable',
       'version': '',
@@ -296,13 +298,15 @@ class _SettingsPageState extends State<SettingsPage> {
       await controller.refreshSingleAgentCapabilitiesInternal(
         forceRefresh: true,
       );
-    } catch (e, stackTrace) { debugPrint('Error: $e\n$stackTrace');
+    } catch (e, stackTrace) {
+      debugPrint('Error: $e\n$stackTrace');
       // Best effort only. Account sync should still succeed if runtime refresh
       // is temporarily unavailable.
     }
     try {
       await controller.refreshAcpCapabilitiesInternal(forceRefresh: true);
-    } catch (e, stackTrace) { debugPrint('Error: $e\n$stackTrace');
+    } catch (e, stackTrace) {
+      debugPrint('Error: $e\n$stackTrace');
       // Best effort only. Runtime capabilities can be retried later.
     }
   }
@@ -400,7 +404,9 @@ class _SettingsPageState extends State<SettingsPage> {
     }
     if (status == 'unauthorized') {
       await widget.controller.settingsController
-          .markAccountBridgeRuntimeUnavailable('Bridge authorization rejected');
+          .markAccountBridgeRuntimeUnavailable(
+            'Bridge token expired or rejected. Please re-sync the account token.',
+          );
     }
     if (mounted) {
       setState(() {
@@ -576,10 +582,10 @@ class _SettingsTabSelector extends StatelessWidget {
                 tab == SettingsTab.remoteDesktop
                     ? Icons.desktop_windows_outlined
                     : (tab == SettingsTab.logs
-                        ? Icons.terminal_outlined
-                        : (tab == SettingsTab.archivedTasks
-                            ? Icons.inventory_2_outlined
-                            : Icons.hub_outlined)),
+                          ? Icons.terminal_outlined
+                          : (tab == SettingsTab.archivedTasks
+                                ? Icons.inventory_2_outlined
+                                : Icons.hub_outlined)),
               ),
               label: Text(tab.label),
             ),
