@@ -227,7 +227,7 @@ App → Bridge → Gateway: device.pair.approve / device.pair.reject
 | `xworkmate.artifacts.collect-and-snapshot` | `{sessionKey, runId, artifactScope?, sinceUnixMs?, expectedArtifactDirs?}` | `{artifacts[], warnings[]}` |
 | `xworkmate.artifacts.list` | `{sessionKey, runId, ...}` | `{artifacts[] (不含内容), manifestMarkdown}` |
 | `xworkmate.artifacts.read` | `{sessionKey, runId, artifactScope?, relativePath?, artifactRef?}` | `{artifacts[0], manifestMarkdown}` |
-| `xworkmate.tasks.get` | `{sessionKey, runId}` | `{taskStatus, status, artifacts[], warnings[]}` |
+| `xworkmate.tasks.get` | `{appThreadKey, openclawSessionKey, runId/taskId}` | `{taskStatus, status, artifacts[], warnings[]}` |
 
 `expectedArtifactDirs` has a single upstream source:
 `session.start.metadata.xworkmateTaskArtifactContract.expectedArtifactDirs`.

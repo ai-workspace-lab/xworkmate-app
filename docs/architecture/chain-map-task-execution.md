@@ -43,6 +43,7 @@ xworkmate-app
        │   ├─ params: sessionId, threadId, prompt, workingDirectory
        │   ├─ routing: executionTarget=gateway, preferredGatewayProviderId=openclaw
        │   └─ metadata: xworkmateTaskArtifactContract
+       │      └─ appThreadKey only; no prefilled openclawSessionKey
        └─ Listen for SSE session.update events
           ├─ status=running → poll xworkmate.tasks.get
           ├─ terminal snapshot → applyGatewayChatResult()
@@ -198,6 +199,8 @@ now copied into tasks/<session>/<run>/artifacts/ before export.
 
   xworkmate.tasks.get:
     Bridge forwards typed lookup to the plugin/native task-registry.
+    The request uses the persisted association:
+      {appThreadKey, openclawSessionKey, runId/taskId}
     Terminal state comes from native task records only. Missing native records
     return structured errors such as no_native_task_record instead of inferring
     success from artifacts or reconstructing a Bridge task dictionary.

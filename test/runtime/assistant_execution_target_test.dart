@@ -94,6 +94,32 @@ void main() {
       expect(params, isNot(contains('artifactScope')));
     });
 
+    test(
+      'gateway ACP params expose appThreadKey without preempting the OpenClaw session key',
+      () {
+        const request = GoTaskServiceRequest(
+          sessionId: 'draft:1780718661814229-2',
+          threadId: 'draft:1780718661814229-2',
+          target: AssistantExecutionTarget.gateway,
+          prompt: 'collect latest AI news',
+          workingDirectory: '/tmp/xworkmate-thread',
+          model: '',
+          thinking: 'low',
+          selectedSkills: <String>[],
+          inlineAttachments: <GatewayChatAttachmentPayload>[],
+          localAttachments: <CollaborationAttachment>[],
+          agentId: '',
+          metadata: <String, dynamic>{},
+          provider: SingleAgentProvider.openclaw,
+        );
+
+        final params = request.toExternalAcpParams();
+
+        expect(params['appThreadKey'], 'draft:1780718661814229-2');
+        expect(params, isNot(contains('openclawSessionKey')));
+      },
+    );
+
     test('recognizes openclaw as the canonical gateway provider', () {
       final provider = SingleAgentProvider.fromJsonValue('openclaw');
 
