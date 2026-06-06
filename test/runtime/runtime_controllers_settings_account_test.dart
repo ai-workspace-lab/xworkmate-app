@@ -502,6 +502,71 @@ void main() {
     );
 
     test(
+      'syncAccountSettings prefers review bridge auth token when present',
+      () async {
+        final storeRoot = await Directory.systemTemp.createTemp(
+          'xworkmate-account-review-bridge-token-',
+        );
+        addTearDown(() async {
+          if (await storeRoot.exists()) {
+            await storeRoot.delete(recursive: true);
+          }
+        });
+
+        final store = SecureConfigStore(
+          secretRootPathResolver: () async => '${storeRoot.path}/secrets',
+          appDataRootPathResolver: () async => '${storeRoot.path}/app-data',
+          supportRootPathResolver: () async => '${storeRoot.path}/support',
+          enableSecureStorage: false,
+        );
+        await store.initialize();
+        await store.saveSettingsSnapshot(
+          SettingsSnapshot.defaults().copyWith(
+            accountBaseUrl: 'https://accounts.svc.plus',
+            accountUsername: 'review@svc.plus',
+            assistantExecutionTarget: AssistantExecutionTarget.gateway,
+          ),
+        );
+        await store.saveAccountSessionToken('session-token');
+
+        final client = _FakeAccountRuntimeClient(
+          loginPayload: const <String, dynamic>{},
+          sessionPayload: const <String, dynamic>{
+            'user': <String, dynamic>{
+              'id': 'user-1',
+              'email': 'review@svc.plus',
+            },
+          },
+          syncPayload: <String, dynamic>{
+            'BRIDGE_REVIEW_AUTH_TOKEN': 'review-bridge-token',
+            'BRIDGE_AUTH_TOKEN': 'multi-tenant-bridge-token',
+            'BRIDGE_SERVER_URL': 'https://xworkmate-bridge-review.svc.plus',
+          },
+        );
+        final controller = SettingsController(
+          store,
+          accountClientFactory: (_) => client,
+        );
+        addTearDown(controller.dispose);
+        await controller.initialize();
+
+        final result = await controller.syncAccountSettings(
+          baseUrl: 'https://accounts.svc.plus',
+        );
+
+        expect(result.state, 'ready');
+        expect(
+          await store.loadAccountManagedSecret(
+            target: kAccountManagedSecretTargetBridgeAuthToken,
+          ),
+          'review-bridge-token',
+        );
+        expect(client.loadProfileCallCount, 1);
+        expect(client.loadXWorkmateProfileSyncCallCount, 1);
+      },
+    );
+
+    test(
       'managed bridge endpoint stays fixed regardless of synced bridge url metadata',
       () async {
         final storeRoot = await Directory.systemTemp.createTemp(
