@@ -334,8 +334,6 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
         : null;
   }
 
-
-
   Future<List<String>> recoverGatewayFailureArtifactPathsInternal(
     String sessionKey,
     Object error,
@@ -750,12 +748,34 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     );
     final artifacts = result.artifacts;
     if (artifacts.isEmpty) {
+      final association = existingThread.openClawTaskAssociation;
+      final waitingForOpenClawArtifacts =
+          association != null &&
+          (association.requiresArtifactExport ||
+              association.requiredArtifactExtensions.isNotEmpty) &&
+          (association.artifactScope.trim().isNotEmpty ||
+              association.artifactDirectory.trim().isNotEmpty) &&
+          result.success;
+      if (waitingForOpenClawArtifacts) {
+        upsertTaskThreadInternal(
+          normalizedSessionKey,
+          lifecycleStatus: 'running',
+          lastResultCode: 'running',
+          lastArtifactSyncAtMs: syncedAtMs,
+          lastArtifactSyncStatus: 'syncing',
+          openClawTaskAssociation: association.copyWith(
+            status: 'syncing-artifacts',
+          ),
+          updatedAtMs: syncedAtMs,
+        );
+        return;
+      }
       final currentTaskArtifactRelativePaths =
           await _workspaceArtifactPathsModifiedSinceInternal(
-              root,
-              existingThread.lifecycleState.lastRunAtMs,
-              artifactSyncPolicy,
-            );
+            root,
+            existingThread.lifecycleState.lastRunAtMs,
+            artifactSyncPolicy,
+          );
       if (currentTaskArtifactRelativePaths.isNotEmpty) {
         upsertTaskThreadInternal(
           normalizedSessionKey,

@@ -1744,6 +1744,75 @@ void main() {
     expect(snapshot.resultMessage, 'No task artifacts recorded for this run.');
   });
 
+  test('keeps OpenClaw task-scope empty artifact results syncing', () async {
+    final controller = AppController(
+      environmentOverride: const <String, String>{},
+    );
+    addTearDown(controller.dispose);
+
+    final localWorkspace = await Directory.systemTemp.createTemp(
+      'xworkmate-openclaw-empty-artifacts-workspace-',
+    );
+    addTearDown(() async {
+      if (await localWorkspace.exists()) {
+        await localWorkspace.delete(recursive: true);
+      }
+    });
+
+    controller.upsertTaskThreadInternal(
+      'unit-fixture-openclaw-empty',
+      workspaceBinding: WorkspaceBinding(
+        workspaceId: 'unit-fixture-openclaw-empty',
+        workspaceKind: WorkspaceKind.localFs,
+        workspacePath: localWorkspace.path,
+        displayPath: localWorkspace.path,
+        writable: true,
+      ),
+      lifecycleStatus: 'running',
+      lastResultCode: 'running',
+      openClawTaskAssociation: const OpenClawTaskAssociation(
+        sessionId: 'unit-fixture-openclaw-empty',
+        threadId: 'unit-fixture-openclaw-empty',
+        turnId: 'turn-empty',
+        runId: 'turn-empty',
+        artifactScope:
+            'tasks/agent:main:unit-fixture-openclaw-empty/turn-empty',
+        artifactDirectory:
+            '/home/ubuntu/.openclaw/workspace/tasks/agent:main:unit-fixture-openclaw-empty/turn-empty',
+        gatewayProviderId: 'openclaw',
+        startedAtMs: 1,
+        status: 'running',
+        appThreadKey: 'unit-fixture-openclaw-empty',
+        openclawSessionKey: 'agent:main:unit-fixture-openclaw-empty',
+        requiresArtifactExport: true,
+      ),
+    );
+
+    const result = GoTaskServiceResult(
+      success: true,
+      message: 'completed but export is still empty',
+      turnId: 'turn-empty',
+      raw: <String, dynamic>{},
+      errorMessage: '',
+      resolvedModel: '',
+      route: GoTaskServiceRoute.externalAcpSingle,
+    );
+
+    await controller.persistGoTaskArtifactsForSessionInternal(
+      'unit-fixture-openclaw-empty',
+      result,
+    );
+
+    final thread = controller.requireTaskThreadForSessionInternal(
+      'unit-fixture-openclaw-empty',
+    );
+    expect(thread.lifecycleState.status, 'running');
+    expect(thread.lifecycleState.lastResultCode, 'running');
+    expect(thread.lastArtifactSyncStatus, 'syncing');
+    expect(thread.lastTaskArtifactRelativePaths, isEmpty);
+    expect(thread.openClawTaskAssociation?.status, 'syncing-artifacts');
+  });
+
   test(
     'records workspace files produced during an empty-artifact task run',
     () async {
