@@ -96,7 +96,7 @@ jobs:
     runs-on: ubuntu-22.04
     needs:
       - verify
-    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+    if: ${{ github.event_name != 'push' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
     steps:
       - name: Checkout source
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
@@ -110,6 +110,7 @@ jobs:
           method: jwt
           role: github-actions-xworkmate-app
           jwtGithubAudience: vault
+          ignoreNotFound: true
           secrets: |
             kv/data/github-actions/xworkmate-app REVIEW_ACCOUNT_LOGIN_PASSWORD | REVIEW_ACCOUNT_LOGIN_PASSWORD
 
@@ -189,6 +190,7 @@ jobs:
           method: jwt
           role: github-actions-xworkmate-app
           jwtGithubAudience: vault
+          ignoreNotFound: true
           secrets: |
             kv/data/github-actions/xworkmate-app XWORKMATE_SIGN_IDENTITY | XWORKMATE_SIGN_IDENTITY ;
             kv/data/github-actions/xworkmate-app WINDOWS_PFX_BASE64 | WINDOWS_PFX_BASE64 ;
