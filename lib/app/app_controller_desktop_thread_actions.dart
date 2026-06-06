@@ -1372,7 +1372,7 @@ extension AppControllerDesktopThreadActions on AppController {
       lifecycleStatus: 'ready',
       lastRunAtMs: completedAtMs,
       lastResultCode: terminalResultCode,
-      clearOpenClawTaskAssociation: true,
+      clearOpenClawTaskAssociation: !hasCurrentRunArtifacts,
       updatedAtMs: completedAtMs,
     );
   }
