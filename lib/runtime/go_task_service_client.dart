@@ -328,7 +328,6 @@ class GoTaskServiceRequest {
       if (_usesGatewaySessionMode(acpMode)) ...<String, dynamic>{
         'executionTarget': normalizedTarget.promptValue,
         'appThreadKey': threadId,
-        'openclawSessionKey': threadId,
         if (agentId.trim().isNotEmpty) 'agentId': agentId.trim(),
         if (metadata.isNotEmpty) 'metadata': metadata,
       },
