@@ -238,7 +238,7 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
           resolvedTarget,
         ),
       );
-    } catch (_) {
+    } catch (e, stackTrace) { debugPrint('Error: $e\n$stackTrace');
       // Keep the selected execution target even when the immediate reconnect
       // fails so the user can retry or adjust gateway settings manually.
     }
@@ -441,7 +441,7 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
               sessionId: normalizedSessionKey,
               threadId: normalizedSessionKey,
             );
-          } catch (_) {
+          } catch (e, stackTrace) { debugPrint('Error: $e\n$stackTrace');
             // Best effort only.
           }
         }).catchError((_) {}),

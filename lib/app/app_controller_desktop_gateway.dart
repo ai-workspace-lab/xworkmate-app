@@ -247,7 +247,7 @@ extension AppControllerDesktopGateway on AppController {
         forceRefresh: true,
         persistMountTargets: true,
       );
-    } catch (_) {
+    } catch (e, stackTrace) { debugPrint('Error: $e\n$stackTrace');
       // Keep the Gateway connect flow usable even if ACP capability refresh
       // trails the runtime handshake.
     }

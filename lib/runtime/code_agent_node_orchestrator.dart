@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 import '../app/app_metadata.dart';
 import 'runtime_coordinator.dart';
 import 'runtime_models.dart';
@@ -68,7 +70,7 @@ class CodeAgentNodeOrchestrator {
             metadata: resolution.metadata,
           );
         }
-      } catch (_) {
+      } catch (e, stackTrace) { debugPrint('Error: $e\n$stackTrace');
         // Dispatch metadata is advisory; task execution still carries routing.
       }
     }
