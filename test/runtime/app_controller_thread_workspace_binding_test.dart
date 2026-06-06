@@ -1451,7 +1451,6 @@ void main() {
       'contains=XWorkmate Task Artifact\n'
       'contains=Required extensions: pdf\n'
       'contains=TaskThread workspace context:\n'
-      'contains=Workspace isolation rules:\n'
       '```\n',
     );
 
@@ -1459,8 +1458,7 @@ void main() {
       '%PDF-1.3\n'
       'BT /F1 14 Tf (XWorkmate Task Artifact) Tj '
       '(Required extensions: pdf) Tj '
-      '(TaskThread workspace context:) Tj '
-      '(Workspace isolation rules:) Tj ET',
+      '(TaskThread workspace context:) Tj ET',
     );
     final result = GoTaskServiceResult(
       success: true,

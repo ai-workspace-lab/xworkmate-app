@@ -865,24 +865,21 @@ extension AppControllerDesktopThreadActions on AppController {
     final requestText = userPrompt.trim().isEmpty
         ? 'See attached.'
         : userPrompt.trim();
-    final buffer = StringBuffer()
-      ..writeln('TaskThread workspace context:')
-      ..writeln('- sessionKey: $sessionKey')
-      ..writeln('- localWorkspace: ${workingDirectory.trim()}');
-    final remoteHint = remoteWorkingDirectoryHint.trim();
     final executionWorkspace =
         executionWorkingDirectory?.trim().isNotEmpty == true
         ? executionWorkingDirectory!.trim()
-        : (remoteHint.isNotEmpty ? remoteHint : workingDirectory.trim());
-    if (remoteHint.isNotEmpty) {
-      buffer.writeln('- remoteWorkspaceHint: $remoteHint');
-    }
-    final resolvedWorkspace = executionWorkspace.isNotEmpty
+        : (remoteWorkingDirectoryHint.trim().isNotEmpty
+              ? remoteWorkingDirectoryHint.trim()
+              : workingDirectory.trim());
+    final currentTaskWorkspace = executionWorkspace.isNotEmpty
         ? executionWorkspace
-        : target.isGateway
-        ? r'$XWORKMATE_ARTIFACT_DIRECTORY'
-        : workingDirectory.trim();
-    buffer.writeln('- currentTaskWorkspace: $resolvedWorkspace');
+        : (target.isGateway
+              ? r'$XWORKMATE_ARTIFACT_DIRECTORY'
+              : workingDirectory.trim());
+    final buffer = StringBuffer()
+      ..writeln('TaskThread workspace context:')
+      ..writeln('- sessionKey: $sessionKey')
+      ..writeln('- currentTaskWorkspace: $currentTaskWorkspace');
     final visibleTaskInputAttachments = taskInputAttachments
         .where((item) => item.name.trim().isNotEmpty && item.key.isNotEmpty)
         .toList(growable: false);
@@ -893,48 +890,6 @@ extension AppControllerDesktopThreadActions on AppController {
           '  - ${attachment.name.trim()} (${attachment.mimeType.trim()}, sha256: ${attachment.key})',
         );
       }
-    }
-    buffer
-      ..writeln()
-      ..writeln('Workspace isolation rules:')
-      ..writeln(
-        '1. Treat currentTaskWorkspace as the only writable workspace for this TaskThread execution.',
-      )
-      ..writeln(
-        '2. Create, modify, and export task files inside currentTaskWorkspace or its task artifact scope.',
-      )
-      ..writeln(
-        '3. Do not use arbitrary global directories, OpenClaw media cache, Downloads, Desktop, or /tmp as final deliverable locations.',
-      )
-      ..writeln(
-        '4. If a tool creates output outside currentTaskWorkspace, copy or export the final deliverables into currentTaskWorkspace before claiming completion.',
-      )
-      ..writeln(
-        '5. When reporting files, prefer paths inside currentTaskWorkspace or paths relative to currentTaskWorkspace.',
-      )
-      ..writeln(
-        '6. The app syncs final artifacts from currentTaskWorkspace back into localWorkspace.',
-      )
-      ..writeln(
-        '7. Files listed in taskInputAttachments already belong to this TaskThread; reuse them from the task context and do not ask the user to upload them again.',
-      )
-      ..writeln();
-    if (target.isGateway) {
-      buffer
-        ..writeln('XWorkmate task artifact contract:')
-        ..writeln(
-          '- The remote runtime owns final-deliverable detection; do not rely on local task classification.',
-        )
-        ..writeln(
-          '- If this request needs files, export the final deliverables through the current XWorkmate task artifact scope before final response.',
-        )
-        ..writeln(
-          '- A textual download/path claim is not a deliverable unless the file has been exported into the current task artifact scope.',
-        )
-        ..writeln(
-          '- Do not reuse artifacts from previous sessions, previous runs, or global OpenClaw workspaces.',
-        )
-        ..writeln();
     }
     buffer
       ..writeln('User request:')
