@@ -2,6 +2,7 @@ name: Build and Release XWorkmate Packages
 
 env:
   VAULT_ADDR: https://vault.svc.plus
+  FLUTTER_VERSION: 3.41.4
 
 on:
   push:
@@ -37,9 +38,6 @@ permissions:
 concurrency:
   group: build-and-release-${{ github.ref }}
   cancel-in-progress: true
-
-env:
-  FLUTTER_VERSION: 3.41.4
 
 jobs:
   prepare:
