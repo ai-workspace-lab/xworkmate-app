@@ -46,6 +46,9 @@ Process:
   3. resolveWorkspaceDir({ openclawSessionKey, params, pluginConfig, config })
      → Falls back through: explicit → pluginConfig → agent config
        → profile env → ~/.openclaw/workspace
+     → Bridge must pass only a real OpenClaw workspace root here. App/owner
+       scoped hints such as `/owners/...` are UI/sync references, not plugin
+       workspace roots, and must fall back to the managed OpenClaw workspace.
 
   4. safeScopeSegment(openclawSessionKey)
      → replace [/\\:*?"<>|] with "-", truncate to 96 chars
@@ -64,6 +67,9 @@ Output:
 
 Fragile:
   - workspace resolution chain has 5 ordered sources
+  - `remoteWorkingDirectoryHint` may be an app owner-scoped reference; using it
+    as `workspaceDir` causes plugin `realpath(workspaceDir)` failures before
+    `tasks/<session>/<run>/` can be created
   - session key format must match across bridge and plugin
   - no cleanup of old scope directories
 ```
