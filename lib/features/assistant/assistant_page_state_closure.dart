@@ -305,6 +305,9 @@ extension AssistantPageStateClosureInternal on AssistantPageStateInternal {
         final activeSessionKey = currentTask.sessionKey.trim().isEmpty
             ? controller.currentSessionKey
             : currentTask.sessionKey.trim();
+        final activeThread = controller.taskThreadForSessionInternal(
+          activeSessionKey,
+        );
         final panel = Row(
           children: [
             Expanded(child: child),
@@ -347,6 +350,15 @@ extension AssistantPageStateClosureInternal on AssistantPageStateInternal {
                       .assistantArtifactSyncAtMsForSession(activeSessionKey),
                   artifactSyncStatus: controller
                       .assistantArtifactSyncStatusForSession(activeSessionKey),
+                  taskContextMessageCount: activeThread?.messages.length ?? 0,
+                  taskContextSelectedSkillKeys:
+                      activeThread?.selectedSkillKeys ?? const <String>[],
+                  taskContextRemoteWorkingDirectory:
+                      activeThread?.lastRemoteWorkingDirectory ?? '',
+                  taskContextOpenClawRunId:
+                      activeThread?.openClawTaskAssociation?.runId ?? '',
+                  taskContextOpenClawStatus:
+                      activeThread?.openClawTaskAssociation?.status ?? '',
                   onCollapse: () {
                     setState(() {
                       artifactPaneCollapsedInternal = true;
