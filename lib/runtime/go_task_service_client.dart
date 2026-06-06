@@ -529,10 +529,12 @@ class GoTaskServiceResult {
   }
 
   OpenClawTaskAssociation? get openClawTaskAssociation {
-    if (!isOpenClawRunningTaskHandle) {
+    final association = OpenClawTaskAssociation.fromJsonOrNull(raw);
+    if (association == null) {
       return null;
     }
-    return OpenClawTaskAssociation.fromJsonOrNull(raw);
+    final provider = association.gatewayProviderId.trim().toLowerCase();
+    return provider.contains('openclaw') ? association : null;
   }
 
   String get resolvedExecutionTarget =>

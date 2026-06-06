@@ -4055,7 +4055,7 @@ void main() {
     });
 
     test(
-      'OpenClaw terminal snapshot without required artifacts does not stay running',
+      'OpenClaw terminal snapshot without required artifacts keeps polling',
       () async {
         final fakeGoTaskService = _RecordingGoTaskServiceClient()
           ..outcomes.add(
@@ -4116,28 +4116,28 @@ void main() {
         await _waitForThreadLifecycleStatusWithin(
           controller,
           'openclaw-missing-screenshot',
-          'ready',
+          'running',
           const Duration(seconds: 10),
         );
         await _waitForThreadArtifactSyncStatusWithin(
           controller,
           'openclaw-missing-screenshot',
-          'no-artifacts',
+          'syncing',
           const Duration(seconds: 10),
         );
 
         final thread = controller.requireTaskThreadForSessionInternal(
           'openclaw-missing-screenshot',
         );
-        expect(thread.lifecycleState.status, 'ready');
-        expect(thread.lifecycleState.lastResultCode, 'success');
-        expect(thread.lastArtifactSyncStatus, 'no-artifacts');
-        expect(thread.openClawTaskAssociation, isNull);
+        expect(thread.lifecycleState.status, 'running');
+        expect(thread.lifecycleState.lastResultCode, 'running');
+        expect(thread.lastArtifactSyncStatus, 'syncing');
+        expect(thread.openClawTaskAssociation?.status, 'syncing-artifacts');
         expect(
           controller.assistantSessionHasPendingRun(
             'openclaw-missing-screenshot',
           ),
-          isFalse,
+          isTrue,
         );
       },
     );
