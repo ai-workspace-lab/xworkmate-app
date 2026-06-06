@@ -928,6 +928,7 @@ class OpenClawTaskAssociation {
     this.taskLoadClass = '',
     this.requiredArtifactExtensions = const <String>[],
     this.expectedArtifactExtensions = const <String>[],
+    this.requiresArtifactExport = false,
   });
 
   final String sessionId;
@@ -944,6 +945,7 @@ class OpenClawTaskAssociation {
   final String taskLoadClass;
   final List<String> requiredArtifactExtensions;
   final List<String> expectedArtifactExtensions;
+  final bool requiresArtifactExport;
 
   bool get isTerminal {
     final normalized = status.trim().toLowerCase();
@@ -969,6 +971,7 @@ class OpenClawTaskAssociation {
       taskLoadClass: taskLoadClass,
       requiredArtifactExtensions: requiredArtifactExtensions,
       expectedArtifactExtensions: expectedArtifactExtensions,
+      requiresArtifactExport: requiresArtifactExport,
     );
   }
 
@@ -988,6 +991,7 @@ class OpenClawTaskAssociation {
       'taskLoadClass': taskLoadClass,
       'requiredArtifactExtensions': requiredArtifactExtensions,
       'expectedArtifactExtensions': expectedArtifactExtensions,
+      'requiresArtifactExport': requiresArtifactExport,
     };
   }
 
@@ -1046,6 +1050,10 @@ class OpenClawTaskAssociation {
       expectedArtifactExtensions: _stringListFromJson(
         json['expectedArtifactExtensions'],
       ),
+      requiresArtifactExport:
+          _boolFromJson(json['requiresArtifactExport']) ??
+          _boolFromJson(json['requiresExportBeforeFinalResponse']) ??
+          false,
     );
   }
 }
@@ -1069,6 +1077,20 @@ List<String> _stringListFromJson(Object? value) {
     }
   }
   return items;
+}
+
+bool? _boolFromJson(Object? value) {
+  if (value is bool) {
+    return value;
+  }
+  final normalized = value?.toString().trim().toLowerCase() ?? '';
+  if (normalized == 'true' || normalized == '1' || normalized == 'yes') {
+    return true;
+  }
+  if (normalized == 'false' || normalized == '0' || normalized == 'no') {
+    return false;
+  }
+  return null;
 }
 
 class ThreadLifecycleState {
