@@ -487,7 +487,7 @@ mixin GatewayRuntimeHelpersInternal on ChangeNotifier {
         version: info.version,
         buildNumber: info.buildNumber,
       );
-    } catch (_) {
+    } catch (e, stackTrace) { debugPrint('Error: $e\n$stackTrace');
       return const RuntimePackageInfo(
         appName: kSystemAppName,
         packageName: 'plus.svc.xworkmate',
@@ -546,7 +546,7 @@ mixin GatewayRuntimeHelpersInternal on ChangeNotifier {
           modelIdentifier: info.machineId ?? 'linux',
         );
       }
-    } catch (_) {
+    } catch (e, stackTrace) { debugPrint('Error: $e\n$stackTrace');
       // Fall through to generic info.
     }
     return RuntimeDeviceInfo(
@@ -589,7 +589,7 @@ GatewaySetupPayload? decodeGatewaySetupCode(String rawInput) {
     final padded = normalized + '=' * ((4 - normalized.length % 4) % 4);
     final decoded = utf8.decode(base64.decode(padded));
     return decodeSetupPayloadJsonInternal(decoded);
-  } catch (_) {
+  } catch (e, stackTrace) { debugPrint('Error: $e\n$stackTrace');
     return null;
   }
 }
@@ -614,7 +614,7 @@ GatewaySetupPayload? decodeSetupPayloadJsonInternal(String raw) {
       token: stringValue(json['token']) ?? '',
       password: stringValue(json['password']) ?? '',
     );
-  } catch (_) {
+  } catch (e, stackTrace) { debugPrint('Error: $e\n$stackTrace');
     return null;
   }
 }
@@ -625,7 +625,7 @@ String resolveSetupCodeCandidateInternal(String raw) {
     if (decoded is Map<String, dynamic>) {
       return stringValue(decoded['setupCode']) ?? raw;
     }
-  } catch (_) {
+  } catch (e, stackTrace) { debugPrint('Error: $e\n$stackTrace');
     // Leave raw as-is.
   }
   return raw;

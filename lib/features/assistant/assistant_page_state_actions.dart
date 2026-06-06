@@ -359,7 +359,7 @@ extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
   Future<void> continueCurrentTaskInternal(String sessionKey) async {
     try {
       await widget.controller.continueAssistantTaskInternal(sessionKey);
-    } catch (_) {
+    } catch (e, stackTrace) { debugPrint('Error: $e\n$stackTrace');
       focusComposerInternal();
     }
   }
