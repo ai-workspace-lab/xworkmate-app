@@ -267,7 +267,7 @@ extension AppControllerDesktopSettingsRuntime on AppController {
       );
       try {
         await runtime.health();
-      } catch (_) {
+      } catch (e, stackTrace) { debugPrint('Error: $e\n$stackTrace');
         // Connectivity succeeded; health is best-effort for the test path.
       }
       final endpoint =
@@ -286,14 +286,14 @@ extension AppControllerDesktopSettingsRuntime on AppController {
     } finally {
       try {
         await runtime.disconnect(clearDesiredProfile: false);
-      } catch (_) {
+      } catch (e, stackTrace) { debugPrint('Error: $e\n$stackTrace');
         // Ignore teardown noise from temporary connectivity checks.
       }
       runtime.dispose();
       temporaryStore.dispose();
       try {
         await temporaryRoot.delete(recursive: true);
-      } catch (_) {
+      } catch (e, stackTrace) { debugPrint('Error: $e\n$stackTrace');
         // Ignore cleanup noise for temporary connectivity checks.
       }
     }
@@ -447,7 +447,7 @@ extension AppControllerDesktopSettingsRuntime on AppController {
       }
       try {
         await settingsControllerInternal.restoreAccountSession();
-      } catch (_) {
+      } catch (e, stackTrace) { debugPrint('Error: $e\n$stackTrace');
         // Keep initialization resilient when remote account restore fails.
       }
       restoreAssistantThreadsInternal(sanitizedAssistantThreads);
@@ -501,7 +501,7 @@ extension AppControllerDesktopSettingsRuntime on AppController {
               startupTarget,
             ),
           );
-        } catch (_) {
+        } catch (e, stackTrace) { debugPrint('Error: $e\n$stackTrace');
           // Keep the shell usable when auto-connect fails.
         }
       }

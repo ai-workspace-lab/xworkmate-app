@@ -339,7 +339,7 @@ class SettingsSnapshot {
     try {
       final decoded = jsonDecode(raw) as Map<String, dynamic>;
       return SettingsSnapshot.fromJson(decoded);
-    } catch (_) {
+    } catch (e, stackTrace) { debugPrint('Error: $e\n$stackTrace');
       return SettingsSnapshot.defaults();
     }
   }
