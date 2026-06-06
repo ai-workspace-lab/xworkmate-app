@@ -1328,8 +1328,15 @@ void main() {
       expect(request.resumeSession, isFalse);
       expect(request.prompt, contains('TaskThread workspace context:'));
       expect(request.prompt, contains('- sessionKey: unit-fixture-task-a'));
-      expect(request.prompt, contains(request.workingDirectory));
-      expect(request.prompt, contains(request.remoteWorkingDirectoryHint));
+      expect(
+        request.prompt,
+        contains('- currentTaskWorkspace: ${request.workingDirectory}'),
+      );
+      expect(request.prompt, isNot(contains('Workspace isolation rules:')));
+      expect(
+        request.prompt,
+        isNot(contains('XWorkmate task artifact contract:')),
+      );
       expect(request.prompt, contains('User request:\nfirst turn'));
       expect(
         controller.chatMessages.map((message) => message.text),
@@ -1439,13 +1446,10 @@ void main() {
           artifactContract['currentTaskWorkspace'],
           request.workingDirectory,
         );
-        expect(request.prompt, isNot(contains('Required final artifact')));
-        expect(request.prompt, contains('XWorkmate task artifact contract:'));
+        expect(request.prompt, isNot(contains('Workspace isolation rules:')));
         expect(
           request.prompt,
-          contains(
-            'export the final deliverables through the current XWorkmate task artifact scope',
-          ),
+          isNot(contains('XWorkmate task artifact contract:')),
         );
         expect(request.prompt, contains('最后 输出 PDF文件'));
       },
@@ -3121,6 +3125,14 @@ void main() {
         expect(
           queuedRequest.prompt,
           contains('- sessionKey: queue-task-waiting'),
+        );
+        expect(
+          queuedRequest.prompt,
+          contains('- currentTaskWorkspace: ${queuedRequest.workingDirectory}'),
+        );
+        expect(
+          queuedRequest.prompt,
+          isNot(contains('Workspace isolation rules:')),
         );
         expect(queuedRequest.prompt, contains('User request:\nqueued prompt'));
         expect(queuedRequest.resumeSession, isFalse);
