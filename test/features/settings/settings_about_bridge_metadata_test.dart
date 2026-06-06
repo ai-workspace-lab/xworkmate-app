@@ -127,7 +127,10 @@ void main() {
       );
 
       expect(metadata['status'], 'unauthorized');
-      expect(metadata['message'], 'Bridge authorization rejected');
+      expect(
+        metadata['message'],
+        'Bridge authorization rejected. Please re-sync the account token.',
+      );
       expect(metadata['version'], '');
       expect(metadata['commit'], '');
       expect(metadata['image'], '');
