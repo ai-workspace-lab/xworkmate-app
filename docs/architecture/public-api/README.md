@@ -126,7 +126,7 @@ rg -n '`_' docs/architecture/public-api/*.md
 - `lib/runtime/go_task_service_client.dart`
 - `lib/runtime/codex_runtime.dart`
 - `lib/app/app_controller_desktop_settings_runtime.dart`
-- `rust/src/lib.rs`
+- `rust/src/lib.rs`（历史记录）
 
 ## Maintenance Rule
 

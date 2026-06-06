@@ -45,7 +45,7 @@
 - 多 provider 调度策略
 - 第二个 provider 之前的泛化产品设计
 
-## Phase 3: Built-in Codex / Rust FFI
+## Phase 3: Built-in Codex / Rust FFI（历史）
 
 目标：
 
@@ -53,8 +53,7 @@
 
 前置条件：
 
-- `rust/src/lib.rs` 补完消息发送与事件轮询
-- `rust/src/runtime.rs` 补完进程启动与停止
+- 这一路径仅保留历史记录，不再作为当前实施目标
 - 能复用当前 coordinator / registry 契约
 
 状态：

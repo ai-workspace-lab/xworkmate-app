@@ -2,7 +2,9 @@
 
 ## Purpose
 
-`rust/src` 当前是一组相对独立、边界清晰的 Codex FFI 草图实现。这里的重点是：
+`rust/` 目录已退役，下面这份文档仅作为历史记录保留。它描述的是曾经存在的 Codex FFI 草图实现，不代表当前可用能力。
+
+历史上这里的重点是：
 
 - Rust 公开结构体与状态模型
 - C ABI 函数签名
@@ -170,7 +172,7 @@
 
 ## Exported FFI Functions
 
-下面这些函数定义在 `rust/src/lib.rs`，是 Flutter / Dart 侧真正可调用的 C ABI 面。
+下面这些函数曾定义在 `rust/src/lib.rs`，是 Flutter / Dart 侧的 C ABI 面。
 
 ## `codex_init`
 
@@ -280,4 +282,4 @@
   3. `rust/src/lib.rs`
   4. `rust/src/runtime.rs`
   5. `rust/src/types.rs`
-- 当前 FFI 面已经具备“结构体/函数签名骨架”，但消息收发、event polling、thread lifecycle 仍未完整实现
+- 当前 FFI 面仅停留在结构体/函数签名骨架，消息收发、event polling、thread lifecycle 都未完成
