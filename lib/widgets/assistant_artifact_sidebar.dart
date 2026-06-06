@@ -33,6 +33,11 @@ class AssistantArtifactSidebar extends StatefulWidget {
     required this.workspaceKind,
     required this.artifactSyncAtMs,
     required this.artifactSyncStatus,
+    required this.taskContextMessageCount,
+    required this.taskContextSelectedSkillKeys,
+    required this.taskContextRemoteWorkingDirectory,
+    required this.taskContextOpenClawRunId,
+    required this.taskContextOpenClawStatus,
     required this.onCollapse,
     required this.loadSnapshot,
     required this.loadPreview,
@@ -46,6 +51,11 @@ class AssistantArtifactSidebar extends StatefulWidget {
   final WorkspaceRefKind workspaceKind;
   final double? artifactSyncAtMs;
   final String artifactSyncStatus;
+  final int taskContextMessageCount;
+  final List<String> taskContextSelectedSkillKeys;
+  final String taskContextRemoteWorkingDirectory;
+  final String taskContextOpenClawRunId;
+  final String taskContextOpenClawStatus;
   final VoidCallback onCollapse;
   final AssistantArtifactSnapshotLoader loadSnapshot;
   final AssistantArtifactPreviewLoader loadPreview;
@@ -65,6 +75,7 @@ class _AssistantArtifactSidebarState extends State<AssistantArtifactSidebar> {
   Object? _loadError;
   bool _loadingSnapshot = false;
   bool _loadingPreview = false;
+  bool _taskContextExpanded = false;
 
   @override
   void initState() {
@@ -259,6 +270,24 @@ class _AssistantArtifactSidebarState extends State<AssistantArtifactSidebar> {
               ],
             ),
           ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+            child: _TaskContextSummaryCard(
+              messageCount: widget.taskContextMessageCount,
+              selectedSkillKeys: widget.taskContextSelectedSkillKeys,
+              remoteWorkingDirectory: widget.taskContextRemoteWorkingDirectory,
+              openClawRunId: widget.taskContextOpenClawRunId,
+              openClawStatus: widget.taskContextOpenClawStatus,
+              artifactSyncStatus: widget.artifactSyncStatus,
+              expanded: _taskContextExpanded,
+              onToggle: () {
+                setState(() {
+                  _taskContextExpanded = !_taskContextExpanded;
+                });
+              },
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
             child: SectionTabs(
@@ -572,6 +601,184 @@ class AssistantArtifactSidebarRevealButton extends StatelessWidget {
           shape: const CircleBorder(),
         ),
         icon: const Icon(Icons.keyboard_double_arrow_left_rounded, size: 20),
+      ),
+    );
+  }
+}
+
+class _TaskContextSummaryCard extends StatelessWidget {
+  const _TaskContextSummaryCard({
+    required this.messageCount,
+    required this.selectedSkillKeys,
+    required this.remoteWorkingDirectory,
+    required this.openClawRunId,
+    required this.openClawStatus,
+    required this.artifactSyncStatus,
+    required this.expanded,
+    required this.onToggle,
+  });
+
+  final int messageCount;
+  final List<String> selectedSkillKeys;
+  final String remoteWorkingDirectory;
+  final String openClawRunId;
+  final String openClawStatus;
+  final String artifactSyncStatus;
+  final bool expanded;
+  final VoidCallback onToggle;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final theme = Theme.of(context);
+    final skills = selectedSkillKeys
+        .map((item) => item.trim())
+        .where((item) => item.isNotEmpty)
+        .toList(growable: false);
+    final status = artifactSyncStatus.trim().isEmpty
+        ? appText('未同步', 'Not synced')
+        : artifactSyncStatus.trim();
+    return Container(
+      decoration: BoxDecoration(
+        color: palette.chromeSurface.withValues(alpha: 0.72),
+        borderRadius: BorderRadius.circular(AppRadius.button),
+        border: Border.all(color: palette.chromeStroke),
+      ),
+      child: Column(
+        children: [
+          InkWell(
+            key: const Key('assistant-artifact-task-context-toggle'),
+            onTap: onToggle,
+            borderRadius: BorderRadius.circular(AppRadius.button),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.sm,
+                vertical: AppSpacing.xs,
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.forum_outlined,
+                    size: 16,
+                    color: palette.textSecondary,
+                  ),
+                  const SizedBox(width: AppSpacing.xs),
+                  Expanded(
+                    child: Text(
+                      appText('任务上下文会话', 'Task context session'),
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  Text(
+                    '$messageCount msg · $status',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: palette.textMuted,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.xxs),
+                  Icon(
+                    expanded
+                        ? Icons.expand_less_rounded
+                        : Icons.expand_more_rounded,
+                    size: 18,
+                    color: palette.textSecondary,
+                  ),
+                ],
+              ),
+            ),
+          ),
+          AnimatedCrossFade(
+            duration: const Duration(milliseconds: 140),
+            crossFadeState: expanded
+                ? CrossFadeState.showSecond
+                : CrossFadeState.showFirst,
+            firstChild: const SizedBox(width: double.infinity),
+            secondChild: Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.sm,
+                0,
+                AppSpacing.sm,
+                AppSpacing.sm,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _TaskContextLine(
+                    label: appText('消息', 'Messages'),
+                    value: '$messageCount',
+                  ),
+                  _TaskContextLine(
+                    label: appText('技能', 'Skills'),
+                    value: skills.isEmpty
+                        ? appText('未选择', 'None')
+                        : skills.join(', '),
+                  ),
+                  _TaskContextLine(
+                    label: appText('远端路径', 'Remote path'),
+                    value: remoteWorkingDirectory.trim().isEmpty
+                        ? appText('未记录', 'Not recorded')
+                        : remoteWorkingDirectory.trim(),
+                  ),
+                  _TaskContextLine(
+                    label: appText('OpenClaw run', 'OpenClaw run'),
+                    value: openClawRunId.trim().isEmpty
+                        ? appText('未绑定', 'Not bound')
+                        : openClawRunId.trim(),
+                  ),
+                  _TaskContextLine(
+                    label: appText('OpenClaw 状态', 'OpenClaw status'),
+                    value: openClawStatus.trim().isEmpty
+                        ? appText('未记录', 'Not recorded')
+                        : openClawStatus.trim(),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TaskContextLine extends StatelessWidget {
+  const _TaskContextLine({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(top: AppSpacing.xxs),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 86,
+            child: Text(
+              label,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: palette.textMuted,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: palette.textSecondary,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
