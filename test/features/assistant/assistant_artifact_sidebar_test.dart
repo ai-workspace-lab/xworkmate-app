@@ -46,6 +46,46 @@ void main() {
     expect(find.text('artifact-2.txt'), findsAtLeastNWidgets(1));
   });
 
+  testWidgets('keeps polling partial artifact snapshots', (tester) async {
+    var loadCount = 0;
+
+    await tester.pumpWidget(
+      _buildTestApp(
+        artifactSyncAtMs: 1,
+        artifactSyncStatus: 'partial',
+        loadSnapshot: () async {
+          loadCount += 1;
+          return AssistantArtifactSnapshot(
+            workspacePath: '/tmp/thread',
+            workspaceKind: WorkspaceRefKind.localPath,
+            fileEntries: <AssistantArtifactEntry>[
+              AssistantArtifactEntry(
+                id: 'entry-$loadCount',
+                label: 'artifact-$loadCount.txt',
+                relativePath: 'artifact-$loadCount.txt',
+                kind: AssistantArtifactEntryKind.file,
+                mimeType: 'text/plain',
+                previewable: true,
+                workspacePath: '/tmp/thread',
+              ),
+            ],
+          );
+        },
+      ),
+    );
+    await tester.pump();
+
+    expect(loadCount, 1);
+
+    await tester.pump(const Duration(milliseconds: 3100));
+    await tester.pump();
+
+    expect(loadCount, greaterThanOrEqualTo(2));
+    expect(find.text('artifact-2.txt'), findsAtLeastNWidgets(1));
+
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
   testWidgets('explains OpenClaw runs with no exported artifacts', (
     tester,
   ) async {
