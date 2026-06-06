@@ -388,7 +388,13 @@ extension AppControllerDesktopThreadSessions on AppController {
       artifactRelativePaths:
           thread?.lastTaskArtifactRelativePaths ?? const <String>[],
     );
-    if (snapshot.fileEntries.isNotEmpty || thread == null) {
+    if (thread == null) {
+      return snapshot;
+    }
+    final shouldRefreshRemote = _shouldRefreshRemoteArtifactSnapshotInternal(
+      thread,
+    );
+    if (snapshot.fileEntries.isNotEmpty && !shouldRefreshRemote) {
       return snapshot;
     }
     final synced = await syncRemoteTaskArtifactsForSessionInternal(
@@ -404,6 +410,18 @@ extension AppControllerDesktopThreadSessions on AppController {
       artifactRelativePaths:
           refreshedThread?.lastTaskArtifactRelativePaths ?? const <String>[],
     );
+  }
+
+  bool _shouldRefreshRemoteArtifactSnapshotInternal(TaskThread thread) {
+    final syncStatus = thread.lastArtifactSyncStatus?.trim().toLowerCase();
+    if (syncStatus == 'partial' ||
+        syncStatus == 'syncing' ||
+        syncStatus == 'running' ||
+        syncStatus == 'queued') {
+      return true;
+    }
+    final association = thread.openClawTaskAssociation;
+    return association != null && !association.isTerminal;
   }
 
   Future<bool> syncRemoteTaskArtifactsForSessionInternal(
