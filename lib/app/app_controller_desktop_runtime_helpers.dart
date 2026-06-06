@@ -1207,10 +1207,7 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
   }
 
   Future<String?> _resolveManagedBridgeAuthTokenInternal() async {
-    final accountSyncState = settingsControllerInternal.accountSyncState;
-    if (settingsControllerInternal.accountSignedIn &&
-        accountSyncState?.syncState.trim().toLowerCase() == 'ready' &&
-        accountSyncState?.tokenConfigured.bridge == true) {
+    if (settingsControllerInternal.accountSignedIn) {
       final bridgeToken = (await storeInternal.loadAccountManagedSecret(
         target: kAccountManagedSecretTargetBridgeAuthToken,
       ))?.trim();
