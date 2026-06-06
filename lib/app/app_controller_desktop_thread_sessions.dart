@@ -26,6 +26,7 @@ import '../runtime/codex_config_bridge.dart';
 import '../runtime/code_agent_node_orchestrator.dart';
 import '../runtime/assistant_artifacts.dart';
 import '../runtime/desktop_thread_artifact_service.dart';
+import '../runtime/go_task_service_client.dart';
 import '../runtime/mode_switcher.dart';
 import '../runtime/agent_registry.dart';
 import '../runtime/platform_environment.dart';
@@ -376,17 +377,89 @@ extension AppControllerDesktopThreadSessions on AppController {
 
   Future<AssistantArtifactSnapshot> loadAssistantArtifactSnapshot({
     String? sessionKey,
-  }) {
+  }) async {
     final resolvedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey ?? currentSessionKey,
     );
     final thread = taskThreadForSessionInternal(resolvedSessionKey);
-    return threadArtifactServiceInternal.loadSnapshot(
+    final snapshot = await threadArtifactServiceInternal.loadSnapshot(
       workspacePath: assistantWorkspacePathForSession(resolvedSessionKey),
       workspaceKind: assistantWorkspaceKindForSession(resolvedSessionKey),
       artifactRelativePaths:
           thread?.lastTaskArtifactRelativePaths ?? const <String>[],
     );
+    if (snapshot.fileEntries.isNotEmpty || thread == null) {
+      return snapshot;
+    }
+    final synced = await syncRemoteTaskArtifactsForSessionInternal(
+      resolvedSessionKey,
+    );
+    if (!synced) {
+      return snapshot;
+    }
+    final refreshedThread = taskThreadForSessionInternal(resolvedSessionKey);
+    return threadArtifactServiceInternal.loadSnapshot(
+      workspacePath: assistantWorkspacePathForSession(resolvedSessionKey),
+      workspaceKind: assistantWorkspaceKindForSession(resolvedSessionKey),
+      artifactRelativePaths:
+          refreshedThread?.lastTaskArtifactRelativePaths ?? const <String>[],
+    );
+  }
+
+  Future<bool> syncRemoteTaskArtifactsForSessionInternal(
+    String sessionKey,
+  ) async {
+    final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
+      sessionKey,
+    );
+    final thread = taskThreadForSessionInternal(normalizedSessionKey);
+    if (thread == null ||
+        thread.workspaceBinding.workspaceKind != WorkspaceKind.localFs) {
+      return false;
+    }
+    final association =
+        thread.openClawTaskAssociation ??
+        _inferOpenClawTaskAssociationFromThreadInternal(thread);
+    if (association == null) {
+      return false;
+    }
+    try {
+      final result = await goTaskServiceClientInternal.getTask(
+        route: GoTaskServiceRoute.externalAcpSingle,
+        target: assistantExecutionTargetFromExecutionMode(
+          thread.executionBinding.executionMode,
+        ),
+        association: association,
+      );
+      if (result.artifacts.isEmpty) {
+        return false;
+      }
+      final status = result.status.trim();
+      final nextAssociation =
+          result.openClawTaskAssociation ??
+          association.copyWith(status: status.isEmpty ? 'completed' : status);
+      upsertTaskThreadInternal(
+        normalizedSessionKey,
+        openClawTaskAssociation: nextAssociation,
+        lastRemoteWorkingDirectory: result.remoteWorkingDirectory.trim().isEmpty
+            ? thread.lastRemoteWorkingDirectory
+            : result.remoteWorkingDirectory.trim(),
+        lastRemoteWorkspaceRefKind:
+            result.remoteWorkspaceRefKind ?? thread.lastRemoteWorkspaceRefKind,
+        updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+      );
+      await persistGoTaskArtifactsForSessionInternal(
+        normalizedSessionKey,
+        result,
+      );
+      final refreshed = taskThreadForSessionInternal(normalizedSessionKey);
+      return refreshed?.lastTaskArtifactRelativePaths.isNotEmpty == true;
+    } catch (error) {
+      debugPrint(
+        'Remote artifact sync failed for $normalizedSessionKey: $error',
+      );
+      return false;
+    }
   }
 
   Future<AssistantArtifactPreview> loadAssistantArtifactPreview(
@@ -641,6 +714,66 @@ extension AppControllerDesktopThreadSessions on AppController {
     });
     return items;
   }
+}
+
+OpenClawTaskAssociation? _inferOpenClawTaskAssociationFromThreadInternal(
+  TaskThread thread,
+) {
+  final remoteWorkspace = thread.lastRemoteWorkingDirectory?.trim() ?? '';
+  if (remoteWorkspace.isEmpty) {
+    return null;
+  }
+  final normalized = remoteWorkspace.replaceAll('\\', '/');
+  final segments = normalized
+      .split('/')
+      .where((segment) => segment.trim().isNotEmpty)
+      .toList(growable: false);
+  final tasksIndex = segments.lastIndexOf('tasks');
+  if (tasksIndex < 0 || tasksIndex + 2 >= segments.length) {
+    return null;
+  }
+  final taskDir = segments[tasksIndex + 1].trim();
+  final runId = segments[tasksIndex + 2].trim();
+  final openclawSessionKey = _openClawSessionKeyFromTaskDirInternal(taskDir);
+  final appThreadKey = _appThreadKeyFromSessionKeyInternal(thread.threadId);
+  if (runId.isEmpty || openclawSessionKey.isEmpty || appThreadKey.isEmpty) {
+    return null;
+  }
+  return OpenClawTaskAssociation(
+    sessionId: thread.threadId,
+    threadId: thread.threadId,
+    turnId: runId,
+    runId: runId,
+    artifactScope: remoteWorkspace,
+    artifactDirectory: remoteWorkspace,
+    gatewayProviderId: 'openclaw',
+    startedAtMs: thread.lifecycleState.lastRunAtMs ?? 0,
+    status: 'completed',
+    appThreadKey: appThreadKey,
+    openclawSessionKey: openclawSessionKey,
+  );
+}
+
+String _appThreadKeyFromSessionKeyInternal(String sessionKey) {
+  final normalized = sessionKey.trim();
+  if (normalized.startsWith('draft:')) {
+    return normalized;
+  }
+  if (normalized.startsWith('draft-')) {
+    return 'draft:${normalized.substring('draft-'.length)}';
+  }
+  return normalized;
+}
+
+String _openClawSessionKeyFromTaskDirInternal(String taskDir) {
+  final normalized = taskDir.trim();
+  if (normalized.startsWith('agent_main_draft_')) {
+    return 'agent:main:draft:${normalized.substring('agent_main_draft_'.length)}';
+  }
+  if (normalized.startsWith('draft_')) {
+    return 'draft:${normalized.substring('draft_'.length)}';
+  }
+  return '';
 }
 
 AssistantExecutionTarget resolveAssistantExecutionTargetFromRecordForTest(
