@@ -799,7 +799,22 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     var wroteArtifact = false;
     var failedArtifact = false;
     var skippedArtifact = false;
+    final previousSyncStatus =
+        existingThread.lastArtifactSyncStatus?.trim().toLowerCase() ?? '';
+    final preserveExistingArtifactPaths =
+        previousSyncStatus == 'partial' ||
+        previousSyncStatus == 'syncing' ||
+        previousSyncStatus == 'running' ||
+        previousSyncStatus == 'queued';
     final currentTaskArtifactPaths = <String>{};
+    if (preserveExistingArtifactPaths) {
+      for (final relativePath in existingThread.lastTaskArtifactRelativePaths) {
+        final sanitized = _sanitizeArtifactRelativePathInternal(relativePath);
+        if (sanitized.isNotEmpty && !artifactSyncPolicy.ignores(sanitized)) {
+          currentTaskArtifactPaths.add(sanitized);
+        }
+      }
+    }
     for (final artifact in artifacts) {
       final relativePath = _sanitizeArtifactRelativePathInternal(
         artifact.relativePath,

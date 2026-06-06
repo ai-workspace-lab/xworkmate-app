@@ -76,11 +76,13 @@ class _AssistantArtifactSidebarState extends State<AssistantArtifactSidebar> {
   bool _loadingSnapshot = false;
   bool _loadingPreview = false;
   bool _taskContextExpanded = false;
+  Timer? _refreshTimer;
 
   @override
   void initState() {
     super.initState();
     unawaited(_refreshSnapshot());
+    _syncRefreshTimer();
   }
 
   @override
@@ -96,6 +98,13 @@ class _AssistantArtifactSidebarState extends State<AssistantArtifactSidebar> {
       _preview = const AssistantArtifactPreview.empty();
       unawaited(_refreshSnapshot());
     }
+    _syncRefreshTimer();
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
   }
 
   @override
@@ -449,6 +458,9 @@ class _AssistantArtifactSidebarState extends State<AssistantArtifactSidebar> {
   }
 
   Future<void> _refreshSnapshot() async {
+    if (_loadingSnapshot) {
+      return;
+    }
     setState(() {
       _loadingSnapshot = true;
       _loadError = null;
@@ -479,6 +491,36 @@ class _AssistantArtifactSidebarState extends State<AssistantArtifactSidebar> {
         _loadingSnapshot = false;
         _loadError = error;
       });
+    }
+  }
+
+  void _syncRefreshTimer() {
+    final shouldPoll = _shouldPollArtifactSnapshot(widget.artifactSyncStatus);
+    if (!shouldPoll) {
+      _refreshTimer?.cancel();
+      _refreshTimer = null;
+      return;
+    }
+    if (_refreshTimer?.isActive == true) {
+      return;
+    }
+    _refreshTimer = Timer.periodic(const Duration(seconds: 3), (_) {
+      if (!mounted || _loadingSnapshot) {
+        return;
+      }
+      unawaited(_refreshSnapshot());
+    });
+  }
+
+  bool _shouldPollArtifactSnapshot(String status) {
+    switch (status.trim().toLowerCase()) {
+      case 'partial':
+      case 'syncing':
+      case 'running':
+      case 'queued':
+        return true;
+      default:
+        return false;
     }
   }
 
