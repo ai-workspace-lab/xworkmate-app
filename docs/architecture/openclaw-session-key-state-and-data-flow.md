@@ -16,14 +16,15 @@ session identity boundary.
 Rules:
 
 - App code may keep `sessionKey` for local TaskThread and UI session APIs.
-- XWorkmate OpenClaw integration payloads must use `appThreadKey` and
-  `openclawSessionKey`.
-- Bridge may send `sessionKey` only when calling OpenClaw native APIs that
-  require that field, such as `chat.send`.
+- App `session.start` only carries `appThreadKey` in typed metadata; it does
+  not preemptively choose the OpenClaw native session key.
+- Bridge resolves or reuses `openclawSessionKey`, persists the mapping, and
+  then uses that key for OpenClaw native APIs such as `chat.send`.
 - Plugin lookup must read `appThreadKey -> openclawSessionKey` from
   `SessionEntry.pluginExtensions`, not from string replace or reverse parsing.
-- Legacy `sessionKey` aliases are not accepted from App or Bridge as mapping
-  inputs.
+- `xworkmate.tasks.get` must be invoked with the persisted association
+  (`appThreadKey`, `openclawSessionKey`, `runId/taskId`), not with a legacy
+  `sessionKey` alias.
 
 ## State Graph
 
