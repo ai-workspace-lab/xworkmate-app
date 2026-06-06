@@ -772,16 +772,27 @@ extension AppControllerDesktopThreadActions on AppController {
           continue;
         }
         if (aiGatewayPendingSessionKeysInternal.contains(sessionKey)) {
+          final hasTaskScopedOpenClawArtifacts =
+              current.artifactScope.trim().isNotEmpty ||
+              current.artifactDirectory.trim().isNotEmpty;
           final hasRequiredExts = current.requiredArtifactExtensions.isNotEmpty;
+          final requiresArtifactExport =
+              current.requiresArtifactExport || hasRequiredExts;
           final hasEnoughArtifacts =
-              !hasRequiredExts ||
-              current.requiredArtifactExtensions.every((ext) {
-                return result.artifacts.any(
-                  (a) =>
-                      a.relativePath.toLowerCase().endsWith(ext.toLowerCase()),
-                );
-              });
-          if (!hasEnoughArtifacts) {
+              result.artifacts.isNotEmpty &&
+              (!hasRequiredExts ||
+                  current.requiredArtifactExtensions.every((ext) {
+                    return result.artifacts.any(
+                      (a) => a.relativePath.toLowerCase().endsWith(
+                        ext.toLowerCase(),
+                      ),
+                    );
+                  }));
+          final shouldKeepPollingForArtifacts =
+              hasTaskScopedOpenClawArtifacts &&
+              requiresArtifactExport &&
+              !hasEnoughArtifacts;
+          if (shouldKeepPollingForArtifacts) {
             final nowMs = DateTime.now().millisecondsSinceEpoch.toDouble();
             current = current.copyWith(status: 'syncing-artifacts');
             upsertTaskThreadInternal(
@@ -1257,6 +1268,22 @@ extension AppControllerDesktopThreadActions on AppController {
     final completedAtMs = DateTime.now().millisecondsSinceEpoch.toDouble();
     final assistantText = result.message.trim();
     final hasCurrentRunArtifacts = result.artifacts.isNotEmpty;
+    final openClawAssociation = result.openClawTaskAssociation;
+    final waitingForOpenClawArtifacts =
+        openClawAssociation != null &&
+        !hasCurrentRunArtifacts &&
+        result.success &&
+        (openClawAssociation.requiresArtifactExport ||
+            openClawAssociation.requiredArtifactExtensions.isNotEmpty) &&
+        (openClawAssociation.artifactScope.trim().isNotEmpty ||
+            openClawAssociation.artifactDirectory.trim().isNotEmpty);
+    if (waitingForOpenClawArtifacts) {
+      persistOpenClawTaskAssociationInternal(
+        sessionKey: sessionKey,
+        association: openClawAssociation.copyWith(status: 'syncing-artifacts'),
+      );
+      return;
+    }
     final noDisplayableOutput =
         result.success && assistantText.isEmpty && !hasCurrentRunArtifacts;
     final terminalResultCode = noDisplayableOutput
