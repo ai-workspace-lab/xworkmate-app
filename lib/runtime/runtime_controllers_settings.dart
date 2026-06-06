@@ -535,7 +535,7 @@ class SettingsController extends ChangeNotifier {
             }),
           );
         }
-      } catch (_) {
+      } catch (e, stackTrace) { debugPrint('Error: $e\n$stackTrace');
         // Best effort only. If file watching fails, directory watching may still work.
       }
     }
@@ -549,7 +549,7 @@ class SettingsController extends ChangeNotifier {
             scheduleReload();
           }),
         );
-      } catch (_) {
+      } catch (e, stackTrace) { debugPrint('Error: $e\n$stackTrace');
         // Best effort only. Missing watch support should not block runtime.
       }
     }

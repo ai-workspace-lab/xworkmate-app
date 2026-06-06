@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -122,7 +124,7 @@ class SettingsStore {
       final layout = await _layoutResolver.resolve();
       await deleteIfExists(File('${layout.tasksDirectory.path}/threads.json'));
       await deleteIfExists(File('${layout.configDirectory.path}/settings.yaml'));
-    } catch (_) {
+    } catch (e, stackTrace) { debugPrint('Error: $e\n$stackTrace');
       // Ignore errors for secondary persistence.
     }
   }
@@ -138,7 +140,7 @@ class SettingsStore {
           return decoded.map((e) => SecretAuditEntry.fromJson(e)).toList();
         }
       }
-    } catch (_) {
+    } catch (e, stackTrace) { debugPrint('Error: $e\n$stackTrace');
       // Ignore errors for secondary persistence.
     }
     return const [];

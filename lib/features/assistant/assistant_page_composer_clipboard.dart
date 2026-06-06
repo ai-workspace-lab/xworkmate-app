@@ -170,7 +170,7 @@ Future<Directory> resolveClipboardAttachmentTempDirectoryInternal() async {
   Directory rootDirectory;
   try {
     rootDirectory = await getTemporaryDirectory();
-  } catch (_) {
+  } catch (e, stackTrace) { debugPrint('Error: $e\n$stackTrace');
     rootDirectory = Directory.systemTemp;
   }
   final clipboardDirectory = Directory(

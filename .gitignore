@@ -70,3 +70,6 @@ app.*.map.json
 
 # Repomix — dynamically generated, not committed
 repomix-output.xml
+
+# Flutter analyze — local diagnostic dump
+flutter_analyze_output.txt
