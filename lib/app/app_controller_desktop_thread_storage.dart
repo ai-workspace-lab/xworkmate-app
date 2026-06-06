@@ -77,7 +77,7 @@ extension AppControllerDesktopThreadStorage on AppController {
     }
     try {
       await syncAiGatewayCatalog(snapshot.aiGateway, apiKeyOverride: apiKey);
-    } catch (_) {
+    } catch (e, stackTrace) { debugPrint('Error: $e\n$stackTrace');
       // Keep the saved draft applied even if model sync fails immediately.
     }
   }
@@ -564,7 +564,7 @@ extension AppControllerDesktopThreadStorage on AppController {
           normalizedRecord.workspacePath.trim().isNotEmpty) {
         try {
           Directory(normalizedRecord.workspacePath).createSync(recursive: true);
-        } catch (_) {
+        } catch (e, stackTrace) { debugPrint('Error: $e\n$stackTrace');
           // Best effort only. The thread should still restore even when the
           // directory cannot be recreated immediately.
         }
