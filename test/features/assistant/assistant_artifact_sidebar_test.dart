@@ -222,6 +222,12 @@ Widget _buildTestApp({
           workspaceKind: WorkspaceRefKind.localPath,
           artifactSyncAtMs: artifactSyncAtMs,
           artifactSyncStatus: artifactSyncStatus,
+          taskContextMessageCount: 2,
+          taskContextSelectedSkillKeys: const <String>['openclaw'],
+          taskContextRemoteWorkingDirectory:
+              '/home/ubuntu/.openclaw/workspace/tasks/unit/run',
+          taskContextOpenClawRunId: 'run',
+          taskContextOpenClawStatus: 'syncing-artifacts',
           onCollapse: () {},
           loadSnapshot: loadSnapshot,
           loadPreview:

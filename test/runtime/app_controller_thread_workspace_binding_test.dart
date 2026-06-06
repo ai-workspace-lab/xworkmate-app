@@ -941,6 +941,87 @@ void main() {
   );
 
   test(
+    'refreshing an empty artifact snapshot backfills completed OpenClaw task artifacts from recorded association',
+    () async {
+      late OpenClawTaskAssociation observedAssociation;
+      final goTaskClient = _ArtifactBackfillGoTaskServiceClient(
+        onGetTask: (association) {
+          observedAssociation = association;
+        },
+      );
+      final controller = AppController(
+        environmentOverride: const <String, String>{},
+        goTaskServiceClient: goTaskClient,
+      );
+      addTearDown(controller.dispose);
+
+      final taskWorkspace = await Directory.systemTemp.createTemp(
+        'xworkmate-completed-association-backfill-',
+      );
+      addTearDown(() async {
+        if (await taskWorkspace.exists()) {
+          await taskWorkspace.delete(recursive: true);
+        }
+      });
+
+      const sessionKey = 'draft-completed-sync';
+      const runId = 'turn-completed';
+      const openClawSessionKey = 'agent:main:draft:completed-sync';
+      final completedResult = GoTaskServiceResult(
+        success: true,
+        message: 'completed without inline artifacts',
+        turnId: runId,
+        raw: <String, dynamic>{
+          'success': true,
+          'status': 'completed',
+          'sessionId': sessionKey,
+          'threadId': sessionKey,
+          'turnId': runId,
+          'runId': runId,
+          'artifactScope': 'tasks/$openClawSessionKey/$runId',
+          'artifactDirectory':
+              '/home/ubuntu/.openclaw/workspace/tasks/$openClawSessionKey/$runId',
+          'gatewayProviderId': 'openclaw',
+          'appThreadKey': 'draft:completed-sync',
+          'openclawSessionKey': openClawSessionKey,
+        },
+        errorMessage: '',
+        resolvedModel: '',
+        route: GoTaskServiceRoute.externalAcpSingle,
+      );
+
+      controller.upsertTaskThreadInternal(
+        sessionKey,
+        workspaceBinding: WorkspaceBinding(
+          workspaceId: sessionKey,
+          workspaceKind: WorkspaceKind.localFs,
+          workspacePath: taskWorkspace.path,
+          displayPath: taskWorkspace.path,
+          writable: true,
+        ),
+        openClawTaskAssociation: completedResult.openClawTaskAssociation,
+        lastRemoteWorkingDirectory: taskWorkspace.path,
+        lastArtifactSyncStatus: 'no-artifacts',
+        lastTaskArtifactRelativePaths: const <String>[],
+      );
+
+      final snapshot = await controller.loadAssistantArtifactSnapshot(
+        sessionKey: sessionKey,
+      );
+
+      expect(observedAssociation.runId, runId);
+      expect(observedAssociation.openclawSessionKey, openClawSessionKey);
+      expect(
+        snapshot.fileEntries.map((entry) => entry.relativePath),
+        contains('ai-news-report.md'),
+      );
+      final thread = controller.requireTaskThreadForSessionInternal(sessionKey);
+      expect(thread.lastArtifactSyncStatus, 'synced');
+      expect(thread.openClawTaskAssociation?.status, 'completed');
+    },
+  );
+
+  test(
     'resumes bridge artifact downloads after a weak network disconnect',
     () async {
       final body = <int>[0x41, 0x52, 0x54, 0x49, 0x46, 0x41, 0x43, 0x54];

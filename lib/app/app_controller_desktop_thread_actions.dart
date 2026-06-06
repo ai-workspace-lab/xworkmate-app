@@ -735,7 +735,6 @@ extension AppControllerDesktopThreadActions on AppController {
     required OpenClawTaskAssociation association,
   }) async {
     var current = association;
-    var artifactRetries = 0;
     var firstAttempt = true;
     while (true) {
       if (disposedInternal) {
@@ -754,6 +753,9 @@ extension AppControllerDesktopThreadActions on AppController {
           target: target,
           association: current,
         );
+        if (disposedInternal) {
+          return;
+        }
         final nextAssociation =
             result.openClawTaskAssociation ??
             current.copyWith(
@@ -779,8 +781,32 @@ extension AppControllerDesktopThreadActions on AppController {
                       a.relativePath.toLowerCase().endsWith(ext.toLowerCase()),
                 );
               });
-          if (!hasEnoughArtifacts && artifactRetries < 3) {
-            artifactRetries += 1;
+          if (!hasEnoughArtifacts) {
+            final nowMs = DateTime.now().millisecondsSinceEpoch.toDouble();
+            current = current.copyWith(status: 'syncing-artifacts');
+            upsertTaskThreadInternal(
+              sessionKey,
+              lifecycleStatus: 'running',
+              lastResultCode: 'running',
+              lastRemoteWorkingDirectory:
+                  result.remoteWorkingDirectory.trim().isEmpty
+                  ? taskThreadForSessionInternal(
+                      sessionKey,
+                    )?.lastRemoteWorkingDirectory
+                  : result.remoteWorkingDirectory.trim(),
+              lastRemoteWorkspaceRefKind:
+                  result.remoteWorkspaceRefKind ??
+                  taskThreadForSessionInternal(
+                    sessionKey,
+                  )?.lastRemoteWorkspaceRefKind,
+              lastArtifactSyncAtMs: nowMs,
+              lastArtifactSyncStatus: 'syncing',
+              openClawTaskAssociation: current,
+              updatedAtMs: nowMs,
+            );
+            recomputeTasksInternal();
+            notifyIfActiveInternal();
+            unawaited(flushAssistantThreadPersistenceInternal());
             continue;
           }
           await applyGatewayChatResultInternal(
@@ -795,6 +821,9 @@ extension AppControllerDesktopThreadActions on AppController {
         notifyIfActiveInternal();
         return;
       } catch (error) {
+        if (disposedInternal) {
+          return;
+        }
         if (aiGatewayPendingSessionKeysInternal.contains(sessionKey)) {
           await applyGatewayChatFailureInternal(
             sessionKey: sessionKey,
