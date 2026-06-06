@@ -4055,7 +4055,7 @@ void main() {
     });
 
     test(
-      'OpenClaw terminal snapshot without required artifacts keeps polling',
+      'OpenClaw terminal task-scope snapshot without artifacts keeps polling',
       () async {
         final fakeGoTaskService = _RecordingGoTaskServiceClient()
           ..outcomes.add(
@@ -4078,7 +4078,7 @@ void main() {
                     '/tmp/tasks/agent:main:openclaw-missing-screenshot/run-openclaw-missing-screenshot',
                 'gatewayProviderId': 'openclaw',
                 'runtimeBudgetMinutes': 1,
-                'requiredArtifactExtensions': <String>['.png'],
+                'requiresArtifactExport': true,
               },
               errorMessage: '',
               resolvedModel: '',
