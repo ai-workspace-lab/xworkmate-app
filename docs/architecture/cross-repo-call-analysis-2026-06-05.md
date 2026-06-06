@@ -321,6 +321,11 @@ Bridge 不再组装 terminal snapshot。Terminal success/failure 必须来自 Op
 
 如果 agent config 变更（增删 agent、修改 default、调整 workspace），可能影响所有运行中 session 的 artifact 路径。
 
+App/owner-scoped `remoteWorkingDirectoryHint`（例如 `/owners/...`）不是
+OpenClaw 文件系统路径，Bridge 不得把它透传为 plugin `workspaceDir`。否则
+Plugin 会在创建 `tasks/<session>/<run>/` 前先 `realpath(workspaceDir)`，并以
+`ENOENT` 失败。
+
 ### 🟡 MEDIUM: 配置与部署区
 
 **6.10 Distributed bridge forwarding topology 变更**
