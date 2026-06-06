@@ -1022,6 +1022,93 @@ void main() {
   );
 
   test(
+    'refreshing a partial artifact snapshot keeps backfilling OpenClaw task artifacts',
+    () async {
+      var getTaskCount = 0;
+      late OpenClawTaskAssociation observedAssociation;
+      final goTaskClient = _ArtifactBackfillGoTaskServiceClient(
+        onGetTask: (association) {
+          getTaskCount += 1;
+          observedAssociation = association;
+        },
+      );
+      final controller = AppController(
+        environmentOverride: const <String, String>{},
+        goTaskServiceClient: goTaskClient,
+      );
+      addTearDown(controller.dispose);
+
+      final taskWorkspace = await Directory.systemTemp.createTemp(
+        'xworkmate-partial-association-backfill-',
+      );
+      addTearDown(() async {
+        if (await taskWorkspace.exists()) {
+          await taskWorkspace.delete(recursive: true);
+        }
+      });
+      await Directory(
+        '${taskWorkspace.path}/assets/images',
+      ).create(recursive: true);
+      await File(
+        '${taskWorkspace.path}/assets/images/09-AI-Agent.v32.png',
+      ).writeAsBytes(<int>[1, 2, 3]);
+
+      const sessionKey = 'draft-partial-sync';
+      const runId = 'turn-partial';
+      const openClawSessionKey = 'agent:main:draft:partial-sync';
+      controller.upsertTaskThreadInternal(
+        sessionKey,
+        workspaceBinding: WorkspaceBinding(
+          workspaceId: sessionKey,
+          workspaceKind: WorkspaceKind.localFs,
+          workspacePath: taskWorkspace.path,
+          displayPath: taskWorkspace.path,
+          writable: true,
+        ),
+        openClawTaskAssociation: const OpenClawTaskAssociation(
+          sessionId: sessionKey,
+          threadId: sessionKey,
+          turnId: runId,
+          runId: runId,
+          artifactScope: 'tasks/$openClawSessionKey/$runId',
+          artifactDirectory:
+              '/home/ubuntu/.openclaw/workspace/tasks/$openClawSessionKey/$runId',
+          gatewayProviderId: 'openclaw',
+          startedAtMs: 1,
+          status: 'completed',
+          appThreadKey: 'draft:partial-sync',
+          openclawSessionKey: openClawSessionKey,
+        ),
+        lastArtifactSyncStatus: 'partial',
+        lastTaskArtifactRelativePaths: const <String>[
+          'assets/images/09-AI-Agent.v32.png',
+        ],
+      );
+
+      final snapshot = await controller.loadAssistantArtifactSnapshot(
+        sessionKey: sessionKey,
+      );
+
+      expect(getTaskCount, 1);
+      expect(observedAssociation.runId, runId);
+      expect(
+        snapshot.fileEntries.map((entry) => entry.relativePath),
+        containsAll(<String>[
+          'assets/images/09-AI-Agent.v32.png',
+          'ai-news-report.md',
+        ]),
+      );
+      expect(
+        await File('${taskWorkspace.path}/ai-news-report.md').readAsString(),
+        '# AI news\n',
+      );
+      final thread = controller.requireTaskThreadForSessionInternal(sessionKey);
+      expect(thread.lastArtifactSyncStatus, 'synced');
+      expect(thread.openClawTaskAssociation?.status, 'completed');
+    },
+  );
+
+  test(
     'resumes bridge artifact downloads after a weak network disconnect',
     () async {
       final body = <int>[0x41, 0x52, 0x54, 0x49, 0x46, 0x41, 0x43, 0x54];
