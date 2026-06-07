@@ -61,6 +61,7 @@ class _DesktopViewState extends State<DesktopView> {
 
   StreamSubscription<MediaStream>? _streamSubscription;
   StreamSubscription<String>? _stateSubscription;
+  Timer? _firstFrameStatsTimer;
 
   bool get _hasVideoFrame =>
       _hasStream &&
@@ -89,6 +90,7 @@ class _DesktopViewState extends State<DesktopView> {
           _localRenderer.srcObject = stream;
           _hasStream = true;
         });
+        _startFirstFrameDiagnostics();
       }
     });
 
@@ -100,6 +102,7 @@ class _DesktopViewState extends State<DesktopView> {
               _connectionState == 'failed') {
             _hasStream = false;
             _localRenderer.srcObject = null;
+            _stopFirstFrameDiagnostics();
           }
         });
       }
@@ -109,14 +112,42 @@ class _DesktopViewState extends State<DesktopView> {
   Future<void> _initRenderer() async {
     await _localRenderer.initialize();
     _localRenderer.onResize = () {
+      _stopFirstFrameDiagnostics();
       if (mounted) {
         setState(() {});
       }
     };
   }
 
+  void _startFirstFrameDiagnostics() {
+    _firstFrameStatsTimer?.cancel();
+    _firstFrameStatsTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (!_hasStream || _hasVideoFrame || !mounted) {
+        _stopFirstFrameDiagnostics();
+        return;
+      }
+      unawaited(() async {
+        try {
+          final stats = await _client.collectVideoStats();
+          if (stats == null) {
+            return;
+          }
+          debugPrint('Remote desktop waiting for first frame: $stats');
+        } catch (error) {
+          debugPrint('Remote desktop stats failed: $error');
+        }
+      }());
+    });
+  }
+
+  void _stopFirstFrameDiagnostics() {
+    _firstFrameStatsTimer?.cancel();
+    _firstFrameStatsTimer = null;
+  }
+
   @override
   void dispose() {
+    _stopFirstFrameDiagnostics();
     _streamSubscription?.cancel();
     _stateSubscription?.cancel();
     _client.disconnect();
