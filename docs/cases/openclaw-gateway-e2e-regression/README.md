@@ -107,6 +107,23 @@ legacy `sessionKey` compatibility field.
 - Bridge 和 OpenClaw Gateway 只建立稳定连接，不重复并发握手。
 - 不出现 `invalid handshake: first request must be connect`、`SOCKET_CLOSED`、`ACP_HTTP_CONNECTION_CLOSED`。
 
+### `OPENCLAW-E2E-006` 多文案输出
+
+围绕
+
+从单机权限 → 网络边界 → Web安全 → 云身份 → Zero Trust → AI Agent 身份 → AI模型与知识保护 演进
+
+1. 输出Markdown格式文件， 微信公众号短图文  400-600字 插入关键词的软文
+2. 输出Markdown格式文件， 小红书风格        600-800字 插入钩子话题的软文
+3. 输出Markdown格式文件， X文案串           小于144字的英语 鲜明的观点
+4. 输出Markdown格式文件， 微信公众号文章    800-1200字左右
+4. 输出Markdown格式文件， 头条号长文        800-1200字左右
+
+期望结果：
+
+- 右侧边栏有输出
+- 不出现 `invalid handshake: first request must be connect`、`SOCKET_CLOSED`、`ACP_HTTP_CONNECTION_CLOSED`。
+
 ## 手动验收步骤
 
 前置条件：

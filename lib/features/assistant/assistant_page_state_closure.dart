@@ -159,6 +159,12 @@ extension AssistantPageStateClosureInternal on AssistantPageStateInternal {
                     ).connectFromSavedSettingsOrShowDialogInternal,
                     onMessageViewModeChanged:
                         controller.setAssistantMessageViewMode,
+                    onRecallUserMessage: AssistantPageStateActionsInternal(
+                      this,
+                    ).recallUserMessageInternal,
+                    onEditUserMessage: AssistantPageStateActionsInternal(
+                      this,
+                    ).editUserMessageInternal,
                   ),
                 ),
               ),
