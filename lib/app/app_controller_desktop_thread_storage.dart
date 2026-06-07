@@ -77,7 +77,8 @@ extension AppControllerDesktopThreadStorage on AppController {
     }
     try {
       await syncAiGatewayCatalog(snapshot.aiGateway, apiKeyOverride: apiKey);
-    } catch (e, stackTrace) { debugPrint('Error: $e\n$stackTrace');
+    } catch (e, stackTrace) {
+      debugPrint('Error: $e\n$stackTrace');
       // Keep the saved draft applied even if model sync fails immediately.
     }
   }
@@ -295,13 +296,15 @@ extension AppControllerDesktopThreadStorage on AppController {
     final localMessages = localSessionMessagesInternal[key];
     if (localMessages != null && localMessages.isNotEmpty) {
       var changed = false;
-      final next = localMessages.map((msg) {
-        if (msg.pending && msg.toolCallId != null) {
-          changed = true;
-          return msg.copyWith(pending: false, error: hasError || msg.error);
-        }
-        return msg;
-      }).toList(growable: false);
+      final next = localMessages
+          .map((msg) {
+            if (msg.pending && msg.toolCallId != null) {
+              changed = true;
+              return msg.copyWith(pending: false, error: hasError || msg.error);
+            }
+            return msg;
+          })
+          .toList(growable: false);
       if (changed) {
         localSessionMessagesInternal[key] = next;
         modified = true;
@@ -311,13 +314,15 @@ extension AppControllerDesktopThreadStorage on AppController {
     final threadMessages = assistantThreadMessagesInternal[key];
     if (threadMessages != null && threadMessages.isNotEmpty) {
       var changed = false;
-      final next = threadMessages.map((msg) {
-        if (msg.pending && msg.toolCallId != null) {
-          changed = true;
-          return msg.copyWith(pending: false, error: hasError || msg.error);
-        }
-        return msg;
-      }).toList(growable: false);
+      final next = threadMessages
+          .map((msg) {
+            if (msg.pending && msg.toolCallId != null) {
+              changed = true;
+              return msg.copyWith(pending: false, error: hasError || msg.error);
+            }
+            return msg;
+          })
+          .toList(growable: false);
       if (changed) {
         assistantThreadMessagesInternal[key] = next;
         modified = true;
@@ -327,13 +332,15 @@ extension AppControllerDesktopThreadStorage on AppController {
     final record = assistantThreadRecordsInternal[key];
     if (record != null && record.messages.isNotEmpty) {
       var changed = false;
-      final next = record.messages.map((msg) {
-        if (msg.pending && msg.toolCallId != null) {
-          changed = true;
-          return msg.copyWith(pending: false, error: hasError || msg.error);
-        }
-        return msg;
-      }).toList(growable: false);
+      final next = record.messages
+          .map((msg) {
+            if (msg.pending && msg.toolCallId != null) {
+              changed = true;
+              return msg.copyWith(pending: false, error: hasError || msg.error);
+            }
+            return msg;
+          })
+          .toList(growable: false);
       if (changed) {
         upsertTaskThreadInternal(key, messages: next);
         modified = true;
@@ -369,6 +376,93 @@ extension AppControllerDesktopThreadStorage on AppController {
       );
     }
     notifyIfActiveInternal();
+  }
+
+  Future<bool> removeAssistantUserMessageInternal(
+    String sessionKey,
+    String messageId,
+  ) async {
+    return mutateAssistantUserMessageInternal(
+      sessionKey: sessionKey,
+      messageId: messageId,
+      mutate: (_) => null,
+    );
+  }
+
+  Future<bool> updateAssistantUserMessageInternal(
+    String sessionKey,
+    String messageId,
+    String text,
+  ) async {
+    final normalizedText = text.trim();
+    if (normalizedText.isEmpty) {
+      return false;
+    }
+    return mutateAssistantUserMessageInternal(
+      sessionKey: sessionKey,
+      messageId: messageId,
+      mutate: (message) => message.copyWith(text: normalizedText),
+    );
+  }
+
+  Future<bool> mutateAssistantUserMessageInternal({
+    required String sessionKey,
+    required String messageId,
+    required GatewayChatMessage? Function(GatewayChatMessage message) mutate,
+  }) async {
+    final key = normalizedAssistantSessionKeyInternal(sessionKey);
+    final id = messageId.trim();
+    if (key.isEmpty || id.isEmpty) {
+      return false;
+    }
+
+    var changed = false;
+    List<GatewayChatMessage> mutateList(List<GatewayChatMessage> messages) {
+      final next = <GatewayChatMessage>[];
+      for (final message in messages) {
+        final isTarget =
+            message.id == id &&
+            message.role.trim().toLowerCase() == 'user' &&
+            !message.pending;
+        if (!isTarget) {
+          next.add(message);
+          continue;
+        }
+        final replacement = mutate(message);
+        if (replacement != null) {
+          next.add(replacement);
+        }
+        changed = true;
+      }
+      return next;
+    }
+
+    final localMessages = localSessionMessagesInternal[key];
+    if (localMessages != null) {
+      localSessionMessagesInternal[key] = mutateList(localMessages);
+    }
+
+    final threadMessages = assistantThreadMessagesInternal[key];
+    if (threadMessages != null) {
+      assistantThreadMessagesInternal[key] = mutateList(threadMessages);
+    }
+
+    final record = assistantThreadRecordsInternal[key];
+    if (record != null) {
+      upsertTaskThreadInternal(
+        key,
+        messages: mutateList(record.messages),
+        updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+      );
+    }
+
+    if (!changed) {
+      return false;
+    }
+    await flushAssistantThreadPersistenceInternal();
+    recomputeTasksInternal();
+    notifyIfActiveInternal();
+    return true;
   }
 
   List<GatewaySessionSummary> assistantSessionSummariesInternal() {
@@ -564,7 +658,8 @@ extension AppControllerDesktopThreadStorage on AppController {
           normalizedRecord.workspacePath.trim().isNotEmpty) {
         try {
           Directory(normalizedRecord.workspacePath).createSync(recursive: true);
-        } catch (e, stackTrace) { debugPrint('Error: $e\n$stackTrace');
+        } catch (e, stackTrace) {
+          debugPrint('Error: $e\n$stackTrace');
           // Best effort only. The thread should still restore even when the
           // directory cannot be recreated immediately.
         }

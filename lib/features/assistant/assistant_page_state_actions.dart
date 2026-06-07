@@ -359,7 +359,8 @@ extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
   Future<void> continueCurrentTaskInternal(String sessionKey) async {
     try {
       await widget.controller.continueAssistantTaskInternal(sessionKey);
-    } catch (e, stackTrace) { debugPrint('Error: $e\n$stackTrace');
+    } catch (e, stackTrace) {
+      debugPrint('Error: $e\n$stackTrace');
       focusComposerInternal();
     }
   }
@@ -421,7 +422,70 @@ extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
   Future<void> refreshTasksWithRetryInternal() async {
     await runTaskSessionActionWithRetryInternal(
       appText('刷新任务列表', 'Refresh task list'),
-      widget.controller.refreshSessions,
+      () => widget.controller.refreshSessions(preserveCurrentSelection: true),
+    );
+  }
+
+  Future<void> recallUserMessageInternal(TimelineItemInternal item) async {
+    final removed = await widget.controller.removeAssistantUserMessage(
+      widget.controller.currentSessionKey,
+      item.key,
+    );
+    if (!mounted || !removed) {
+      return;
+    }
+    final text = item.text?.trim() ?? '';
+    if (text.isNotEmpty) {
+      inputControllerInternal.value = TextEditingValue(
+        text: text,
+        selection: TextSelection.collapsed(offset: text.length),
+      );
+      focusComposerInternal();
+    }
+  }
+
+  Future<void> editUserMessageInternal(TimelineItemInternal item) async {
+    final original = item.text?.trim() ?? '';
+    if (original.isEmpty) {
+      return;
+    }
+    final input = TextEditingController(text: original);
+    final edited = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text(appText('修改消息', 'Edit message')),
+          content: TextField(
+            key: const Key('assistant-message-edit-input'),
+            controller: input,
+            autofocus: true,
+            minLines: 3,
+            maxLines: 8,
+            decoration: InputDecoration(
+              hintText: appText('输入修改后的内容', 'Enter the revised message'),
+            ),
+            onSubmitted: (value) => Navigator.of(context).pop(value),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(appText('取消', 'Cancel')),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(input.text),
+              child: Text(appText('保存', 'Save')),
+            ),
+          ],
+        );
+      },
+    );
+    if (!mounted || edited == null) {
+      return;
+    }
+    await widget.controller.updateAssistantUserMessage(
+      widget.controller.currentSessionKey,
+      item.key,
+      edited,
     );
   }
 
