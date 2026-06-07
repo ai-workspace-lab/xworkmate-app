@@ -43,6 +43,8 @@ class MessageBubbleInternal extends StatelessWidget {
     required this.alignRight,
     required this.tone,
     required this.messageViewMode,
+    this.onRecall,
+    this.onEdit,
   });
 
   final String label;
@@ -50,6 +52,8 @@ class MessageBubbleInternal extends StatelessWidget {
   final bool alignRight;
   final BubbleToneInternal tone;
   final AssistantMessageViewMode messageViewMode;
+  final VoidCallback? onRecall;
+  final VoidCallback? onEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -100,6 +104,32 @@ class MessageBubbleInternal extends StatelessWidget {
                     tone != BubbleToneInternal.user,
                 compactUserMetadata: tone == BubbleToneInternal.user,
               ),
+              if (tone == BubbleToneInternal.user &&
+                  (onRecall != null || onEdit != null)) ...[
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 4,
+                  runSpacing: 4,
+                  children: [
+                    if (onRecall != null)
+                      MessageMetaToggleButtonInternal(
+                        key: const Key('assistant-user-message-recall'),
+                        icon: Icons.undo_rounded,
+                        expanded: false,
+                        tooltip: appText('撤回并放回输入框', 'Recall to composer'),
+                        onTap: onRecall!,
+                      ),
+                    if (onEdit != null)
+                      MessageMetaToggleButtonInternal(
+                        key: const Key('assistant-user-message-edit'),
+                        icon: Icons.edit_rounded,
+                        expanded: false,
+                        tooltip: appText('修改这条消息', 'Edit this message'),
+                        onTap: onEdit!,
+                      ),
+                  ],
+                ),
+              ],
             ],
           ),
         ),
