@@ -199,5 +199,31 @@ void main() {
       expect(stream, isNull);
       expect(fallbackCreated, isFalse);
     });
+
+    test('summarizes inbound video stats for first-frame diagnostics', () {
+      final snapshot = desktopVideoStatsSnapshotFromReports([
+        StatsReport('RTCInboundRTPVideoStream_1', 'inbound-rtp', 1, {
+          'id': 'RTCInboundRTPVideoStream_1',
+          'type': 'inbound-rtp',
+          'kind': 'video',
+          'packetsReceived': 120,
+          'bytesReceived': 48000,
+          'framesDecoded': 0,
+          'framesDropped': 0,
+          'keyFramesDecoded': 0,
+          'jitter': 0.003,
+          'jitterBufferDelay': 0.12,
+        }),
+      ]);
+
+      expect(snapshot.inboundVideoReports, 1);
+      expect(snapshot.packetsReceived, 120);
+      expect(snapshot.bytesReceived, 48000);
+      expect(snapshot.framesDecoded, 0);
+      expect(snapshot.keyFramesDecoded, 0);
+      expect(snapshot.hasRtpPackets, isTrue);
+      expect(snapshot.hasDecodedFrames, isFalse);
+      expect(snapshot.toString(), contains('packetsReceived=120'));
+    });
   });
 }
