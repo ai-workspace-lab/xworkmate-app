@@ -46,6 +46,109 @@ Future<MediaStream?> desktopRemoteVideoStreamForTrack(
   return stream;
 }
 
+class DesktopWebRtcStatsSnapshot {
+  const DesktopWebRtcStatsSnapshot({
+    required this.inboundVideoReports,
+    required this.packetsReceived,
+    required this.bytesReceived,
+    required this.framesDecoded,
+    required this.framesDropped,
+    required this.keyFramesDecoded,
+    required this.jitter,
+    required this.jitterBufferDelay,
+  });
+
+  final int inboundVideoReports;
+  final int? packetsReceived;
+  final int? bytesReceived;
+  final int? framesDecoded;
+  final int? framesDropped;
+  final int? keyFramesDecoded;
+  final double? jitter;
+  final double? jitterBufferDelay;
+
+  bool get hasRtpPackets => (packetsReceived ?? 0) > 0;
+  bool get hasDecodedFrames => (framesDecoded ?? 0) > 0;
+
+  @override
+  String toString() {
+    return 'inboundVideoReports=$inboundVideoReports '
+        'packetsReceived=${packetsReceived ?? 'unknown'} '
+        'bytesReceived=${bytesReceived ?? 'unknown'} '
+        'framesDecoded=${framesDecoded ?? 'unknown'} '
+        'keyFramesDecoded=${keyFramesDecoded ?? 'unknown'} '
+        'framesDropped=${framesDropped ?? 'unknown'} '
+        'jitter=${jitter ?? 'unknown'} '
+        'jitterBufferDelay=${jitterBufferDelay ?? 'unknown'}';
+  }
+}
+
+DesktopWebRtcStatsSnapshot desktopVideoStatsSnapshotFromReports(
+  List<StatsReport> reports,
+) {
+  int inboundVideoReports = 0;
+  int? packetsReceived;
+  int? bytesReceived;
+  int? framesDecoded;
+  int? framesDropped;
+  int? keyFramesDecoded;
+  double? jitter;
+  double? jitterBufferDelay;
+
+  for (final report in reports) {
+    final values = report.values;
+    final type = report.type.toString();
+    final kind = values['kind']?.toString() ?? values['mediaType']?.toString();
+    final isInboundVideo =
+        type == 'inbound-rtp' && (kind == null || kind == 'video');
+    if (!isInboundVideo) {
+      continue;
+    }
+    inboundVideoReports += 1;
+    packetsReceived ??= _statsInt(values['packetsReceived']);
+    bytesReceived ??= _statsInt(values['bytesReceived']);
+    framesDecoded ??= _statsInt(values['framesDecoded']);
+    framesDropped ??= _statsInt(values['framesDropped']);
+    keyFramesDecoded ??= _statsInt(values['keyFramesDecoded']);
+    jitter ??= _statsDouble(values['jitter']);
+    jitterBufferDelay ??= _statsDouble(values['jitterBufferDelay']);
+  }
+
+  return DesktopWebRtcStatsSnapshot(
+    inboundVideoReports: inboundVideoReports,
+    packetsReceived: packetsReceived,
+    bytesReceived: bytesReceived,
+    framesDecoded: framesDecoded,
+    framesDropped: framesDropped,
+    keyFramesDecoded: keyFramesDecoded,
+    jitter: jitter,
+    jitterBufferDelay: jitterBufferDelay,
+  );
+}
+
+int? _statsInt(Object? value) {
+  if (value is int) {
+    return value;
+  }
+  if (value is num) {
+    return value.toInt();
+  }
+  if (value is String) {
+    return int.tryParse(value);
+  }
+  return null;
+}
+
+double? _statsDouble(Object? value) {
+  if (value is num) {
+    return value.toDouble();
+  }
+  if (value is String) {
+    return double.tryParse(value);
+  }
+  return null;
+}
+
 class DesktopClient {
   DesktopClient({required this.controller, required this.sessionId});
 
@@ -68,6 +171,15 @@ class DesktopClient {
   bool get isConnected =>
       _peerConnection?.connectionState ==
       RTCPeerConnectionState.RTCPeerConnectionStateConnected;
+
+  Future<DesktopWebRtcStatsSnapshot?> collectVideoStats() async {
+    final peerConnection = _peerConnection;
+    if (peerConnection == null) {
+      return null;
+    }
+    final reports = await peerConnection.getStats();
+    return desktopVideoStatsSnapshotFromReports(reports);
+  }
 
   Future<void> connect({
     String display = '',
