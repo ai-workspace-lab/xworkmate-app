@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xworkmate/runtime/assistant_artifacts.dart';
@@ -45,6 +47,85 @@ void main() {
     expect(loadCount, 2);
     expect(find.text('artifact-2.txt'), findsAtLeastNWidgets(1));
   });
+
+  testWidgets(
+    'clears stale artifacts and ignores late snapshot after task switch',
+    (tester) async {
+      final firstSnapshot = Completer<AssistantArtifactSnapshot>();
+      var sessionKey = 'task-a';
+      var workspacePath = '/tmp/task-a';
+
+      Future<AssistantArtifactSnapshot> loadSnapshot() {
+        final capturedSessionKey = sessionKey;
+        if (capturedSessionKey == 'task-a') {
+          return firstSnapshot.future;
+        }
+        return Future<AssistantArtifactSnapshot>.value(
+          AssistantArtifactSnapshot(
+            workspacePath: '/tmp/task-b',
+            workspaceKind: WorkspaceRefKind.localPath,
+            fileEntries: const <AssistantArtifactEntry>[
+              AssistantArtifactEntry(
+                id: 'task-b-entry',
+                label: 'task-b.md',
+                relativePath: 'task-b.md',
+                kind: AssistantArtifactEntryKind.file,
+                mimeType: 'text/markdown',
+                previewable: true,
+                workspacePath: '/tmp/task-b',
+              ),
+            ],
+          ),
+        );
+      }
+
+      await tester.pumpWidget(
+        _buildTestApp(
+          sessionKey: sessionKey,
+          workspacePath: workspacePath,
+          artifactSyncAtMs: 1,
+          loadSnapshot: loadSnapshot,
+        ),
+      );
+      await tester.pump();
+
+      sessionKey = 'task-b';
+      workspacePath = '/tmp/task-b';
+      await tester.pumpWidget(
+        _buildTestApp(
+          sessionKey: sessionKey,
+          workspacePath: workspacePath,
+          artifactSyncAtMs: 1,
+          loadSnapshot: loadSnapshot,
+        ),
+      );
+      await tester.pump();
+
+      expect(find.text('task-a.md'), findsNothing);
+
+      firstSnapshot.complete(
+        AssistantArtifactSnapshot(
+          workspacePath: '/tmp/task-a',
+          workspaceKind: WorkspaceRefKind.localPath,
+          fileEntries: const <AssistantArtifactEntry>[
+            AssistantArtifactEntry(
+              id: 'task-a-entry',
+              label: 'task-a.md',
+              relativePath: 'task-a.md',
+              kind: AssistantArtifactEntryKind.file,
+              mimeType: 'text/markdown',
+              previewable: true,
+              workspacePath: '/tmp/task-a',
+            ),
+          ],
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('task-a.md'), findsNothing);
+      expect(find.text('task-b.md'), findsAtLeastNWidgets(1));
+    },
+  );
 
   testWidgets('keeps polling partial artifact snapshots', (tester) async {
     var loadCount = 0;
@@ -242,6 +323,8 @@ void main() {
 }
 
 Widget _buildTestApp({
+  String sessionKey = 'unit-fixture-task-a',
+  String workspacePath = '/tmp/thread',
   required double artifactSyncAtMs,
   String artifactSyncStatus = '',
   required Future<AssistantArtifactSnapshot> Function() loadSnapshot,
@@ -256,9 +339,9 @@ Widget _buildTestApp({
         width: 460,
         height: 640,
         child: AssistantArtifactSidebar(
-          sessionKey: 'unit-fixture-task-a',
+          sessionKey: sessionKey,
           threadTitle: 'Thread',
-          workspacePath: '/tmp/thread',
+          workspacePath: workspacePath,
           workspaceKind: WorkspaceRefKind.localPath,
           artifactSyncAtMs: artifactSyncAtMs,
           artifactSyncStatus: artifactSyncStatus,
