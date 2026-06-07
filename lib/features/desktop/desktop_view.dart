@@ -62,6 +62,11 @@ class _DesktopViewState extends State<DesktopView> {
   StreamSubscription<MediaStream>? _streamSubscription;
   StreamSubscription<String>? _stateSubscription;
 
+  bool get _hasVideoFrame =>
+      _hasStream &&
+      _localRenderer.videoWidth > 0 &&
+      _localRenderer.videoHeight > 0;
+
   @override
   void initState() {
     super.initState();
@@ -207,6 +212,7 @@ class _DesktopViewState extends State<DesktopView> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final hasVideoFrame = _hasVideoFrame;
 
     return Padding(
       padding: const EdgeInsets.all(16.0),
@@ -611,8 +617,39 @@ class _DesktopViewState extends State<DesktopView> {
                         ),
                       ),
 
+                    if (_hasStream && !hasVideoFrame)
+                      Positioned.fill(
+                        child: IgnorePointer(
+                          child: Container(
+                            color: isDark
+                                ? Colors.black.withValues(alpha: 0.56)
+                                : Colors.white.withValues(alpha: 0.72),
+                            child: Center(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const CircularProgressIndicator(),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    appText(
+                                      'WebRTC 已连接，正在等待远程桌面首帧...',
+                                      'WebRTC connected. Waiting for the first remote desktop frame...',
+                                    ),
+                                    style: TextStyle(
+                                      color: theme.colorScheme.onSurface
+                                          .withValues(alpha: 0.7),
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+
                     // Focus watermark badge
-                    if (_hasStream)
+                    if (hasVideoFrame)
                       Positioned(
                         right: 8,
                         bottom: 8,
