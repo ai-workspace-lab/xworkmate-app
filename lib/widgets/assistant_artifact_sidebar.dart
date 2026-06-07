@@ -76,6 +76,8 @@ class _AssistantArtifactSidebarState extends State<AssistantArtifactSidebar> {
   bool _loadingSnapshot = false;
   bool _loadingPreview = false;
   bool _taskContextExpanded = false;
+  int _snapshotLoadGeneration = 0;
+  int _previewLoadGeneration = 0;
   Timer? _refreshTimer;
 
   @override
@@ -88,14 +90,23 @@ class _AssistantArtifactSidebarState extends State<AssistantArtifactSidebar> {
   @override
   void didUpdateWidget(covariant AssistantArtifactSidebar oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.sessionKey != widget.sessionKey ||
+    final workspaceChanged =
+        oldWidget.sessionKey != widget.sessionKey ||
         oldWidget.workspacePath != widget.workspacePath ||
-        oldWidget.workspaceKind != widget.workspaceKind ||
+        oldWidget.workspaceKind != widget.workspaceKind;
+    if (workspaceChanged ||
         oldWidget.artifactSyncAtMs != widget.artifactSyncAtMs ||
         oldWidget.artifactSyncStatus != widget.artifactSyncStatus) {
-      _activeTab = AssistantArtifactSidebarTab.files;
-      _selectedEntry = null;
-      _preview = const AssistantArtifactPreview.empty();
+      if (workspaceChanged) {
+        _activeTab = AssistantArtifactSidebarTab.files;
+        _snapshot = null;
+        _selectedEntry = null;
+        _preview = const AssistantArtifactPreview.empty();
+        _loadError = null;
+        _loadingSnapshot = false;
+        _loadingPreview = false;
+        _previewLoadGeneration += 1;
+      }
       unawaited(_refreshSnapshot());
     }
     _syncRefreshTimer();
@@ -461,13 +472,17 @@ class _AssistantArtifactSidebarState extends State<AssistantArtifactSidebar> {
     if (_loadingSnapshot) {
       return;
     }
+    final generation = ++_snapshotLoadGeneration;
+    final sessionKey = widget.sessionKey;
     setState(() {
       _loadingSnapshot = true;
       _loadError = null;
     });
     try {
       final snapshot = await widget.loadSnapshot();
-      if (!mounted) {
+      if (!mounted ||
+          generation != _snapshotLoadGeneration ||
+          sessionKey != widget.sessionKey) {
         return;
       }
       final nextSelected = _reconcileSelection(
@@ -484,7 +499,9 @@ class _AssistantArtifactSidebarState extends State<AssistantArtifactSidebar> {
         await _loadPreview(nextSelected);
       }
     } catch (error) {
-      if (!mounted) {
+      if (!mounted ||
+          generation != _snapshotLoadGeneration ||
+          sessionKey != widget.sessionKey) {
         return;
       }
       setState(() {
@@ -555,13 +572,19 @@ class _AssistantArtifactSidebarState extends State<AssistantArtifactSidebar> {
   }
 
   Future<void> _loadPreview(AssistantArtifactEntry entry) async {
+    final generation = ++_previewLoadGeneration;
+    final sessionKey = widget.sessionKey;
+    final relativePath = entry.relativePath;
     setState(() {
       _loadingPreview = true;
       _preview = const AssistantArtifactPreview.empty();
     });
     try {
       final preview = await widget.loadPreview(entry);
-      if (!mounted) {
+      if (!mounted ||
+          generation != _previewLoadGeneration ||
+          sessionKey != widget.sessionKey ||
+          relativePath != _selectedEntry?.relativePath) {
         return;
       }
       setState(() {
@@ -569,7 +592,10 @@ class _AssistantArtifactSidebarState extends State<AssistantArtifactSidebar> {
         _loadingPreview = false;
       });
     } catch (error) {
-      if (!mounted) {
+      if (!mounted ||
+          generation != _previewLoadGeneration ||
+          sessionKey != widget.sessionKey ||
+          relativePath != _selectedEntry?.relativePath) {
         return;
       }
       setState(() {
