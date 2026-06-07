@@ -708,6 +708,8 @@ class ConversationAreaInternal extends StatelessWidget {
     required this.onOpenAiGatewaySettings,
     required this.onReconnectGateway,
     required this.onMessageViewModeChanged,
+    required this.onRecallUserMessage,
+    required this.onEditUserMessage,
   });
 
   final AppController controller;
@@ -724,6 +726,8 @@ class ConversationAreaInternal extends StatelessWidget {
   final Future<void> Function() onReconnectGateway;
   final Future<void> Function(AssistantMessageViewMode mode)
   onMessageViewModeChanged;
+  final ValueChanged<TimelineItemInternal> onRecallUserMessage;
+  final ValueChanged<TimelineItemInternal> onEditUserMessage;
 
   @override
   Widget build(BuildContext context) {
@@ -799,6 +803,8 @@ class ConversationAreaInternal extends StatelessWidget {
                               alignRight: true,
                               tone: BubbleToneInternal.user,
                               messageViewMode: messageViewMode,
+                              onRecall: () => onRecallUserMessage(item),
+                              onEdit: () => onEditUserMessage(item),
                             ),
                           TimelineItemKindInternal.assistant =>
                             MessageBubbleInternal(

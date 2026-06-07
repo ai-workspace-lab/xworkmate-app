@@ -588,6 +588,21 @@ class AppController extends ChangeNotifier {
     selectedSkillLabels: selectedSkillLabels,
   );
 
+  Future<bool> removeAssistantUserMessage(
+    String sessionKey,
+    String messageId,
+  ) async => AppControllerDesktopThreadStorage(
+    this,
+  ).removeAssistantUserMessageInternal(sessionKey, messageId);
+
+  Future<bool> updateAssistantUserMessage(
+    String sessionKey,
+    String messageId,
+    String text,
+  ) async => AppControllerDesktopThreadStorage(
+    this,
+  ).updateAssistantUserMessageInternal(sessionKey, messageId, text);
+
   double get assistantSkillCount => skills.length.toDouble();
   int get currentAssistantSkillCount => skills.length;
 }

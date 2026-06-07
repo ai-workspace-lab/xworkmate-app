@@ -185,12 +185,25 @@ extension AppControllerDesktopThreadActions on AppController {
     recomputeTasksInternal();
   }
 
-  Future<void> refreshSessions() async {
+  Future<void> refreshSessions({bool preserveCurrentSelection = false}) async {
+    final previousSessionKey = normalizedAssistantSessionKeyInternal(
+      sessionsControllerInternal.currentSessionKey,
+    );
     sessionsControllerInternal.configure(
       selectedAgentId: agentsControllerInternal.selectedAgentId,
       defaultAgentId: '',
     );
     await sessionsControllerInternal.refresh();
+    if (preserveCurrentSelection &&
+        isAppOwnedAssistantSessionKeyInternal(previousSessionKey) &&
+        !isAssistantTaskArchived(previousSessionKey)) {
+      await setCurrentAssistantSessionKeyInternal(
+        previousSessionKey,
+        persistSelection: false,
+      );
+      recomputeTasksInternal();
+      return;
+    }
     await ensureActiveAssistantThreadInternal();
     final selectedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionsControllerInternal.currentSessionKey,
