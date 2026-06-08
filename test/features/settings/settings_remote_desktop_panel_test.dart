@@ -31,6 +31,7 @@ void main() {
       // Verify the panel headers and titles
       expect(find.text('AI工作空间'), findsOneWidget);
       expect(find.text('连接AI工作空间'), findsOneWidget);
+      expect(find.text('工作空间管理'), findsOneWidget);
 
       // Verify advanced options are hidden initially
       expect(find.text('GPU 加速'), findsNothing);
@@ -43,6 +44,7 @@ void main() {
       expect(find.text('GPU 加速'), findsOneWidget);
       expect(find.widgetWithText(TextField, 'Display'), findsOneWidget);
       expect(find.text('Display'), findsOneWidget);
+      expect(find.text('工作空间管理'), findsOneWidget);
     });
   });
 }
