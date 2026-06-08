@@ -4,15 +4,22 @@ import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../app/app_controller.dart';
 import '../../i18n/app_language.dart';
+import '../../runtime/runtime_controllers.dart';
 import 'workspace_management_i18n.dart';
 import 'workspace_provision_controller.dart';
 import 'workspace_provision_models.dart';
 
 class WorkspaceManagementResult extends StatelessWidget {
-  const WorkspaceManagementResult({super.key, required this.controller});
+  const WorkspaceManagementResult({
+    super.key,
+    required this.controller,
+    required this.appController,
+  });
 
   final WorkspaceProvisionController controller;
+  final AppController appController;
 
   @override
   Widget build(BuildContext context) {
@@ -80,6 +87,13 @@ class WorkspaceManagementResult extends StatelessWidget {
                   label: Text(appText('复制 Token', 'Copy token')),
                 ),
                 OutlinedButton.icon(
+                  onPressed: result == null
+                      ? null
+                      : () => _saveAsDefault(result),
+                  icon: const Icon(Icons.bookmark_add_outlined),
+                  label: Text(appText('设为默认', 'Set as default')),
+                ),
+                OutlinedButton.icon(
                   onPressed: result == null ? null : () => _downloadResult(result),
                   icon: const Icon(Icons.download_outlined),
                   label: Text(appText('下载凭据', 'Download credentials')),
@@ -105,6 +119,20 @@ class WorkspaceManagementResult extends StatelessWidget {
       return;
     }
     await File(location.path).writeAsString(result.downloadText);
+  }
+
+  Future<void> _saveAsDefault(WorkspaceDeploymentResult result) async {
+    final settingsController = appController.settingsController;
+    final currentSettings = appController.settings;
+    final nextSettings = await settingsController.buildSavedAccountProfileSettings(
+      settings: currentSettings,
+      accountBaseUrl: currentSettings.accountBaseUrl,
+      accountIdentifier: currentSettings.accountUsername,
+      bridgeServerUrl: result.url,
+      bridgeToken: result.bridgeToken,
+      isManualBridge: true,
+    );
+    await appController.saveSettings(nextSettings, refreshAfterSave: true);
   }
 
   Widget _failure(BuildContext context) {
