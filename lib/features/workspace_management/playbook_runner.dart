@@ -23,10 +23,7 @@ class PlaybookRunner {
     required String installPath,
     required bool installMissingPrerequisites,
     required ServerInfo? serverInfo,
-    String? deepseekApiKey,
-    String? nvidiaApiKey,
-    String? ollamaApiKey,
-    String? openclawGatewayToken,
+    List<WorkspaceExtraConfig>? extraConfigs,
     required void Function(String stepId, StepStatus status, String? message)
     onStepUpdate,
     required void Function(String logLine) onLog,
@@ -79,10 +76,7 @@ class PlaybookRunner {
         workspaceDomain: workspaceDomain,
         bridgeDomain: bridgeDomain,
         bridgeToken: bridgeToken,
-        deepseekApiKey: deepseekApiKey,
-        nvidiaApiKey: nvidiaApiKey,
-        ollamaApiKey: ollamaApiKey,
-        openclawGatewayToken: openclawGatewayToken,
+        extraConfigs: extraConfigs,
       ),
       onLog,
     );
@@ -183,25 +177,26 @@ class PlaybookRunner {
     required String workspaceDomain,
     required String bridgeDomain,
     required String bridgeToken,
-    String? deepseekApiKey,
-    String? nvidiaApiKey,
-    String? ollamaApiKey,
-    String? openclawGatewayToken,
+    List<WorkspaceExtraConfig>? extraConfigs,
   }) {
     final domain = workspaceDomain.trim();
     final bridge = bridgeDomain.trim();
     final bridgeUrl = 'https://$bridge';
-    final extraEnvVars = <String>[
-      if ((deepseekApiKey ?? '').trim().isNotEmpty)
-        'deepseek_api_key: ${shellQuote(deepseekApiKey!.trim())}',
-      if ((nvidiaApiKey ?? '').trim().isNotEmpty)
-        'nvidia_api_key: ${shellQuote(nvidiaApiKey!.trim())}',
-      if ((ollamaApiKey ?? '').trim().isNotEmpty)
-        'ollama_api_key: ${shellQuote(ollamaApiKey!.trim())}',
-      if ((openclawGatewayToken ?? '').trim().isNotEmpty)
-        'openclaw_gateway_token: ${shellQuote(openclawGatewayToken!.trim())}',
-    ];
-    final extraEnvBlock = extraEnvVars.isEmpty ? '' : '${extraEnvVars.join('\n')}\n';
+    final extraEnvVars = <String>[];
+    for (final config in extraConfigs ?? const <WorkspaceExtraConfig>[]) {
+      final key = config.key.trim();
+      final value = config.value.trim();
+      if (key.isEmpty || value.isEmpty) {
+        continue;
+      }
+      extraEnvVars.add('$key: ${shellQuote(value)}');
+      final note = config.note.trim();
+      if (note.isNotEmpty) {
+        extraEnvVars.add('# ${note.length > 20 ? note.substring(0, 20) : note}');
+      }
+    }
+    final extraEnvBlock =
+        extraEnvVars.isEmpty ? '' : '${extraEnvVars.join('\n')}\n';
     return '''
 cat > ${shellQuote(inventoryPath)} <<'EOF'
 [all]
