@@ -265,6 +265,12 @@ class WorkspaceProvisionController extends ChangeNotifier {
     if (info == null) {
       return null;
     }
+    if (!info.os.toLowerCase().contains('ubuntu')) {
+      return appText(
+        '当前仅支持 Ubuntu 20.04 / 22.04 / 24.04，检测到 ${info.os}。',
+        'Only Ubuntu 20.04 / 22.04 / 24.04 is supported. Detected: ${info.os}.',
+      );
+    }
     if (!info.dnsResolved) {
       return appText(
         '部署前需要先把 ${workspaceDomain.trim()} 做好 DNS 解析。',
