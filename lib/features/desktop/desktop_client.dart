@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import '../../app/app_controller.dart';
+import '../../runtime/gateway_runtime_helpers.dart';
 
 String desktopConnectionStateName(RTCPeerConnectionState state) {
   final value = state.toString().split('.').last;
@@ -29,6 +30,10 @@ Map<String, Object?> desktopOfferParams({
     'bitrate': bitrate,
     'useGpu': useGpu,
   };
+}
+
+String desktopSessionId() {
+  return 'remote-desktop-${randomIdInternal()}';
 }
 
 Future<MediaStream?> desktopRemoteVideoStreamForTrack(
@@ -242,11 +247,8 @@ class DesktopClient {
         }
       };
 
-      // Add transceivers for receiving video and audio
-      await _peerConnection!.addTransceiver(
-        kind: RTCRtpMediaType.RTCRtpMediaTypeAudio,
-        init: RTCRtpTransceiverInit(direction: TransceiverDirection.RecvOnly),
-      );
+      // Bridge publishes a video-only desktop stream; keep SDP m-line mapping
+      // simple so reconnects do not depend on rejected audio sections.
       await _peerConnection!.addTransceiver(
         kind: RTCRtpMediaType.RTCRtpMediaTypeVideo,
         init: RTCRtpTransceiverInit(direction: TransceiverDirection.RecvOnly),
