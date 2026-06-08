@@ -1667,6 +1667,84 @@ void main() {
     expect(thread.lastTaskArtifactRelativePaths, isEmpty);
   });
 
+  test(
+    'keeps polling OpenClaw export after required artifact download fails',
+    () async {
+      final controller = AppController(
+        environmentOverride: const <String, String>{},
+      );
+      addTearDown(controller.dispose);
+
+      final localWorkspace = await Directory.systemTemp.createTemp(
+        'xworkmate-openclaw-required-download-failed-',
+      );
+      addTearDown(() async {
+        if (await localWorkspace.exists()) {
+          await localWorkspace.delete(recursive: true);
+        }
+      });
+      controller.upsertTaskThreadInternal(
+        'unit-fixture-task-a',
+        workspaceBinding: WorkspaceBinding(
+          workspaceId: 'unit-fixture-task-a',
+          workspaceKind: WorkspaceKind.localFs,
+          workspacePath: localWorkspace.path,
+          displayPath: localWorkspace.path,
+          writable: true,
+        ),
+        openClawTaskAssociation: const OpenClawTaskAssociation(
+          sessionId: 'unit-fixture-task-a',
+          threadId: 'unit-fixture-task-a',
+          turnId: 'turn-1',
+          runId: 'turn-1',
+          artifactScope: 'tasks/agent_main_unit_fixture/turn-1',
+          artifactDirectory: '/remote/tasks/agent_main_unit_fixture/turn-1',
+          gatewayProviderId: 'openclaw',
+          startedAtMs: 1,
+          status: 'completed',
+          appThreadKey: 'unit-fixture-task-a',
+          openclawSessionKey: 'agent:main:unit-fixture',
+          requiresArtifactExport: true,
+        ),
+      );
+
+      final bytes = utf8.encode('# Final\n');
+      final result = GoTaskServiceResult(
+        success: true,
+        message: 'done',
+        turnId: 'turn-1',
+        raw: <String, dynamic>{
+          'artifacts': <Map<String, dynamic>>[
+            <String, dynamic>{
+              'relativePath': 'exports/final.md',
+              'contentType': 'text/markdown',
+              'encoding': 'base64',
+              'content': base64Encode(bytes),
+              'sizeBytes': bytes.length,
+              'sha256': '0' * 64,
+            },
+          ],
+        },
+        errorMessage: '',
+        resolvedModel: '',
+        route: GoTaskServiceRoute.externalAcpSingle,
+      );
+
+      await controller.persistGoTaskArtifactsForSessionInternal(
+        'unit-fixture-task-a',
+        result,
+      );
+
+      final thread = controller.requireTaskThreadForSessionInternal(
+        'unit-fixture-task-a',
+      );
+      expect(thread.lastArtifactSyncStatus, 'syncing');
+      expect(thread.lifecycleState.lastResultCode, 'running');
+      expect(thread.openClawTaskAssociation?.status, 'syncing-artifacts');
+      expect(thread.lastTaskArtifactRelativePaths, isEmpty);
+    },
+  );
+
   test('loads global and selected skill artifact-ignore policies', () async {
     final controller = AppController(
       environmentOverride: const <String, String>{},
@@ -1773,6 +1851,78 @@ void main() {
       'renders/final.mp4',
       'renders/tmp/scratch.png',
     ]);
+  });
+
+  test('uses default artifact-ignore policy for video skill outputs', () async {
+    final controller = AppController(
+      environmentOverride: const <String, String>{},
+    );
+    addTearDown(controller.dispose);
+
+    final localWorkspace = await Directory.systemTemp.createTemp(
+      'xworkmate-video-default-artifact-policy-',
+    );
+    addTearDown(() async {
+      if (await localWorkspace.exists()) {
+        await localWorkspace.delete(recursive: true);
+      }
+    });
+    final startedAtMs = DateTime.now().millisecondsSinceEpoch.toDouble();
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+    await Directory(
+      '${localWorkspace.path}/assets/images',
+    ).create(recursive: true);
+    await Directory('${localWorkspace.path}/build_segments').create();
+    await Directory('${localWorkspace.path}/snapshots').create();
+    await Directory('${localWorkspace.path}/renders').create();
+    await File(
+      '${localWorkspace.path}/assets/images/01.v8.png',
+    ).writeAsBytes(<int>[1]);
+    await File(
+      '${localWorkspace.path}/build_segments/segment-01.mp4',
+    ).writeAsBytes(<int>[2]);
+    await File(
+      '${localWorkspace.path}/snapshots/frame-01.png',
+    ).writeAsBytes(<int>[3]);
+    await File(
+      '${localWorkspace.path}/renders/final.mp4',
+    ).writeAsBytes(<int>[4]);
+
+    controller.upsertTaskThreadInternal(
+      'unit-fixture-task-a',
+      workspaceBinding: WorkspaceBinding(
+        workspaceId: 'unit-fixture-task-a',
+        workspaceKind: WorkspaceKind.localFs,
+        workspacePath: localWorkspace.path,
+        displayPath: localWorkspace.path,
+        writable: true,
+      ),
+      selectedSkillKeys: const <String>['it-infra-evolution-video-v2'],
+      lifecycleStatus: 'running',
+      lastRunAtMs: startedAtMs,
+      lastResultCode: 'running',
+    );
+
+    const result = GoTaskServiceResult(
+      success: true,
+      message: 'done',
+      turnId: 'turn-1',
+      raw: <String, dynamic>{},
+      errorMessage: '',
+      resolvedModel: '',
+      route: GoTaskServiceRoute.externalAcpSingle,
+    );
+
+    await controller.persistGoTaskArtifactsForSessionInternal(
+      'unit-fixture-task-a',
+      result,
+    );
+
+    final thread = controller.requireTaskThreadForSessionInternal(
+      'unit-fixture-task-a',
+    );
+    expect(thread.lastArtifactSyncStatus, 'synced');
+    expect(thread.lastTaskArtifactRelativePaths, <String>['renders/final.mp4']);
   });
 
   test('records ordinary empty artifact results as no artifacts', () async {
