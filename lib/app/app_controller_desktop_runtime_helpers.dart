@@ -871,9 +871,9 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     }
 
     final thread = taskThreadForSessionInternal(normalizedSessionKey);
+    final association = thread?.openClawTaskAssociation;
     final requiredExts =
-        thread?.openClawTaskAssociation?.requiredArtifactExtensions ??
-        const <String>[];
+        association?.requiredArtifactExtensions ?? const <String>[];
     final missingRequired = requiredExts
         .where((ext) {
           return !currentTaskArtifactPaths.any(
@@ -881,6 +881,31 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
           );
         })
         .toList(growable: false);
+
+    final shouldKeepPollingAfterDownloadFailure =
+        !wroteArtifact &&
+        failedArtifact &&
+        result.success &&
+        association != null &&
+        (association.requiresArtifactExport ||
+            association.requiredArtifactExtensions.isNotEmpty) &&
+        (association.artifactScope.trim().isNotEmpty ||
+            association.artifactDirectory.trim().isNotEmpty);
+    if (shouldKeepPollingAfterDownloadFailure) {
+      upsertTaskThreadInternal(
+        normalizedSessionKey,
+        lifecycleStatus: 'running',
+        lastResultCode: 'running',
+        lastArtifactSyncAtMs: syncedAtMs,
+        lastArtifactSyncStatus: 'syncing',
+        lastTaskArtifactRelativePaths: const <String>[],
+        openClawTaskAssociation: association.copyWith(
+          status: 'syncing-artifacts',
+        ),
+        updatedAtMs: syncedAtMs,
+      );
+      return;
+    }
 
     final syncStatus = wroteArtifact
         ? (failedArtifact || skippedArtifact || missingRequired.isNotEmpty
@@ -1394,7 +1419,9 @@ Future<_ArtifactSyncPolicy> _loadArtifactSyncPolicyInternal(
       policyFiles.add(resolvedRelativePath);
     }
   }
-  final policies = <_ArtifactSyncPolicy>[];
+  final policies = <_ArtifactSyncPolicy>[
+    ..._defaultArtifactSyncPoliciesForSkillsInternal(selectedSkillKeys),
+  ];
   try {
     for (final file in files) {
       if (!await file.exists()) {
@@ -1406,6 +1433,33 @@ Future<_ArtifactSyncPolicy> _loadArtifactSyncPolicyInternal(
     return const _ArtifactSyncPolicy();
   }
   return _ArtifactSyncPolicy.merge(policies, policyFiles: policyFiles);
+}
+
+List<_ArtifactSyncPolicy> _defaultArtifactSyncPoliciesForSkillsInternal(
+  List<String> selectedSkillKeys,
+) {
+  final hasVideoSkill = selectedSkillKeys.any((skillKey) {
+    final normalized = _sanitizeArtifactRelativePathInternal(
+      skillKey,
+    ).toLowerCase();
+    final segments = normalized.split('/');
+    final leaf = segments.isEmpty ? normalized : segments.last;
+    return leaf == 'it-infra-evolution-video-v2';
+  });
+  if (!hasVideoSkill) {
+    return const <_ArtifactSyncPolicy>[];
+  }
+  return <_ArtifactSyncPolicy>[
+    _ArtifactSyncPolicy.parse(
+      '```artifact-ignore\n'
+      'assets/audio/\n'
+      'assets/images/\n'
+      'build_segments/\n'
+      'snapshots/\n'
+      'tmp/\n'
+      '```\n',
+    ),
+  ];
 }
 
 String _normalizeAuthorizationHeaderInternal(String raw) {
