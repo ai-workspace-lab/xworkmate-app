@@ -70,7 +70,8 @@ class CodeAgentNodeOrchestrator {
             metadata: resolution.metadata,
           );
         }
-      } catch (e, stackTrace) { debugPrint('Error: $e\n$stackTrace');
+      } catch (e, stackTrace) {
+        debugPrint('Error: $e\n$stackTrace');
         // Dispatch metadata is advisory; task execution still carries routing.
       }
     }
