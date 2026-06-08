@@ -108,6 +108,66 @@ class _WorkspaceManagementPanelState extends State<WorkspaceManagementPanel> {
     }
   }
 
+  Future<void> _exportConfig() async {
+    final yaml = _controller.exportYaml();
+    await Clipboard.setData(ClipboardData(text: yaml));
+    if (!mounted) {
+      return;
+    }
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(appText('YAML 已导出', 'YAML exported')),
+        content: SingleChildScrollView(child: SelectableText(yaml)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(appText('关闭', 'Close')),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _importConfig() async {
+    final yamlController = TextEditingController();
+    try {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text(appText('导入 YAML', 'Import YAML')),
+          content: SizedBox(
+            width: 720,
+            child: TextField(
+              controller: yamlController,
+              minLines: 12,
+              maxLines: 18,
+              decoration: InputDecoration(
+                hintText: appText('粘贴 YAML 配置', 'Paste YAML configuration'),
+                alignLabelWithHint: true,
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: Text(appText('取消', 'Cancel')),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: Text(appText('导入', 'Import')),
+            ),
+          ],
+        ),
+      );
+      if (confirmed == true) {
+        _controller.importYaml(yamlController.text);
+      }
+    } finally {
+      yamlController.dispose();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -139,6 +199,22 @@ class _WorkspaceManagementPanelState extends State<WorkspaceManagementPanel> {
                             ),
                           ),
                         ),
+                        TextButton.icon(
+                          onPressed: _controller.isBusy
+                              ? null
+                              : () => unawaited(_exportConfig()),
+                          icon: const Icon(Icons.upload_outlined),
+                          label: Text(appText('导出 YAML', 'Export YAML')),
+                        ),
+                        const SizedBox(width: 8),
+                        TextButton.icon(
+                          onPressed: _controller.isBusy
+                              ? null
+                              : () => unawaited(_importConfig()),
+                          icon: const Icon(Icons.download_outlined),
+                          label: Text(appText('导入 YAML', 'Import YAML')),
+                        ),
+                        const SizedBox(width: 8),
                         IconButton(
                           onPressed: _controller.isBusy
                               ? null
