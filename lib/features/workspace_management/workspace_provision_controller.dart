@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:yaml/yaml.dart';
 
@@ -11,12 +13,15 @@ class WorkspaceProvisionController extends ChangeNotifier {
   WorkspaceProvisionController({
     WorkspaceSshExecutor? executor,
     String initialWorkspaceDomain = '',
+    Future<void> Function(String host)? externalPortProbe,
   }) : executor = executor ?? const DartSshExecutor(),
-       workspaceDomain = initialWorkspaceDomain {
+       workspaceDomain = initialWorkspaceDomain,
+       externalPortProbe = externalPortProbe ?? _probeExternalPorts {
     steps = defaultProvisionSteps();
   }
 
   final WorkspaceSshExecutor executor;
+  final Future<void> Function(String host) externalPortProbe;
 
   String serverAddress = '';
   String workspaceDomain = '';
@@ -155,6 +160,7 @@ class WorkspaceProvisionController extends ChangeNotifier {
         onStepUpdate: _setStep,
         onLog: _appendLog,
       );
+      await _verifyDeploymentReadiness();
       for (final step in steps) {
         if (step.status == StepStatus.pending || step.status == StepStatus.running) {
           _setStep(step.id, StepStatus.success, null);
@@ -358,19 +364,98 @@ class WorkspaceProvisionController extends ChangeNotifier {
         'The target server cannot resolve $bridgeDomain. Add an A record for this host at your DNS provider, then confirm dig/getent returns an address on the VPS.',
       );
     }
-    if (!info.bridgePort443Open) {
-      return appText(
-        '$bridgeDomain 的 443 端口未开放，请先放通 HTTPS 访问。',
-        'Port 443 is not open for $bridgeDomain. Allow HTTPS traffic first.',
-      );
-    }
-    if (!info.isBridgePort443Available) {
-      return appText(
-        '$bridgeDomain 的 443 端口已被占用，请先释放。',
-        'Port 443 is already in use for $bridgeDomain.',
-      );
-    }
     return null;
+  }
+
+  Future<void> _verifyDeploymentReadiness() async {
+    final result = await executor.execute(
+      sshConfig(),
+      _coreServicesCheckCommand(),
+    );
+    for (final line in result.combinedOutput.split(RegExp(r'\r?\n'))) {
+      if (line.trim().isNotEmpty) {
+        _appendLog(line);
+      }
+    }
+    if (!result.success) {
+      throw PlaybookRunException(
+        appText(
+          '部署完成后核心服务校验失败，请查看日志。',
+          'Core service validation failed after deployment. Check logs.',
+        ),
+      );
+    }
+
+    final serviceStates = <String, String>{};
+    for (final raw in result.combinedOutput.split(RegExp(r'\r?\n'))) {
+      final match = RegExp(r'^SERVICE_(.+?)=(.+)$').firstMatch(raw.trim());
+      if (match != null) {
+        serviceStates[match.group(1)!] = match.group(2)!;
+      }
+    }
+    final unhealthy = serviceStates.entries
+        .where((entry) => entry.value.trim().toLowerCase() != 'active')
+        .map((entry) => entry.key)
+        .toList();
+    if (unhealthy.isNotEmpty) {
+      throw PlaybookRunException(
+        appText(
+          '部署完成后核心服务未处于 active：${unhealthy.join(', ')}。',
+          'Core services are not active after deployment: ${unhealthy.join(', ')}.',
+        ),
+      );
+    }
+
+    await externalPortProbe(bridgeDomain.trim());
+  }
+
+  String _coreServicesCheckCommand() {
+    final services = <String>[
+      'caddy',
+      'xworkmate-bridge',
+      'openclaw-gateway',
+      'hermes-gateway',
+    ];
+    final buffer = StringBuffer();
+    buffer.writeln('set +e');
+    for (final service in services) {
+      final unit = shellQuote('$service.service');
+      final envKey = service.toUpperCase().replaceAll('-', '_');
+      buffer.writeln('if systemctl list-unit-files $unit >/dev/null 2>&1 || systemctl status $unit >/dev/null 2>&1; then');
+      buffer.writeln('  STATE=\$(systemctl is-active $unit 2>/dev/null || echo inactive)');
+      buffer.writeln('  echo SERVICE_$envKey=\$STATE');
+      buffer.writeln('fi');
+    }
+    buffer.writeln('exit 0');
+    return buffer.toString();
+  }
+
+  static Future<void> _probeExternalPorts(String host) async {
+    final bridgeHost = host.trim();
+    if (bridgeHost.isEmpty) {
+      return;
+    }
+    final probeFailures = <String>[];
+    for (final port in <int>[80, 443]) {
+      try {
+        final socket = await Socket.connect(
+          bridgeHost,
+          port,
+          timeout: const Duration(seconds: 3),
+        );
+        socket.destroy();
+      } catch (_) {
+        probeFailures.add('$port');
+      }
+    }
+    if (probeFailures.isNotEmpty) {
+      throw PlaybookRunException(
+        appText(
+          '部署已完成，但外部探测仍然不通：$bridgeHost 的 ${probeFailures.join(' / ')} 端口未真正放行。',
+          'Deployment finished, but external probes still fail: $bridgeHost ports ${probeFailures.join(' / ')} are not truly open.',
+        ),
+      );
+    }
   }
 
   @override

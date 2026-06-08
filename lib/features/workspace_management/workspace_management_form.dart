@@ -32,11 +32,13 @@ class _WorkspaceManagementFormState extends State<WorkspaceManagementForm> {
   late final TextEditingController _sudoController;
   late final TextEditingController _installPathController;
   final List<_ExtraRowControllers> _extraRows = <_ExtraRowControllers>[];
+  bool _syncingFromController = false;
 
   @override
   void initState() {
     super.initState();
     final c = widget.controller;
+    widget.controller.addListener(_handleControllerUpdate);
     _serverController = TextEditingController(text: c.serverAddress);
     _domainController = TextEditingController(text: c.workspaceDomain);
     _userController = TextEditingController(text: c.sshUsername);
@@ -57,8 +59,67 @@ class _WorkspaceManagementFormState extends State<WorkspaceManagementForm> {
     }
   }
 
+  void _handleControllerUpdate() {
+    if (!mounted || _syncingFromController) {
+      return;
+    }
+    _syncingFromController = true;
+    try {
+      _syncText(_serverController, widget.controller.serverAddress);
+      _syncText(_domainController, widget.controller.workspaceDomain);
+      _syncText(_userController, widget.controller.sshUsername);
+      _syncText(_passwordController, widget.controller.sshPassword ?? '');
+      _syncText(_keyController, widget.controller.sshKeyContent ?? '');
+      _syncText(_keyPathController, widget.controller.sshKeyPath ?? '');
+      _syncText(_portController, widget.controller.sshPort.toString());
+      _syncText(_sudoController, widget.controller.sudoPassword ?? '');
+      _syncText(_installPathController, widget.controller.installPath);
+      _syncExtraRows(widget.controller.extraConfigs);
+    } finally {
+      _syncingFromController = false;
+    }
+  }
+
+  void _syncText(TextEditingController controller, String value) {
+    if (controller.text != value) {
+      controller.value = controller.value.copyWith(
+        text: value,
+        selection: TextSelection.collapsed(offset: value.length),
+        composing: TextRange.empty,
+      );
+    }
+  }
+
+  void _syncExtraRows(List<WorkspaceExtraConfig> configs) {
+    if (_extraRows.length != configs.length) {
+      for (final row in _extraRows) {
+        row.dispose();
+      }
+      _extraRows
+        ..clear()
+        ..addAll(
+          configs.map(
+            (row) => _ExtraRowControllers(
+              keyController: TextEditingController(text: row.key),
+              valueController: TextEditingController(text: row.value),
+              noteController: TextEditingController(text: row.note),
+            ),
+          ),
+        );
+      return;
+    }
+    for (var i = 0; i < configs.length; i++) {
+      final source = configs[i];
+      final row = _extraRows[i];
+      _syncText(row.keyController, source.key);
+      _syncText(row.valueController, source.value);
+      _syncText(row.noteController, source.note);
+    }
+  }
+
   @override
   void dispose() {
+    widget.controller.removeListener(_handleControllerUpdate);
     _serverController.dispose();
     _domainController.dispose();
     _userController.dispose();
