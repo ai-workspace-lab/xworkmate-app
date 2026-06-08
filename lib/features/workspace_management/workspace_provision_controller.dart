@@ -354,8 +354,8 @@ class WorkspaceProvisionController extends ChangeNotifier {
     }
     if (!info.bridgeDnsResolved) {
       return appText(
-        '部署前需要先把 $bridgeDomain 做好 DNS 解析。',
-        'Configure DNS for $bridgeDomain before deploying.',
+        '目标服务器当前无法解析 $bridgeDomain。请先在 DNS 服务商添加这条主机名的 A 记录，并确认在 VPS 上执行 dig/getent 能返回地址。',
+        'The target server cannot resolve $bridgeDomain. Add an A record for this host at your DNS provider, then confirm dig/getent returns an address on the VPS.',
       );
     }
     if (!info.bridgePort443Open) {
