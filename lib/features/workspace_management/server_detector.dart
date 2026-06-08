@@ -6,10 +6,14 @@ class ServerDetector {
 
   final WorkspaceSshExecutor executor;
 
-  Future<ServerInfo> detect(SshConfig ssh, String workspaceDomain) async {
+  Future<ServerInfo> detect(
+    SshConfig ssh,
+    String workspaceDomain,
+    String bridgeDomain,
+  ) async {
     final result = await executor.execute(
       ssh,
-      detectionCommand(workspaceDomain),
+      detectionCommand(workspaceDomain, bridgeDomain),
     );
     if (!result.success) {
       throw ServerDetectionException(result.combinedOutput.trim());
@@ -17,8 +21,9 @@ class ServerDetector {
     return parseServerInfo(result.stdout);
   }
 
-  static String detectionCommand(String workspaceDomain) {
+  static String detectionCommand(String workspaceDomain, String bridgeDomain) {
     final domain = shellQuote(workspaceDomain.trim());
+    final bridge = shellQuote(bridgeDomain.trim());
     return '''
 if command -v lsb_release >/dev/null 2>&1; then
   echo "OS=\$(lsb_release -ds)"
@@ -35,14 +40,17 @@ echo "ANSIBLE=\$(ansible --version 2>/dev/null | head -1 || echo missing)"
 echo "GIT=\$(git --version 2>/dev/null || echo missing)"
 echo "DNS_OK=\$(getent hosts $domain 2>/dev/null | wc -l | tr -d ' ')"
 echo "PORT_443_LISTENERS=\$(ss -ltn '( sport = :443 )' 2>/dev/null | tail -n +2 | wc -l | tr -d ' ')"
+echo "BRIDGE_DNS_OK=\$(getent hosts $bridge 2>/dev/null | wc -l | tr -d ' ')"
+echo "BRIDGE_PORT_443_LISTENERS=\$(ss -ltn '( sport = :443 )' 2>/dev/null | tail -n +2 | wc -l | tr -d ' ')"
+PORT_443_OPEN=yes
 if command -v ufw >/dev/null 2>&1; then
   UFW_STATUS="\$(ufw status 2>/dev/null || sudo -n ufw status 2>/dev/null || echo unavailable)"
   if printf '%s' "\$UFW_STATUS" | grep -qi 'Status: inactive'; then
-    echo "PORT_443_OPEN=yes"
+    PORT_443_OPEN=yes
   elif printf '%s' "\$UFW_STATUS" | grep -Eqi '(^|[[:space:]])(443(/tcp)?|https)[[:space:]]+ALLOW'; then
-    echo "PORT_443_OPEN=yes"
+    PORT_443_OPEN=yes
   else
-    echo "PORT_443_OPEN=no"
+    PORT_443_OPEN=no
   fi
   elif command -v firewall-cmd >/dev/null 2>&1; then
   FIREWALL_STATE="\$(firewall-cmd --state 2>/dev/null || sudo -n firewall-cmd --state 2>/dev/null || echo not-running)"
@@ -51,16 +59,16 @@ if command -v ufw >/dev/null 2>&1; then
        sudo -n firewall-cmd --quiet --query-service=https 2>/dev/null ||
        firewall-cmd --quiet --query-port=443/tcp 2>/dev/null ||
        sudo -n firewall-cmd --quiet --query-port=443/tcp 2>/dev/null; then
-      echo "PORT_443_OPEN=yes"
+      PORT_443_OPEN=yes
     else
-      echo "PORT_443_OPEN=no"
+      PORT_443_OPEN=no
     fi
   else
-    echo "PORT_443_OPEN=yes"
+    PORT_443_OPEN=yes
   fi
-else
-  echo "PORT_443_OPEN=yes"
 fi
+echo "PORT_443_OPEN=\$PORT_443_OPEN"
+echo "BRIDGE_PORT_443_OPEN=\$PORT_443_OPEN"
 ''';
   }
 
@@ -83,9 +91,17 @@ fi
       ansibleVersion: values['ANSIBLE'] ?? 'missing',
       gitVersion: values['GIT'] ?? 'missing',
       dnsAddressCount: int.tryParse(values['DNS_OK'] ?? '') ?? 0,
-      port443ListenerCount:
+  port443ListenerCount:
           int.tryParse(values['PORT_443_LISTENERS'] ?? '') ?? 0,
-      port443Open: (values['PORT_443_OPEN'] ?? '').toLowerCase() != 'no',
+  port443Open: (values['PORT_443_OPEN'] ?? '').toLowerCase() != 'no',
+      bridgeDnsAddressCount:
+          int.tryParse(values['BRIDGE_DNS_OK'] ?? '') ?? 0,
+      bridgePort443ListenerCount:
+          int.tryParse(values['BRIDGE_PORT_443_LISTENERS'] ?? '') ?? 0,
+      bridgePort443Open:
+          (values['BRIDGE_PORT_443_OPEN'] ?? values['PORT_443_OPEN'] ?? '')
+              .toLowerCase() !=
+          'no',
     );
   }
 }
