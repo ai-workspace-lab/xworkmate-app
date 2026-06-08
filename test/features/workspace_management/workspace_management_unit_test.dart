@@ -90,6 +90,13 @@ BRIDGE_PORT_443_OPEN=yes
       expect(command, contains('getent hosts'));
     });
 
+    test('bridge domain uses user input when already a bridge host', () {
+      expect(
+        WorkspaceProvisionController.deriveBridgeDomain('acp-bridge.onwalk.net'),
+        'acp-bridge.onwalk.net',
+      );
+    });
+
     test('exported yaml redacts sensitive values', () {
       final controller = WorkspaceProvisionController();
       addTearDown(controller.dispose);
@@ -98,17 +105,28 @@ BRIDGE_PORT_443_OPEN=yes
         workspaceDomain: 'onwalk.net',
         sshUsername: 'root',
         sshPassword: 'ssh-secret',
-        deepseekApiKey: 'deepseek-secret',
-        openclawGatewayToken: 'gateway-secret',
         showAdvanced: true,
+        extraConfigs: [
+          WorkspaceExtraConfig(
+            key: 'DEEPSEEK_API_KEY',
+            value: 'deepseek-secret',
+            note: '深度搜索',
+          ),
+          WorkspaceExtraConfig(
+            key: 'OPENCLAW_GATEWAY_TOKEN',
+            value: 'gateway-secret',
+            note: 'OpenClaw',
+          ),
+        ],
       );
 
       final yaml = controller.exportYaml();
 
       expect(yaml, contains('server_address: 203.0.113.10'));
       expect(yaml, contains('ssh_password: "__redacted__"'));
-      expect(yaml, contains('deepseek_api_key: "__redacted__"'));
-      expect(yaml, contains('openclaw_gateway_token: "__redacted__"'));
+      expect(yaml, contains('extra_configs:'));
+      expect(yaml, contains('key: DEEPSEEK_API_KEY'));
+      expect(yaml, contains('value: "__redacted__"'));
     });
   });
 
@@ -314,16 +332,21 @@ install_path: /opt/xworkspace/playbooks
 show_advanced: true
 logs_expanded: false
 ssh_password: "__redacted__"
-deepseek_api_key: "deepseek-new"
-openclaw_gateway_token: "__redacted__"
+extra_configs:
+  - key: DEEPSEEK_API_KEY
+    value: "deepseek-new"
+    note: "深度搜索"
+  - key: OPENCLAW_GATEWAY_TOKEN
+    value: "__redacted__"
+    note: "OpenClaw"
 ''');
 
       expect(controller.serverAddress, '167.179.110.129');
       expect(controller.workspaceDomain, 'onwalk.net');
       expect(controller.showAdvanced, isTrue);
       expect(controller.sshPassword, 'keep-secret');
-      expect(controller.deepseekApiKey, 'deepseek-new');
-      expect(controller.openclawGatewayToken, isNull);
+      expect(controller.extraConfigs.first.value, 'deepseek-new');
+      expect(controller.extraConfigs.last.value, '');
     });
   });
 }
