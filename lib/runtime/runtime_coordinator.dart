@@ -64,9 +64,15 @@ class RuntimeCoordinator extends ChangeNotifier {
     }
     final normalizedCommand = provider.command.trim();
     if (normalizedCommand.isEmpty) {
-      throw ArgumentError.value(provider.command, 'provider.command', 'Cannot be empty');
+      throw ArgumentError.value(
+        provider.command,
+        'provider.command',
+        'Cannot be empty',
+      );
     }
-    final normalizedCapabilities = _normalizeCapabilitySet(provider.capabilities).toList(growable: false)..sort();
+    final normalizedCapabilities = _normalizeCapabilitySet(
+      provider.capabilities,
+    ).toList(growable: false)..sort();
 
     _externalCodeAgents[normalizedId] = ExternalCodeAgentProvider(
       id: normalizedId,
@@ -96,7 +102,8 @@ class RuntimeCoordinator extends ChangeNotifier {
     Iterable<String> requiredCapabilities = const <String>[],
   }) {
     final required = _normalizeCapabilitySet(requiredCapabilities);
-    final providers = _externalCodeAgents.values
+    final providers =
+        _externalCodeAgents.values
             .where((provider) => _providerSupports(provider, required))
             .toList(growable: false)
           ..sort((a, b) => a.id.compareTo(b.id));
@@ -147,7 +154,9 @@ class RuntimeCoordinator extends ChangeNotifier {
       }
     }
 
-    final discovered = discoverExternalCodeAgents(requiredCapabilities: required);
+    final discovered = discoverExternalCodeAgents(
+      requiredCapabilities: required,
+    );
     if (discovered.isEmpty) {
       return null;
     }
@@ -250,7 +259,9 @@ class RuntimeCoordinator extends ChangeNotifier {
   }
 
   Future<void> stopCodeAgentRuntime() async {
-    _state = gateway.isConnected ? CoordinatorState.ready : CoordinatorState.disconnected;
+    _state = gateway.isConnected
+        ? CoordinatorState.ready
+        : CoordinatorState.disconnected;
     notifyListeners();
   }
 
@@ -264,12 +275,18 @@ class RuntimeCoordinator extends ChangeNotifier {
 
   bool supportsCapability(String capability) {
     switch (capability) {
-      case 'cloud-memory': return capabilities.hasCloudMemory;
-      case 'task-queue': return capabilities.hasTaskQueue;
-      case 'multi-agent': return capabilities.hasMultiAgent;
-      case 'local-models': return capabilities.hasLocalModels;
-      case 'code-agent': return capabilities.hasCodeAgent;
-      default: return false;
+      case 'cloud-memory':
+        return capabilities.hasCloudMemory;
+      case 'task-queue':
+        return capabilities.hasTaskQueue;
+      case 'multi-agent':
+        return capabilities.hasMultiAgent;
+      case 'local-models':
+        return capabilities.hasLocalModels;
+      case 'code-agent':
+        return capabilities.hasCodeAgent;
+      default:
+        return false;
     }
   }
 
@@ -295,16 +312,24 @@ class RuntimeCoordinator extends ChangeNotifier {
 
   Future<ModeSwitchResult> _switchMode(GatewayMode mode) {
     switch (mode) {
-      case GatewayMode.remote: return modeSwitcher.switchToRemote();
-      case GatewayMode.offline: return modeSwitcher.switchToOffline();
+      case GatewayMode.remote:
+        return modeSwitcher.switchToRemote();
+      case GatewayMode.offline:
+        return modeSwitcher.switchToOffline();
     }
   }
 
   static Set<String> _normalizeCapabilitySet(Iterable<String> capabilities) {
-    return capabilities.map((item) => item.trim().toLowerCase()).where((item) => item.isNotEmpty).toSet();
+    return capabilities
+        .map((item) => item.trim().toLowerCase())
+        .where((item) => item.isNotEmpty)
+        .toSet();
   }
 
-  static bool _providerSupports(ExternalCodeAgentProvider provider, Set<String> requiredCapabilities) {
+  static bool _providerSupports(
+    ExternalCodeAgentProvider provider,
+    Set<String> requiredCapabilities,
+  ) {
     if (requiredCapabilities.isEmpty) return true;
     final provided = _normalizeCapabilitySet(provider.capabilities);
     return requiredCapabilities.every(provided.contains);
