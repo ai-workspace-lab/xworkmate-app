@@ -76,7 +76,7 @@ class _DesktopViewState extends State<DesktopView> {
     _initRenderer();
     _client = DesktopClient(
       controller: widget.controller,
-      sessionId: 'remote-desktop-session',
+      sessionId: desktopSessionId(),
     );
     _inputHandler = DesktopInputHandler(
       onSendInput: (event) {
