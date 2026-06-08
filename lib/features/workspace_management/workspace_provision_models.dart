@@ -56,9 +56,13 @@ class ServerInfo {
     required this.ansibleVersion,
     required this.gitVersion,
     required this.dnsAddressCount,
+    required this.port80ListenerCount,
+    required this.port80Open,
     required this.port443ListenerCount,
     required this.port443Open,
     required this.bridgeDnsAddressCount,
+    required this.bridgePort80ListenerCount,
+    required this.bridgePort80Open,
     required this.bridgePort443ListenerCount,
     required this.bridgePort443Open,
   });
@@ -72,9 +76,13 @@ class ServerInfo {
   final String ansibleVersion;
   final String gitVersion;
   final int dnsAddressCount;
+  final int port80ListenerCount;
+  final bool port80Open;
   final int port443ListenerCount;
   final bool port443Open;
   final int bridgeDnsAddressCount;
+  final int bridgePort80ListenerCount;
+  final bool bridgePort80Open;
   final int bridgePort443ListenerCount;
   final bool bridgePort443Open;
 
@@ -82,8 +90,10 @@ class ServerInfo {
   bool get ansibleMissing => _isMissing(ansibleVersion);
   bool get hasMissingPrerequisites => gitMissing || ansibleMissing;
   bool get dnsResolved => dnsAddressCount > 0;
+  bool get isPort80Available => port80ListenerCount == 0;
   bool get isPort443Available => port443ListenerCount == 0;
   bool get bridgeDnsResolved => bridgeDnsAddressCount > 0;
+  bool get isBridgePort80Available => bridgePort80ListenerCount == 0;
   bool get isBridgePort443Available => bridgePort443ListenerCount == 0;
 
   String get displaySummary {
@@ -93,9 +103,13 @@ class ServerInfo {
       if (arch.trim().isNotEmpty) arch.trim(),
       sudo,
       dnsResolved ? 'dns=ok' : 'dns=missing',
+      port80Open ? '80=open' : '80=blocked',
+      isPort80Available ? '80=free' : '80=busy',
       port443Open ? '443=open' : '443=blocked',
       isPort443Available ? '443=free' : '443=busy',
       bridgeDnsResolved ? 'bridge-dns=ok' : 'bridge-dns=missing',
+      bridgePort80Open ? 'bridge-80=open' : 'bridge-80=blocked',
+      isBridgePort80Available ? 'bridge-80=free' : 'bridge-80=busy',
       bridgePort443Open ? 'bridge-443=open' : 'bridge-443=blocked',
       isBridgePort443Available ? 'bridge-443=free' : 'bridge-443=busy',
     ].join(', ');
