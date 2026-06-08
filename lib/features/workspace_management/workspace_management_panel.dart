@@ -242,7 +242,10 @@ class _WorkspaceManagementPanelState extends State<WorkspaceManagementPanel> {
                           const SizedBox(height: 12),
                           _LogPanel(controller: _controller),
                           const SizedBox(height: 12),
-                          WorkspaceManagementResult(controller: _controller),
+                          WorkspaceManagementResult(
+                            controller: _controller,
+                            appController: widget.appController,
+                          ),
                         ],
                       ),
                     ),
