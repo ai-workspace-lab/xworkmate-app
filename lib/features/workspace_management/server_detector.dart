@@ -39,15 +39,24 @@ echo "CADDY=\$(caddy version 2>/dev/null || echo missing)"
 echo "ANSIBLE=\$(ansible --version 2>/dev/null | head -1 || echo missing)"
 echo "GIT=\$(git --version 2>/dev/null || echo missing)"
 echo "DNS_OK=\$(getent hosts $domain 2>/dev/null | wc -l | tr -d ' ')"
+echo "PORT_80_LISTENERS=\$(ss -ltn '( sport = :80 )' 2>/dev/null | tail -n +2 | wc -l | tr -d ' ')"
 echo "PORT_443_LISTENERS=\$(ss -ltn '( sport = :443 )' 2>/dev/null | tail -n +2 | wc -l | tr -d ' ')"
 echo "BRIDGE_DNS_OK=\$(getent hosts $bridge 2>/dev/null | wc -l | tr -d ' ')"
+echo "BRIDGE_PORT_80_LISTENERS=\$(ss -ltn '( sport = :80 )' 2>/dev/null | tail -n +2 | wc -l | tr -d ' ')"
 echo "BRIDGE_PORT_443_LISTENERS=\$(ss -ltn '( sport = :443 )' 2>/dev/null | tail -n +2 | wc -l | tr -d ' ')"
+PORT_80_OPEN=yes
 PORT_443_OPEN=yes
 if command -v ufw >/dev/null 2>&1; then
   UFW_STATUS="\$(ufw status 2>/dev/null || sudo -n ufw status 2>/dev/null || echo unavailable)"
   if printf '%s' "\$UFW_STATUS" | grep -qi 'Status: inactive'; then
+    PORT_80_OPEN=yes
     PORT_443_OPEN=yes
-  elif printf '%s' "\$UFW_STATUS" | grep -Eqi '(^|[[:space:]])(443(/tcp)?|https)[[:space:]]+ALLOW'; then
+  elif printf '%s' "\$UFW_STATUS" | grep -Eqi '(^|[[:space:]])(80(/tcp)?|http)[[:space:]]+ALLOW'; then
+    PORT_80_OPEN=yes
+  else
+    PORT_80_OPEN=no
+  fi
+  if printf '%s' "\$UFW_STATUS" | grep -Eqi '(^|[[:space:]])(443(/tcp)?|https)[[:space:]]+ALLOW'; then
     PORT_443_OPEN=yes
   else
     PORT_443_OPEN=no
@@ -55,6 +64,14 @@ if command -v ufw >/dev/null 2>&1; then
   elif command -v firewall-cmd >/dev/null 2>&1; then
   FIREWALL_STATE="\$(firewall-cmd --state 2>/dev/null || sudo -n firewall-cmd --state 2>/dev/null || echo not-running)"
   if [ "\$FIREWALL_STATE" = "running" ]; then
+    if firewall-cmd --quiet --query-service=http 2>/dev/null ||
+       sudo -n firewall-cmd --quiet --query-service=http 2>/dev/null ||
+       firewall-cmd --quiet --query-port=80/tcp 2>/dev/null ||
+       sudo -n firewall-cmd --quiet --query-port=80/tcp 2>/dev/null; then
+      PORT_80_OPEN=yes
+    else
+      PORT_80_OPEN=no
+    fi
     if firewall-cmd --quiet --query-service=https 2>/dev/null ||
        sudo -n firewall-cmd --quiet --query-service=https 2>/dev/null ||
        firewall-cmd --quiet --query-port=443/tcp 2>/dev/null ||
@@ -64,10 +81,13 @@ if command -v ufw >/dev/null 2>&1; then
       PORT_443_OPEN=no
     fi
   else
+    PORT_80_OPEN=yes
     PORT_443_OPEN=yes
   fi
 fi
+echo "PORT_80_OPEN=\$PORT_80_OPEN"
 echo "PORT_443_OPEN=\$PORT_443_OPEN"
+echo "BRIDGE_PORT_80_OPEN=\$PORT_80_OPEN"
 echo "BRIDGE_PORT_443_OPEN=\$PORT_443_OPEN"
 ''';
   }
@@ -91,11 +111,20 @@ echo "BRIDGE_PORT_443_OPEN=\$PORT_443_OPEN"
       ansibleVersion: values['ANSIBLE'] ?? 'missing',
       gitVersion: values['GIT'] ?? 'missing',
       dnsAddressCount: int.tryParse(values['DNS_OK'] ?? '') ?? 0,
+      port80ListenerCount:
+          int.tryParse(values['PORT_80_LISTENERS'] ?? '') ?? 0,
+      port80Open: (values['PORT_80_OPEN'] ?? '').toLowerCase() != 'no',
   port443ListenerCount:
           int.tryParse(values['PORT_443_LISTENERS'] ?? '') ?? 0,
   port443Open: (values['PORT_443_OPEN'] ?? '').toLowerCase() != 'no',
       bridgeDnsAddressCount:
           int.tryParse(values['BRIDGE_DNS_OK'] ?? '') ?? 0,
+      bridgePort80ListenerCount:
+          int.tryParse(values['BRIDGE_PORT_80_LISTENERS'] ?? '') ?? 0,
+      bridgePort80Open:
+          (values['BRIDGE_PORT_80_OPEN'] ?? values['PORT_80_OPEN'] ?? '')
+              .toLowerCase() !=
+          'no',
       bridgePort443ListenerCount:
           int.tryParse(values['BRIDGE_PORT_443_LISTENERS'] ?? '') ?? 0,
       bridgePort443Open:
