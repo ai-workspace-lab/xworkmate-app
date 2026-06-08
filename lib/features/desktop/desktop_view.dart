@@ -8,6 +8,8 @@ import '../../app/app_controller.dart';
 import '../../runtime/gateway_acp_client.dart';
 import '../../widgets/surface_card.dart';
 import '../../i18n/app_language.dart';
+import '../workspace_management/workspace_management_panel.dart';
+import '../workspace_management/workspace_management_i18n.dart';
 
 class DesktopView extends StatefulWidget {
   const DesktopView({
@@ -368,6 +370,15 @@ class _DesktopViewState extends State<DesktopView> {
                                 : Icons.expand_more,
                           ),
                           label: const Text('高级选项'),
+                        ),
+                        OutlinedButton.icon(
+                          key: const Key('desktop-workspace-management-button'),
+                          onPressed: () => WorkspaceManagementPanel.show(
+                            context,
+                            widget.controller,
+                          ),
+                          icon: const Icon(Icons.dns_outlined),
+                          label: Text(WorkspaceManagementText.button),
                         ),
                         // Maximize Toggle
                         if (widget.onToggleMaximize != null)
