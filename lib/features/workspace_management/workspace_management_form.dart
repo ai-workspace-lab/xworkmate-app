@@ -31,10 +31,7 @@ class _WorkspaceManagementFormState extends State<WorkspaceManagementForm> {
   late final TextEditingController _portController;
   late final TextEditingController _sudoController;
   late final TextEditingController _installPathController;
-  late final TextEditingController _deepseekKeyController;
-  late final TextEditingController _nvidiaKeyController;
-  late final TextEditingController _ollamaKeyController;
-  late final TextEditingController _openclawTokenController;
+  final List<_ExtraRowControllers> _extraRows = <_ExtraRowControllers>[];
 
   @override
   void initState() {
@@ -49,11 +46,15 @@ class _WorkspaceManagementFormState extends State<WorkspaceManagementForm> {
     _portController = TextEditingController(text: c.sshPort.toString());
     _sudoController = TextEditingController(text: c.sudoPassword ?? '');
     _installPathController = TextEditingController(text: c.installPath);
-    _deepseekKeyController = TextEditingController(text: c.deepseekApiKey ?? '');
-    _nvidiaKeyController = TextEditingController(text: c.nvidiaApiKey ?? '');
-    _ollamaKeyController = TextEditingController(text: c.ollamaApiKey ?? '');
-    _openclawTokenController =
-        TextEditingController(text: c.openclawGatewayToken ?? '');
+    for (final row in c.extraConfigs) {
+      _extraRows.add(
+        _ExtraRowControllers(
+          keyController: TextEditingController(text: row.key),
+          valueController: TextEditingController(text: row.value),
+          noteController: TextEditingController(text: row.note),
+        ),
+      );
+    }
   }
 
   @override
@@ -67,10 +68,9 @@ class _WorkspaceManagementFormState extends State<WorkspaceManagementForm> {
     _portController.dispose();
     _sudoController.dispose();
     _installPathController.dispose();
-    _deepseekKeyController.dispose();
-    _nvidiaKeyController.dispose();
-    _ollamaKeyController.dispose();
-    _openclawTokenController.dispose();
+    for (final row in _extraRows) {
+      row.dispose();
+    }
     super.dispose();
   }
 
@@ -87,10 +87,16 @@ class _WorkspaceManagementFormState extends State<WorkspaceManagementForm> {
       installPath: _installPathController.text.trim().isEmpty
           ? '/opt/xworkspace/playbooks'
           : _installPathController.text.trim(),
-      deepseekApiKey: _deepseekKeyController.text,
-      nvidiaApiKey: _nvidiaKeyController.text,
-      ollamaApiKey: _ollamaKeyController.text,
-      openclawGatewayToken: _openclawTokenController.text,
+      extraConfigs: _extraRows
+          .map(
+            (row) => WorkspaceExtraConfig(
+              key: row.keyController.text.trim(),
+              value: row.valueController.text,
+              note: row.noteController.text.trim(),
+            ),
+          )
+          .where((row) => row.key.trim().isNotEmpty)
+          .toList(),
     );
   }
 
@@ -134,8 +140,8 @@ class _WorkspaceManagementFormState extends State<WorkspaceManagementForm> {
                         padding: const EdgeInsets.only(left: 14, top: 2),
                         child: Text(
                           appText(
-                            '将检测桥接域名：${controller.bridgeDomain}',
-                            'Bridge domain will be checked: ${controller.bridgeDomain}',
+                            '将按当前输入检测桥接域名：${controller.bridgeDomain}',
+                            'Bridge domain will be checked from the current input: ${controller.bridgeDomain}',
                           ),
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
@@ -248,37 +254,26 @@ class _WorkspaceManagementFormState extends State<WorkspaceManagementForm> {
                     label: appText('安装路径', 'Install path'),
                     icon: Icons.storage_outlined,
                   ),
-                  _field(
-                    width: 320,
-                    controller: _deepseekKeyController,
+                  _ExtraConfigEditor(
+                    rows: _extraRows,
                     enabled: !disabled,
-                    label: 'DEEPSEEK_API_KEY',
-                    icon: Icons.key_outlined,
-                    obscureText: true,
-                  ),
-                  _field(
-                    width: 320,
-                    controller: _nvidiaKeyController,
-                    enabled: !disabled,
-                    label: 'NVIDIA_API_KEY',
-                    icon: Icons.key_outlined,
-                    obscureText: true,
-                  ),
-                  _field(
-                    width: 320,
-                    controller: _ollamaKeyController,
-                    enabled: !disabled,
-                    label: 'OLLAMA_API_KEY',
-                    icon: Icons.key_outlined,
-                    obscureText: true,
-                  ),
-                  _field(
-                    width: 320,
-                    controller: _openclawTokenController,
-                    enabled: !disabled,
-                    label: 'OPENCLAW_GATEWAY_TOKEN',
-                    icon: Icons.key_outlined,
-                    obscureText: true,
+                    onAdd: () {
+                      setState(() {
+                        _extraRows.add(
+                          _ExtraRowControllers(
+                            keyController: TextEditingController(),
+                            valueController: TextEditingController(),
+                            noteController: TextEditingController(),
+                          ),
+                        );
+                      });
+                    },
+                    onRemove: (index) {
+                      setState(() {
+                        final row = _extraRows.removeAt(index);
+                        row.dispose();
+                      });
+                    },
                   ),
                 ],
               ),
@@ -357,5 +352,168 @@ class _WorkspaceManagementFormState extends State<WorkspaceManagementForm> {
         ),
       ),
     );
+  }
+}
+
+class _ExtraConfigEditor extends StatelessWidget {
+  const _ExtraConfigEditor({
+    required this.rows,
+    required this.enabled,
+    required this.onAdd,
+    required this.onRemove,
+  });
+
+  final List<_ExtraRowControllers> rows;
+  final bool enabled;
+  final VoidCallback onAdd;
+  final ValueChanged<int> onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Text(
+              appText('额外配置', 'Extra configs'),
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const Spacer(),
+            TextButton.icon(
+              onPressed: enabled ? onAdd : null,
+              icon: const Icon(Icons.add),
+              label: Text(appText('添加行', 'Add row')),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        ...List.generate(rows.length, (index) {
+          final row = rows[index];
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: _ExtraConfigRow(
+              index: index,
+              row: row,
+              enabled: enabled,
+              onRemove: () => onRemove(index),
+            ),
+          );
+        }),
+      ],
+    );
+  }
+}
+
+class _ExtraConfigRow extends StatelessWidget {
+  const _ExtraConfigRow({
+    required this.index,
+    required this.row,
+    required this.enabled,
+    required this.onRemove,
+  });
+
+  final int index;
+  final _ExtraRowControllers row;
+  final bool enabled;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final columns = constraints.maxWidth > 820 ? 3 : 1;
+        final itemWidth = columns == 3
+            ? (constraints.maxWidth - 24) / 3
+            : constraints.maxWidth;
+        return Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            SizedBox(
+              width: itemWidth,
+              child: TextField(
+                controller: row.keyController,
+                enabled: enabled,
+                decoration: InputDecoration(
+                  labelText: appText('KEY', 'KEY'),
+                  prefixIcon: const Icon(Icons.key_outlined, size: 18),
+                ),
+              ),
+            ),
+            SizedBox(
+              width: itemWidth,
+              child: TextField(
+                controller: row.valueController,
+                enabled: enabled,
+                obscureText: row.isSensitiveKey,
+                decoration: InputDecoration(
+                  labelText: appText('VALUE', 'VALUE'),
+                  prefixIcon: const Icon(Icons.data_object_outlined, size: 18),
+                ),
+              ),
+            ),
+            SizedBox(
+              width: itemWidth,
+              child: TextField(
+                controller: row.noteController,
+                enabled: enabled,
+                maxLength: 20,
+                decoration: InputDecoration(
+                  labelText: appText('备注(20字内)', 'Note (<=20 chars)'),
+                  prefixIcon: const Icon(Icons.note_outlined, size: 18),
+                  counterText: '',
+                ),
+              ),
+            ),
+            if (columns == 1)
+              SizedBox(
+                width: constraints.maxWidth,
+                child: Align(
+                  alignment: Alignment.centerRight,
+                  child: IconButton(
+                    onPressed: enabled ? onRemove : null,
+                    icon: const Icon(Icons.delete_outline),
+                    tooltip: appText('删除', 'Delete'),
+                  ),
+                ),
+              )
+            else
+              IconButton(
+                onPressed: enabled ? onRemove : null,
+                icon: const Icon(Icons.delete_outline),
+                tooltip: appText('删除', 'Delete'),
+              ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _ExtraRowControllers {
+  _ExtraRowControllers({
+    required this.keyController,
+    required this.valueController,
+    required this.noteController,
+  });
+
+  final TextEditingController keyController;
+  final TextEditingController valueController;
+  final TextEditingController noteController;
+
+  bool get isSensitiveKey {
+    final key = keyController.text.trim().toUpperCase();
+    return key.contains('KEY') || key.contains('TOKEN') || key.contains('SECRET');
+  }
+
+  void dispose() {
+    keyController.dispose();
+    valueController.dispose();
+    noteController.dispose();
   }
 }
