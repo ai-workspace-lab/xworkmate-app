@@ -933,6 +933,14 @@ extension AppControllerDesktopThreadActions on AppController {
       ..writeln('TaskThread workspace context:')
       ..writeln('- sessionKey: $sessionKey')
       ..writeln('- currentTaskWorkspace: $currentTaskWorkspace');
+    if (workingDirectory.trim().isNotEmpty) {
+      buffer.writeln('- localWorkspace: ${workingDirectory.trim()}');
+    }
+    if (remoteWorkingDirectoryHint.trim().isNotEmpty) {
+      buffer.writeln(
+        '- remoteWorkspaceHint: ${remoteWorkingDirectoryHint.trim()}',
+      );
+    }
     final visibleTaskInputAttachments = taskInputAttachments
         .where((item) => item.name.trim().isNotEmpty && item.key.isNotEmpty)
         .toList(growable: false);

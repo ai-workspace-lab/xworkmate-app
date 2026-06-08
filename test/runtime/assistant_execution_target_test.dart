@@ -12,6 +12,7 @@ import 'package:xworkmate/features/assistant/assistant_page_composer_skill_picke
 import 'package:xworkmate/runtime/gateway_acp_client.dart';
 import 'package:xworkmate/runtime/go_task_service_client.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
+import 'package:xworkmate/runtime/runtime_dispatch_resolver.dart';
 import 'package:xworkmate/runtime/secure_config_store.dart';
 import 'package:xworkmate/runtime/runtime_coordinator.dart';
 import 'package:xworkmate/runtime/desktop_platform_service.dart';
@@ -1645,6 +1646,7 @@ void main() {
           'continue with the same image',
           attachments: <GatewayChatAttachmentPayload>[imageAttachment],
         );
+        await fakeGoTaskService.waitForRequestCount(2);
 
         expect(fakeGoTaskService.requests, hasLength(2));
         expect(
@@ -4608,6 +4610,7 @@ AppController _sandboxController({
       'HOME': actualHome,
     },
     goTaskServiceClient: goTaskServiceClient,
+    dispatchResolver: _NoopRuntimeDispatchResolver(),
   );
 }
 
@@ -4847,6 +4850,16 @@ class _RecordingGoTaskServiceClient implements GoTaskServiceClient {
     );
   }
 
+  Future<void> waitForRequestCount(int count) async {
+    final deadline = DateTime.now().add(const Duration(seconds: 15));
+    while (requests.length < count && DateTime.now().isBefore(deadline)) {
+      await Future<void>.delayed(const Duration(milliseconds: 10));
+    }
+    if (requests.length < count) {
+      throw StateError('Timed out waiting for $count requests.');
+    }
+  }
+
   @override
   Future<GoTaskServiceResult> getTask({
     required AssistantExecutionTarget target,
@@ -5007,4 +5020,108 @@ class _BlockingGoTaskServiceClient implements GoTaskServiceClient {
 
   @override
   Future<void> dispose() async {}
+}
+
+class _NoopRuntimeDispatchResolver implements RuntimeDispatchResolver {
+  @override
+  Future<RuntimeDispatchResolution> resolveGatewayDispatch({
+    required List<ExternalCodeAgentProvider> providers,
+    required String preferredProviderId,
+    required Iterable<String> requiredCapabilities,
+    required Map<String, dynamic> nodeState,
+    required Map<String, dynamic> nodeInfo,
+  }) async {
+    final selectedProvider = _selectLocalProvider(
+      providers,
+      preferredProviderId,
+      requiredCapabilities,
+    );
+    final metadata = <String, dynamic>{
+      'node': <String, dynamic>{
+        'id': nodeInfo['id']?.toString() ?? 'xworkmate-app',
+        'name': nodeInfo['name']?.toString() ?? '',
+        'version': nodeInfo['version']?.toString() ?? '',
+        'kind': 'app-mediated-cooperative-node',
+        'gatewayTransport': 'websocket-rpc',
+      },
+      'dispatch': <String, dynamic>{
+        'mode': nodeState['bridgeEnabled'] == true
+            ? 'cooperative'
+            : 'gateway-only',
+        'executionTarget': nodeState['executionTarget']?.toString() ?? '',
+      },
+      'bridge': <String, dynamic>{
+        'enabled': nodeState['bridgeEnabled'] == true,
+        'state': nodeState['bridgeState']?.toString() ?? '',
+        'gatewayConnected': nodeState['gatewayConnected'] == true,
+        'runtimeMode': nodeState['runtimeMode']?.toString() ?? '',
+        'localTransport': 'stdio-jsonrpc',
+      },
+      if (selectedProvider != null)
+        'provider': <String, dynamic>{
+          'id': selectedProvider.id,
+          'name': selectedProvider.name,
+          'defaultArgs': selectedProvider.defaultArgs,
+          'capabilities': selectedProvider.capabilities,
+        },
+    };
+    return RuntimeDispatchResolution(
+      agentId:
+          nodeState['selectedAgentId']?.toString().trim().isNotEmpty == true
+          ? nodeState['selectedAgentId'].toString().trim()
+          : null,
+      providerId: selectedProvider?.id,
+      metadata: metadata,
+      raw: metadata,
+    );
+  }
+
+  @override
+  Future<String?> selectProviderId({
+    required List<ExternalCodeAgentProvider> providers,
+    String preferredProviderId = '',
+    Iterable<String> requiredCapabilities = const <String>[],
+  }) async {
+    return null;
+  }
+
+  @override
+  Future<void> dispose() async {}
+
+  ExternalCodeAgentProvider? _selectLocalProvider(
+    List<ExternalCodeAgentProvider> providers,
+    String preferredProviderId,
+    Iterable<String> requiredCapabilities,
+  ) {
+    final required = requiredCapabilities
+        .map((item) => item.trim().toLowerCase())
+        .where((item) => item.isNotEmpty)
+        .toSet();
+
+    bool supports(ExternalCodeAgentProvider provider) {
+      if (required.isEmpty) {
+        return true;
+      }
+      final capabilities = provider.capabilities
+          .map((item) => item.trim().toLowerCase())
+          .where((item) => item.isNotEmpty)
+          .toSet();
+      return required.every(capabilities.contains);
+    }
+
+    final normalizedPreferred = preferredProviderId.trim();
+    if (normalizedPreferred.isNotEmpty) {
+      for (final provider in providers) {
+        if (provider.id == normalizedPreferred && supports(provider)) {
+          return provider;
+        }
+      }
+    }
+    for (final provider in providers) {
+      if (supports(provider)) {
+        return provider;
+      }
+    }
+    return null;
+  }
 }
