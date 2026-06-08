@@ -73,6 +73,9 @@ BRIDGE_PORT_443_OPEN=yes
       expect(info.isBridgePort80Available, isTrue);
       expect(info.bridgePort443Open, isTrue);
       expect(info.isBridgePort443Available, isTrue);
+      expect(info.displaySummary, contains('sudo 可用'));
+      expect(info.displaySummary, contains('主域名 DNS 已解析'));
+      expect(info.displaySummary, contains('桥接 443 端口当前空闲'));
     });
 
     test('ansible parser maps human readable output to step events', () {
