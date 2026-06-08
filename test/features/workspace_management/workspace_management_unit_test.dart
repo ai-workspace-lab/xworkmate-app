@@ -190,6 +190,34 @@ PORT_443_OPEN=yes
         contains('443'),
       );
     });
+
+    test('precheck blocks unsupported non-Ubuntu systems', () async {
+      final controller = WorkspaceProvisionController(executor: _FakeSshExecutor());
+      addTearDown(controller.dispose);
+      controller.updateForm(
+        serverAddress: '203.0.113.10',
+        workspaceDomain: 'xworkmate-bridge.example.com',
+        sshKeyContent: 'key',
+      );
+      controller.serverInfo = const ServerInfo(
+        os: 'Debian GNU/Linux 11 (bullseye)',
+        arch: 'x86_64',
+        sudoAvailable: true,
+        dockerVersion: 'missing',
+        systemdVersion: 'systemd 249',
+        caddyVersion: 'missing',
+        ansibleVersion: 'ansible [core 2.14]',
+        gitVersion: 'git version 2.34.1',
+        dnsAddressCount: 1,
+        port443ListenerCount: 0,
+        port443Open: true,
+      );
+
+      expect(
+        controller.validatePrecheckBlockingIssue(),
+        contains('Ubuntu'),
+      );
+    });
   });
 }
 
