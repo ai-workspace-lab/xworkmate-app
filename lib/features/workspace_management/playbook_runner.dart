@@ -18,10 +18,15 @@ class PlaybookRunner {
     required SshConfig ssh,
     required String action,
     required String workspaceDomain,
+    required String bridgeDomain,
     required String bridgeToken,
     required String installPath,
     required bool installMissingPrerequisites,
     required ServerInfo? serverInfo,
+    String? deepseekApiKey,
+    String? nvidiaApiKey,
+    String? ollamaApiKey,
+    String? openclawGatewayToken,
     required void Function(String stepId, StepStatus status, String? message)
     onStepUpdate,
     required void Function(String logLine) onLog,
@@ -38,7 +43,11 @@ class PlaybookRunner {
     var info = serverInfo;
     if (info == null) {
       onStepUpdate('ssh_connect', StepStatus.running, null);
-      info = await ServerDetector(executor).detect(ssh, workspaceDomain);
+      info = await ServerDetector(executor).detect(
+        ssh,
+        workspaceDomain,
+        bridgeDomain,
+      );
       onStepUpdate('ssh_connect', StepStatus.success, null);
       onStepUpdate('detect_env', StepStatus.success, info.displaySummary);
     }
@@ -68,7 +77,12 @@ class PlaybookRunner {
         inventoryPath: inventoryPath,
         varsPath: varsPath,
         workspaceDomain: workspaceDomain,
+        bridgeDomain: bridgeDomain,
         bridgeToken: bridgeToken,
+        deepseekApiKey: deepseekApiKey,
+        nvidiaApiKey: nvidiaApiKey,
+        ollamaApiKey: ollamaApiKey,
+        openclawGatewayToken: openclawGatewayToken,
       ),
       onLog,
     );
@@ -167,10 +181,27 @@ class PlaybookRunner {
     required String inventoryPath,
     required String varsPath,
     required String workspaceDomain,
+    required String bridgeDomain,
     required String bridgeToken,
+    String? deepseekApiKey,
+    String? nvidiaApiKey,
+    String? ollamaApiKey,
+    String? openclawGatewayToken,
   }) {
     final domain = workspaceDomain.trim();
-    final publicUrl = 'https://$domain';
+    final bridge = bridgeDomain.trim();
+    final bridgeUrl = 'https://$bridge';
+    final extraEnvVars = <String>[
+      if ((deepseekApiKey ?? '').trim().isNotEmpty)
+        'deepseek_api_key: ${shellQuote(deepseekApiKey!.trim())}',
+      if ((nvidiaApiKey ?? '').trim().isNotEmpty)
+        'nvidia_api_key: ${shellQuote(nvidiaApiKey!.trim())}',
+      if ((ollamaApiKey ?? '').trim().isNotEmpty)
+        'ollama_api_key: ${shellQuote(ollamaApiKey!.trim())}',
+      if ((openclawGatewayToken ?? '').trim().isNotEmpty)
+        'openclaw_gateway_token: ${shellQuote(openclawGatewayToken!.trim())}',
+    ];
+    final extraEnvBlock = extraEnvVars.isEmpty ? '' : '${extraEnvVars.join('\n')}\n';
     return '''
 cat > ${shellQuote(inventoryPath)} <<'EOF'
 [all]
@@ -178,12 +209,12 @@ localhost ansible_connection=local
 EOF
 cat > ${shellQuote(varsPath)} <<'EOF'
 workspace_domain: $domain
-xworkmate_bridge_domain: $domain
-xworkmate_bridge_public_base_url: $publicUrl
-xworkmate_bridge_service_domain: $domain
-xworkmate_bridge_service_public_base_url: $publicUrl
+xworkmate_bridge_domain: $bridge
+xworkmate_bridge_public_base_url: $bridgeUrl
+xworkmate_bridge_service_domain: $bridge
+xworkmate_bridge_service_public_base_url: $bridgeUrl
 xworkmate_bridge_auth_token: ${bridgeToken.trim()}
-EOF
+${extraEnvBlock}EOF
 ''';
   }
 
