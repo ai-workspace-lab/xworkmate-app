@@ -23,6 +23,7 @@ import '../runtime/settings_store.dart';
 import '../runtime/secure_config_store.dart';
 import '../runtime/embedded_agent_launch_policy.dart';
 import '../runtime/runtime_coordinator.dart';
+import '../runtime/runtime_dispatch_resolver.dart';
 import '../runtime/gateway_acp_client.dart';
 import '../runtime/codex_runtime.dart';
 import '../runtime/codex_config_bridge.dart';
@@ -67,6 +68,7 @@ class AppController extends ChangeNotifier {
     AccountRuntimeClient Function(String baseUrl)? accountClientFactory,
     Map<String, String>? environmentOverride,
     GoTaskServiceClient? goTaskServiceClient,
+    RuntimeDispatchResolver? dispatchResolver,
   }) {
     environmentOverrideInternal = environmentOverride == null
         ? null
@@ -145,10 +147,11 @@ class AppController extends ChangeNotifier {
     desktopPlatformServiceInternal =
         desktopPlatformService ?? createDesktopPlatformService();
     runtimeCoordinatorInternal.attachDispatchResolver(
-      GoRuntimeDispatchDesktopClient(
-        client: gatewayAcpClientInternal,
-        endpointResolver: resolveGatewayAcpEndpointInternal,
-      ),
+      dispatchResolver ??
+          GoRuntimeDispatchDesktopClient(
+            client: gatewayAcpClientInternal,
+            endpointResolver: resolveGatewayAcpEndpointInternal,
+          ),
     );
     goTaskServiceClientInternal =
         goTaskServiceClient ??
