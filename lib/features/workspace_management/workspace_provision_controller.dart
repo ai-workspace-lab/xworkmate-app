@@ -28,10 +28,12 @@ class WorkspaceProvisionController extends ChangeNotifier {
   int sshPort = 22;
   String? sudoPassword;
   String installPath = '/opt/xworkspace/playbooks';
-  String? deepseekApiKey;
-  String? nvidiaApiKey;
-  String? ollamaApiKey;
-  String? openclawGatewayToken;
+  final List<WorkspaceExtraConfig> extraConfigs = <WorkspaceExtraConfig>[
+    WorkspaceExtraConfig(key: 'DEEPSEEK_API_KEY', value: '', note: ''),
+    WorkspaceExtraConfig(key: 'NVIDIA_API_KEY', value: '', note: ''),
+    WorkspaceExtraConfig(key: 'OLLAMA_API_KEY', value: '', note: ''),
+    WorkspaceExtraConfig(key: 'OPENCLAW_GATEWAY_TOKEN', value: '', note: ''),
+  ];
   bool showAdvanced = false;
   bool logsExpanded = false;
 
@@ -146,10 +148,7 @@ class WorkspaceProvisionController extends ChangeNotifier {
         workspaceDomain: workspaceDomain.trim(),
         bridgeDomain: bridgeDomain,
         bridgeToken: bridgeToken,
-        deepseekApiKey: deepseekApiKey,
-        nvidiaApiKey: nvidiaApiKey,
-        ollamaApiKey: ollamaApiKey,
-        openclawGatewayToken: openclawGatewayToken,
+        extraConfigs: extraConfigs,
         installPath: installPath.trim(),
         installMissingPrerequisites: installMissingPrerequisites,
         serverInfo: serverInfo,
@@ -206,10 +205,7 @@ class WorkspaceProvisionController extends ChangeNotifier {
     int? sshPort,
     String? sudoPassword,
     String? installPath,
-    String? deepseekApiKey,
-    String? nvidiaApiKey,
-    String? ollamaApiKey,
-    String? openclawGatewayToken,
+    List<WorkspaceExtraConfig>? extraConfigs,
     bool? showAdvanced,
     bool? logsExpanded,
   }) {
@@ -223,38 +219,40 @@ class WorkspaceProvisionController extends ChangeNotifier {
     this.sshPort = sshPort ?? this.sshPort;
     this.sudoPassword = sudoPassword ?? this.sudoPassword;
     this.installPath = installPath ?? this.installPath;
-    this.deepseekApiKey = deepseekApiKey ?? this.deepseekApiKey;
-    this.nvidiaApiKey = nvidiaApiKey ?? this.nvidiaApiKey;
-    this.ollamaApiKey = ollamaApiKey ?? this.ollamaApiKey;
-    this.openclawGatewayToken =
-        openclawGatewayToken ?? this.openclawGatewayToken;
+    if (extraConfigs != null) {
+      this.extraConfigs
+        ..clear()
+        ..addAll(extraConfigs.map((config) => config.copyWith()));
+    }
     this.showAdvanced = showAdvanced ?? this.showAdvanced;
     this.logsExpanded = logsExpanded ?? this.logsExpanded;
     notifyListeners();
   }
 
   String exportYaml() {
-    final data = <String, Object?>{
-      'server_address': serverAddress.trim(),
-      'workspace_domain': workspaceDomain.trim(),
-      'ssh_username': sshUsername.trim(),
-      'auth_method': authMethod.name,
-      'ssh_port': sshPort,
-      'install_path': installPath.trim(),
-      'show_advanced': showAdvanced,
-      'logs_expanded': logsExpanded,
-      'ssh_password': redact(sshPassword),
-      'ssh_key_content': redact(sshKeyContent),
-      'ssh_key_path': redact(sshKeyPath),
-      'sudo_password': redact(sudoPassword),
-      'deepseek_api_key': redact(deepseekApiKey),
-      'nvidia_api_key': redact(nvidiaApiKey),
-      'ollama_api_key': redact(ollamaApiKey),
-      'openclaw_gateway_token': redact(openclawGatewayToken),
-    };
     final buffer = StringBuffer();
-    for (final entry in data.entries) {
+    final entries = <MapEntry<String, Object?>>[
+      MapEntry('server_address', serverAddress.trim()),
+      MapEntry('workspace_domain', workspaceDomain.trim()),
+      MapEntry('ssh_username', sshUsername.trim()),
+      MapEntry('auth_method', authMethod.name),
+      MapEntry('ssh_port', sshPort),
+      MapEntry('install_path', installPath.trim()),
+      MapEntry('show_advanced', showAdvanced),
+      MapEntry('logs_expanded', logsExpanded),
+      MapEntry('ssh_password', redact(sshPassword)),
+      MapEntry('ssh_key_content', redact(sshKeyContent)),
+      MapEntry('ssh_key_path', redact(sshKeyPath)),
+      MapEntry('sudo_password', redact(sudoPassword)),
+    ];
+    for (final entry in entries) {
       buffer.writeln('${entry.key}: ${yamlScalar(entry.value)}');
+    }
+    buffer.writeln('extra_configs:');
+    for (final config in extraConfigs) {
+      buffer.writeln('  - key: ${yamlScalar(config.key.trim())}');
+      buffer.writeln('    value: ${yamlScalar(redact(config.value))}');
+      buffer.writeln('    note: ${yamlScalar(sanitizeNote(config.note))}');
     }
     return buffer.toString().trimRight();
   }
@@ -279,13 +277,7 @@ class WorkspaceProvisionController extends ChangeNotifier {
       sshPort: intValue(map['ssh_port'], sshPort),
       sudoPassword: secretValue(map['sudo_password'], sudoPassword),
       installPath: stringValue(map['install_path']),
-      deepseekApiKey: secretValue(map['deepseek_api_key'], deepseekApiKey),
-      nvidiaApiKey: secretValue(map['nvidia_api_key'], nvidiaApiKey),
-      ollamaApiKey: secretValue(map['ollama_api_key'], ollamaApiKey),
-      openclawGatewayToken: secretValue(
-        map['openclaw_gateway_token'],
-        openclawGatewayToken,
-      ),
+      extraConfigs: parseExtraConfigs(map['extra_configs'], extraConfigs),
       showAdvanced: boolValue(map['show_advanced'], showAdvanced),
       logsExpanded: boolValue(map['logs_expanded'], logsExpanded),
     );
@@ -386,10 +378,6 @@ class WorkspaceProvisionController extends ChangeNotifier {
     sshPassword = null;
     sshKeyContent = null;
     sudoPassword = null;
-    deepseekApiKey = null;
-    nvidiaApiKey = null;
-    ollamaApiKey = null;
-    openclawGatewayToken = null;
     super.dispose();
   }
 
@@ -398,7 +386,7 @@ class WorkspaceProvisionController extends ChangeNotifier {
     if (domain.isEmpty) {
       return '';
     }
-    if (domain.startsWith('xworkmate-bridge.')) {
+    if (domain.contains('bridge.') || domain.startsWith('bridge.')) {
       return domain;
     }
     return 'xworkmate-bridge.$domain';
@@ -460,6 +448,47 @@ class WorkspaceProvisionController extends ChangeNotifier {
   static AuthMethod parseAuthMethod(Object? value) {
     final text = value?.toString().trim().toLowerCase() ?? '';
     return text == 'password' ? AuthMethod.password : AuthMethod.sshKey;
+  }
+
+  static String sanitizeNote(String note) {
+    final trimmed = note.trim();
+    return trimmed.length <= 20 ? trimmed : trimmed.substring(0, 20);
+  }
+
+  static List<WorkspaceExtraConfig> parseExtraConfigs(
+    Object? value,
+    List<WorkspaceExtraConfig> current,
+  ) {
+    final existing = {
+      for (final config in current) config.key.trim(): config,
+    };
+    final parsed = <WorkspaceExtraConfig>[];
+    if (value is YamlList) {
+      for (final item in value) {
+        if (item is! YamlMap) {
+          continue;
+        }
+        final key = item['key']?.toString().trim() ?? '';
+        if (key.isEmpty) {
+          continue;
+        }
+        final rawValue = item['value']?.toString().trim() ?? '';
+        final note = sanitizeNote(item['note']?.toString() ?? '');
+        parsed.add(
+          WorkspaceExtraConfig(
+            key: key,
+            value: rawValue == redactedValue
+                ? (existing[key]?.value ?? '')
+                : rawValue,
+            note: note,
+          ),
+        );
+      }
+    }
+    if (parsed.isNotEmpty) {
+      return parsed;
+    }
+    return current.map((config) => config.copyWith()).toList();
   }
 }
 

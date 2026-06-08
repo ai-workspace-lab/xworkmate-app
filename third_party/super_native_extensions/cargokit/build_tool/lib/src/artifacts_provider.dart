@@ -40,6 +40,7 @@ final _log = Logger('artifacts_provider');
 
 class ArtifactProvider {
   static const int _maxDownloadAttempts = 10;
+  static const int _maxArtifactFetchAttempts = 3;
 
   ArtifactProvider({required this.environment, required this.userOptions});
 
@@ -275,16 +276,14 @@ class ArtifactProvider {
     final prefix = precompiledBinaries.uriPrefix;
     final url = Uri.parse('$prefix$crateHash/$fileName');
     final signatureUrl = Uri.parse('$prefix$crateHash/$signatureFileName');
-    _log.fine('Downloading signature from $signatureUrl');
-    late final Response signature;
-    try {
-      signature = await _get(signatureUrl);
-    } on Object catch (error, stackTrace) {
+    final signature = await _downloadArtifact(
+      url: signatureUrl,
+      label: 'signature',
+    );
+    if (signature == null) {
       _log.warning(
         'Failed to download signature $signatureUrl. '
         'Will fall back to local build if Rust toolchain is available.',
-        error,
-        stackTrace,
       );
       return;
     }
@@ -294,27 +293,13 @@ class ArtifactProvider {
       );
       return;
     }
-    if (signature.statusCode != 200) {
-      _log.severe(
-        'Failed to download signature $signatureUrl: status ${signature.statusCode}',
-      );
-      return;
-    }
-    _log.fine('Downloading binary from $url');
-    late final Response res;
-    try {
-      res = await _get(url);
-    } on Object catch (error, stackTrace) {
+
+    final res = await _downloadArtifact(url: url, label: 'binary');
+    if (res == null) {
       _log.warning(
         'Failed to download binary $url. '
         'Will fall back to local build if Rust toolchain is available.',
-        error,
-        stackTrace,
       );
-      return;
-    }
-    if (res.statusCode != 200) {
-      _log.severe('Failed to download binary $url: status ${res.statusCode}');
       return;
     }
     if (verify(
@@ -326,6 +311,55 @@ class ArtifactProvider {
     } else {
       _log.shout('Signature verification failed! Ignoring binary.');
     }
+  }
+
+  Future<Response?> _downloadArtifact({
+    required Uri url,
+    required String label,
+  }) async {
+    for (var attempt = 1; attempt <= _maxArtifactFetchAttempts; attempt++) {
+      late final Response response;
+      try {
+        response = await _get(url);
+      } on Object catch (error, stackTrace) {
+        if (attempt >= _maxArtifactFetchAttempts) {
+          _log.warning(
+            'Failed to download $label $url after $attempt attempts.',
+            error,
+            stackTrace,
+          );
+          return null;
+        }
+        _log.warning(
+          'Failed to download $label $url: $error. '
+          'Retrying ($attempt/$_maxArtifactFetchAttempts)...',
+          error,
+          stackTrace,
+        );
+        await Future.delayed(Duration(seconds: attempt));
+        continue;
+      }
+
+      if (response.statusCode == 200 || response.statusCode == 404) {
+        return response;
+      }
+
+      if (response.statusCode >= 500 &&
+          attempt < _maxArtifactFetchAttempts) {
+        _log.warning(
+          'Got ${response.statusCode} while downloading $label $url. '
+          'Retrying ($attempt/$_maxArtifactFetchAttempts)...',
+        );
+        await Future.delayed(Duration(seconds: attempt));
+        continue;
+      }
+
+      _log.severe(
+        'Failed to download $label $url: status ${response.statusCode}',
+      );
+      return response;
+    }
+    return null;
   }
 }
 
