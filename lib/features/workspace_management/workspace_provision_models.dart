@@ -131,6 +131,30 @@ class SshConfig {
   String get targetLabel => '$username@$host:$port';
 }
 
+class WorkspaceExtraConfig {
+  WorkspaceExtraConfig({
+    required this.key,
+    required this.value,
+    this.note = '',
+  });
+
+  String key;
+  String value;
+  String note;
+
+  WorkspaceExtraConfig copyWith({
+    String? key,
+    String? value,
+    String? note,
+  }) {
+    return WorkspaceExtraConfig(
+      key: key ?? this.key,
+      value: value ?? this.value,
+      note: note ?? this.note,
+    );
+  }
+}
+
 class SshResult {
   const SshResult({
     required this.exitCode,
