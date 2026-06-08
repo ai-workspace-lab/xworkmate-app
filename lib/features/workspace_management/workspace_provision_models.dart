@@ -97,22 +97,42 @@ class ServerInfo {
   bool get isBridgePort443Available => bridgePort443ListenerCount == 0;
 
   String get displaySummary {
-    final sudo = sudoAvailable ? 'sudo=yes' : 'sudo=no';
-    return [
+    final systemParts = <String>[
       if (os.trim().isNotEmpty) os.trim(),
       if (arch.trim().isNotEmpty) arch.trim(),
-      sudo,
-      dnsResolved ? 'dns=ok' : 'dns=missing',
-      port80Open ? '80=open' : '80=blocked',
-      isPort80Available ? '80=free' : '80=busy',
-      port443Open ? '443=open' : '443=blocked',
-      isPort443Available ? '443=free' : '443=busy',
-      bridgeDnsResolved ? 'bridge-dns=ok' : 'bridge-dns=missing',
-      bridgePort80Open ? 'bridge-80=open' : 'bridge-80=blocked',
-      isBridgePort80Available ? 'bridge-80=free' : 'bridge-80=busy',
-      bridgePort443Open ? 'bridge-443=open' : 'bridge-443=blocked',
-      isBridgePort443Available ? 'bridge-443=free' : 'bridge-443=busy',
-    ].join(', ');
+      sudoAvailable ? 'sudo 可用' : 'sudo 不可用',
+    ];
+    final bridgeParts = <String>[
+      dnsResolved ? '主域名 DNS 已解析' : '主域名 DNS 未解析',
+      bridgeDnsResolved ? '桥接域名 DNS 已解析' : '桥接域名 DNS 未解析',
+    ];
+    final portParts = <String>[
+      port80Open
+          ? '80 端口策略已放行'
+          : '80 端口策略未放行',
+      isPort80Available ? '80 端口当前空闲' : '80 端口当前被占用',
+      port443Open
+          ? '443 端口策略已放行'
+          : '443 端口策略未放行',
+      isPort443Available ? '443 端口当前空闲' : '443 端口当前被占用',
+      bridgePort80Open
+          ? '桥接 80 端口策略已放行'
+          : '桥接 80 端口策略未放行',
+      isBridgePort80Available
+          ? '桥接 80 端口当前空闲'
+          : '桥接 80 端口当前被占用',
+      bridgePort443Open
+          ? '桥接 443 端口策略已放行'
+          : '桥接 443 端口策略未放行',
+      isBridgePort443Available
+          ? '桥接 443 端口当前空闲'
+          : '桥接 443 端口当前被占用',
+    ];
+    return [
+      if (systemParts.isNotEmpty) systemParts.join(' · '),
+      if (bridgeParts.isNotEmpty) bridgeParts.join(' · '),
+      if (portParts.isNotEmpty) portParts.join(' · '),
+    ].join('\n');
   }
 
   static bool _isMissing(String value) =>
@@ -253,7 +273,10 @@ List<ProvisionStep> defaultProvisionSteps() {
     ),
     ProvisionStep(
       id: 'deploy_webrtc',
-      title: appText('部署 WebRTC 远端桌面', 'Deploy WebRTC remote desktop'),
+      title: appText(
+        '部署 AI 智能体工作空间',
+        'Deploy AI Agentic Workspace environment',
+      ),
       phaseGroup: 'console',
     ),
     ProvisionStep(
