@@ -58,6 +58,9 @@ class ServerInfo {
     required this.dnsAddressCount,
     required this.port443ListenerCount,
     required this.port443Open,
+    required this.bridgeDnsAddressCount,
+    required this.bridgePort443ListenerCount,
+    required this.bridgePort443Open,
   });
 
   final String os;
@@ -71,12 +74,17 @@ class ServerInfo {
   final int dnsAddressCount;
   final int port443ListenerCount;
   final bool port443Open;
+  final int bridgeDnsAddressCount;
+  final int bridgePort443ListenerCount;
+  final bool bridgePort443Open;
 
   bool get gitMissing => _isMissing(gitVersion);
   bool get ansibleMissing => _isMissing(ansibleVersion);
   bool get hasMissingPrerequisites => gitMissing || ansibleMissing;
   bool get dnsResolved => dnsAddressCount > 0;
   bool get isPort443Available => port443ListenerCount == 0;
+  bool get bridgeDnsResolved => bridgeDnsAddressCount > 0;
+  bool get isBridgePort443Available => bridgePort443ListenerCount == 0;
 
   String get displaySummary {
     final sudo = sudoAvailable ? 'sudo=yes' : 'sudo=no';
@@ -87,6 +95,9 @@ class ServerInfo {
       dnsResolved ? 'dns=ok' : 'dns=missing',
       port443Open ? '443=open' : '443=blocked',
       isPort443Available ? '443=free' : '443=busy',
+      bridgeDnsResolved ? 'bridge-dns=ok' : 'bridge-dns=missing',
+      bridgePort443Open ? 'bridge-443=open' : 'bridge-443=blocked',
+      isBridgePort443Available ? 'bridge-443=free' : 'bridge-443=busy',
     ].join(', ');
   }
 
