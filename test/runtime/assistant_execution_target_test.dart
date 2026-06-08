@@ -91,7 +91,15 @@ void main() {
       expect(params, isNot(contains('sessionKey')));
       expect(params, isNot(contains('sessionId')));
       expect(params, isNot(contains('threadId')));
-      expect(params, isNot(contains('artifactScope')));
+      expect(
+        params['artifactScope'],
+        'tasks/agent:main:draft:1780658097668838-1/run-1',
+      );
+      expect(
+        params['artifactDirectory'],
+        '/tmp/tasks/agent:main:draft:1780658097668838-1/run-1',
+      );
+      expect(params['gatewayProviderId'], 'openclaw');
     });
 
     test(

@@ -1001,6 +1001,16 @@ class OpenClawTaskAssociation {
       'appThreadKey': appThreadKey,
       'openclawSessionKey': openclawSessionKey,
       'includeArtifacts': true,
+      if (artifactScope.trim().isNotEmpty) 'artifactScope': artifactScope,
+      if (artifactDirectory.trim().isNotEmpty)
+        'artifactDirectory': artifactDirectory,
+      if (gatewayProviderId.trim().isNotEmpty)
+        'gatewayProviderId': gatewayProviderId,
+      if (requiresArtifactExport) 'requiresArtifactExport': true,
+      if (expectedArtifactExtensions.isNotEmpty)
+        'expectedArtifactExtensions': expectedArtifactExtensions,
+      if (requiredArtifactExtensions.isNotEmpty)
+        'requiredArtifactExtensions': requiredArtifactExtensions,
     };
   }
 
