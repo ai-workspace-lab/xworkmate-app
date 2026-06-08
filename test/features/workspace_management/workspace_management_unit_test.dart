@@ -47,10 +47,14 @@ CADDY=missing
 ANSIBLE=missing
 GIT=git version 2.34.1
 DNS_OK=1
+PORT_80_LISTENERS=0
 PORT_443_LISTENERS=0
+PORT_80_OPEN=yes
 PORT_443_OPEN=yes
 BRIDGE_DNS_OK=1
+BRIDGE_PORT_80_LISTENERS=0
 BRIDGE_PORT_443_LISTENERS=0
+BRIDGE_PORT_80_OPEN=yes
 BRIDGE_PORT_443_OPEN=yes
 ''');
 
@@ -60,9 +64,13 @@ BRIDGE_PORT_443_OPEN=yes
       expect(info.ansibleMissing, isTrue);
       expect(info.gitMissing, isFalse);
       expect(info.dnsResolved, isTrue);
+      expect(info.port80Open, isTrue);
+      expect(info.isPort80Available, isTrue);
       expect(info.port443Open, isTrue);
       expect(info.isPort443Available, isTrue);
       expect(info.bridgeDnsResolved, isTrue);
+      expect(info.bridgePort80Open, isTrue);
+      expect(info.isBridgePort80Available, isTrue);
       expect(info.bridgePort443Open, isTrue);
       expect(info.isBridgePort443Available, isTrue);
     });
@@ -147,10 +155,14 @@ CADDY=missing
 ANSIBLE=ansible [core 2.16]
 GIT=git version 2.43.0
 DNS_OK=1
+PORT_80_LISTENERS=0
 PORT_443_LISTENERS=0
+PORT_80_OPEN=yes
 PORT_443_OPEN=yes
 BRIDGE_DNS_OK=1
+BRIDGE_PORT_80_LISTENERS=0
 BRIDGE_PORT_443_LISTENERS=0
+BRIDGE_PORT_80_OPEN=yes
 BRIDGE_PORT_443_OPEN=yes
 ''',
               stderr: '',
@@ -180,13 +192,26 @@ BRIDGE_PORT_443_OPEN=yes
         commandResults: [
           const SshResult(exitCode: 0, stdout: 'pulled', stderr: ''),
           const SshResult(exitCode: 0, stdout: 'wrote', stderr: ''),
+          const SshResult(
+            exitCode: 0,
+            stdout: '''
+SERVICE_CADDY=active
+SERVICE_XWORKMATE_BRIDGE=active
+SERVICE_OPENCLAW_GATEWAY=active
+SERVICE_HERMES_GATEWAY=active
+''',
+            stderr: '',
+          ),
         ],
         streamingChunks: [
           'TASK [Install desktop packages]\nok: [localhost]\n',
           'TASK [Configure caddy TLS]\nchanged: [localhost]\n',
         ],
       );
-      final controller = WorkspaceProvisionController(executor: executor);
+      final controller = WorkspaceProvisionController(
+        executor: executor,
+        externalPortProbe: (_) async {},
+      );
       addTearDown(controller.dispose);
       controller.updateForm(
         serverAddress: '203.0.113.10',
@@ -203,9 +228,13 @@ BRIDGE_PORT_443_OPEN=yes
         ansibleVersion: 'ansible [core 2.14]',
         gitVersion: 'git version 2.34.1',
         dnsAddressCount: 1,
+        port80ListenerCount: 0,
+        port80Open: true,
         port443ListenerCount: 0,
         port443Open: true,
         bridgeDnsAddressCount: 1,
+        bridgePort80ListenerCount: 0,
+        bridgePort80Open: true,
         bridgePort443ListenerCount: 0,
         bridgePort443Open: true,
       );
@@ -221,7 +250,7 @@ BRIDGE_PORT_443_OPEN=yes
       expect(executor.commands.join('\n'), contains('ansible-playbook'));
     });
 
-    test('precheck blocks when 443 is not open', () async {
+    test('precheck does not block when 443 is not open', () async {
       final controller = WorkspaceProvisionController(executor: _FakeSshExecutor());
       addTearDown(controller.dispose);
       controller.updateForm(
@@ -239,17 +268,18 @@ BRIDGE_PORT_443_OPEN=yes
         ansibleVersion: 'ansible [core 2.14]',
         gitVersion: 'git version 2.34.1',
         dnsAddressCount: 1,
+        port80ListenerCount: 0,
+        port80Open: true,
         port443ListenerCount: 0,
         port443Open: false,
         bridgeDnsAddressCount: 1,
+        bridgePort80ListenerCount: 0,
+        bridgePort80Open: true,
         bridgePort443ListenerCount: 0,
         bridgePort443Open: false,
       );
 
-      expect(
-        controller.validatePrecheckBlockingIssue(),
-        contains('443'),
-      );
+      expect(controller.validatePrecheckBlockingIssue(), isNull);
     });
 
     test('precheck blocks when bridge DNS is missing', () async {
@@ -270,9 +300,13 @@ BRIDGE_PORT_443_OPEN=yes
         ansibleVersion: 'ansible [core 2.14]',
         gitVersion: 'git version 2.34.1',
         dnsAddressCount: 1,
+        port80ListenerCount: 0,
+        port80Open: true,
         port443ListenerCount: 0,
         port443Open: true,
         bridgeDnsAddressCount: 0,
+        bridgePort80ListenerCount: 0,
+        bridgePort80Open: true,
         bridgePort443ListenerCount: 0,
         bridgePort443Open: true,
       );
@@ -301,9 +335,13 @@ BRIDGE_PORT_443_OPEN=yes
         ansibleVersion: 'ansible [core 2.14]',
         gitVersion: 'git version 2.34.1',
         dnsAddressCount: 1,
+        port80ListenerCount: 0,
+        port80Open: true,
         port443ListenerCount: 0,
         port443Open: true,
         bridgeDnsAddressCount: 1,
+        bridgePort80ListenerCount: 0,
+        bridgePort80Open: true,
         bridgePort443ListenerCount: 0,
         bridgePort443Open: true,
       );
@@ -347,6 +385,62 @@ extra_configs:
       expect(controller.sshPassword, 'keep-secret');
       expect(controller.extraConfigs.first.value, 'deepseek-new');
       expect(controller.extraConfigs.last.value, '');
+    });
+
+    test('post deploy verification fails when external probe does not connect', () async {
+      final controller = WorkspaceProvisionController(
+        executor: _FakeSshExecutor(
+          commandResults: [
+            const SshResult(exitCode: 0, stdout: 'pulled', stderr: ''),
+            const SshResult(exitCode: 0, stdout: 'wrote', stderr: ''),
+            const SshResult(
+              exitCode: 0,
+              stdout: '''
+SERVICE_CADDY=active
+SERVICE_XWORKMATE_BRIDGE=active
+''',
+              stderr: '',
+            ),
+          ],
+          streamingChunks: [
+            'TASK [Configure caddy TLS]\nchanged: [localhost]\n',
+          ],
+        ),
+        externalPortProbe: (host) async {
+          throw PlaybookRunException('probe failed for $host');
+        },
+      );
+      addTearDown(controller.dispose);
+      controller.updateForm(
+        serverAddress: '203.0.113.10',
+        workspaceDomain: 'workspace.example.com',
+        sshKeyContent: 'key',
+      );
+      controller.serverInfo = const ServerInfo(
+        os: 'Ubuntu 22.04',
+        arch: 'x86_64',
+        sudoAvailable: true,
+        dockerVersion: 'missing',
+        systemdVersion: 'systemd 249',
+        caddyVersion: 'missing',
+        ansibleVersion: 'ansible [core 2.14]',
+        gitVersion: 'git version 2.34.1',
+        dnsAddressCount: 1,
+        port80ListenerCount: 0,
+        port80Open: true,
+        port443ListenerCount: 0,
+        port443Open: true,
+        bridgeDnsAddressCount: 1,
+        bridgePort80ListenerCount: 0,
+        bridgePort80Open: true,
+        bridgePort443ListenerCount: 0,
+        bridgePort443Open: true,
+      );
+
+      await controller.createWorkspace();
+
+      expect(controller.phase, ProvisionPhase.failed);
+      expect(controller.errorMessage, contains('probe failed'));
     });
   });
 }
