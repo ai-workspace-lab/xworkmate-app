@@ -49,6 +49,9 @@ GIT=git version 2.34.1
 DNS_OK=1
 PORT_443_LISTENERS=0
 PORT_443_OPEN=yes
+BRIDGE_DNS_OK=1
+BRIDGE_PORT_443_LISTENERS=0
+BRIDGE_PORT_443_OPEN=yes
 ''');
 
       expect(info.os, 'Ubuntu 22.04.4 LTS');
@@ -59,6 +62,9 @@ PORT_443_OPEN=yes
       expect(info.dnsResolved, isTrue);
       expect(info.port443Open, isTrue);
       expect(info.isPort443Available, isTrue);
+      expect(info.bridgeDnsResolved, isTrue);
+      expect(info.bridgePort443Open, isTrue);
+      expect(info.isBridgePort443Available, isTrue);
     });
 
     test('ansible parser maps human readable output to step events', () {
@@ -74,10 +80,35 @@ PORT_443_OPEN=yes
     });
 
     test('detection command quotes workspace domain', () {
-      final command = ServerDetector.detectionCommand("a'b.example.com");
+      final command = ServerDetector.detectionCommand(
+        "a'b.example.com",
+        'xworkmate-bridge.a\'b.example.com',
+      );
 
       expect(command, contains("'a'\"'\"'b.example.com'"));
+      expect(command, contains('xworkmate-bridge.a'));
       expect(command, contains('getent hosts'));
+    });
+
+    test('exported yaml redacts sensitive values', () {
+      final controller = WorkspaceProvisionController();
+      addTearDown(controller.dispose);
+      controller.updateForm(
+        serverAddress: '203.0.113.10',
+        workspaceDomain: 'onwalk.net',
+        sshUsername: 'root',
+        sshPassword: 'ssh-secret',
+        deepseekApiKey: 'deepseek-secret',
+        openclawGatewayToken: 'gateway-secret',
+        showAdvanced: true,
+      );
+
+      final yaml = controller.exportYaml();
+
+      expect(yaml, contains('server_address: 203.0.113.10'));
+      expect(yaml, contains('ssh_password: "__redacted__"'));
+      expect(yaml, contains('deepseek_api_key: "__redacted__"'));
+      expect(yaml, contains('openclaw_gateway_token: "__redacted__"'));
     });
   });
 
@@ -100,6 +131,9 @@ GIT=git version 2.43.0
 DNS_OK=1
 PORT_443_LISTENERS=0
 PORT_443_OPEN=yes
+BRIDGE_DNS_OK=1
+BRIDGE_PORT_443_LISTENERS=0
+BRIDGE_PORT_443_OPEN=yes
 ''',
               stderr: '',
             ),
@@ -153,12 +187,18 @@ PORT_443_OPEN=yes
         dnsAddressCount: 1,
         port443ListenerCount: 0,
         port443Open: true,
+        bridgeDnsAddressCount: 1,
+        bridgePort443ListenerCount: 0,
+        bridgePort443Open: true,
       );
 
       await controller.createWorkspace();
 
       expect(controller.phase, ProvisionPhase.success);
-      expect(controller.deploymentResult?.url, 'https://workspace.example.com');
+      expect(
+        controller.deploymentResult?.url,
+        'https://xworkmate-bridge.workspace.example.com',
+      );
       expect(controller.deploymentResult?.bridgeToken, isNotEmpty);
       expect(executor.commands.join('\n'), contains('ansible-playbook'));
     });
@@ -183,6 +223,9 @@ PORT_443_OPEN=yes
         dnsAddressCount: 1,
         port443ListenerCount: 0,
         port443Open: false,
+        bridgeDnsAddressCount: 1,
+        bridgePort443ListenerCount: 0,
+        bridgePort443Open: false,
       );
 
       expect(
@@ -191,7 +234,38 @@ PORT_443_OPEN=yes
       );
     });
 
-    test('precheck blocks unsupported non-Ubuntu systems', () async {
+    test('precheck blocks when bridge DNS is missing', () async {
+      final controller = WorkspaceProvisionController(executor: _FakeSshExecutor());
+      addTearDown(controller.dispose);
+      controller.updateForm(
+        serverAddress: '203.0.113.10',
+        workspaceDomain: 'onwalk.net',
+        sshKeyContent: 'key',
+      );
+      controller.serverInfo = const ServerInfo(
+        os: 'Ubuntu 22.04',
+        arch: 'x86_64',
+        sudoAvailable: true,
+        dockerVersion: 'missing',
+        systemdVersion: 'systemd 249',
+        caddyVersion: 'missing',
+        ansibleVersion: 'ansible [core 2.14]',
+        gitVersion: 'git version 2.34.1',
+        dnsAddressCount: 1,
+        port443ListenerCount: 0,
+        port443Open: true,
+        bridgeDnsAddressCount: 0,
+        bridgePort443ListenerCount: 0,
+        bridgePort443Open: true,
+      );
+
+      expect(
+        controller.validatePrecheckBlockingIssue(),
+        contains('xworkmate-bridge.onwalk.net'),
+      );
+    });
+
+    test('precheck allows debian family systems', () async {
       final controller = WorkspaceProvisionController(executor: _FakeSshExecutor());
       addTearDown(controller.dispose);
       controller.updateForm(
@@ -211,12 +285,45 @@ PORT_443_OPEN=yes
         dnsAddressCount: 1,
         port443ListenerCount: 0,
         port443Open: true,
+        bridgeDnsAddressCount: 1,
+        bridgePort443ListenerCount: 0,
+        bridgePort443Open: true,
       );
 
-      expect(
-        controller.validatePrecheckBlockingIssue(),
-        contains('Ubuntu'),
+      expect(controller.validatePrecheckBlockingIssue(), isNull);
+    });
+
+    test('import yaml restores editable state without leaking redacted values', () {
+      final controller = WorkspaceProvisionController();
+      addTearDown(controller.dispose);
+      controller.updateForm(
+        serverAddress: 'old.example.com',
+        workspaceDomain: 'old.net',
+        sshUsername: 'root',
+        sshPassword: 'keep-secret',
+        showAdvanced: false,
       );
+
+      controller.importYaml('''
+server_address: 167.179.110.129
+workspace_domain: onwalk.net
+ssh_username: root
+auth_method: password
+ssh_port: 22
+install_path: /opt/xworkspace/playbooks
+show_advanced: true
+logs_expanded: false
+ssh_password: "__redacted__"
+deepseek_api_key: "deepseek-new"
+openclaw_gateway_token: "__redacted__"
+''');
+
+      expect(controller.serverAddress, '167.179.110.129');
+      expect(controller.workspaceDomain, 'onwalk.net');
+      expect(controller.showAdvanced, isTrue);
+      expect(controller.sshPassword, 'keep-secret');
+      expect(controller.deepseekApiKey, 'deepseek-new');
+      expect(controller.openclawGatewayToken, isNull);
     });
   });
 }

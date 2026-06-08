@@ -31,6 +31,10 @@ class _WorkspaceManagementFormState extends State<WorkspaceManagementForm> {
   late final TextEditingController _portController;
   late final TextEditingController _sudoController;
   late final TextEditingController _installPathController;
+  late final TextEditingController _deepseekKeyController;
+  late final TextEditingController _nvidiaKeyController;
+  late final TextEditingController _ollamaKeyController;
+  late final TextEditingController _openclawTokenController;
 
   @override
   void initState() {
@@ -45,6 +49,11 @@ class _WorkspaceManagementFormState extends State<WorkspaceManagementForm> {
     _portController = TextEditingController(text: c.sshPort.toString());
     _sudoController = TextEditingController(text: c.sudoPassword ?? '');
     _installPathController = TextEditingController(text: c.installPath);
+    _deepseekKeyController = TextEditingController(text: c.deepseekApiKey ?? '');
+    _nvidiaKeyController = TextEditingController(text: c.nvidiaApiKey ?? '');
+    _ollamaKeyController = TextEditingController(text: c.ollamaApiKey ?? '');
+    _openclawTokenController =
+        TextEditingController(text: c.openclawGatewayToken ?? '');
   }
 
   @override
@@ -58,6 +67,10 @@ class _WorkspaceManagementFormState extends State<WorkspaceManagementForm> {
     _portController.dispose();
     _sudoController.dispose();
     _installPathController.dispose();
+    _deepseekKeyController.dispose();
+    _nvidiaKeyController.dispose();
+    _ollamaKeyController.dispose();
+    _openclawTokenController.dispose();
     super.dispose();
   }
 
@@ -74,6 +87,10 @@ class _WorkspaceManagementFormState extends State<WorkspaceManagementForm> {
       installPath: _installPathController.text.trim().isEmpty
           ? '/opt/xworkspace/playbooks'
           : _installPathController.text.trim(),
+      deepseekApiKey: _deepseekKeyController.text,
+      nvidiaApiKey: _nvidiaKeyController.text,
+      ollamaApiKey: _ollamaKeyController.text,
+      openclawGatewayToken: _openclawTokenController.text,
     );
   }
 
@@ -110,6 +127,19 @@ class _WorkspaceManagementFormState extends State<WorkspaceManagementForm> {
                       enabled: !disabled,
                       label: appText('Workspace 域名 *', 'Workspace domain *'),
                       icon: Icons.public_outlined,
+                    ),
+                    SizedBox(
+                      width: itemWidth,
+                      child: Padding(
+                        padding: const EdgeInsets.only(left: 14, top: 2),
+                        child: Text(
+                          appText(
+                            '将检测桥接域名：${controller.bridgeDomain}',
+                            'Bridge domain will be checked: ${controller.bridgeDomain}',
+                          ),
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                      ),
                     ),
                     _field(
                       width: itemWidth,
@@ -217,6 +247,38 @@ class _WorkspaceManagementFormState extends State<WorkspaceManagementForm> {
                     enabled: !disabled,
                     label: appText('安装路径', 'Install path'),
                     icon: Icons.storage_outlined,
+                  ),
+                  _field(
+                    width: 320,
+                    controller: _deepseekKeyController,
+                    enabled: !disabled,
+                    label: 'DEEPSEEK_API_KEY',
+                    icon: Icons.key_outlined,
+                    obscureText: true,
+                  ),
+                  _field(
+                    width: 320,
+                    controller: _nvidiaKeyController,
+                    enabled: !disabled,
+                    label: 'NVIDIA_API_KEY',
+                    icon: Icons.key_outlined,
+                    obscureText: true,
+                  ),
+                  _field(
+                    width: 320,
+                    controller: _ollamaKeyController,
+                    enabled: !disabled,
+                    label: 'OLLAMA_API_KEY',
+                    icon: Icons.key_outlined,
+                    obscureText: true,
+                  ),
+                  _field(
+                    width: 320,
+                    controller: _openclawTokenController,
+                    enabled: !disabled,
+                    label: 'OPENCLAW_GATEWAY_TOKEN',
+                    icon: Icons.key_outlined,
+                    obscureText: true,
                   ),
                 ],
               ),
