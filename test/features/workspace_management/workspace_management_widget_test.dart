@@ -109,6 +109,56 @@ void main() {
     expect(find.text('bridge-token-123'), findsOneWidget);
     expect(find.text('下载凭据'), findsOneWidget);
   });
+
+  testWidgets('success result can save deployed bridge as default', (tester) async {
+    final store = _MemorySecureConfigStore();
+    final appController = _NoopAppController(store: store);
+    final provisionController = WorkspaceProvisionController(
+      executor: _FakeSshExecutor(),
+    );
+    await tester.binding.setSurfaceSize(const Size(1200, 1400));
+    addTearDown(() async {
+      await tester.binding.setSurfaceSize(null);
+    });
+    addTearDown(() {
+      provisionController.dispose();
+      appController.dispose();
+    });
+    provisionController.deploymentResult = const WorkspaceDeploymentResult(
+      url: 'https://acp-bridge.onwalk.net',
+      bridgeToken: 'save-token-123',
+    );
+    provisionController.phase = ProvisionPhase.success;
+
+    await tester.pumpWidget(
+      _buildApp(
+        WorkspaceManagementPanel(
+          appController: appController,
+          provisionController: provisionController,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.text('设为默认'));
+    await tester.tap(find.text('设为默认'));
+    await tester.pumpAndSettle();
+
+    expect(
+      appController.settings.acpBridgeServerModeConfig.selfHosted.serverUrl,
+      'https://acp-bridge.onwalk.net',
+    );
+    expect(
+      await appController.settingsController.loadSecretValueByRef(
+        appController
+            .settings
+            .acpBridgeServerModeConfig
+            .selfHosted
+            .passwordRef,
+      ),
+      'save-token-123',
+    );
+  });
 }
 
 Widget _buildApp(Widget child) {
