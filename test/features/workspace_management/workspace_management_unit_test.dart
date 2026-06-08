@@ -279,7 +279,7 @@ BRIDGE_PORT_443_OPEN=yes
 
       expect(
         controller.validatePrecheckBlockingIssue(),
-        contains('xworkmate-bridge.onwalk.net'),
+        contains('A 记录'),
       );
     });
 
