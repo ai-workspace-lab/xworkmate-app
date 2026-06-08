@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:yaml/yaml.dart';
 
 import '../../i18n/app_language.dart';
 import 'playbook_runner.dart';
@@ -27,8 +28,14 @@ class WorkspaceProvisionController extends ChangeNotifier {
   int sshPort = 22;
   String? sudoPassword;
   String installPath = '/opt/xworkspace/playbooks';
+  String? deepseekApiKey;
+  String? nvidiaApiKey;
+  String? ollamaApiKey;
+  String? openclawGatewayToken;
   bool showAdvanced = false;
   bool logsExpanded = false;
+
+  static const String redactedValue = '__redacted__';
 
   ProvisionPhase phase = ProvisionPhase.idle;
   late List<ProvisionStep> steps;
@@ -39,6 +46,13 @@ class WorkspaceProvisionController extends ChangeNotifier {
 
   bool get isBusy =>
       phase == ProvisionPhase.checking || phase == ProvisionPhase.running;
+
+  String get bridgeDomain => deriveBridgeDomain(workspaceDomain);
+
+  String get bridgeBaseUrl {
+    final domain = bridgeDomain.trim();
+    return domain.isEmpty ? '' : 'https://$domain';
+  }
 
   bool get canSubmit {
     final hasAuth = switch (authMethod) {
@@ -73,11 +87,12 @@ class WorkspaceProvisionController extends ChangeNotifier {
       return;
     }
     _prepareRun(ProvisionPhase.checking);
-      _setStep('ssh_connect', StepStatus.running, null);
+    _setStep('ssh_connect', StepStatus.running, null);
     try {
       final detected = await ServerDetector(executor).detect(
         sshConfig(),
         workspaceDomain.trim(),
+        bridgeDomain,
       );
       serverInfo = detected;
       _setStep('ssh_connect', StepStatus.success, null);
@@ -111,6 +126,7 @@ class WorkspaceProvisionController extends ChangeNotifier {
         final detected = await ServerDetector(executor).detect(
           sshConfig(),
           workspaceDomain.trim(),
+          bridgeDomain,
         );
         serverInfo = detected;
       }
@@ -128,7 +144,12 @@ class WorkspaceProvisionController extends ChangeNotifier {
         ssh: sshConfig(),
         action: 'create',
         workspaceDomain: workspaceDomain.trim(),
+        bridgeDomain: bridgeDomain,
         bridgeToken: bridgeToken,
+        deepseekApiKey: deepseekApiKey,
+        nvidiaApiKey: nvidiaApiKey,
+        ollamaApiKey: ollamaApiKey,
+        openclawGatewayToken: openclawGatewayToken,
         installPath: installPath.trim(),
         installMissingPrerequisites: installMissingPrerequisites,
         serverInfo: serverInfo,
@@ -142,7 +163,7 @@ class WorkspaceProvisionController extends ChangeNotifier {
       }
       phase = ProvisionPhase.success;
       deploymentResult = WorkspaceDeploymentResult(
-        url: 'https://${workspaceDomain.trim()}',
+        url: bridgeBaseUrl,
         bridgeToken: bridgeToken,
       );
       errorMessage = null;
@@ -185,6 +206,10 @@ class WorkspaceProvisionController extends ChangeNotifier {
     int? sshPort,
     String? sudoPassword,
     String? installPath,
+    String? deepseekApiKey,
+    String? nvidiaApiKey,
+    String? ollamaApiKey,
+    String? openclawGatewayToken,
     bool? showAdvanced,
     bool? logsExpanded,
   }) {
@@ -198,9 +223,72 @@ class WorkspaceProvisionController extends ChangeNotifier {
     this.sshPort = sshPort ?? this.sshPort;
     this.sudoPassword = sudoPassword ?? this.sudoPassword;
     this.installPath = installPath ?? this.installPath;
+    this.deepseekApiKey = deepseekApiKey ?? this.deepseekApiKey;
+    this.nvidiaApiKey = nvidiaApiKey ?? this.nvidiaApiKey;
+    this.ollamaApiKey = ollamaApiKey ?? this.ollamaApiKey;
+    this.openclawGatewayToken =
+        openclawGatewayToken ?? this.openclawGatewayToken;
     this.showAdvanced = showAdvanced ?? this.showAdvanced;
     this.logsExpanded = logsExpanded ?? this.logsExpanded;
     notifyListeners();
+  }
+
+  String exportYaml() {
+    final data = <String, Object?>{
+      'server_address': serverAddress.trim(),
+      'workspace_domain': workspaceDomain.trim(),
+      'ssh_username': sshUsername.trim(),
+      'auth_method': authMethod.name,
+      'ssh_port': sshPort,
+      'install_path': installPath.trim(),
+      'show_advanced': showAdvanced,
+      'logs_expanded': logsExpanded,
+      'ssh_password': redact(sshPassword),
+      'ssh_key_content': redact(sshKeyContent),
+      'ssh_key_path': redact(sshKeyPath),
+      'sudo_password': redact(sudoPassword),
+      'deepseek_api_key': redact(deepseekApiKey),
+      'nvidia_api_key': redact(nvidiaApiKey),
+      'ollama_api_key': redact(ollamaApiKey),
+      'openclaw_gateway_token': redact(openclawGatewayToken),
+    };
+    final buffer = StringBuffer();
+    for (final entry in data.entries) {
+      buffer.writeln('${entry.key}: ${yamlScalar(entry.value)}');
+    }
+    return buffer.toString().trimRight();
+  }
+
+  void importYaml(String raw) {
+    final decoded = loadYaml(raw);
+    if (decoded is! YamlMap) {
+      throw const FormatException('Invalid YAML document');
+    }
+    final map = <String, Object?>{};
+    for (final entry in decoded.nodes.entries) {
+      map['${entry.key.value}'] = entry.value.value;
+    }
+    updateForm(
+      serverAddress: stringValue(map['server_address']),
+      workspaceDomain: stringValue(map['workspace_domain']),
+      sshUsername: stringValue(map['ssh_username']),
+      authMethod: parseAuthMethod(map['auth_method']),
+      sshPassword: secretValue(map['ssh_password'], sshPassword),
+      sshKeyContent: secretValue(map['ssh_key_content'], sshKeyContent),
+      sshKeyPath: secretValue(map['ssh_key_path'], sshKeyPath),
+      sshPort: intValue(map['ssh_port'], sshPort),
+      sudoPassword: secretValue(map['sudo_password'], sudoPassword),
+      installPath: stringValue(map['install_path']),
+      deepseekApiKey: secretValue(map['deepseek_api_key'], deepseekApiKey),
+      nvidiaApiKey: secretValue(map['nvidia_api_key'], nvidiaApiKey),
+      ollamaApiKey: secretValue(map['ollama_api_key'], ollamaApiKey),
+      openclawGatewayToken: secretValue(
+        map['openclaw_gateway_token'],
+        openclawGatewayToken,
+      ),
+      showAdvanced: boolValue(map['show_advanced'], showAdvanced),
+      logsExpanded: boolValue(map['logs_expanded'], logsExpanded),
+    );
   }
 
   void _prepareRun(ProvisionPhase nextPhase, {bool keepDetection = false}) {
@@ -251,7 +339,7 @@ class WorkspaceProvisionController extends ChangeNotifier {
 
   String ensureBridgeToken() {
     deploymentResult ??= WorkspaceDeploymentResult(
-      url: 'https://${workspaceDomain.trim()}',
+      url: bridgeBaseUrl,
       bridgeToken: generateBridgeToken(),
     );
     return deploymentResult!.bridgeToken;
@@ -265,28 +353,29 @@ class WorkspaceProvisionController extends ChangeNotifier {
     if (info == null) {
       return null;
     }
-    if (!info.os.toLowerCase().contains('ubuntu')) {
+    final os = info.os.toLowerCase();
+    if (!(os.contains('ubuntu') || os.contains('debian'))) {
       return appText(
-        '当前仅支持 Ubuntu 20.04 / 22.04 / 24.04，检测到 ${info.os}。',
-        'Only Ubuntu 20.04 / 22.04 / 24.04 is supported. Detected: ${info.os}.',
+        '当前仅支持 Ubuntu / Debian 系列，检测到 ${info.os}。',
+        'Only Ubuntu / Debian family systems are supported. Detected: ${info.os}.',
       );
     }
-    if (!info.dnsResolved) {
+    if (!info.bridgeDnsResolved) {
       return appText(
-        '部署前需要先把 ${workspaceDomain.trim()} 做好 DNS 解析。',
-        'Configure DNS for ${workspaceDomain.trim()} before deploying.',
+        '部署前需要先把 $bridgeDomain 做好 DNS 解析。',
+        'Configure DNS for $bridgeDomain before deploying.',
       );
     }
-    if (!info.port443Open) {
+    if (!info.bridgePort443Open) {
       return appText(
-        '目标服务器的 443 端口未开放，请先放通 HTTPS 访问。',
-        'Port 443 is not open on the target server. Allow HTTPS traffic first.',
+        '$bridgeDomain 的 443 端口未开放，请先放通 HTTPS 访问。',
+        'Port 443 is not open for $bridgeDomain. Allow HTTPS traffic first.',
       );
     }
-    if (!info.isPort443Available) {
+    if (!info.isBridgePort443Available) {
       return appText(
-        '目标服务器的 443 端口已被占用，请先释放。',
-        'Port 443 is already in use on the target server.',
+        '$bridgeDomain 的 443 端口已被占用，请先释放。',
+        'Port 443 is already in use for $bridgeDomain.',
       );
     }
     return null;
@@ -297,7 +386,80 @@ class WorkspaceProvisionController extends ChangeNotifier {
     sshPassword = null;
     sshKeyContent = null;
     sudoPassword = null;
+    deepseekApiKey = null;
+    nvidiaApiKey = null;
+    ollamaApiKey = null;
+    openclawGatewayToken = null;
     super.dispose();
+  }
+
+  static String deriveBridgeDomain(String input) {
+    final domain = input.trim().toLowerCase();
+    if (domain.isEmpty) {
+      return '';
+    }
+    if (domain.startsWith('xworkmate-bridge.')) {
+      return domain;
+    }
+    return 'xworkmate-bridge.$domain';
+  }
+
+  static String redact(String? value) {
+    final trimmed = value?.trim() ?? '';
+    return trimmed.isEmpty ? '' : redactedValue;
+  }
+
+  static String yamlScalar(Object? value) {
+    if (value == null) {
+      return '""';
+    }
+    if (value is bool || value is num) {
+      return '$value';
+    }
+    final text = '$value';
+    if (text.isEmpty) {
+      return '""';
+    }
+    if (text == redactedValue || text.contains(RegExp(r'[:#\n\r\t]')) || text.startsWith(' ') || text.endsWith(' ')) {
+      return '"${text.replaceAll('"', '\\"')}"';
+    }
+    return text;
+  }
+
+  static String stringValue(Object? value) {
+    final text = value?.toString().trim() ?? '';
+    return text == redactedValue ? '' : text;
+  }
+
+  static String? secretValue(Object? value, String? current) {
+    final text = value?.toString().trim() ?? '';
+    if (text.isEmpty || text == redactedValue) {
+      return current;
+    }
+    return text;
+  }
+
+  static int intValue(Object? value, int fallback) {
+    return int.tryParse(value?.toString().trim() ?? '') ?? fallback;
+  }
+
+  static bool boolValue(Object? value, bool fallback) {
+    final text = value?.toString().trim().toLowerCase();
+    if (text == null || text.isEmpty) {
+      return fallback;
+    }
+    if (text == 'true' || text == 'yes' || text == '1') {
+      return true;
+    }
+    if (text == 'false' || text == 'no' || text == '0') {
+      return false;
+    }
+    return fallback;
+  }
+
+  static AuthMethod parseAuthMethod(Object? value) {
+    final text = value?.toString().trim().toLowerCase() ?? '';
+    return text == 'password' ? AuthMethod.password : AuthMethod.sshKey;
   }
 }
 
