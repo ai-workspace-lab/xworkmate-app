@@ -40,6 +40,16 @@ bool desktopShouldDropInputEvent(
   return event['type'] == 'mouse_move' && bufferedAmount > bufferedAmountLimit;
 }
 
+bool desktopHasRenderedVideoFrame({
+  required bool hasStream,
+  required int rendererVideoWidth,
+  required int rendererVideoHeight,
+  required bool hasDecodedFrames,
+}) {
+  return hasStream &&
+      (hasDecodedFrames || (rendererVideoWidth > 0 && rendererVideoHeight > 0));
+}
+
 String desktopSessionId() {
   return 'remote-desktop-${randomIdInternal()}';
 }
