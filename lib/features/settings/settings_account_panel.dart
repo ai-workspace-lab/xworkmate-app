@@ -99,7 +99,7 @@ class _SettingsAccountPanelState extends State<SettingsAccountPanel>
                 controller: _signedOutTabController,
                 tabs: [
                   Tab(text: appText('svc.plus 云端同步', 'svc.plus Cloud Sync')),
-                  Tab(text: appText('手动 Bridge 配置', 'Manual Bridge Config')),
+                  Tab(text: appText('AI 智能体工作空间', 'AI Agentic Workspace')),
                 ],
               ),
               const SizedBox(height: 24),
@@ -189,15 +189,15 @@ class _ManualBridgePanel extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             Text(
-              appText('手动 Bridge 配置', 'Manual Bridge Config'),
+              appText('AI 智能体工作空间', 'AI Agentic Workspace'),
               style: theme.textTheme.headlineMedium,
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 10),
             Text(
               appText(
-                '直接配置本地或私有 xworkmate-bridge 地址与令牌。',
-                'Configure local or private xworkmate-bridge address and token directly.',
+                '直接配置本地或私有 AI 智能体工作空间地址与令牌。',
+                'Configure a local or private AI Agentic Workspace address and token directly.',
               ),
               style: theme.textTheme.titleMedium?.copyWith(
                 color: theme.textTheme.bodyMedium?.color?.withValues(
@@ -799,7 +799,7 @@ String _connectionSourceLabel(
   );
   return mode == _SignedInAccountMode.accountSync
       ? appText('svc.plus 托管配置', 'svc.plus managed profile')
-      : appText('手动 Bridge 配置', 'Manual Bridge configuration');
+      : appText('AI 智能体工作空间', 'AI Agentic Workspace');
 }
 
 class _TokenConfiguredSummary extends StatelessWidget {
