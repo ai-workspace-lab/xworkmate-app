@@ -160,7 +160,7 @@ void main() {
       expect(
         desktopShouldDropInputEvent({
           'type': 'mouse_move',
-        }, bufferedAmount: 80 * 1024),
+        }, bufferedAmount: desktopMoveBufferedAmountLimit + 1),
         isTrue,
       );
       expect(
@@ -175,6 +175,36 @@ void main() {
         }, bufferedAmount: 1024),
         isFalse,
       );
+    });
+
+    test('routes mouse moves to the low-latency input channel', () {
+      expect(
+        desktopInputChannelLabelForEvent({'type': 'mouse_move'}),
+        desktopMoveInputChannelLabel,
+      );
+      expect(
+        desktopInputChannelLabelForEvent({'type': 'mouse_down'}),
+        desktopReliableInputChannelLabel,
+      );
+      expect(
+        desktopInputChannelLabelForEvent({'type': 'key_down'}),
+        desktopReliableInputChannelLabel,
+      );
+    });
+
+    test('configures mouse move channel for low-latency delivery', () {
+      final reliableConfig = desktopReliableInputChannelConfig();
+      final moveConfig = desktopMoveInputChannelConfig();
+
+      expect(reliableConfig.ordered, isTrue);
+      expect(reliableConfig.id, desktopReliableInputChannelId);
+      expect(moveConfig.ordered, isFalse);
+      expect(moveConfig.id, desktopMoveInputChannelId);
+      expect(
+        moveConfig.maxRetransmitTime,
+        desktopMoveChannelMaxPacketLifeTimeMs,
+      );
+      expect(moveConfig.toMap()['maxPacketLifeTime'], 100);
     });
 
     test('treats decoded video stats as a rendered first frame', () {
