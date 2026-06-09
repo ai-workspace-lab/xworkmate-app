@@ -34,7 +34,10 @@ void main() {
 
     expect(find.text('创建 / 升级 AI 工作空间'), findsOneWidget);
     expect(find.text('workspace.example.com'), findsOneWidget);
-    expect(find.byKey(const Key('workspace-management-upgrade-button')), findsOneWidget);
+    expect(
+      find.byKey(const Key('workspace-management-upgrade-button')),
+      findsOneWidget,
+    );
     expect(
       tester
           .widget<FilledButton>(
@@ -77,7 +80,10 @@ void main() {
     provisionController.updateForm(logsExpanded: true);
     await tester.pumpAndSettle();
 
-    expect(find.byKey(const Key('workspace-management-log-content')), findsOneWidget);
+    expect(
+      find.byKey(const Key('workspace-management-log-content')),
+      findsOneWidget,
+    );
     expect(find.textContaining('hello log'), findsOneWidget);
   });
 
@@ -108,9 +114,13 @@ void main() {
     expect(find.text('https://xworkmate-bridge.example.com'), findsOneWidget);
     expect(find.text('bridge-token-123'), findsOneWidget);
     expect(find.text('下载凭据'), findsOneWidget);
+    expect(find.text('连接到该工作空间'), findsOneWidget);
+    expect(find.text('设为默认保存配置'), findsOneWidget);
   });
 
-  testWidgets('success result can save deployed bridge as default', (tester) async {
+  testWidgets('success result can save deployed bridge as default', (
+    tester,
+  ) async {
     final store = _MemorySecureConfigStore();
     final appController = _NoopAppController(store: store);
     final provisionController = WorkspaceProvisionController(
@@ -140,8 +150,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.ensureVisible(find.text('设为默认'));
-    await tester.tap(find.text('设为默认'));
+    await tester.ensureVisible(find.text('设为默认保存配置'));
+    await tester.tap(find.text('设为默认保存配置'));
     await tester.pumpAndSettle();
 
     expect(
@@ -150,11 +160,7 @@ void main() {
     );
     expect(
       await appController.settingsController.loadSecretValueByRef(
-        appController
-            .settings
-            .acpBridgeServerModeConfig
-            .selfHosted
-            .passwordRef,
+        appController.settings.acpBridgeServerModeConfig.selfHosted.passwordRef,
       ),
       'save-token-123',
     );
