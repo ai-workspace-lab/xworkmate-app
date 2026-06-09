@@ -82,26 +82,33 @@ class WorkspaceManagementResult extends StatelessWidget {
                   label: Text(WorkspaceManagementText.copyAddress),
                 ),
                 OutlinedButton.icon(
-                  onPressed: () => Clipboard.setData(ClipboardData(text: token)),
+                  onPressed: () =>
+                      Clipboard.setData(ClipboardData(text: token)),
                   icon: const Icon(Icons.key_outlined),
                   label: Text(appText('复制 Token', 'Copy token')),
                 ),
                 OutlinedButton.icon(
                   onPressed: result == null
                       ? null
-                      : () => _saveAsDefault(result),
-                  icon: const Icon(Icons.bookmark_add_outlined),
-                  label: Text(appText('设为默认', 'Set as default')),
-                ),
-                OutlinedButton.icon(
-                  onPressed: result == null ? null : () => _downloadResult(result),
+                      : () => _downloadResult(result),
                   icon: const Icon(Icons.download_outlined),
                   label: Text(appText('下载凭据', 'Download credentials')),
                 ),
-                FilledButton.tonalIcon(
-                  onPressed: null,
+                FilledButton.icon(
+                  onPressed: result == null
+                      ? null
+                      : () => _openWorkspace(result),
                   icon: const Icon(Icons.settings_remote_outlined),
                   label: Text(WorkspaceManagementText.connectToWorkspace),
+                ),
+                FilledButton.icon(
+                  onPressed: result == null
+                      ? null
+                      : () => _saveAsDefault(result),
+                  icon: const Icon(Icons.bookmark_add_outlined),
+                  label: Text(
+                    appText('设为默认保存配置', 'Set as default and save config'),
+                  ),
                 ),
               ],
             ),
@@ -121,17 +128,41 @@ class WorkspaceManagementResult extends StatelessWidget {
     await File(location.path).writeAsString(result.downloadText);
   }
 
+  Future<void> _openWorkspace(WorkspaceDeploymentResult result) async {
+    final url = result.url.trim();
+    if (url.isEmpty) {
+      return;
+    }
+    try {
+      if (Platform.isMacOS) {
+        await Process.run('open', [url]);
+        return;
+      }
+      if (Platform.isWindows) {
+        await Process.run('cmd', ['/c', 'start', '', url]);
+        return;
+      }
+      if (Platform.isLinux) {
+        await Process.run('xdg-open', [url]);
+      }
+    } catch (error) {
+      debugPrint('Open workspace URL failed: $error');
+      await Clipboard.setData(ClipboardData(text: url));
+    }
+  }
+
   Future<void> _saveAsDefault(WorkspaceDeploymentResult result) async {
     final settingsController = appController.settingsController;
     final currentSettings = appController.settings;
-    final nextSettings = await settingsController.buildSavedAccountProfileSettings(
-      settings: currentSettings,
-      accountBaseUrl: currentSettings.accountBaseUrl,
-      accountIdentifier: currentSettings.accountUsername,
-      bridgeServerUrl: result.url,
-      bridgeToken: result.bridgeToken,
-      isManualBridge: true,
-    );
+    final nextSettings = await settingsController
+        .buildSavedAccountProfileSettings(
+          settings: currentSettings,
+          accountBaseUrl: currentSettings.accountBaseUrl,
+          accountIdentifier: currentSettings.accountUsername,
+          bridgeServerUrl: result.url,
+          bridgeToken: result.bridgeToken,
+          isManualBridge: true,
+        );
     await appController.saveSettings(nextSettings, refreshAfterSave: true);
   }
 
@@ -143,7 +174,9 @@ class WorkspaceManagementResult extends StatelessWidget {
       decoration: BoxDecoration(
         color: theme.colorScheme.errorContainer.withValues(alpha: 0.45),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: theme.colorScheme.error.withValues(alpha: 0.35)),
+        border: Border.all(
+          color: theme.colorScheme.error.withValues(alpha: 0.35),
+        ),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -162,8 +195,7 @@ class WorkspaceManagementResult extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  controller.errorMessage ??
-                      appText('请查看日志。', 'Check logs.'),
+                  controller.errorMessage ?? appText('请查看日志。', 'Check logs.'),
                 ),
               ],
             ),
