@@ -177,6 +177,36 @@ void main() {
       );
     });
 
+    test('treats decoded video stats as a rendered first frame', () {
+      expect(
+        desktopHasRenderedVideoFrame(
+          hasStream: true,
+          rendererVideoWidth: 0,
+          rendererVideoHeight: 0,
+          hasDecodedFrames: true,
+        ),
+        isTrue,
+      );
+      expect(
+        desktopHasRenderedVideoFrame(
+          hasStream: true,
+          rendererVideoWidth: 1280,
+          rendererVideoHeight: 720,
+          hasDecodedFrames: false,
+        ),
+        isTrue,
+      );
+      expect(
+        desktopHasRenderedVideoFrame(
+          hasStream: false,
+          rendererVideoWidth: 1280,
+          rendererVideoHeight: 720,
+          hasDecodedFrames: true,
+        ),
+        isFalse,
+      );
+    });
+
     test('uses bridge-provided remote stream when present', () async {
       var fallbackCreated = false;
       final providedStream = FakeMediaStream('provided-stream');
