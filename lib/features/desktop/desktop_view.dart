@@ -55,6 +55,7 @@ class _DesktopViewState extends State<DesktopView> {
   bool _showControlPanel = true;
   String _connectionState = 'disconnected';
   bool _hasStream = false;
+  bool _hasDecodedVideoFrame = false;
   bool _isFocused = false;
   Size _remoteDesktopSize = const Size(1280, 720);
 
@@ -65,10 +66,12 @@ class _DesktopViewState extends State<DesktopView> {
   StreamSubscription<String>? _stateSubscription;
   Timer? _firstFrameStatsTimer;
 
-  bool get _hasVideoFrame =>
-      _hasStream &&
-      _localRenderer.videoWidth > 0 &&
-      _localRenderer.videoHeight > 0;
+  bool get _hasVideoFrame => desktopHasRenderedVideoFrame(
+    hasStream: _hasStream,
+    rendererVideoWidth: _localRenderer.videoWidth,
+    rendererVideoHeight: _localRenderer.videoHeight,
+    hasDecodedFrames: _hasDecodedVideoFrame,
+  );
 
   @override
   void initState() {
@@ -91,6 +94,7 @@ class _DesktopViewState extends State<DesktopView> {
         setState(() {
           _localRenderer.srcObject = stream;
           _hasStream = true;
+          _hasDecodedVideoFrame = false;
         });
         _startFirstFrameDiagnostics();
       }
@@ -103,6 +107,7 @@ class _DesktopViewState extends State<DesktopView> {
           if (_connectionState == 'disconnected' ||
               _connectionState == 'failed') {
             _hasStream = false;
+            _hasDecodedVideoFrame = false;
             _localRenderer.srcObject = null;
             _stopFirstFrameDiagnostics();
           }
@@ -114,6 +119,9 @@ class _DesktopViewState extends State<DesktopView> {
   Future<void> _initRenderer() async {
     await _localRenderer.initialize();
     _localRenderer.onResize = () {
+      if (_localRenderer.videoWidth > 0 && _localRenderer.videoHeight > 0) {
+        _hasDecodedVideoFrame = true;
+      }
       _stopFirstFrameDiagnostics();
       if (mounted) {
         setState(() {});
@@ -123,23 +131,33 @@ class _DesktopViewState extends State<DesktopView> {
 
   void _startFirstFrameDiagnostics() {
     _firstFrameStatsTimer?.cancel();
-    _firstFrameStatsTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+    unawaited(_collectFirstFrameStats());
+    _firstFrameStatsTimer = Timer.periodic(const Duration(seconds: 2), (_) {
       if (!_hasStream || _hasVideoFrame || !mounted) {
         _stopFirstFrameDiagnostics();
         return;
       }
-      unawaited(() async {
-        try {
-          final stats = await _client.collectVideoStats();
-          if (stats == null) {
-            return;
-          }
-          debugPrint('Remote desktop waiting for first frame: $stats');
-        } catch (error) {
-          debugPrint('Remote desktop stats failed: $error');
-        }
-      }());
+      unawaited(_collectFirstFrameStats());
     });
+  }
+
+  Future<void> _collectFirstFrameStats() async {
+    try {
+      final stats = await _client.collectVideoStats();
+      if (stats == null || !mounted || !_hasStream) {
+        return;
+      }
+      if (stats.hasDecodedFrames) {
+        setState(() {
+          _hasDecodedVideoFrame = true;
+        });
+        _stopFirstFrameDiagnostics();
+        return;
+      }
+      debugPrint('Remote desktop waiting for first frame: $stats');
+    } catch (error) {
+      debugPrint('Remote desktop stats failed: $error');
+    }
   }
 
   void _stopFirstFrameDiagnostics() {
