@@ -156,7 +156,7 @@ void main() {
         ),
       );
 
-      await tester.tap(find.text('手动 Bridge 配置'));
+      await tester.tap(find.text('AI 智能体工作空间'));
       await tester.pump();
       await tester.enterText(
         find.byKey(const ValueKey('settings-manual-bridge-url-field')),
@@ -211,7 +211,7 @@ void main() {
         ),
       );
 
-      await tester.tap(find.text('手动 Bridge 配置'));
+      await tester.tap(find.text('AI 智能体工作空间'));
       await tester.pump();
 
       expect(saveCount, 0);
@@ -265,7 +265,7 @@ void main() {
         ),
       );
 
-      await tester.tap(find.text('手动 Bridge 配置'));
+      await tester.tap(find.text('AI 智能体工作空间'));
       await tester.pump();
       await tester.enterText(
         find.byKey(const ValueKey('settings-manual-bridge-url-field')),
