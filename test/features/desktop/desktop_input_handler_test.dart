@@ -1,5 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
 import 'package:xworkmate/features/desktop/desktop_input_handler.dart';
 
 void main() {
@@ -71,6 +73,84 @@ void main() {
       );
 
       expect(position, const Offset(0.5, 0.5));
+    });
+  });
+
+  group('DesktopInputHandler pointer flow control', () {
+    test('throttles pointer move events before they hit the data channel', () {
+      var now = 0;
+      final events = <Map<String, dynamic>>[];
+      final handler = DesktopInputHandler(
+        onSendInput: events.add,
+        nowMillis: () => now,
+      );
+
+      handler.handlePointerMove(
+        const PointerHoverEvent(position: Offset(10, 10)),
+        const Size(100, 100),
+      );
+      now = 5;
+      handler.handlePointerMove(
+        const PointerHoverEvent(position: Offset(20, 20)),
+        const Size(100, 100),
+      );
+      now = 16;
+      handler.handlePointerMove(
+        const PointerHoverEvent(position: Offset(30, 30)),
+        const Size(100, 100),
+      );
+
+      expect(events, hasLength(2));
+      expect(events.first['x'], 0.1);
+      expect(events.last['x'], 0.3);
+    });
+
+    test('deduplicates unchanged pointer move positions', () {
+      var now = 0;
+      final events = <Map<String, dynamic>>[];
+      final handler = DesktopInputHandler(
+        onSendInput: events.add,
+        nowMillis: () => now,
+      );
+
+      handler.handlePointerMove(
+        const PointerHoverEvent(position: Offset(10, 10)),
+        const Size(100, 100),
+      );
+      now = 100;
+      handler.handlePointerMove(
+        const PointerHoverEvent(position: Offset(10, 10)),
+        const Size(100, 100),
+      );
+
+      expect(events, hasLength(1));
+    });
+
+    test('forces latest pointer position before mouse down', () {
+      var now = 0;
+      final events = <Map<String, dynamic>>[];
+      final handler = DesktopInputHandler(
+        onSendInput: events.add,
+        nowMillis: () => now,
+      );
+
+      handler.handlePointerMove(
+        const PointerHoverEvent(position: Offset(10, 10)),
+        const Size(100, 100),
+      );
+      now = 5;
+      handler.handlePointerDown(
+        const PointerDownEvent(
+          position: Offset(80, 20),
+          buttons: kPrimaryMouseButton,
+        ),
+        const Size(100, 100),
+      );
+
+      expect(events, hasLength(3));
+      expect(events[1], containsPair('type', 'mouse_move'));
+      expect(events[1]['x'], 0.8);
+      expect(events[2], containsPair('type', 'mouse_down'));
     });
   });
 }

@@ -2,11 +2,22 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 
+typedef DesktopInputClock = int Function();
+
 class DesktopInputHandler {
-  DesktopInputHandler({required this.onSendInput});
+  DesktopInputHandler({
+    required this.onSendInput,
+    int moveIntervalMs = 16,
+    DesktopInputClock? nowMillis,
+  }) : moveIntervalMs = moveIntervalMs < 0 ? 0 : moveIntervalMs,
+       _nowMillis = nowMillis ?? (() => DateTime.now().millisecondsSinceEpoch);
 
   final void Function(Map<String, dynamic> event) onSendInput;
+  final int moveIntervalMs;
+  final DesktopInputClock _nowMillis;
   int _lastPressedButton = 1; // Default to left click
+  int? _lastMoveSentAtMs;
+  Offset? _lastMovePosition;
 
   void handlePointerMove(
     PointerEvent event,
@@ -20,7 +31,7 @@ class DesktopInputHandler {
     );
     if (position == null) return;
 
-    onSendInput({'type': 'mouse_move', 'x': position.dx, 'y': position.dy});
+    _sendPointerMove(position);
   }
 
   void handlePointerDown(
@@ -36,7 +47,7 @@ class DesktopInputHandler {
     if (position == null) return;
 
     // Send move event first to ensure click hits the exact coordinates
-    onSendInput({'type': 'mouse_move', 'x': position.dx, 'y': position.dy});
+    _sendPointerMove(position, force: true);
 
     _lastPressedButton = _mapPointerButtons(event.buttons);
 
@@ -79,6 +90,25 @@ class DesktopInputHandler {
     if (buttons & 2 != 0) return 3; // right click
     return 1;
   }
+
+  void _sendPointerMove(Offset position, {bool force = false}) {
+    final lastPosition = _lastMovePosition;
+    if (!force &&
+        lastPosition != null &&
+        (position - lastPosition).distance < 0.001) {
+      return;
+    }
+
+    final now = _nowMillis();
+    final lastSentAt = _lastMoveSentAtMs;
+    if (!force && lastSentAt != null && now - lastSentAt < moveIntervalMs) {
+      return;
+    }
+
+    _lastMoveSentAtMs = now;
+    _lastMovePosition = position;
+    onSendInput({'type': 'mouse_move', 'x': position.dx, 'y': position.dy});
+  }
 }
 
 String? desktopKeyName(LogicalKeyboardKey key) {
@@ -97,7 +127,7 @@ String? desktopKeyName(LogicalKeyboardKey key) {
   if (key == LogicalKeyboardKey.end) return 'End';
   if (key == LogicalKeyboardKey.pageUp) return 'Page_Up';
   if (key == LogicalKeyboardKey.pageDown) return 'Page_Down';
-  
+
   if (key == LogicalKeyboardKey.shiftLeft) return 'Shift_L';
   if (key == LogicalKeyboardKey.shiftRight) return 'Shift_R';
   if (key == LogicalKeyboardKey.controlLeft) return 'Control_L';
@@ -162,7 +192,9 @@ Offset? desktopContentPosition(
 }) {
   if (viewportSize.width <= 0 || viewportSize.height <= 0) return null;
 
-  if (contentSize == null || contentSize.width <= 0 || contentSize.height <= 0) {
+  if (contentSize == null ||
+      contentSize.width <= 0 ||
+      contentSize.height <= 0) {
     return Offset(
       (localPosition.dx / viewportSize.width).clamp(0.0, 1.0),
       (localPosition.dy / viewportSize.height).clamp(0.0, 1.0),
