@@ -32,6 +32,14 @@ Map<String, Object?> desktopOfferParams({
   };
 }
 
+bool desktopShouldDropInputEvent(
+  Map<String, dynamic> event, {
+  required int bufferedAmount,
+  int bufferedAmountLimit = 64 * 1024,
+}) {
+  return event['type'] == 'mouse_move' && bufferedAmount > bufferedAmountLimit;
+}
+
 String desktopSessionId() {
   return 'remote-desktop-${randomIdInternal()}';
 }
@@ -326,6 +334,10 @@ class DesktopClient {
     final channel = _dataChannel;
     if (channel != null &&
         channel.state == RTCDataChannelState.RTCDataChannelOpen) {
+      final bufferedAmount = channel.bufferedAmount ?? 0;
+      if (desktopShouldDropInputEvent(event, bufferedAmount: bufferedAmount)) {
+        return;
+      }
       final jsonStr = jsonEncode(event);
       channel.send(RTCDataChannelMessage(jsonStr));
     }
