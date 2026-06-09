@@ -5,6 +5,13 @@ import 'package:flutter_webrtc/flutter_webrtc.dart';
 import '../../app/app_controller.dart';
 import '../../runtime/gateway_runtime_helpers.dart';
 
+const String desktopReliableInputChannelLabel = 'input';
+const String desktopMoveInputChannelLabel = 'input-move';
+const int desktopReliableInputChannelId = 0;
+const int desktopMoveInputChannelId = 1;
+const int desktopMoveChannelMaxPacketLifeTimeMs = 100;
+const int desktopMoveBufferedAmountLimit = 16 * 1024;
+
 String desktopConnectionStateName(RTCPeerConnectionState state) {
   final value = state.toString().split('.').last;
   return value.replaceFirst('RTCPeerConnectionState', '').toLowerCase();
@@ -35,9 +42,28 @@ Map<String, Object?> desktopOfferParams({
 bool desktopShouldDropInputEvent(
   Map<String, dynamic> event, {
   required int bufferedAmount,
-  int bufferedAmountLimit = 64 * 1024,
+  int bufferedAmountLimit = desktopMoveBufferedAmountLimit,
 }) {
   return event['type'] == 'mouse_move' && bufferedAmount > bufferedAmountLimit;
+}
+
+String desktopInputChannelLabelForEvent(Map<String, dynamic> event) {
+  return event['type'] == 'mouse_move'
+      ? desktopMoveInputChannelLabel
+      : desktopReliableInputChannelLabel;
+}
+
+RTCDataChannelInit desktopReliableInputChannelConfig() {
+  return RTCDataChannelInit()
+    ..ordered = true
+    ..id = desktopReliableInputChannelId;
+}
+
+RTCDataChannelInit desktopMoveInputChannelConfig() {
+  return RTCDataChannelInit()
+    ..ordered = false
+    ..id = desktopMoveInputChannelId
+    ..maxRetransmitTime = desktopMoveChannelMaxPacketLifeTimeMs;
 }
 
 bool desktopHasRenderedVideoFrame({
@@ -179,7 +205,8 @@ class DesktopClient {
   final String sessionId;
 
   RTCPeerConnection? _peerConnection;
-  RTCDataChannel? _dataChannel;
+  RTCDataChannel? _inputChannel;
+  RTCDataChannel? _moveInputChannel;
 
   final StreamController<MediaStream> _streamController =
       StreamController<MediaStream>.broadcast();
@@ -244,11 +271,14 @@ class DesktopClient {
         _stateController.add(desktopConnectionStateName(state));
       };
 
-      // Create data channel for inputs BEFORE creating offer
-      final dcConfig = RTCDataChannelInit()..ordered = true;
-      _dataChannel = await _peerConnection!.createDataChannel(
-        'input',
-        dcConfig,
+      // Create input data channels BEFORE creating the offer.
+      _inputChannel = await _peerConnection!.createDataChannel(
+        desktopReliableInputChannelLabel,
+        desktopReliableInputChannelConfig(),
+      );
+      _moveInputChannel = await _peerConnection!.createDataChannel(
+        desktopMoveInputChannelLabel,
+        desktopMoveInputChannelConfig(),
       );
 
       // Handle ICE Candidates generated locally
@@ -341,7 +371,10 @@ class DesktopClient {
   }
 
   void sendInput(Map<String, dynamic> event) {
-    final channel = _dataChannel;
+    final channel =
+        desktopInputChannelLabelForEvent(event) == desktopMoveInputChannelLabel
+        ? (_moveInputChannel ?? _inputChannel)
+        : _inputChannel;
     if (channel != null &&
         channel.state == RTCDataChannelState.RTCDataChannelOpen) {
       final bufferedAmount = channel.bufferedAmount ?? 0;
@@ -363,9 +396,11 @@ class DesktopClient {
       debugPrint('Desktop close request failed: $error');
     }
 
-    await _dataChannel?.close();
+    await _moveInputChannel?.close();
+    await _inputChannel?.close();
     await _peerConnection?.close();
-    _dataChannel = null;
+    _moveInputChannel = null;
+    _inputChannel = null;
     _peerConnection = null;
     _stateController.add('disconnected');
   }
