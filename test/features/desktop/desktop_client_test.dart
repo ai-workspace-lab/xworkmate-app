@@ -143,14 +143,38 @@ void main() {
       expect(params['height'], 720);
     });
 
-    test('generates distinct desktop session ids for parallel app instances', () {
-      final first = desktopSessionId();
-      final second = desktopSessionId();
+    test(
+      'generates distinct desktop session ids for parallel app instances',
+      () {
+        final first = desktopSessionId();
+        final second = desktopSessionId();
 
-      expect(first, startsWith('remote-desktop-'));
-      expect(second, startsWith('remote-desktop-'));
-      expect(first, isNot(second));
-      expect(first, isNot('remote-desktop-session'));
+        expect(first, startsWith('remote-desktop-'));
+        expect(second, startsWith('remote-desktop-'));
+        expect(first, isNot(second));
+        expect(first, isNot('remote-desktop-session'));
+      },
+    );
+
+    test('drops only stale mouse moves when data channel is backed up', () {
+      expect(
+        desktopShouldDropInputEvent({
+          'type': 'mouse_move',
+        }, bufferedAmount: 80 * 1024),
+        isTrue,
+      );
+      expect(
+        desktopShouldDropInputEvent({
+          'type': 'mouse_down',
+        }, bufferedAmount: 80 * 1024),
+        isFalse,
+      );
+      expect(
+        desktopShouldDropInputEvent({
+          'type': 'mouse_move',
+        }, bufferedAmount: 1024),
+        isFalse,
+      );
     });
 
     test('uses bridge-provided remote stream when present', () async {
