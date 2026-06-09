@@ -118,15 +118,29 @@ class _DesktopViewState extends State<DesktopView> {
 
   Future<void> _initRenderer() async {
     await _localRenderer.initialize();
+    _localRenderer.onFirstFrameRendered = () {
+      _markRemoteDesktopFrameReady();
+    };
     _localRenderer.onResize = () {
       if (_localRenderer.videoWidth > 0 && _localRenderer.videoHeight > 0) {
-        _hasDecodedVideoFrame = true;
+        _markRemoteDesktopFrameReady();
+        return;
       }
-      _stopFirstFrameDiagnostics();
       if (mounted) {
         setState(() {});
       }
     };
+  }
+
+  void _markRemoteDesktopFrameReady() {
+    if (!_hasStream || _hasDecodedVideoFrame) {
+      return;
+    }
+    _hasDecodedVideoFrame = true;
+    _stopFirstFrameDiagnostics();
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   void _startFirstFrameDiagnostics() {
@@ -148,10 +162,7 @@ class _DesktopViewState extends State<DesktopView> {
         return;
       }
       if (stats.hasDecodedFrames) {
-        setState(() {
-          _hasDecodedVideoFrame = true;
-        });
-        _stopFirstFrameDiagnostics();
+        _markRemoteDesktopFrameReady();
         return;
       }
       debugPrint('Remote desktop waiting for first frame: $stats');
@@ -171,6 +182,8 @@ class _DesktopViewState extends State<DesktopView> {
     _streamSubscription?.cancel();
     _stateSubscription?.cancel();
     _client.disconnect();
+    _localRenderer.onResize = null;
+    _localRenderer.onFirstFrameRendered = null;
     _localRenderer.dispose();
     _displayController.dispose();
     _widthController.dispose();
