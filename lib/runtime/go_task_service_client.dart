@@ -300,7 +300,7 @@ class GoTaskServiceRequest {
           (item) => <String, dynamic>{
             'name': item.fileName,
             'description': item.mimeType,
-            'path': '',
+            'path': item.sourcePath.trim(),
           },
         ),
       ],
@@ -314,6 +314,8 @@ class GoTaskServiceRequest {
                 'sizeBytes': goTaskServiceBase64Size(item.content),
                 if (goTaskServiceAttachmentSha256(item).isNotEmpty)
                   'sha256': goTaskServiceAttachmentSha256(item),
+                if (item.sourcePath.trim().isNotEmpty)
+                  'sourcePath': item.sourcePath.trim(),
               },
             )
             .toList(growable: false),

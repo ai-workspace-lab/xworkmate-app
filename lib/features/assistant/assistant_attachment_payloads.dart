@@ -84,6 +84,7 @@ buildAssistantAttachmentPayloadsInternal(
         fileName: attachment.name,
         content: base64Encode(bytes),
         sha256: crypto.sha256.convert(bytes).toString(),
+        sourcePath: attachment.path,
       ),
     );
   }

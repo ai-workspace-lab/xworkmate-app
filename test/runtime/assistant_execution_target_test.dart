@@ -1591,6 +1591,7 @@ void main() {
               mimeType: 'text/plain',
               fileName: 'note.txt',
               content: base64Encode(utf8.encode('note body')),
+              sourcePath: '/Users/shenlan/Desktop/note.txt',
             ),
           ],
         );
@@ -1615,7 +1616,11 @@ void main() {
         final attachments = params['attachments'] as List<dynamic>;
         final attachment = attachments.single as Map<String, dynamic>;
         expect(attachment['name'], 'note.txt');
-        expect(attachment['path'], isEmpty);
+        expect(attachment['path'], '/Users/shenlan/Desktop/note.txt');
+        expect(
+          inlineAttachment['sourcePath'],
+          '/Users/shenlan/Desktop/note.txt',
+        );
       },
     );
 
@@ -1636,6 +1641,7 @@ void main() {
           mimeType: 'image/png',
           fileName: 'diagram.png',
           content: base64Encode(utf8.encode('image bytes')),
+          sourcePath: '/Users/shenlan/Pictures/diagram.png',
         );
 
         await controller.sendChatMessage(
@@ -1662,11 +1668,19 @@ void main() {
           fakeGoTaskService.requests.last.prompt,
           contains('diagram.png (image/png, sha256:'),
         );
+        expect(
+          fakeGoTaskService.requests.last.prompt,
+          contains('path: /Users/shenlan/Pictures/diagram.png'),
+        );
         final thread = controller.requireTaskThreadForSessionInternal(
           fakeGoTaskService.requests.last.sessionId,
         );
         expect(thread.taskInputAttachments, hasLength(1));
         expect(thread.taskInputAttachments.single.name, 'diagram.png');
+        expect(
+          thread.taskInputAttachments.single.sourcePath,
+          '/Users/shenlan/Pictures/diagram.png',
+        );
       },
     );
 
