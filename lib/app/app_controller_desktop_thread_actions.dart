@@ -749,6 +749,12 @@ extension AppControllerDesktopThreadActions on AppController {
   }) async {
     var current = association;
     var firstAttempt = true;
+    var artifactSyncAttempts = 0;
+    double? artifactSyncStartedAtMs;
+    final existingThread = taskThreadForSessionInternal(sessionKey);
+    if (association.status.trim().toLowerCase() == 'syncing-artifacts') {
+      artifactSyncStartedAtMs = existingThread?.lastArtifactSyncAtMs;
+    }
     while (true) {
       if (disposedInternal) {
         return;
@@ -796,8 +802,9 @@ extension AppControllerDesktopThreadActions on AppController {
               (!hasRequiredExts ||
                   current.requiredArtifactExtensions.every((ext) {
                     return result.artifacts.any(
-                      (a) => a.relativePath.toLowerCase().endsWith(
-                        ext.toLowerCase(),
+                      (a) => openClawArtifactPathHasRequiredExtension(
+                        a.relativePath,
+                        ext,
                       ),
                     );
                   }));
@@ -807,6 +814,34 @@ extension AppControllerDesktopThreadActions on AppController {
               !hasEnoughArtifacts;
           if (shouldKeepPollingForArtifacts) {
             final nowMs = DateTime.now().millisecondsSinceEpoch.toDouble();
+            artifactSyncAttempts += 1;
+            artifactSyncStartedAtMs ??= nowMs;
+            final missingRequired = current.requiredArtifactExtensions
+                .where((ext) {
+                  return !result.artifacts.any(
+                    (a) => openClawArtifactPathHasRequiredExtension(
+                      a.relativePath,
+                      ext,
+                    ),
+                  );
+                })
+                .toList(growable: false);
+            if (openClawArtifactSyncLimitReachedInternal(
+              attemptCount: artifactSyncAttempts,
+              firstSyncAtMs: artifactSyncStartedAtMs,
+              nowMs: nowMs,
+            )) {
+              markOpenClawArtifactSyncTimeoutInternal(
+                sessionKey: sessionKey,
+                association: current,
+                missingRequiredExtensions: missingRequired.isEmpty
+                    ? current.requiredArtifactExtensions
+                    : missingRequired,
+                remoteWorkingDirectory: result.remoteWorkingDirectory,
+                remoteWorkspaceRefKind: result.remoteWorkspaceRefKind,
+              );
+              return;
+            }
             current = current.copyWith(status: 'syncing-artifacts');
             upsertTaskThreadInternal(
               sessionKey,
@@ -837,6 +872,8 @@ extension AppControllerDesktopThreadActions on AppController {
             sessionKey: sessionKey,
             target: target,
             result: result,
+            artifactSyncAttempts: artifactSyncAttempts,
+            artifactSyncStartedAtMs: artifactSyncStartedAtMs,
           );
         }
         aiGatewayPendingSessionKeysInternal.remove(sessionKey);
@@ -874,6 +911,20 @@ extension AppControllerDesktopThreadActions on AppController {
       }
       final association = record.openClawTaskAssociation;
       if (association == null || association.isTerminal) {
+        continue;
+      }
+      if (association.status.trim().toLowerCase() == 'syncing-artifacts' &&
+          openClawArtifactSyncLimitReachedInternal(
+            attemptCount: 0,
+            firstSyncAtMs: record.lastArtifactSyncAtMs,
+          )) {
+        markOpenClawArtifactSyncTimeoutInternal(
+          sessionKey: record.threadId,
+          association: association,
+          missingRequiredExtensions: association.requiredArtifactExtensions,
+          remoteWorkingDirectory: record.lastRemoteWorkingDirectory,
+          remoteWorkspaceRefKind: record.lastRemoteWorkspaceRefKind,
+        );
         continue;
       }
       aiGatewayPendingSessionKeysInternal.add(record.threadId);
@@ -1285,6 +1336,8 @@ extension AppControllerDesktopThreadActions on AppController {
     required String sessionKey,
     required AssistantExecutionTarget target,
     required GoTaskServiceResult result,
+    int artifactSyncAttempts = 0,
+    double? artifactSyncStartedAtMs,
   }) async {
     final completedAtMs = DateTime.now().millisecondsSinceEpoch.toDouble();
     final assistantText = result.message.trim();
@@ -1398,7 +1451,18 @@ extension AppControllerDesktopThreadActions on AppController {
     }
     recomputeTasksInternal();
     notifyIfActiveInternal();
-    await persistGoTaskArtifactsForSessionInternal(sessionKey, result);
+    await persistGoTaskArtifactsForSessionInternal(
+      sessionKey,
+      result,
+      artifactSyncAttempts: artifactSyncAttempts,
+      artifactSyncStartedAtMs: artifactSyncStartedAtMs,
+    );
+    if (taskThreadForSessionInternal(
+          sessionKey,
+        )?.lifecycleState.lastResultCode ==
+        kOpenClawArtifactSyncTimeoutCode) {
+      return;
+    }
     upsertTaskThreadInternal(
       sessionKey,
       lifecycleStatus: 'ready',

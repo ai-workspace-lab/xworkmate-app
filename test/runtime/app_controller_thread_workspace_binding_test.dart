@@ -5,6 +5,7 @@ import 'package:crypto/crypto.dart' as crypto;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xworkmate/app/app_controller.dart';
 import 'package:xworkmate/app/app_controller_desktop_runtime_coordination_impl.dart';
+import 'package:xworkmate/app/app_controller_desktop_runtime_helpers.dart';
 import 'package:xworkmate/app/app_controller_desktop_thread_binding.dart';
 import 'package:xworkmate/runtime/assistant_artifacts.dart';
 import 'package:xworkmate/runtime/go_task_service_client.dart';
@@ -2182,6 +2183,245 @@ void main() {
       'no-artifacts',
     );
   });
+
+  test(
+    'OpenClaw artifact polling times out when required artifacts stay missing',
+    () async {
+      var getTaskCount = 0;
+      final staleSyncAtMs = DateTime.now()
+          .subtract(
+            kOpenClawArtifactSyncMaxDuration + const Duration(seconds: 1),
+          )
+          .millisecondsSinceEpoch
+          .toDouble();
+      const sessionKey = 'draft-openclaw-required-timeout';
+      const runId = 'turn-required-timeout';
+      const openClawSessionKey = 'agent:main:draft:openclaw-required-timeout';
+      final association = OpenClawTaskAssociation(
+        sessionId: sessionKey,
+        threadId: sessionKey,
+        turnId: runId,
+        runId: runId,
+        artifactScope: 'tasks/$openClawSessionKey/$runId',
+        artifactDirectory:
+            '/home/ubuntu/.openclaw/workspace/tasks/$openClawSessionKey/$runId',
+        gatewayProviderId: 'openclaw',
+        startedAtMs: staleSyncAtMs,
+        status: 'syncing-artifacts',
+        appThreadKey: 'draft:openclaw-required-timeout',
+        openclawSessionKey: openClawSessionKey,
+        requiredArtifactExtensions: const <String>['pdf'],
+        requiresArtifactExport: true,
+      );
+      final goTaskClient = _PollingGoTaskServiceClient(
+        onGetTask: (observedAssociation) {
+          getTaskCount += 1;
+          expect(observedAssociation.runId, runId);
+          return GoTaskServiceResult(
+            success: true,
+            message: 'done but still missing pdf',
+            turnId: runId,
+            raw: <String, dynamic>{
+              'success': true,
+              'status': 'completed',
+              'sessionId': sessionKey,
+              'threadId': sessionKey,
+              'turnId': runId,
+              'runId': runId,
+              'artifactScope': association.artifactScope,
+              'artifactDirectory': association.artifactDirectory,
+              'gatewayProviderId': 'openclaw',
+              'appThreadKey': association.appThreadKey,
+              'openclawSessionKey': openClawSessionKey,
+              'requiredArtifactExtensions': <String>['pdf'],
+              'requiresArtifactExport': true,
+              'artifacts': <Map<String, dynamic>>[
+                <String, dynamic>{
+                  'relativePath': 'exports/final.md',
+                  'content': '# not the final pdf\n',
+                  'contentType': 'text/markdown',
+                },
+              ],
+            },
+            errorMessage: '',
+            resolvedModel: '',
+            route: GoTaskServiceRoute.externalAcpSingle,
+          );
+        },
+      );
+      final controller = AppController(
+        environmentOverride: const <String, String>{},
+        goTaskServiceClient: goTaskClient,
+      );
+      addTearDown(controller.dispose);
+
+      final taskWorkspace = await Directory.systemTemp.createTemp(
+        'xworkmate-required-timeout-',
+      );
+      addTearDown(() async {
+        if (await taskWorkspace.exists()) {
+          await taskWorkspace.delete(recursive: true);
+        }
+      });
+      controller.upsertTaskThreadInternal(
+        sessionKey,
+        workspaceBinding: WorkspaceBinding(
+          workspaceId: sessionKey,
+          workspaceKind: WorkspaceKind.localFs,
+          workspacePath: taskWorkspace.path,
+          displayPath: taskWorkspace.path,
+          writable: true,
+        ),
+        lifecycleStatus: 'running',
+        lastResultCode: 'running',
+        lastArtifactSyncAtMs: staleSyncAtMs,
+        lastArtifactSyncStatus: 'syncing',
+        openClawTaskAssociation: association,
+      );
+      controller.aiGatewayPendingSessionKeysInternal.add(sessionKey);
+
+      await controller
+          .pollOpenClawTaskAssociationInternal(
+            sessionKey: sessionKey,
+            target: AssistantExecutionTarget.gateway,
+            association: association,
+          )
+          .timeout(const Duration(seconds: 1));
+
+      final thread = controller.requireTaskThreadForSessionInternal(sessionKey);
+      expect(getTaskCount, 1);
+      expect(thread.lifecycleState.status, 'ready');
+      expect(
+        thread.lifecycleState.lastResultCode,
+        kOpenClawArtifactSyncTimeoutCode,
+      );
+      expect(thread.lastArtifactSyncStatus, 'partial');
+      expect(thread.openClawTaskAssociation?.status, 'completed');
+      expect(controller.assistantSessionHasPendingRun(sessionKey), isFalse);
+      expect(
+        controller.localSessionMessagesInternal[sessionKey]?.last.text,
+        contains('pdf'),
+      );
+    },
+  );
+
+  test(
+    'OpenClaw artifact sync times out when artifact downloads keep failing',
+    () async {
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() => server.close(force: true));
+      server.listen((request) async {
+        request.response
+          ..statusCode = HttpStatus.ok
+          ..headers.contentType = ContentType.binary
+          ..add(<int>[1, 2, 3]);
+        await request.response.close();
+      });
+
+      final staleSyncAtMs = DateTime.now()
+          .subtract(
+            kOpenClawArtifactSyncMaxDuration + const Duration(seconds: 1),
+          )
+          .millisecondsSinceEpoch
+          .toDouble();
+      const sessionKey = 'draft-openclaw-download-timeout';
+      const runId = 'turn-download-timeout';
+      const openClawSessionKey = 'agent:main:draft:openclaw-download-timeout';
+      final association = OpenClawTaskAssociation(
+        sessionId: sessionKey,
+        threadId: sessionKey,
+        turnId: runId,
+        runId: runId,
+        artifactScope: 'tasks/$openClawSessionKey/$runId',
+        artifactDirectory:
+            '/home/ubuntu/.openclaw/workspace/tasks/$openClawSessionKey/$runId',
+        gatewayProviderId: 'openclaw',
+        startedAtMs: staleSyncAtMs,
+        status: 'syncing-artifacts',
+        appThreadKey: 'draft:openclaw-download-timeout',
+        openclawSessionKey: openClawSessionKey,
+        requiredArtifactExtensions: const <String>['pdf'],
+        requiresArtifactExport: true,
+      );
+      final controller = AppController(
+        environmentOverride: const <String, String>{
+          'BRIDGE_AUTH_TOKEN': 'bridge-token',
+        },
+      );
+      addTearDown(controller.dispose);
+
+      final taskWorkspace = await Directory.systemTemp.createTemp(
+        'xworkmate-download-timeout-',
+      );
+      addTearDown(() async {
+        if (await taskWorkspace.exists()) {
+          await taskWorkspace.delete(recursive: true);
+        }
+      });
+      controller.upsertTaskThreadInternal(
+        sessionKey,
+        workspaceBinding: WorkspaceBinding(
+          workspaceId: sessionKey,
+          workspaceKind: WorkspaceKind.localFs,
+          workspacePath: taskWorkspace.path,
+          displayPath: taskWorkspace.path,
+          writable: true,
+        ),
+        lifecycleStatus: 'running',
+        lastResultCode: 'running',
+        lastArtifactSyncAtMs: staleSyncAtMs,
+        lastArtifactSyncStatus: 'syncing',
+        openClawTaskAssociation: association,
+      );
+      final result = GoTaskServiceResult(
+        success: true,
+        message: 'pdf exported',
+        turnId: runId,
+        raw: <String, dynamic>{
+          'success': true,
+          'status': 'completed',
+          'artifacts': <Map<String, dynamic>>[
+            <String, dynamic>{
+              'relativePath': 'exports/final.pdf',
+              'downloadUrl':
+                  'http://xworkmate-bridge.svc.plus:${server.port}/final.pdf',
+              'contentType': 'application/pdf',
+              'sizeBytes': 99,
+            },
+          ],
+        },
+        errorMessage: '',
+        resolvedModel: '',
+        route: GoTaskServiceRoute.externalAcpSingle,
+      );
+
+      final clientFactory = _proxiedClientFactory(server.port);
+      await HttpOverrides.runZoned(() async {
+        await controller.persistGoTaskArtifactsForSessionInternal(
+          sessionKey,
+          result,
+          artifactSyncStartedAtMs: staleSyncAtMs,
+        );
+      }, createHttpClient: clientFactory);
+
+      final thread = controller.requireTaskThreadForSessionInternal(sessionKey);
+      expect(
+        await File('${taskWorkspace.path}/exports/final.pdf').exists(),
+        isFalse,
+      );
+      expect(thread.lifecycleState.status, 'ready');
+      expect(
+        thread.lifecycleState.lastResultCode,
+        kOpenClawArtifactSyncTimeoutCode,
+      );
+      expect(thread.lastArtifactSyncStatus, 'partial');
+      expect(thread.openClawTaskAssociation?.status, 'completed');
+      expect(
+        controller.localSessionMessagesInternal[sessionKey]?.last.text,
+        contains('pdf'),
+      );
+    },
+  );
 }
 
 HttpClient Function(SecurityContext?) _proxiedClientFactory(int port) {
@@ -2290,6 +2530,42 @@ class _ArtifactBackfillGoTaskServiceClient implements GoTaskServiceClient {
       resolvedModel: '',
       route: route,
     );
+  }
+
+  @override
+  Future<void> cancelTask({
+    required GoTaskServiceRoute route,
+    required AssistantExecutionTarget target,
+    required String sessionId,
+    required String threadId,
+    OpenClawTaskAssociation? association,
+  }) async {}
+
+  @override
+  Future<void> dispose() async {}
+}
+
+class _PollingGoTaskServiceClient implements GoTaskServiceClient {
+  _PollingGoTaskServiceClient({required this.onGetTask});
+
+  final GoTaskServiceResult Function(OpenClawTaskAssociation association)
+  onGetTask;
+
+  @override
+  Future<GoTaskServiceResult> executeTask(
+    GoTaskServiceRequest request, {
+    required void Function(GoTaskServiceUpdate update) onUpdate,
+  }) async {
+    throw UnimplementedError('executeTask is not used by this test');
+  }
+
+  @override
+  Future<GoTaskServiceResult> getTask({
+    required AssistantExecutionTarget target,
+    required OpenClawTaskAssociation association,
+    required GoTaskServiceRoute route,
+  }) async {
+    return onGetTask(association);
   }
 
   @override
