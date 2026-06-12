@@ -51,7 +51,6 @@ class _DesktopViewState extends State<DesktopView> {
 
   bool _useGpu = false;
   bool _adaptiveResolution = false;
-  bool _showAdvancedOptions = false;
   bool _showControlPanel = true;
   String _connectionState = 'disconnected';
   bool _hasStream = false;
@@ -390,18 +389,6 @@ class _DesktopViewState extends State<DesktopView> {
                             ],
                           ),
                         ),
-                        // Advanced Options Toggle
-                        TextButton.icon(
-                          onPressed: () => setState(
-                            () => _showAdvancedOptions = !_showAdvancedOptions,
-                          ),
-                          icon: Icon(
-                            _showAdvancedOptions
-                                ? Icons.expand_less
-                                : Icons.expand_more,
-                          ),
-                          label: const Text('高级选项'),
-                        ),
                         OutlinedButton.icon(
                           key: const Key('desktop-workspace-management-button'),
                           onPressed: () => WorkspaceManagementPanel.show(
@@ -431,109 +418,6 @@ class _DesktopViewState extends State<DesktopView> {
                         ),
                       ],
                     ),
-                    if (_showAdvancedOptions) ...[
-                      const SizedBox(height: 16),
-                      Wrap(
-                        spacing: 16,
-                        runSpacing: 16,
-                        crossAxisAlignment: WrapCrossAlignment.center,
-                        children: [
-                          // Display Selector
-                          SizedBox(
-                            width: 100,
-                            child: TextField(
-                              controller: _displayController,
-                              enabled: _connectionState == 'disconnected',
-                              decoration: const InputDecoration(
-                                labelText: 'Display',
-                                prefixIcon: Icon(
-                                  Icons.monitor_rounded,
-                                  size: 16,
-                                ),
-                              ),
-                            ),
-                          ),
-                          // Adaptive Resolution Toggle
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(appText('自适应分辨率', 'Adaptive Resolution')),
-                              Switch(
-                                value: _adaptiveResolution,
-                                onChanged: _connectionState == 'disconnected'
-                                    ? (val) => setState(
-                                        () => _adaptiveResolution = val,
-                                      )
-                                    : null,
-                              ),
-                            ],
-                          ),
-                          // Resolution settings
-                          SizedBox(
-                            width: 90,
-                            child: TextField(
-                              controller: _widthController,
-                              enabled:
-                                  _connectionState == 'disconnected' &&
-                                  !_adaptiveResolution,
-                              keyboardType: TextInputType.number,
-                              decoration: const InputDecoration(
-                                labelText: '宽度',
-                              ),
-                            ),
-                          ),
-                          SizedBox(
-                            width: 90,
-                            child: TextField(
-                              controller: _heightController,
-                              enabled:
-                                  _connectionState == 'disconnected' &&
-                                  !_adaptiveResolution,
-                              keyboardType: TextInputType.number,
-                              decoration: const InputDecoration(
-                                labelText: '高度',
-                              ),
-                            ),
-                          ),
-                          // FPS / Bitrate
-                          SizedBox(
-                            width: 70,
-                            child: TextField(
-                              controller: _fpsController,
-                              enabled: _connectionState == 'disconnected',
-                              keyboardType: TextInputType.number,
-                              decoration: const InputDecoration(
-                                labelText: '帧率',
-                              ),
-                            ),
-                          ),
-                          SizedBox(
-                            width: 90,
-                            child: TextField(
-                              controller: _bitrateController,
-                              enabled: _connectionState == 'disconnected',
-                              keyboardType: TextInputType.number,
-                              decoration: const InputDecoration(
-                                labelText: '码率 (kbps)',
-                              ),
-                            ),
-                          ),
-                          // GPU accelerator toggle
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Text('GPU 加速'),
-                              Switch(
-                                value: _useGpu,
-                                onChanged: _connectionState == 'disconnected'
-                                    ? (val) => setState(() => _useGpu = val)
-                                    : null,
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ],
                   ],
                 ),
               ),
