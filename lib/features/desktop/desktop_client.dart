@@ -11,6 +11,7 @@ const int desktopReliableInputChannelId = 0;
 const int desktopMoveInputChannelId = 1;
 const int desktopMoveChannelMaxPacketLifeTimeMs = 100;
 const int desktopMoveBufferedAmountLimit = 16 * 1024;
+const Duration desktopOfferRequestTimeout = Duration(seconds: 15);
 
 String desktopConnectionStateName(RTCPeerConnectionState state) {
   final value = state.toString().split('.').last;
@@ -307,19 +308,27 @@ class DesktopClient {
       await _peerConnection!.setLocalDescription(offer);
 
       // Send SDP Offer to Bridge
-      final response = await controller.gatewayAcpClientInternal.request(
-        method: 'xworkmate.desktop.offer',
-        params: desktopOfferParams(
-          sessionId: sessionId,
-          sdpOffer: offer.sdp,
-          display: display,
-          width: width,
-          height: height,
-          fps: fps,
-          bitrate: bitrate,
-          useGpu: useGpu,
-        ),
-      );
+      final response = await controller.gatewayAcpClientInternal
+          .request(
+            method: 'xworkmate.desktop.offer',
+            params: desktopOfferParams(
+              sessionId: sessionId,
+              sdpOffer: offer.sdp,
+              display: display,
+              width: width,
+              height: height,
+              fps: fps,
+              bitrate: bitrate,
+              useGpu: useGpu,
+            ),
+          )
+          .timeout(
+            desktopOfferRequestTimeout,
+            onTimeout: () => throw TimeoutException(
+              'Timed out waiting for desktop SDP answer',
+              desktopOfferRequestTimeout,
+            ),
+          );
 
       final sdpAnswerData = response['result']?['sdpAnswer'];
       if (sdpAnswerData == null) {

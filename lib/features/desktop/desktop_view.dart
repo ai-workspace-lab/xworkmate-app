@@ -64,6 +64,7 @@ class _DesktopViewState extends State<DesktopView> {
   StreamSubscription<MediaStream>? _streamSubscription;
   StreamSubscription<String>? _stateSubscription;
   Timer? _firstFrameStatsTimer;
+  int _firstFrameStatsPolls = 0;
 
   bool get _hasVideoFrame => desktopHasRenderedVideoFrame(
     hasStream: _hasStream,
@@ -123,10 +124,6 @@ class _DesktopViewState extends State<DesktopView> {
     _localRenderer.onResize = () {
       if (_localRenderer.videoWidth > 0 && _localRenderer.videoHeight > 0) {
         _markRemoteDesktopFrameReady();
-        return;
-      }
-      if (mounted) {
-        setState(() {});
       }
     };
   }
@@ -144,13 +141,24 @@ class _DesktopViewState extends State<DesktopView> {
 
   void _startFirstFrameDiagnostics() {
     _firstFrameStatsTimer?.cancel();
+    _firstFrameStatsPolls = 0;
     unawaited(_collectFirstFrameStats());
-    _firstFrameStatsTimer = Timer.periodic(const Duration(seconds: 2), (_) {
+    _scheduleFirstFrameStatsPoll(const Duration(milliseconds: 500));
+  }
+
+  void _scheduleFirstFrameStatsPoll(Duration delay) {
+    _firstFrameStatsTimer?.cancel();
+    _firstFrameStatsTimer = Timer(delay, () {
       if (!_hasStream || _hasVideoFrame || !mounted) {
         _stopFirstFrameDiagnostics();
         return;
       }
+      _firstFrameStatsPolls += 1;
       unawaited(_collectFirstFrameStats());
+      final nextDelay = _firstFrameStatsPolls < 4
+          ? const Duration(milliseconds: 500)
+          : const Duration(seconds: 2);
+      _scheduleFirstFrameStatsPoll(nextDelay);
     });
   }
 
