@@ -5,7 +5,6 @@ import 'package:crypto/crypto.dart' as crypto;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xworkmate/app/app_controller.dart';
 import 'package:xworkmate/app/app_controller_desktop_runtime_coordination_impl.dart';
-import 'package:xworkmate/app/app_controller_desktop_runtime_helpers.dart';
 import 'package:xworkmate/app/app_controller_desktop_thread_binding.dart';
 import 'package:xworkmate/runtime/assistant_artifacts.dart';
 import 'package:xworkmate/runtime/go_task_service_client.dart';
