@@ -46,6 +46,21 @@ import 'app_controller_desktop_skill_permissions.dart';
 import 'app_controller_desktop_runtime_coordination_impl.dart';
 import 'app_controller_desktop_runtime_exceptions.dart';
 
+const int kOpenClawArtifactSyncMaxAttempts = 45;
+const Duration kOpenClawArtifactSyncMaxDuration = Duration(seconds: 90);
+const String kOpenClawArtifactSyncTimeoutCode =
+    'OPENCLAW_ARTIFACT_SYNC_TIMEOUT';
+
+bool openClawArtifactPathHasRequiredExtension(String path, String extension) {
+  final normalizedPath = path.trim().toLowerCase();
+  final normalizedExtension = extension.trim().toLowerCase().replaceFirst(
+    RegExp(r'^\.+'),
+    '',
+  );
+  return normalizedExtension.isNotEmpty &&
+      normalizedPath.endsWith('.$normalizedExtension');
+}
+
 // ignore_for_file: invalid_use_of_visible_for_testing_member, invalid_use_of_protected_member
 extension AppControllerDesktopRuntimeHelpers on AppController {
   Future<void> saveAppUiStateInternal(
@@ -713,8 +728,10 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
 
   Future<void> persistGoTaskArtifactsForSessionInternal(
     String sessionKey,
-    GoTaskServiceResult result,
-  ) async {
+    GoTaskServiceResult result, {
+    int artifactSyncAttempts = 0,
+    double? artifactSyncStartedAtMs,
+  }) async {
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey,
     );
@@ -757,6 +774,22 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
               association.artifactDirectory.trim().isNotEmpty) &&
           result.success;
       if (waitingForOpenClawArtifacts) {
+        final firstSyncAtMs =
+            artifactSyncStartedAtMs ?? existingThread.lastArtifactSyncAtMs;
+        if (openClawArtifactSyncLimitReachedInternal(
+          attemptCount: artifactSyncAttempts + 1,
+          firstSyncAtMs: firstSyncAtMs,
+          nowMs: syncedAtMs,
+        )) {
+          markOpenClawArtifactSyncTimeoutInternal(
+            sessionKey: normalizedSessionKey,
+            association: association,
+            missingRequiredExtensions: association.requiredArtifactExtensions,
+            remoteWorkingDirectory: result.remoteWorkingDirectory,
+            remoteWorkspaceRefKind: result.remoteWorkspaceRefKind,
+          );
+          return;
+        }
         upsertTaskThreadInternal(
           normalizedSessionKey,
           lifecycleStatus: 'running',
@@ -877,7 +910,7 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     final missingRequired = requiredExts
         .where((ext) {
           return !currentTaskArtifactPaths.any(
-            (p) => p.toLowerCase().endsWith(ext.toLowerCase()),
+            (p) => openClawArtifactPathHasRequiredExtension(p, ext),
           );
         })
         .toList(growable: false);
@@ -892,6 +925,24 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
         (association.artifactScope.trim().isNotEmpty ||
             association.artifactDirectory.trim().isNotEmpty);
     if (shouldKeepPollingAfterDownloadFailure) {
+      final firstSyncAtMs =
+          artifactSyncStartedAtMs ?? existingThread.lastArtifactSyncAtMs;
+      if (openClawArtifactSyncLimitReachedInternal(
+        attemptCount: artifactSyncAttempts + 1,
+        firstSyncAtMs: firstSyncAtMs,
+        nowMs: syncedAtMs,
+      )) {
+        markOpenClawArtifactSyncTimeoutInternal(
+          sessionKey: normalizedSessionKey,
+          association: association,
+          missingRequiredExtensions: missingRequired.isEmpty
+              ? association.requiredArtifactExtensions
+              : missingRequired,
+          remoteWorkingDirectory: result.remoteWorkingDirectory,
+          remoteWorkspaceRefKind: result.remoteWorkspaceRefKind,
+        );
+        return;
+      }
       upsertTaskThreadInternal(
         normalizedSessionKey,
         lifecycleStatus: 'running',
@@ -924,6 +975,87 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
       lastTaskArtifactRelativePaths: currentTaskArtifactRelativePaths,
       updatedAtMs: syncedAtMs,
     );
+  }
+
+  bool openClawArtifactSyncLimitReachedInternal({
+    required int attemptCount,
+    required double? firstSyncAtMs,
+    double? nowMs,
+  }) {
+    if (attemptCount >= kOpenClawArtifactSyncMaxAttempts) {
+      return true;
+    }
+    final startedAtMs = firstSyncAtMs;
+    if (startedAtMs == null || startedAtMs <= 0) {
+      return false;
+    }
+    final currentMs = nowMs ?? DateTime.now().millisecondsSinceEpoch.toDouble();
+    return currentMs - startedAtMs >=
+        kOpenClawArtifactSyncMaxDuration.inMilliseconds;
+  }
+
+  void markOpenClawArtifactSyncTimeoutInternal({
+    required String sessionKey,
+    required OpenClawTaskAssociation association,
+    Iterable<String> missingRequiredExtensions = const <String>[],
+    String? remoteWorkingDirectory,
+    WorkspaceRefKind? remoteWorkspaceRefKind,
+  }) {
+    final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
+      sessionKey,
+    );
+    final nowMs = DateTime.now().millisecondsSinceEpoch.toDouble();
+    final missing =
+        missingRequiredExtensions
+            .map((ext) => ext.trim())
+            .where((ext) => ext.isNotEmpty)
+            .toSet()
+            .toList(growable: false)
+          ..sort();
+    final missingLabel = missing.isEmpty ? '' : missing.join(', ');
+    final messageText = missing.isEmpty
+        ? appText(
+            'OpenClaw artifact 同步已超时，已按部分结果结束本轮任务。',
+            'OpenClaw artifact sync timed out; this task was finished with partial results.',
+          )
+        : appText(
+            'OpenClaw artifact 同步已超时，缺少必需文件类型：$missingLabel。已按部分结果结束本轮任务。',
+            'OpenClaw artifact sync timed out before required artifact types arrived: $missingLabel. This task was finished with partial results.',
+          );
+    aiGatewayPendingSessionKeysInternal.remove(normalizedSessionKey);
+    clearAiGatewayStreamingTextInternal(normalizedSessionKey);
+    upsertTaskThreadInternal(
+      normalizedSessionKey,
+      lifecycleStatus: 'ready',
+      lastResultCode: kOpenClawArtifactSyncTimeoutCode,
+      lastRemoteWorkingDirectory:
+          remoteWorkingDirectory?.trim().isNotEmpty == true
+          ? remoteWorkingDirectory!.trim()
+          : null,
+      lastRemoteWorkspaceRefKind: remoteWorkspaceRefKind,
+      lastArtifactSyncAtMs: nowMs,
+      lastArtifactSyncStatus: 'partial',
+      openClawTaskAssociation: association.copyWith(status: 'completed'),
+      updatedAtMs: nowMs,
+    );
+    appendLocalSessionMessageInternal(
+      normalizedSessionKey,
+      GatewayChatMessage(
+        id: nextLocalMessageIdInternal(),
+        role: 'assistant',
+        text: messageText,
+        timestampMs: nowMs,
+        toolCallId: null,
+        toolName: null,
+        stopReason: null,
+        pending: false,
+        error: false,
+      ),
+      persistInThreadContext: true,
+    );
+    recomputeTasksInternal();
+    notifyIfActiveInternal();
+    unawaited(flushAssistantThreadPersistenceInternal());
   }
 
   Future<List<int>?> artifactBytesInternal(
