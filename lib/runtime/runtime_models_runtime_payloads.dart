@@ -855,6 +855,7 @@ class TaskInputAttachmentRecord {
     required this.sha256,
     required this.type,
     required this.uploadedAtMs,
+    this.sourcePath = '',
   });
 
   final String name;
@@ -862,6 +863,7 @@ class TaskInputAttachmentRecord {
   final String sha256;
   final String type;
   final double uploadedAtMs;
+  final String sourcePath;
 
   String get key => sha256.trim().toLowerCase();
 
@@ -872,6 +874,7 @@ class TaskInputAttachmentRecord {
       'sha256': key,
       'type': type.trim(),
       'uploadedAtMs': uploadedAtMs,
+      if (sourcePath.trim().isNotEmpty) 'sourcePath': sourcePath.trim(),
     };
   }
 
@@ -889,6 +892,7 @@ class TaskInputAttachmentRecord {
       sha256: json['sha256']?.toString().trim().toLowerCase() ?? '',
       type: json['type']?.toString().trim() ?? '',
       uploadedAtMs: uploadedAtMs(json['uploadedAtMs']),
+      sourcePath: json['sourcePath']?.toString().trim() ?? '',
     );
   }
 }
