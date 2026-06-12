@@ -38,7 +38,9 @@ class DesktopTaskThreadRepository {
     _records
       ..clear()
       ..addEntries(
-        records.map((record) => MapEntry<String, TaskThread>(record.threadId, record)),
+        records.map(
+          (record) => MapEntry<String, TaskThread>(record.threadId, record),
+        ),
       );
     if (persist) {
       _schedulePersist();
@@ -73,45 +75,4 @@ class DesktopTaskThreadRepository {
     });
     unawaited(_persistQueue);
   }
-}
-
-class WebTaskThreadRepository {
-  final Map<String, TaskThread> _records = <String, TaskThread>{};
-
-  Map<String, TaskThread> get recordsView => UnmodifiableMapView(_records);
-  Iterable<TaskThread> get values => _records.values;
-
-  bool containsKey(String sessionKey) => _records.containsKey(sessionKey);
-
-  TaskThread? taskThreadForSession(String sessionKey) => _records[sessionKey];
-
-  TaskThread requireTaskThreadForSession(String sessionKey) {
-    final record = taskThreadForSession(sessionKey);
-    if (record == null) {
-      throw StateError('Missing TaskThread for session $sessionKey.');
-    }
-    return record;
-  }
-
-  void replace(TaskThread record) {
-    _records[record.threadId] = record;
-  }
-
-  void replaceAll(Iterable<TaskThread> records) {
-    _records
-      ..clear()
-      ..addEntries(
-        records.map((record) => MapEntry<String, TaskThread>(record.threadId, record)),
-      );
-  }
-
-  void clear() {
-    _records.clear();
-  }
-
-  void removeWhere(bool Function(String sessionKey, TaskThread record) predicate) {
-    _records.removeWhere(predicate);
-  }
-
-  List<TaskThread> snapshot() => values.toList(growable: false);
 }
