@@ -577,6 +577,7 @@ extension AppControllerDesktopThreadActions on AppController {
           sha256: key,
           type: attachment.type.trim(),
           uploadedAtMs: uploadedAtMs,
+          sourcePath: attachment.sourcePath.trim(),
         ),
       );
     }
@@ -998,8 +999,10 @@ extension AppControllerDesktopThreadActions on AppController {
     if (visibleTaskInputAttachments.isNotEmpty) {
       buffer.writeln('- taskInputAttachments:');
       for (final attachment in visibleTaskInputAttachments) {
+        final sourcePath = attachment.sourcePath.trim();
+        final pathSuffix = sourcePath.isEmpty ? '' : ', path: $sourcePath';
         buffer.writeln(
-          '  - ${attachment.name.trim()} (${attachment.mimeType.trim()}, sha256: ${attachment.key})',
+          '  - ${attachment.name.trim()} (${attachment.mimeType.trim()}, sha256: ${attachment.key}$pathSuffix)',
         );
       }
     }

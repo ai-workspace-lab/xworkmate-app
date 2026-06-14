@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../i18n/app_language.dart';
+import 'playbook_runner.dart';
 import 'workspace_provision_controller.dart';
 import 'workspace_provision_models.dart';
 
@@ -10,11 +11,13 @@ class WorkspaceManagementForm extends StatefulWidget {
     required this.controller,
     required this.onDetect,
     required this.onCreate,
+    required this.onUpgrade,
   });
 
   final WorkspaceProvisionController controller;
   final VoidCallback onDetect;
   final VoidCallback onCreate;
+  final VoidCallback onUpgrade;
 
   @override
   State<WorkspaceManagementForm> createState() =>
@@ -47,7 +50,9 @@ class _WorkspaceManagementFormState extends State<WorkspaceManagementForm> {
     _keyPathController = TextEditingController(text: c.sshKeyPath ?? '');
     _portController = TextEditingController(text: c.sshPort.toString());
     _sudoController = TextEditingController(text: c.sudoPassword ?? '');
-    _installPathController = TextEditingController(text: c.installPath);
+    _installPathController = TextEditingController(
+      text: PlaybookRunner.setupScriptUrl,
+    );
     for (final row in c.extraConfigs) {
       _extraRows.add(
         _ExtraRowControllers(
@@ -73,7 +78,7 @@ class _WorkspaceManagementFormState extends State<WorkspaceManagementForm> {
       _syncText(_keyPathController, widget.controller.sshKeyPath ?? '');
       _syncText(_portController, widget.controller.sshPort.toString());
       _syncText(_sudoController, widget.controller.sudoPassword ?? '');
-      _syncText(_installPathController, widget.controller.installPath);
+      _syncText(_installPathController, PlaybookRunner.setupScriptUrl);
       _syncExtraRows(widget.controller.extraConfigs);
     } finally {
       _syncingFromController = false;
@@ -145,9 +150,7 @@ class _WorkspaceManagementFormState extends State<WorkspaceManagementForm> {
       sshKeyPath: _keyPathController.text.trim(),
       sshPort: int.tryParse(_portController.text.trim()) ?? 22,
       sudoPassword: _sudoController.text,
-      installPath: _installPathController.text.trim().isEmpty
-          ? '/opt/xworkspace/playbooks'
-          : _installPathController.text.trim(),
+      installPath: '',
       extraConfigs: _extraRows
           .map(
             (row) => WorkspaceExtraConfig(
@@ -311,8 +314,8 @@ class _WorkspaceManagementFormState extends State<WorkspaceManagementForm> {
                   _field(
                     width: 320,
                     controller: _installPathController,
-                    enabled: !disabled,
-                    label: appText('安装路径', 'Install path'),
+                    enabled: false,
+                    label: appText('执行脚本', 'Setup script'),
                     icon: Icons.storage_outlined,
                   ),
                   _ExtraConfigEditor(
@@ -367,17 +370,16 @@ class _WorkspaceManagementFormState extends State<WorkspaceManagementForm> {
                   icon: const Icon(Icons.rocket_launch_outlined),
                   label: Text(appText('创建工作空间', 'Create workspace')),
                 ),
-                Tooltip(
-                  message: appText(
-                    '等待 playbooks 仓库提供 upgrade-ai-workspace.yml 后启用',
-                    'Enabled after playbooks provides upgrade-ai-workspace.yml',
-                  ),
-                  child: FilledButton.tonalIcon(
-                    key: const Key('workspace-management-upgrade-button'),
-                    onPressed: null,
-                    icon: const Icon(Icons.system_update_alt_outlined),
-                    label: Text(appText('升级工作空间', 'Upgrade workspace')),
-                  ),
+                FilledButton.tonalIcon(
+                  key: const Key('workspace-management-upgrade-button'),
+                  onPressed: disabled
+                      ? null
+                      : () {
+                          _sync();
+                          widget.onUpgrade();
+                        },
+                  icon: const Icon(Icons.system_update_alt_outlined),
+                  label: Text(appText('升级工作空间', 'Upgrade workspace')),
                 ),
               ],
             ),
@@ -438,7 +440,7 @@ class _ExtraConfigEditor extends StatelessWidget {
         Row(
           children: [
             Text(
-              appText('额外配置', 'Extra configs'),
+              appText('脚本参数', 'Script parameters'),
               style: theme.textTheme.titleSmall?.copyWith(
                 fontWeight: FontWeight.w700,
               ),
@@ -569,7 +571,9 @@ class _ExtraRowControllers {
 
   bool get isSensitiveKey {
     final key = keyController.text.trim().toUpperCase();
-    return key.contains('KEY') || key.contains('TOKEN') || key.contains('SECRET');
+    return key.contains('KEY') ||
+        key.contains('TOKEN') ||
+        key.contains('SECRET');
   }
 
   void dispose() {

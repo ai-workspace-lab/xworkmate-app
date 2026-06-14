@@ -17,6 +17,7 @@ class GatewayChatAttachmentPayload {
     required this.fileName,
     required this.content,
     this.sha256 = '',
+    this.sourcePath = '',
   });
 
   final String type;
@@ -24,6 +25,7 @@ class GatewayChatAttachmentPayload {
   final String fileName;
   final String content;
   final String sha256;
+  final String sourcePath;
 
   Map<String, dynamic> toJson() {
     return {
@@ -32,6 +34,7 @@ class GatewayChatAttachmentPayload {
       'fileName': fileName,
       'content': content,
       if (sha256.trim().isNotEmpty) 'sha256': sha256.trim(),
+      if (sourcePath.trim().isNotEmpty) 'sourcePath': sourcePath.trim(),
     };
   }
 }
@@ -360,6 +363,7 @@ class LocalDeviceIdentity {
     );
   }
 }
+
 class CollaborationAttachment {
   const CollaborationAttachment({
     required this.name,
