@@ -78,16 +78,37 @@ BRIDGE_PORT_443_OPEN=yes
       expect(info.displaySummary, contains('桥接 443 端口当前空闲'));
     });
 
-    test('ansible parser maps human readable output to step events', () {
-      final parser = AnsibleOutputParser();
+    test('setup script command passes env to remote bash', () {
+      final command = PlaybookRunner.setupScriptCommand(
+        ssh: const SshConfig(
+          host: '203.0.113.10',
+          port: 22,
+          username: 'root',
+          authMethod: AuthMethod.sshKey,
+        ),
+        action: 'create',
+        workspaceDomain: 'workspace.example.com',
+        bridgeDomain: 'xworkmate-bridge.workspace.example.com',
+        bridgeToken: "tok'en",
+        extraConfigs: [
+          WorkspaceExtraConfig(
+            key: 'AI_WORKSPACE_SECURITY_LEVEL',
+            value: 'strict',
+          ),
+          WorkspaceExtraConfig(
+            key: 'XWORKSPACE_CONSOLE_ENABLE_XRDP',
+            value: 'true',
+          ),
+        ],
+      );
 
-      final start = parser.parseLine('TASK [Configure caddy TLS]');
-      final ok = parser.parseLine('changed: [localhost]');
-
-      expect(start?.stepId, 'config_caddy');
-      expect(start?.status, StepStatus.running);
-      expect(ok?.stepId, 'config_caddy');
-      expect(ok?.status, StepStatus.success);
+      expect(command, contains('curl -sfL'));
+      expect(command, contains(PlaybookRunner.setupScriptUrl));
+      expect(command, contains('AI_WORKSPACE_SECURITY_LEVEL='));
+      expect(command, contains('XWORKSPACE_CONSOLE_ENABLE_XRDP='));
+      expect(command, contains('TOKEN='));
+      expect(command, contains("'tok'\"'\"'en'"));
+      expect(command, contains('bash -lc'));
     });
 
     test('detection command quotes workspace domain', () {
@@ -103,7 +124,9 @@ BRIDGE_PORT_443_OPEN=yes
 
     test('bridge domain uses user input when already a bridge host', () {
       expect(
-        WorkspaceProvisionController.deriveBridgeDomain('acp-bridge.onwalk.net'),
+        WorkspaceProvisionController.deriveBridgeDomain(
+          'acp-bridge.onwalk.net',
+        ),
         'acp-bridge.onwalk.net',
       );
     });
@@ -190,11 +213,10 @@ BRIDGE_PORT_443_OPEN=yes
       );
     });
 
-    test('createWorkspace runs playbook flow with fake SSH', () async {
+    test('createWorkspace runs remote setup script with fake SSH', () async {
       final executor = _FakeSshExecutor(
         commandResults: [
-          const SshResult(exitCode: 0, stdout: 'pulled', stderr: ''),
-          const SshResult(exitCode: 0, stdout: 'wrote', stderr: ''),
+          const SshResult(exitCode: 0, stdout: 'curl ready', stderr: ''),
           const SshResult(
             exitCode: 0,
             stdout: '''
@@ -207,8 +229,8 @@ SERVICE_HERMES_GATEWAY=active
           ),
         ],
         streamingChunks: [
-          'TASK [Install desktop packages]\nok: [localhost]\n',
-          'TASK [Configure caddy TLS]\nchanged: [localhost]\n',
+          'Installing desktop packages\n',
+          'Configuring caddy TLS\n',
         ],
       );
       final controller = WorkspaceProvisionController(
@@ -250,11 +272,21 @@ SERVICE_HERMES_GATEWAY=active
         'https://xworkmate-bridge.workspace.example.com',
       );
       expect(controller.deploymentResult?.bridgeToken, isNotEmpty);
-      expect(executor.commands.join('\n'), contains('ansible-playbook'));
+      expect(executor.commands.join('\n'), contains('curl -sfL'));
+      expect(
+        executor.commands.join('\n'),
+        contains('setup-ai-workspace-all-in-one.sh'),
+      );
+      expect(
+        executor.commands.join('\n'),
+        contains('AI_WORKSPACE_SECURITY_LEVEL='),
+      );
     });
 
     test('precheck does not block when 443 is not open', () async {
-      final controller = WorkspaceProvisionController(executor: _FakeSshExecutor());
+      final controller = WorkspaceProvisionController(
+        executor: _FakeSshExecutor(),
+      );
       addTearDown(controller.dispose);
       controller.updateForm(
         serverAddress: '203.0.113.10',
@@ -286,7 +318,9 @@ SERVICE_HERMES_GATEWAY=active
     });
 
     test('precheck blocks when bridge DNS is missing', () async {
-      final controller = WorkspaceProvisionController(executor: _FakeSshExecutor());
+      final controller = WorkspaceProvisionController(
+        executor: _FakeSshExecutor(),
+      );
       addTearDown(controller.dispose);
       controller.updateForm(
         serverAddress: '203.0.113.10',
@@ -314,14 +348,13 @@ SERVICE_HERMES_GATEWAY=active
         bridgePort443Open: true,
       );
 
-      expect(
-        controller.validatePrecheckBlockingIssue(),
-        contains('A 记录'),
-      );
+      expect(controller.validatePrecheckBlockingIssue(), contains('A 记录'));
     });
 
     test('precheck allows debian family systems', () async {
-      final controller = WorkspaceProvisionController(executor: _FakeSshExecutor());
+      final controller = WorkspaceProvisionController(
+        executor: _FakeSshExecutor(),
+      );
       addTearDown(controller.dispose);
       controller.updateForm(
         serverAddress: '203.0.113.10',
@@ -352,18 +385,20 @@ SERVICE_HERMES_GATEWAY=active
       expect(controller.validatePrecheckBlockingIssue(), isNull);
     });
 
-    test('import yaml restores editable state without leaking redacted values', () {
-      final controller = WorkspaceProvisionController();
-      addTearDown(controller.dispose);
-      controller.updateForm(
-        serverAddress: 'old.example.com',
-        workspaceDomain: 'old.net',
-        sshUsername: 'root',
-        sshPassword: 'keep-secret',
-        showAdvanced: false,
-      );
+    test(
+      'import yaml restores editable state without leaking redacted values',
+      () {
+        final controller = WorkspaceProvisionController();
+        addTearDown(controller.dispose);
+        controller.updateForm(
+          serverAddress: 'old.example.com',
+          workspaceDomain: 'old.net',
+          sshUsername: 'root',
+          sshPassword: 'keep-secret',
+          showAdvanced: false,
+        );
 
-      controller.importYaml('''
+        controller.importYaml('''
 server_address: 167.179.110.129
 workspace_domain: onwalk.net
 ssh_username: root
@@ -382,69 +417,70 @@ extra_configs:
     note: "OpenClaw"
 ''');
 
-      expect(controller.serverAddress, '167.179.110.129');
-      expect(controller.workspaceDomain, 'onwalk.net');
-      expect(controller.showAdvanced, isTrue);
-      expect(controller.sshPassword, 'keep-secret');
-      expect(controller.extraConfigs.first.value, 'deepseek-new');
-      expect(controller.extraConfigs.last.value, '');
-    });
+        expect(controller.serverAddress, '167.179.110.129');
+        expect(controller.workspaceDomain, 'onwalk.net');
+        expect(controller.showAdvanced, isTrue);
+        expect(controller.sshPassword, 'keep-secret');
+        expect(controller.extraConfigs.first.value, 'deepseek-new');
+        expect(controller.extraConfigs.last.value, '');
+      },
+    );
 
-    test('post deploy verification fails when external probe does not connect', () async {
-      final controller = WorkspaceProvisionController(
-        executor: _FakeSshExecutor(
-          commandResults: [
-            const SshResult(exitCode: 0, stdout: 'pulled', stderr: ''),
-            const SshResult(exitCode: 0, stdout: 'wrote', stderr: ''),
-            const SshResult(
-              exitCode: 0,
-              stdout: '''
+    test(
+      'post deploy verification fails when external probe does not connect',
+      () async {
+        final controller = WorkspaceProvisionController(
+          executor: _FakeSshExecutor(
+            commandResults: [
+              const SshResult(exitCode: 0, stdout: 'curl ready', stderr: ''),
+              const SshResult(
+                exitCode: 0,
+                stdout: '''
 SERVICE_CADDY=active
 SERVICE_XWORKMATE_BRIDGE=active
 ''',
-              stderr: '',
-            ),
-          ],
-          streamingChunks: [
-            'TASK [Configure caddy TLS]\nchanged: [localhost]\n',
-          ],
-        ),
-        externalPortProbe: (host) async {
-          throw PlaybookRunException('probe failed for $host');
-        },
-      );
-      addTearDown(controller.dispose);
-      controller.updateForm(
-        serverAddress: '203.0.113.10',
-        workspaceDomain: 'workspace.example.com',
-        sshKeyContent: 'key',
-      );
-      controller.serverInfo = const ServerInfo(
-        os: 'Ubuntu 22.04',
-        arch: 'x86_64',
-        sudoAvailable: true,
-        dockerVersion: 'missing',
-        systemdVersion: 'systemd 249',
-        caddyVersion: 'missing',
-        ansibleVersion: 'ansible [core 2.14]',
-        gitVersion: 'git version 2.34.1',
-        dnsAddressCount: 1,
-        port80ListenerCount: 0,
-        port80Open: true,
-        port443ListenerCount: 0,
-        port443Open: true,
-        bridgeDnsAddressCount: 1,
-        bridgePort80ListenerCount: 0,
-        bridgePort80Open: true,
-        bridgePort443ListenerCount: 0,
-        bridgePort443Open: true,
-      );
+                stderr: '',
+              ),
+            ],
+            streamingChunks: ['Configuring caddy TLS\n'],
+          ),
+          externalPortProbe: (host) async {
+            throw PlaybookRunException('probe failed for $host');
+          },
+        );
+        addTearDown(controller.dispose);
+        controller.updateForm(
+          serverAddress: '203.0.113.10',
+          workspaceDomain: 'workspace.example.com',
+          sshKeyContent: 'key',
+        );
+        controller.serverInfo = const ServerInfo(
+          os: 'Ubuntu 22.04',
+          arch: 'x86_64',
+          sudoAvailable: true,
+          dockerVersion: 'missing',
+          systemdVersion: 'systemd 249',
+          caddyVersion: 'missing',
+          ansibleVersion: 'ansible [core 2.14]',
+          gitVersion: 'git version 2.34.1',
+          dnsAddressCount: 1,
+          port80ListenerCount: 0,
+          port80Open: true,
+          port443ListenerCount: 0,
+          port443Open: true,
+          bridgeDnsAddressCount: 1,
+          bridgePort80ListenerCount: 0,
+          bridgePort80Open: true,
+          bridgePort443ListenerCount: 0,
+          bridgePort443Open: true,
+        );
 
-      await controller.createWorkspace();
+        await controller.createWorkspace();
 
-      expect(controller.phase, ProvisionPhase.failed);
-      expect(controller.errorMessage, contains('probe failed'));
-    });
+        expect(controller.phase, ProvisionPhase.failed);
+        expect(controller.errorMessage, contains('probe failed'));
+      },
+    );
   });
 }
 
