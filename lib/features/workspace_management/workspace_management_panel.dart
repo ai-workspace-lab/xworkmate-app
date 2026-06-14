@@ -62,7 +62,9 @@ class _WorkspaceManagementPanelState extends State<WorkspaceManagementPanel> {
     final connection = widget.appController.connection;
     if (connection.status == RuntimeConnectionStatus.connected) {
       final remote = connection.remoteAddress?.trim() ?? '';
-      final parsed = Uri.tryParse(remote.contains('://') ? remote : 'https://$remote');
+      final parsed = Uri.tryParse(
+        remote.contains('://') ? remote : 'https://$remote',
+      );
       if (parsed != null && parsed.host.trim().isNotEmpty) {
         return parsed.host.trim();
       }
@@ -104,7 +106,45 @@ class _WorkspaceManagementPanelState extends State<WorkspaceManagementPanel> {
       ),
     );
     if (confirmed == true) {
-      unawaited(_controller.createWorkspace(installMissingPrerequisites: true));
+      unawaited(_controller.createWorkspace());
+    }
+  }
+
+  Future<void> _confirmUpgrade() async {
+    if (!_controller.canSubmit) {
+      await _controller.upgradeWorkspace();
+      return;
+    }
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(appText('确认升级工作空间', 'Confirm workspace upgrade')),
+        content: Text(
+          appText(
+            '即将在 ${_controller.serverAddress} 上执行远程 all-in-one 脚本升级 AI 工作空间。\n\n'
+                '域名: ${_controller.workspaceDomain}\n'
+                'SSH 用户: ${_controller.sshUsername}\n\n'
+                '该操作会通过 curl 下载脚本并在远程主机执行，请确认这是你自己的服务器。',
+            'XWorkmate will run the remote all-in-one script to upgrade the AI Workspace on ${_controller.serverAddress}.\n\n'
+                'Domain: ${_controller.workspaceDomain}\n'
+                'SSH user: ${_controller.sshUsername}\n\n'
+                'This downloads the script with curl and runs it on the remote host. Confirm this is your own server.',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(appText('取消', 'Cancel')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(appText('确认升级', 'Upgrade')),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      unawaited(_controller.upgradeWorkspace());
     }
   }
 
@@ -234,8 +274,10 @@ class _WorkspaceManagementPanelState extends State<WorkspaceManagementPanel> {
                         children: [
                           WorkspaceManagementForm(
                             controller: _controller,
-                            onDetect: () => unawaited(_controller.detectServer()),
+                            onDetect: () =>
+                                unawaited(_controller.detectServer()),
                             onCreate: () => unawaited(_confirmCreate()),
+                            onUpgrade: () => unawaited(_confirmUpgrade()),
                           ),
                           const SizedBox(height: 20),
                           WorkspaceManagementSteps(steps: _controller.steps),
@@ -275,9 +317,8 @@ class _LogPanel extends StatelessWidget {
           children: [
             TextButton.icon(
               key: const Key('workspace-management-log-toggle'),
-              onPressed: () => controller.updateForm(
-                logsExpanded: !controller.logsExpanded,
-              ),
+              onPressed: () =>
+                  controller.updateForm(logsExpanded: !controller.logsExpanded),
               icon: Icon(
                 controller.logsExpanded ? Icons.expand_less : Icons.expand_more,
               ),
