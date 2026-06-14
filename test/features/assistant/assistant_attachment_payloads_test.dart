@@ -34,6 +34,7 @@ void main() {
     expect(payloads.single.fileName, 'note.txt');
     expect(payloads.single.mimeType, 'text/plain');
     expect(payloads.single.type, 'file');
+    expect(payloads.single.sourcePath, file.path);
     expect(
       base64Decode(payloads.single.content),
       utf8.encode('hello attachment'),
