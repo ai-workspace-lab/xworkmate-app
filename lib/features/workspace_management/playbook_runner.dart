@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import '../../i18n/app_language.dart';
 import 'server_detector.dart';
 import 'ssh_executor.dart';
@@ -8,9 +6,8 @@ import 'workspace_provision_models.dart';
 class PlaybookRunner {
   const PlaybookRunner(this.executor);
 
-  static const String playbookRepoUrl = 'https://github.com/x-evor/playbooks.git';
-  static const String createPlaybook = 'setup-ai-workspace-all-in-one.yml';
-  static const String upgradePlaybook = 'upgrade-ai-workspace.yml';
+  static const String setupScriptUrl =
+      'https://raw.githubusercontent.com/ai-workspace-lab/xworkspace-console/main/scripts/setup-ai-workspace-all-in-one.sh';
 
   final WorkspaceSshExecutor executor;
 
@@ -20,73 +17,43 @@ class PlaybookRunner {
     required String workspaceDomain,
     required String bridgeDomain,
     required String bridgeToken,
-    required String installPath,
-    required bool installMissingPrerequisites,
     required ServerInfo? serverInfo,
     List<WorkspaceExtraConfig>? extraConfigs,
     required void Function(String stepId, StepStatus status, String? message)
     onStepUpdate,
     required void Function(String logLine) onLog,
   }) async {
-    if (action == 'upgrade') {
-      throw PlaybookRunException(
-        appText(
-          'playbooks 仓库尚未提供 $upgradePlaybook。',
-          'The playbooks repository does not provide $upgradePlaybook yet.',
-        ),
-      );
-    }
-
     var info = serverInfo;
     if (info == null) {
       onStepUpdate('ssh_connect', StepStatus.running, null);
-      info = await ServerDetector(executor).detect(
-        ssh,
-        workspaceDomain,
-        bridgeDomain,
-      );
+      info = await ServerDetector(
+        executor,
+      ).detect(ssh, workspaceDomain, bridgeDomain);
       onStepUpdate('ssh_connect', StepStatus.success, null);
       onStepUpdate('detect_env', StepStatus.success, info.displaySummary);
     }
 
-    if (info.hasMissingPrerequisites) {
-      if (!installMissingPrerequisites) {
-        throw PlaybookRunException(
-          appText(
-            '目标服务器缺少 git 或 ansible。',
-            'The target server is missing git or ansible.',
-          ),
-        );
-      }
-      onStepUpdate('install_deps', StepStatus.running, appText('安装 git/ansible', 'Installing git/ansible'));
-      await _executeChecked(ssh, _preflightInstallCommand(ssh), onLog);
-      onStepUpdate('install_deps', StepStatus.success, appText('基础依赖已安装', 'Base dependencies installed'));
-    }
+    onStepUpdate(
+      'install_deps',
+      StepStatus.running,
+      appText('检查 curl', 'Checking curl'),
+    );
+    await _executeChecked(ssh, _preflightInstallCommand(ssh), onLog);
+    onStepUpdate(
+      'install_deps',
+      StepStatus.success,
+      appText('curl 已就绪', 'curl is ready'),
+    );
 
-    onStepUpdate('install_deps', StepStatus.running, appText('拉取 playbooks', 'Fetching playbooks'));
-    await _executeChecked(ssh, _cloneOrPullCommand(installPath), onLog);
-
-    final inventoryPath = '/tmp/xworkspace-inventory.ini';
-    final varsPath = '/tmp/xworkspace-vars.yml';
-    await _executeChecked(
-      ssh,
-      _writeInventoryAndVarsCommand(
-        inventoryPath: inventoryPath,
-        varsPath: varsPath,
+    await _runSetupScript(
+      ssh: ssh,
+      command: setupScriptCommand(
+        ssh: ssh,
+        action: action,
         workspaceDomain: workspaceDomain,
         bridgeDomain: bridgeDomain,
         bridgeToken: bridgeToken,
         extraConfigs: extraConfigs,
-      ),
-      onLog,
-    );
-
-    await _runAnsible(
-      ssh: ssh,
-      command: _ansibleCommand(
-        installPath: installPath,
-        inventoryPath: inventoryPath,
-        varsPath: varsPath,
       ),
       onStepUpdate: onStepUpdate,
       onLog: onLog,
@@ -109,15 +76,20 @@ class PlaybookRunner {
     }
   }
 
-  Future<void> _runAnsible({
+  Future<void> _runSetupScript({
     required SshConfig ssh,
     required String command,
     required void Function(String stepId, StepStatus status, String? message)
     onStepUpdate,
     required void Function(String logLine) onLog,
   }) async {
-    final parser = AnsibleOutputParser();
+    final parser = SetupScriptOutputParser();
     var failed = false;
+    onStepUpdate(
+      'deploy_webrtc',
+      StepStatus.running,
+      appText('执行远程安装脚本', 'Running remote setup script'),
+    );
     await for (final chunk in executor.executeStreaming(ssh, command)) {
       for (final raw in chunk.split(RegExp(r'\r?\n'))) {
         final line = raw.trimRight();
@@ -136,7 +108,9 @@ class PlaybookRunner {
       }
     }
     if (failed) {
-      throw PlaybookRunException(appText('Playbook 执行失败。', 'Playbook execution failed.'));
+      throw PlaybookRunException(
+        appText('远程安装脚本执行失败。', 'Remote setup script failed.'),
+      );
     }
     for (final id in <String>[
       'install_deps',
@@ -151,29 +125,24 @@ class PlaybookRunner {
   }
 
   static String _preflightInstallCommand(SshConfig ssh) {
-    final apt = 'DEBIAN_FRONTEND=noninteractive apt-get update && '
-        'DEBIAN_FRONTEND=noninteractive apt-get install -y git ansible';
+    final apt =
+        'DEBIAN_FRONTEND=noninteractive apt-get update && '
+        'DEBIAN_FRONTEND=noninteractive apt-get install -y curl ca-certificates';
     if (ssh.username == 'root') {
-      return apt;
+      return 'if command -v curl >/dev/null 2>&1; then echo curl ready; else $apt; fi';
     }
     final sudoPassword = ssh.sudoPassword?.trim();
     if (sudoPassword != null && sudoPassword.isNotEmpty) {
-      return "printf '%s\\n' ${shellQuote(sudoPassword)} | sudo -S sh -lc ${shellQuote(apt)}";
+      return 'if command -v curl >/dev/null 2>&1; then echo curl ready; '
+          "else printf '%s\\n' ${shellQuote(sudoPassword)} | sudo -S sh -lc ${shellQuote(apt)}; fi";
     }
-    return 'sudo -n sh -lc ${shellQuote(apt)}';
+    return 'if command -v curl >/dev/null 2>&1; then echo curl ready; '
+        'else sudo -n sh -lc ${shellQuote(apt)}; fi';
   }
 
-  static String _cloneOrPullCommand(String installPath) {
-    final path = shellQuote(installPath.trim());
-    final repo = shellQuote(playbookRepoUrl);
-    return 'mkdir -p $path && cd $path && '
-        'if [ -d .git ]; then git pull --ff-only origin main; '
-        'else git clone $repo .; fi';
-  }
-
-  static String _writeInventoryAndVarsCommand({
-    required String inventoryPath,
-    required String varsPath,
+  static String setupScriptCommand({
+    required SshConfig ssh,
+    required String action,
     required String workspaceDomain,
     required String bridgeDomain,
     required String bridgeToken,
@@ -182,91 +151,96 @@ class PlaybookRunner {
     final domain = workspaceDomain.trim();
     final bridge = bridgeDomain.trim();
     final bridgeUrl = 'https://$bridge';
-    final extraEnvVars = <String>[];
+    final env = <String, String>{
+      'XWORKSPACE_SETUP_ACTION': action.trim().isEmpty
+          ? 'create'
+          : action.trim(),
+      'WORKSPACE_DOMAIN': domain,
+      'XWORKSPACE_CONSOLE_DOMAIN': domain,
+      'XWORKMATE_BRIDGE_DOMAIN': bridge,
+      'XWORKMATE_BRIDGE_PUBLIC_BASE_URL': bridgeUrl,
+      'XWORKMATE_BRIDGE_SERVICE_DOMAIN': bridge,
+      'XWORKMATE_BRIDGE_SERVICE_PUBLIC_BASE_URL': bridgeUrl,
+      'XWORKMATE_BRIDGE_AUTH_TOKEN': bridgeToken.trim(),
+      'TOKEN': bridgeToken.trim(),
+    };
     for (final config in extraConfigs ?? const <WorkspaceExtraConfig>[]) {
       final key = config.key.trim();
       final value = config.value.trim();
       if (key.isEmpty || value.isEmpty) {
         continue;
       }
-      extraEnvVars.add('$key: ${shellQuote(value)}');
-      final note = config.note.trim();
-      if (note.isNotEmpty) {
-        extraEnvVars.add('# ${note.length > 20 ? note.substring(0, 20) : note}');
-      }
+      env[key] = value;
     }
-    final extraEnvBlock =
-        extraEnvVars.isEmpty ? '' : '${extraEnvVars.join('\n')}\n';
-    return '''
-cat > ${shellQuote(inventoryPath)} <<'EOF'
-[all]
-localhost ansible_connection=local
-EOF
-cat > ${shellQuote(varsPath)} <<'EOF'
-workspace_domain: $domain
-xworkmate_bridge_domain: $bridge
-xworkmate_bridge_public_base_url: $bridgeUrl
-xworkmate_bridge_service_domain: $bridge
-xworkmate_bridge_service_public_base_url: $bridgeUrl
-xworkmate_bridge_auth_token: ${bridgeToken.trim()}
-${extraEnvBlock}EOF
-''';
+    final envArgs = env.entries
+        .where((entry) => _isValidEnvKey(entry.key))
+        .map((entry) => '${entry.key}=${shellQuote(entry.value)}')
+        .join(' ');
+    final script =
+        'set -o pipefail; curl -sfL ${shellQuote(setupScriptUrl)} | bash -';
+    final command = 'env $envArgs bash -lc ${shellQuote(script)} 2>&1';
+    if (ssh.username == 'root') {
+      return command;
+    }
+    final sudoPassword = ssh.sudoPassword?.trim();
+    if (sudoPassword != null && sudoPassword.isNotEmpty) {
+      return "printf '%s\\n' ${shellQuote(sudoPassword)} | sudo -S $command";
+    }
+    return 'sudo -n $command';
   }
 
-  static String _ansibleCommand({
-    required String installPath,
-    required String inventoryPath,
-    required String varsPath,
-  }) {
-    return 'cd ${shellQuote(installPath.trim())} && '
-        'ANSIBLE_FORCE_COLOR=0 ansible-playbook '
-        '-i ${shellQuote(inventoryPath)} '
-        '${shellQuote(createPlaybook)} '
-        '-e @${shellQuote(varsPath)} 2>&1';
+  static bool _isValidEnvKey(String key) {
+    return RegExp(r'^[A-Za-z_][A-Za-z0-9_]*$').hasMatch(key);
   }
 }
 
-class AnsibleStepEvent {
-  const AnsibleStepEvent(this.stepId, this.status, this.message);
+class SetupScriptStepEvent {
+  const SetupScriptStepEvent(this.stepId, this.status, this.message);
 
   final String stepId;
   final StepStatus status;
   final String? message;
 }
 
-class AnsibleOutputParser {
-  String? _currentStepId;
-  String? _currentTask;
-
-  AnsibleStepEvent? parseLine(String line) {
-    final taskMatch = RegExp(r'^TASK \[(.+?)\]').firstMatch(line);
-    if (taskMatch != null) {
-      _currentTask = taskMatch.group(1);
-      _currentStepId = stepIdForTask(_currentTask ?? '');
-      return AnsibleStepEvent(_currentStepId!, StepStatus.running, _currentTask);
-    }
-    if (_currentStepId == null) {
-      return null;
-    }
+class SetupScriptOutputParser {
+  SetupScriptStepEvent? parseLine(String line) {
     final lower = line.toLowerCase();
-    if (lower.startsWith('fatal:') || lower.contains(' failed=')) {
-      return AnsibleStepEvent(_currentStepId!, StepStatus.failed, line);
+    if (lower.contains('error') ||
+        lower.contains('failed') ||
+        lower.contains('fatal')) {
+      return SetupScriptStepEvent(
+        stepIdForText(lower),
+        StepStatus.failed,
+        line,
+      );
     }
-    if (lower.startsWith('ok:') || lower.startsWith('changed:')) {
-      return AnsibleStepEvent(_currentStepId!, StepStatus.success, _currentTask);
+    final stepId = stepIdForText(lower);
+    if (lower.contains('install') ||
+        lower.contains('deploy') ||
+        lower.contains('config') ||
+        lower.contains('start') ||
+        lower.contains('enable') ||
+        lower.contains('caddy') ||
+        lower.contains('gateway') ||
+        lower.contains('bridge') ||
+        lower.contains('xworkspace')) {
+      return SetupScriptStepEvent(stepId, StepStatus.running, line);
     }
-    if (lower.startsWith('skipping:')) {
-      return AnsibleStepEvent(_currentStepId!, StepStatus.skipped, _currentTask);
+    if (lower.contains('done') ||
+        lower.contains('success') ||
+        lower.contains('complete')) {
+      return SetupScriptStepEvent(stepId, StepStatus.success, line);
     }
     return null;
   }
 
-  static String stepIdForTask(String task) {
-    final text = task.toLowerCase();
+  static String stepIdForText(String text) {
     if (text.contains('bridge') || text.contains('acp_server')) {
       return 'deploy_bridge';
     }
-    if (text.contains('caddy') || text.contains('tls') || text.contains('cert')) {
+    if (text.contains('caddy') ||
+        text.contains('tls') ||
+        text.contains('cert')) {
       return 'config_caddy';
     }
     if (text.contains('gateway') || text.contains('openclaw')) {
