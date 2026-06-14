@@ -10,7 +10,7 @@ import 'package:xworkmate/runtime/secure_config_store.dart';
 import 'package:xworkmate/theme/app_theme.dart';
 
 void main() {
-  testWidgets('panel renders form controls and keeps upgrade disabled', (
+  testWidgets('panel renders form controls and enables upgrade', (
     tester,
   ) async {
     final appController = _NoopAppController(store: _MemorySecureConfigStore());
@@ -44,13 +44,13 @@ void main() {
             find.byKey(const Key('workspace-management-upgrade-button')),
           )
           .onPressed,
-      isNull,
+      isNotNull,
     );
 
     await tester.tap(find.text('高级选项'));
     await tester.pumpAndSettle();
 
-    expect(find.text('安装路径'), findsOneWidget);
+    expect(find.text('执行脚本'), findsOneWidget);
   });
 
   testWidgets('panel switches auth method and expands logs', (tester) async {

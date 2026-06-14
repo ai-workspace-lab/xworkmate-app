@@ -32,12 +32,40 @@ class WorkspaceProvisionController extends ChangeNotifier {
   String? sshKeyPath;
   int sshPort = 22;
   String? sudoPassword;
-  String installPath = '/opt/xworkspace/playbooks';
+  String installPath = '';
   final List<WorkspaceExtraConfig> extraConfigs = <WorkspaceExtraConfig>[
-    WorkspaceExtraConfig(key: 'DEEPSEEK_API_KEY', value: '', note: ''),
-    WorkspaceExtraConfig(key: 'NVIDIA_API_KEY', value: '', note: ''),
-    WorkspaceExtraConfig(key: 'OLLAMA_API_KEY', value: '', note: ''),
-    WorkspaceExtraConfig(key: 'OPENCLAW_GATEWAY_TOKEN', value: '', note: ''),
+    WorkspaceExtraConfig(
+      key: 'AI_WORKSPACE_SECURITY_LEVEL',
+      value: 'strict',
+      note: '',
+    ),
+    WorkspaceExtraConfig(
+      key: 'XWORKSPACE_CONSOLE_ENABLE_XRDP',
+      value: 'true',
+      note: '',
+    ),
+    WorkspaceExtraConfig(
+      key: 'XWORKSPACE_CONSOLE_PUBLIC_ACCESS',
+      value: 'true',
+      note: '',
+    ),
+    WorkspaceExtraConfig(
+      key: 'XWORKMATE_BRIDGE_PUBLIC_ACCESS',
+      value: 'true',
+      note: '',
+    ),
+    WorkspaceExtraConfig(
+      key: 'GATEWAY_OPENCLAW_PUBLIC_ACCESS',
+      value: 'false',
+      note: '',
+    ),
+    WorkspaceExtraConfig(key: 'VAULT_PUBLIC_ACCESS', value: 'false', note: ''),
+    WorkspaceExtraConfig(
+      key: 'LITELLM_API_CADDY_STRICT_WHITELIST',
+      value: 'true',
+      note: '',
+    ),
+    WorkspaceExtraConfig(key: 'TOKEN', value: '', note: ''),
   ];
   bool showAdvanced = false;
   bool logsExpanded = false;
@@ -96,11 +124,9 @@ class WorkspaceProvisionController extends ChangeNotifier {
     _prepareRun(ProvisionPhase.checking);
     _setStep('ssh_connect', StepStatus.running, null);
     try {
-      final detected = await ServerDetector(executor).detect(
-        sshConfig(),
-        workspaceDomain.trim(),
-        bridgeDomain,
-      );
+      final detected = await ServerDetector(
+        executor,
+      ).detect(sshConfig(), workspaceDomain.trim(), bridgeDomain);
       serverInfo = detected;
       _setStep('ssh_connect', StepStatus.success, null);
       final blockingIssue = validatePrecheckBlockingIssueFor(detected);
@@ -122,7 +148,7 @@ class WorkspaceProvisionController extends ChangeNotifier {
     }
   }
 
-  Future<void> createWorkspace({bool installMissingPrerequisites = false}) async {
+  Future<void> createWorkspace() async {
     if (!canSubmit) {
       _fail(WorkspaceProvisionValidationException());
       return;
@@ -130,11 +156,9 @@ class WorkspaceProvisionController extends ChangeNotifier {
     _prepareRun(ProvisionPhase.running, keepDetection: true);
     try {
       if (serverInfo == null) {
-        final detected = await ServerDetector(executor).detect(
-          sshConfig(),
-          workspaceDomain.trim(),
-          bridgeDomain,
-        );
+        final detected = await ServerDetector(
+          executor,
+        ).detect(sshConfig(), workspaceDomain.trim(), bridgeDomain);
         serverInfo = detected;
       }
       final blockingIssue = validatePrecheckBlockingIssue();
@@ -154,15 +178,14 @@ class WorkspaceProvisionController extends ChangeNotifier {
         bridgeDomain: bridgeDomain,
         bridgeToken: bridgeToken,
         extraConfigs: extraConfigs,
-        installPath: installPath.trim(),
-        installMissingPrerequisites: installMissingPrerequisites,
         serverInfo: serverInfo,
         onStepUpdate: _setStep,
         onLog: _appendLog,
       );
       await _verifyDeploymentReadiness();
       for (final step in steps) {
-        if (step.status == StepStatus.pending || step.status == StepStatus.running) {
+        if (step.status == StepStatus.pending ||
+            step.status == StepStatus.running) {
           _setStep(step.id, StepStatus.success, null);
         }
       }
@@ -180,14 +203,57 @@ class WorkspaceProvisionController extends ChangeNotifier {
   }
 
   Future<void> upgradeWorkspace() async {
-    _fail(
-      PlaybookRunException(
-        appText(
-          '升级功能等待 playbooks 仓库提供 upgrade-ai-workspace.yml 后启用。',
-          'Upgrade waits for upgrade-ai-workspace.yml in the playbooks repository.',
-        ),
-      ),
-    );
+    if (!canSubmit) {
+      _fail(WorkspaceProvisionValidationException());
+      return;
+    }
+    _prepareRun(ProvisionPhase.running, keepDetection: true);
+    try {
+      if (serverInfo == null) {
+        final detected = await ServerDetector(
+          executor,
+        ).detect(sshConfig(), workspaceDomain.trim(), bridgeDomain);
+        serverInfo = detected;
+      }
+      final blockingIssue = validatePrecheckBlockingIssue();
+      if (blockingIssue != null) {
+        _setStep('detect_env', StepStatus.failed, blockingIssue);
+        throw WorkspaceProvisionPrecheckException(blockingIssue);
+      }
+      if (serverInfo != null) {
+        _setStep('ssh_connect', StepStatus.success, null);
+        _setStep('detect_env', StepStatus.success, serverInfo!.displaySummary);
+      }
+      final bridgeToken = ensureBridgeToken();
+      await PlaybookRunner(executor).run(
+        ssh: sshConfig(),
+        action: 'upgrade',
+        workspaceDomain: workspaceDomain.trim(),
+        bridgeDomain: bridgeDomain,
+        bridgeToken: bridgeToken,
+        extraConfigs: extraConfigs,
+        serverInfo: serverInfo,
+        onStepUpdate: _setStep,
+        onLog: _appendLog,
+      );
+      await _verifyDeploymentReadiness();
+      for (final step in steps) {
+        if (step.status == StepStatus.pending ||
+            step.status == StepStatus.running) {
+          _setStep(step.id, StepStatus.success, null);
+        }
+      }
+      phase = ProvisionPhase.success;
+      deploymentResult = WorkspaceDeploymentResult(
+        url: bridgeBaseUrl,
+        bridgeToken: bridgeToken,
+      );
+      errorMessage = null;
+      _appendLog(appText('工作空间升级完成。', 'Workspace upgrade completed.'));
+      notifyListeners();
+    } catch (error) {
+      _fail(error);
+    }
   }
 
   void reset() {
@@ -243,7 +309,7 @@ class WorkspaceProvisionController extends ChangeNotifier {
       MapEntry('ssh_username', sshUsername.trim()),
       MapEntry('auth_method', authMethod.name),
       MapEntry('ssh_port', sshPort),
-      MapEntry('install_path', installPath.trim()),
+      MapEntry('setup_script_url', PlaybookRunner.setupScriptUrl),
       MapEntry('show_advanced', showAdvanced),
       MapEntry('logs_expanded', logsExpanded),
       MapEntry('ssh_password', redact(sshPassword)),
@@ -421,8 +487,12 @@ class WorkspaceProvisionController extends ChangeNotifier {
     for (final service in services) {
       final unit = shellQuote('$service.service');
       final envKey = service.toUpperCase().replaceAll('-', '_');
-      buffer.writeln('if systemctl list-unit-files $unit >/dev/null 2>&1 || systemctl status $unit >/dev/null 2>&1; then');
-      buffer.writeln('  STATE=\$(systemctl is-active $unit 2>/dev/null || echo inactive)');
+      buffer.writeln(
+        'if systemctl list-unit-files $unit >/dev/null 2>&1 || systemctl status $unit >/dev/null 2>&1; then',
+      );
+      buffer.writeln(
+        '  STATE=\$(systemctl is-active $unit 2>/dev/null || echo inactive)',
+      );
       buffer.writeln('  echo SERVICE_$envKey=\$STATE');
       buffer.writeln('fi');
     }
@@ -493,7 +563,10 @@ class WorkspaceProvisionController extends ChangeNotifier {
     if (text.isEmpty) {
       return '""';
     }
-    if (text == redactedValue || text.contains(RegExp(r'[:#\n\r\t]')) || text.startsWith(' ') || text.endsWith(' ')) {
+    if (text == redactedValue ||
+        text.contains(RegExp(r'[:#\n\r\t]')) ||
+        text.startsWith(' ') ||
+        text.endsWith(' ')) {
       return '"${text.replaceAll('"', '\\"')}"';
     }
     return text;
@@ -544,9 +617,7 @@ class WorkspaceProvisionController extends ChangeNotifier {
     Object? value,
     List<WorkspaceExtraConfig> current,
   ) {
-    final existing = {
-      for (final config in current) config.key.trim(): config,
-    };
+    final existing = {for (final config in current) config.key.trim(): config};
     final parsed = <WorkspaceExtraConfig>[];
     if (value is YamlList) {
       for (final item in value) {
