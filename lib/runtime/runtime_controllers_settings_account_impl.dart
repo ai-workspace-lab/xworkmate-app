@@ -603,6 +603,20 @@ AcpBridgeServerEffectiveConfig resolveAcpBridgeServerEffectiveConfigInternal(
   SettingsController controller, {
   required AcpBridgeServerModeConfig config,
 }) {
+  final accountSyncState = controller.accountSyncState;
+  final managedBridgeReady =
+      controller.accountSessionTokenInternal.trim().isNotEmpty &&
+      accountSyncState?.syncState.trim().toLowerCase() == 'ready' &&
+      accountSyncState?.tokenConfigured.bridge == true;
+  if (managedBridgeReady) {
+    return const AcpBridgeServerEffectiveConfig(
+      endpoint: kManagedBridgeServerUrl,
+      tokenRef: '',
+      source: 'cloud',
+      reason: 'Account sync is ready and the managed bridge token is available',
+    );
+  }
+
   if (config.selfHosted.isConfigured) {
     return AcpBridgeServerEffectiveConfig(
       endpoint: config.selfHosted.serverUrl,
