@@ -1248,6 +1248,17 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
   }
 
   Uri? resolveBridgeAcpEndpointInternal() {
+    final accountSyncState = settingsControllerInternal.accountSyncState;
+    final managedBridgeReady =
+        settingsControllerInternal.accountSessionTokenInternal
+            .trim()
+            .isNotEmpty &&
+        accountSyncState?.syncState.trim().toLowerCase() == 'ready' &&
+        accountSyncState?.tokenConfigured.bridge == true;
+    if (managedBridgeReady) {
+      return Uri.parse(kManagedBridgeServerUrl);
+    }
+
     final selfHosted = settingsControllerInternal
         .snapshot
         .acpBridgeServerModeConfig
@@ -1260,8 +1271,7 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
       }
     }
 
-    final uri = Uri.parse(kManagedBridgeServerUrl);
-    return uri.replace(query: null, fragment: null);
+    return Uri.parse(kManagedBridgeServerUrl);
   }
 
   Uri? resolveExternalAcpEndpointForTargetInternal(AssistantExecutionTarget _) {
@@ -1281,12 +1291,16 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
       return true;
     }
     final accountSyncState = settingsControllerInternal.accountSyncState;
-    if (settingsControllerInternal.accountSignedIn &&
+    if (settingsControllerInternal.accountSessionTokenInternal
+            .trim()
+            .isNotEmpty &&
         accountSyncState?.syncState.trim().toLowerCase() == 'ready' &&
         accountSyncState?.tokenConfigured.bridge == true) {
       return true;
     }
-    if (settingsControllerInternal.accountSignedIn) {
+    if (settingsControllerInternal.accountSessionTokenInternal
+        .trim()
+        .isNotEmpty) {
       return false;
     }
     final envToken = runtimeEnvironmentValueInternal('BRIDGE_AUTH_TOKEN');
@@ -1322,18 +1336,27 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     final bridgeEndpoint = resolveBridgeAcpEndpointInternal();
     final bridgeHost = bridgeEndpoint?.host.trim().toLowerCase() ?? '';
     final bridgePort = bridgeEndpoint?.port ?? 0;
+    final accountSyncState = settingsControllerInternal.accountSyncState;
+    final managedBridgeReady =
+        settingsControllerInternal.accountSessionTokenInternal
+            .trim()
+            .isNotEmpty &&
+        accountSyncState?.syncState.trim().toLowerCase() == 'ready' &&
+        accountSyncState?.tokenConfigured.bridge == true;
     final matchesBridgeEndpoint =
         bridgeHost.isNotEmpty &&
         normalizedHost == bridgeHost &&
         (bridgePort <= 0 || endpoint.port == bridgePort);
     if (matchesBridgeEndpoint) {
+      if (managedBridgeReady) {
+        final bridgeToken = await _resolveManagedBridgeAuthTokenInternal();
+        if (bridgeToken != null && bridgeToken.isNotEmpty) {
+          return bridgeToken;
+        }
+      }
       final manualBridgeToken = await _resolveManualBridgeAuthTokenInternal();
       if (manualBridgeToken != null && manualBridgeToken.isNotEmpty) {
         return manualBridgeToken;
-      }
-      final bridgeToken = await _resolveManagedBridgeAuthTokenInternal();
-      if (bridgeToken != null && bridgeToken.isNotEmpty) {
-        return bridgeToken;
       }
     }
     return null;
@@ -1345,17 +1368,27 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     final normalizedHost = endpoint.host.trim().toLowerCase();
     final bridgeEndpoint = resolveBridgeAcpEndpointInternal();
     final bridgeHost = bridgeEndpoint?.host.trim().toLowerCase() ?? '';
+    final accountSyncState = settingsControllerInternal.accountSyncState;
+    final managedBridgeReady =
+        settingsControllerInternal.accountSessionTokenInternal
+            .trim()
+            .isNotEmpty &&
+        accountSyncState?.syncState.trim().toLowerCase() == 'ready' &&
+        accountSyncState?.tokenConfigured.bridge == true;
     if (bridgeHost.isEmpty || normalizedHost != bridgeHost) {
       return null;
+    }
+
+    if (managedBridgeReady) {
+      final bridgeToken = await _resolveManagedBridgeAuthTokenInternal();
+      if (bridgeToken != null && bridgeToken.isNotEmpty) {
+        return _normalizeAuthorizationHeaderInternal(bridgeToken);
+      }
     }
 
     final manualBridgeToken = await _resolveManualBridgeAuthTokenInternal();
     if (manualBridgeToken != null && manualBridgeToken.isNotEmpty) {
       return _normalizeAuthorizationHeaderInternal(manualBridgeToken);
-    }
-    final bridgeToken = await _resolveManagedBridgeAuthTokenInternal();
-    if (bridgeToken != null && bridgeToken.isNotEmpty) {
-      return _normalizeAuthorizationHeaderInternal(bridgeToken);
     }
     return null;
   }
@@ -1379,14 +1412,13 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
   }
 
   Future<String?> _resolveManagedBridgeAuthTokenInternal() async {
-    if (settingsControllerInternal.accountSignedIn) {
+    if (settingsControllerInternal.accountSessionTokenInternal
+        .trim()
+        .isNotEmpty) {
       final bridgeToken = (await storeInternal.loadAccountManagedSecret(
         target: kAccountManagedSecretTargetBridgeAuthToken,
       ))?.trim();
       return bridgeToken?.isNotEmpty == true ? bridgeToken : null;
-    }
-    if (settingsControllerInternal.accountSignedIn) {
-      return null;
     }
 
     final envToken = runtimeEnvironmentValueInternal('BRIDGE_AUTH_TOKEN');
