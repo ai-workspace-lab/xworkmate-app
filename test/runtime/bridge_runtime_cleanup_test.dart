@@ -13,7 +13,7 @@ import 'package:xworkmate/runtime/secure_config_store.dart';
 void main() {
   group('Bridge runtime cleanup', () {
     test(
-      'keeps the managed bridge endpoint fixed even when account sync carries a bridge URL',
+      'keeps the managed bridge endpoint fixed even when account sync carries a bridge URL and stale manual bridge config exists',
       () async {
         final storeRoot = await Directory.systemTemp.createTemp(
           'xworkmate-bridge-runtime-cleanup-',
@@ -48,6 +48,28 @@ void main() {
             ),
           ),
         );
+        await store.saveAccountSessionToken('session-token');
+        await store.saveAccountSessionSummary(
+          const AccountSessionSummary(
+            userId: 'user-1',
+            email: 'review@svc.plus',
+            name: 'Review User',
+            role: 'reviewer',
+            mfaEnabled: true,
+          ),
+        );
+        await store.saveSettingsSnapshot(
+          SettingsSnapshot.defaults().copyWith(
+            acpBridgeServerModeConfig: AcpBridgeServerModeConfig.defaults()
+                .copyWith(
+                  selfHosted: AcpBridgeServerModeConfig.defaults().selfHosted
+                      .copyWith(
+                        serverUrl: 'https://acp-bridge.onwalk.net',
+                        username: 'admin',
+                      ),
+                ),
+          ),
+        );
         await store.saveAccountManagedSecret(
           target: kAccountManagedSecretTargetBridgeAuthToken,
           value: 'bridge-token',
@@ -65,6 +87,12 @@ void main() {
         expect(
           controller.resolveBridgeAcpEndpointInternal()?.toString(),
           kManagedBridgeServerUrl,
+        );
+        expect(
+          await controller.resolveGatewayAcpAuthorizationHeaderInternal(
+            Uri.parse('$kManagedBridgeServerUrl/acp/rpc'),
+          ),
+          'bridge-token',
         );
         expect(
           controller

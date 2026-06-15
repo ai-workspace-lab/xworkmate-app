@@ -49,8 +49,8 @@ class _DesktopViewState extends State<DesktopView> {
     text: '2000',
   );
 
-  bool _useGpu = false;
-  bool _adaptiveResolution = false;
+  final bool _useGpu = false;
+  final bool _adaptiveResolution = false;
   bool _showControlPanel = true;
   String _connectionState = 'disconnected';
   bool _hasStream = false;
