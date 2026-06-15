@@ -101,14 +101,14 @@ flowchart TD
     D --> C
     C --> E["bridge runtime"]
 
-    note1["Priority order\n1. selfHosted when explicitly configured\n2. cloudSynced when account sync is ready and token exists\n3. disconnected"] --> C
+    note1["Priority order\n1. cloudSynced when account sync is ready and token exists\n2. selfHosted when explicitly configured\n3. disconnected or managed default"] --> C
 ```
 
 ### Runtime Invariants
 
-- `selfHosted` always wins when it is configured.
-- `cloudSynced` is valid only when account sync is ready and the managed bridge token exists.
-- Signed-out state is disconnected: runtime must not use a default managed endpoint, stale managed secret, gateway profile token, or loopback ACP endpoint.
+- `cloudSynced` wins when account sync is ready and the managed bridge token exists.
+- `selfHosted` wins only when cloud sync is not ready.
+- Signed-out state is disconnected for authorization decisions: runtime must not use a stale managed secret, gateway profile token, or loopback ACP endpoint.
 - Missing `BRIDGE_AUTH_TOKEN` is disconnected for the managed cloud-sync path.
 - `BRIDGE_SERVER_URL` may be retained in `AccountSyncState.syncedDefaults.bridgeServerUrl`, but it is metadata only.
 - `BRIDGE_AUTH_TOKEN` is written to secure storage only, never to normal settings.
