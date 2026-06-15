@@ -491,6 +491,14 @@ void main() {
           'fresh-bridge-token',
         );
         expect(
+          controller.snapshot.acpBridgeServerModeConfig.effective.source,
+          'cloud',
+        );
+        expect(
+          controller.snapshot.acpBridgeServerModeConfig.effective.endpoint,
+          kManagedBridgeServerUrl,
+        );
+        expect(
           controller.accountSyncState!.syncedDefaults.bridgeServerUrl,
           'https://xworkmate-bridge-new.svc.plus',
         );
