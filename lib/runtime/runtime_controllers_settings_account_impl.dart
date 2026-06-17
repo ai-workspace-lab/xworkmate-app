@@ -596,6 +596,10 @@ String _extractBridgeAuthTokenMetadata(Map<String, dynamic> payload) {
   if (reviewToken.isNotEmpty) {
     return reviewToken;
   }
+  final aiWorkspaceToken = _stringValue(payload['AI_WORKSPACE_AUTH_TOKEN']);
+  if (aiWorkspaceToken.isNotEmpty) {
+    return aiWorkspaceToken;
+  }
   return _stringValue(payload['BRIDGE_AUTH_TOKEN']);
 }
 
@@ -644,10 +648,25 @@ Future<SettingsSnapshot> buildSavedAccountProfileSettingsInternal(
   required bool isManualBridge,
 }) async {
   final bridgeConfig = settings.acpBridgeServerModeConfig;
+  final trimmedBridgeServerUrl = bridgeServerUrl.trim();
+  final trimmedBridgeToken = bridgeToken.trim();
+  final existingBridgeToken = isManualBridge
+      ? ((await controller.storeInternal.loadSecretValueByRef(
+              bridgeConfig.selfHosted.passwordRef,
+            ))?.trim() ??
+            '')
+      : '';
+  if (isManualBridge) {
+    _validateManualBridgeProfile(
+      serverUrl: trimmedBridgeServerUrl,
+      tokenConfigured:
+          trimmedBridgeToken.isNotEmpty || existingBridgeToken.isNotEmpty,
+    );
+  }
   final nextBridgeConfig = bridgeConfig.copyWith(
     selfHosted: isManualBridge
         ? bridgeConfig.selfHosted.copyWith(
-            serverUrl: bridgeServerUrl.trim(),
+            serverUrl: trimmedBridgeServerUrl,
             username: 'admin',
           )
         : bridgeConfig.selfHosted,
@@ -663,7 +682,6 @@ Future<SettingsSnapshot> buildSavedAccountProfileSettingsInternal(
       effective: nextEffective,
     ),
   );
-  final trimmedBridgeToken = bridgeToken.trim();
   if (isManualBridge && trimmedBridgeToken.isNotEmpty) {
     await controller.saveSecretValueByRef(
       nextSettings.acpBridgeServerModeConfig.selfHosted.passwordRef,
@@ -673,6 +691,53 @@ Future<SettingsSnapshot> buildSavedAccountProfileSettingsInternal(
     );
   }
   return nextSettings;
+}
+
+void _validateManualBridgeProfile({
+  required String serverUrl,
+  required bool tokenConfigured,
+}) {
+  if (serverUrl.isEmpty) {
+    throw ArgumentError.value(
+      serverUrl,
+      'bridgeServerUrl',
+      'Bridge URL is required',
+    );
+  }
+  if (!tokenConfigured) {
+    throw ArgumentError.value(
+      '',
+      'bridgeToken',
+      'Bridge auth token is required',
+    );
+  }
+  final uri = Uri.tryParse(serverUrl);
+  if (uri == null || !uri.hasScheme || uri.host.trim().isEmpty) {
+    throw ArgumentError.value(
+      serverUrl,
+      'bridgeServerUrl',
+      'Bridge URL must be a valid URL',
+    );
+  }
+  final scheme = uri.scheme.toLowerCase();
+  final host = uri.host.toLowerCase();
+  final isLocalHttp =
+      scheme == 'http' &&
+      (host == '127.0.0.1' || host == 'localhost') &&
+      uri.hasPort &&
+      uri.port >= 1 &&
+      uri.port <= 65535;
+  if (isLocalHttp) {
+    return;
+  }
+  if (scheme == 'https') {
+    return;
+  }
+  throw ArgumentError.value(
+    serverUrl,
+    'bridgeServerUrl',
+    'Manual Bridge URL must be http://127.0.0.1:<port> or http://localhost:<port> for local mode, or https:// for public custom bridge mode',
+  );
 }
 
 int _parseExpiresAtMs(Object? value) {

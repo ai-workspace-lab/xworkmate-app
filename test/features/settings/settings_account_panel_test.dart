@@ -40,6 +40,7 @@ void main() {
             onVerifyMfa: () async {},
             onCancelMfa: () async {},
             onSync: () async {},
+            onResetManualBridge: () async {},
             onLogout: () async {},
           ),
         ),
@@ -97,6 +98,7 @@ void main() {
             onVerifyMfa: () async {},
             onCancelMfa: () async {},
             onSync: () async {},
+            onResetManualBridge: () async {},
             onLogout: () async {},
           ),
         ),
@@ -151,6 +153,7 @@ void main() {
             onVerifyMfa: () async {},
             onCancelMfa: () async {},
             onSync: () async {},
+            onResetManualBridge: () async {},
             onLogout: () async {},
           ),
         ),
@@ -206,6 +209,7 @@ void main() {
             onVerifyMfa: () async {},
             onCancelMfa: () async {},
             onSync: () async {},
+            onResetManualBridge: () async {},
             onLogout: () async {},
           ),
         ),
@@ -260,6 +264,7 @@ void main() {
             onVerifyMfa: () async {},
             onCancelMfa: () async {},
             onSync: () async {},
+            onResetManualBridge: () async {},
             onLogout: () async {},
           ),
         ),
@@ -321,6 +326,7 @@ void main() {
         addTearDown(controllers.dispose);
 
         var syncCount = 0;
+        var resetCount = 0;
         var logoutCount = 0;
 
         final settings = SettingsSnapshot.defaults().copyWith(
@@ -382,6 +388,9 @@ void main() {
               onSync: () async {
                 syncCount += 1;
               },
+              onResetManualBridge: () async {
+                resetCount += 1;
+              },
               onLogout: () async {
                 logoutCount += 1;
               },
@@ -430,6 +439,7 @@ void main() {
         await tester.pump();
 
         expect(syncCount, 1);
+        expect(resetCount, 0);
         expect(logoutCount, 1);
       },
     );
@@ -476,6 +486,7 @@ void main() {
             onVerifyMfa: () async {},
             onCancelMfa: () async {},
             onSync: () async {},
+            onResetManualBridge: () async {},
             onLogout: () async {},
           ),
         ),
@@ -538,8 +549,8 @@ void main() {
         addTearDown(controllers.dispose);
 
         var saveCount = 0;
+        var resetCount = 0;
         var logoutCount = 0;
-        var receivedManualBridge = false;
 
         await tester.pumpWidget(
           _buildTestApp(
@@ -574,12 +585,14 @@ void main() {
               bridgeTokenController: controllers.bridgeToken,
               onSaveAccountProfile: ({required bool isManualBridge}) async {
                 saveCount += 1;
-                receivedManualBridge = isManualBridge;
               },
               onLogin: () async {},
               onVerifyMfa: () async {},
               onCancelMfa: () async {},
               onSync: () async {},
+              onResetManualBridge: () async {
+                resetCount += 1;
+              },
               onLogout: () async {
                 logoutCount += 1;
               },
@@ -607,9 +620,86 @@ void main() {
         );
         await tester.pump();
 
-        expect(saveCount, 1);
-        expect(receivedManualBridge, isTrue);
-        expect(logoutCount, 1);
+        expect(saveCount, 0);
+        expect(resetCount, 2);
+        expect(logoutCount, 0);
+      },
+    );
+
+    testWidgets(
+      'shows manual bridge status when saved without account sign-in',
+      (tester) async {
+        final controllers = _TestControllers();
+        addTearDown(controllers.dispose);
+
+        var saveCount = 0;
+        var resetCount = 0;
+
+        await tester.pumpWidget(
+          _buildTestApp(
+            child: SettingsAccountPanel(
+              settings: SettingsSnapshot.defaults().copyWith(
+                acpBridgeServerModeConfig: AcpBridgeServerModeConfig.defaults()
+                    .copyWith(
+                      effective: const AcpBridgeServerEffectiveConfig(
+                        endpoint: 'http://127.0.0.1:8787',
+                        tokenRef: 'acp_bridge_server_password',
+                        source: 'bridge',
+                        reason:
+                            'Manual Bridge configuration is present and valid',
+                      ),
+                      selfHosted: AcpBridgeServerModeConfig.defaults()
+                          .selfHosted
+                          .copyWith(
+                            serverUrl: 'http://127.0.0.1:8787',
+                            username: 'admin',
+                          ),
+                    ),
+              ),
+              accountSession: null,
+              accountState: null,
+              accountBusy: false,
+              accountSignedIn: false,
+              accountMfaRequired: false,
+              accountBaseUrlController: controllers.baseUrl,
+              accountIdentifierController: controllers.identifier,
+              accountPasswordController: controllers.password,
+              accountMfaCodeController: controllers.mfaCode,
+              bridgeUrlController: controllers.bridgeUrl,
+              bridgeTokenController: controllers.bridgeToken,
+              onSaveAccountProfile: ({required bool isManualBridge}) async {
+                saveCount += 1;
+              },
+              onLogin: () async {},
+              onVerifyMfa: () async {},
+              onCancelMfa: () async {},
+              onSync: () async {},
+              onResetManualBridge: () async {
+                resetCount += 1;
+              },
+              onLogout: () async {},
+            ),
+          ),
+        );
+
+        expect(find.text('手动 Bridge'), findsOneWidget);
+        expect(find.textContaining('保存状态'), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('settings-account-manual-reset-button')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const ValueKey('settings-manual-bridge-save-button')),
+          findsNothing,
+        );
+
+        await tester.tap(
+          find.byKey(const ValueKey('settings-account-manual-reset-button')),
+        );
+        await tester.pump();
+
+        expect(saveCount, 0);
+        expect(resetCount, 1);
       },
     );
 
@@ -653,6 +743,7 @@ void main() {
             onVerifyMfa: () async {},
             onCancelMfa: () async {},
             onSync: () async {},
+            onResetManualBridge: () async {},
             onLogout: () async {},
           ),
         ),
