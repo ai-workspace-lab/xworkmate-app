@@ -482,6 +482,7 @@ extension AppControllerDesktopThreadActions on AppController {
       gatewayTaskMetadataWithArtifactContractInternal(
         baseMetadata: dispatch.metadata,
         sessionKey: normalizedSessionKey,
+        userPrompt: message,
         localWorkingDirectory: workingDirectory,
         executionWorkingDirectory: executionWorkingDirectory,
         remoteWorkingDirectoryHint: remoteWorkingDirectoryHint,
@@ -1015,6 +1016,7 @@ extension AppControllerDesktopThreadActions on AppController {
   Map<String, dynamic> gatewayTaskMetadataWithArtifactContractInternal({
     required Map<String, dynamic> baseMetadata,
     required String sessionKey,
+    required String userPrompt,
     required String localWorkingDirectory,
     required String executionWorkingDirectory,
     required String remoteWorkingDirectoryHint,
@@ -1022,8 +1024,25 @@ extension AppControllerDesktopThreadActions on AppController {
     final localWorkspace = localWorkingDirectory.trim();
     final executionWorkspace = executionWorkingDirectory.trim();
     final remoteHint = remoteWorkingDirectoryHint.trim();
-    return <String, dynamic>{
+    final caseHint = gatewayCaseHintForPromptInternal(userPrompt);
+    final metadata = <String, dynamic>{
       ...baseMetadata,
+      if (caseHint.caseId.isNotEmpty) 'xworkmateCaseId': caseHint.caseId,
+      if (caseHint.taskLoadClass.isNotEmpty)
+        'taskLoadClass': caseHint.taskLoadClass,
+      if (caseHint.requiredArtifactExtensions.isNotEmpty)
+        'requiredArtifactExtensions': caseHint.requiredArtifactExtensions,
+      if (caseHint.expectedArtifactExtensions.isNotEmpty)
+        'expectedArtifactExtensions': caseHint.expectedArtifactExtensions,
+    };
+    if (caseHint.expectedFileCountByExtension.isNotEmpty) {
+      metadata['xworkmateArtifactConstraints'] = <String, dynamic>{
+        'schemaVersion': 1,
+        'expectedFileCountByExtension': caseHint.expectedFileCountByExtension,
+      };
+    }
+    return <String, dynamic>{
+      ...metadata,
       'xworkmateTaskArtifactContract': <String, dynamic>{
         'schemaVersion': 1,
         'appThreadKey': sessionKey,
@@ -1031,14 +1050,20 @@ extension AppControllerDesktopThreadActions on AppController {
         'finalDeliverableDetection': 'remote-runtime',
         'requiresExportBeforeFinalResponse': true,
         'rejectTextOnlyFileClaims': true,
-        'expectedArtifactDirs': const <String>[
-          'artifacts/',
-          'reports/',
-          'exports/',
-          'assets/',
-          'assets/images/',
-          'dist/',
-        ],
+        'expectedArtifactDirs': caseHint.expectedArtifactDirs.isNotEmpty
+            ? caseHint.expectedArtifactDirs
+            : const <String>[
+                'artifacts/',
+                'reports/',
+                'exports/',
+                'assets/',
+                'assets/images/',
+                'dist/',
+              ],
+        if (caseHint.requiredArtifactExtensions.isNotEmpty)
+          'requiredArtifactExtensions': caseHint.requiredArtifactExtensions,
+        if (caseHint.expectedFileCountByExtension.isNotEmpty)
+          'expectedFileCountByExtension': caseHint.expectedFileCountByExtension,
         'currentTaskWorkspace': executionWorkspace.isNotEmpty
             ? executionWorkspace
             : (remoteHint.isNotEmpty ? remoteHint : localWorkspace),
@@ -1046,6 +1071,115 @@ extension AppControllerDesktopThreadActions on AppController {
         if (remoteHint.isNotEmpty) 'remoteWorkspaceHint': remoteHint,
       },
     };
+  }
+
+  GatewayTaskCaseHintInternal gatewayCaseHintForPromptInternal(String prompt) {
+    final text = prompt.trim();
+    final lower = text.toLowerCase();
+    final hasSecurityEvolution =
+        text.contains('从单机权限') &&
+        text.contains('网络边界') &&
+        text.contains('Web安全') &&
+        text.contains('云身份') &&
+        text.contains('Zero Trust') &&
+        text.contains('AI Agent') &&
+        text.contains('AI模型');
+    final wantsAiNewsMd =
+        (text.contains('AI资讯') ||
+            text.contains('AI 资讯') ||
+            text.contains('AI新闻') ||
+            lower.contains('ai news')) &&
+        (text.contains('md文件') ||
+            text.contains('Markdown') ||
+            lower.contains('.md') ||
+            lower.contains('markdown'));
+    if (wantsAiNewsMd) {
+      return const GatewayTaskCaseHintInternal(
+        caseId: 'case1-ai-news-md',
+        taskLoadClass: 'long_task',
+        requiredArtifactExtensions: <String>['md'],
+        expectedArtifactExtensions: <String>['md'],
+        expectedArtifactDirs: <String>['reports/', 'artifacts/'],
+      );
+    }
+    final wantsVideo =
+        text.contains('制作视频') ||
+        text.contains('测试制作视频') ||
+        lower.contains('make video') ||
+        lower.contains('mp4');
+    final wantsImages =
+        text.contains('7张') ||
+        text.contains('七张') ||
+        text.contains('连续制作') ||
+        text.contains('系列图片') ||
+        text.contains('一些列图片') ||
+        text.contains('一系列图片');
+    final wantsPdf =
+        text.contains('输出 PDF') ||
+        text.contains('输出PDF') ||
+        text.contains('PDF文件') ||
+        lower.contains('final.pdf');
+    final wantsSocialCopy =
+        text.contains('微信公众号短图文') ||
+        text.contains('小红书风格') ||
+        text.contains('X文案串') ||
+        text.contains('头条号长文');
+    final wantsChapteredImages =
+        text.contains('拆章节') ||
+        text.contains('每章') ||
+        lower.contains('gpt images') ||
+        lower.contains('images2');
+    if (hasSecurityEvolution && wantsPdf && wantsChapteredImages) {
+      return const GatewayTaskCaseHintInternal(
+        caseId: 'case5-security-evolution-pdf',
+        taskLoadClass: 'complex_chain_task',
+        requiredArtifactExtensions: <String>['pdf', 'png', 'md'],
+        expectedArtifactExtensions: <String>['pdf', 'png', 'md'],
+        expectedArtifactDirs: <String>[
+          'exports/',
+          'assets/',
+          'assets/images/',
+          'prompts/',
+          'reports/',
+        ],
+        expectedFileCountByExtension: <String, int>{'pdf': 1, 'png': 7},
+      );
+    }
+    if (hasSecurityEvolution && wantsVideo) {
+      return const GatewayTaskCaseHintInternal(
+        caseId: 'case2-security-evolution-video',
+        taskLoadClass: 'complex_chain_task',
+        requiredArtifactExtensions: <String>['mp4'],
+        expectedArtifactExtensions: <String>['mp4', 'png', 'md'],
+        expectedArtifactDirs: <String>[
+          'renders/',
+          'assets/',
+          'assets/images/',
+          'exports/',
+        ],
+      );
+    }
+    if (hasSecurityEvolution && wantsImages) {
+      return const GatewayTaskCaseHintInternal(
+        caseId: 'case3-security-evolution-seven-images',
+        taskLoadClass: 'complex_chain_task',
+        requiredArtifactExtensions: <String>['png'],
+        expectedArtifactExtensions: <String>['png', 'md'],
+        expectedArtifactDirs: <String>['assets/', 'assets/images/', 'prompts/'],
+        expectedFileCountByExtension: <String, int>{'png': 7},
+      );
+    }
+    if (hasSecurityEvolution && wantsSocialCopy) {
+      return const GatewayTaskCaseHintInternal(
+        caseId: 'case4-security-evolution-social-copy',
+        taskLoadClass: 'long_task',
+        requiredArtifactExtensions: <String>['md'],
+        expectedArtifactExtensions: <String>['md'],
+        expectedArtifactDirs: <String>['reports/', 'artifacts/'],
+        expectedFileCountByExtension: <String, int>{'md': 5},
+      );
+    }
+    return const GatewayTaskCaseHintInternal();
   }
 
   bool usesOpenClawGatewayQueueInternal(
@@ -1724,4 +1858,22 @@ extension AppControllerDesktopThreadActions on AppController {
         return 'disconnected';
     }
   }
+}
+
+class GatewayTaskCaseHintInternal {
+  const GatewayTaskCaseHintInternal({
+    this.caseId = '',
+    this.taskLoadClass = '',
+    this.requiredArtifactExtensions = const <String>[],
+    this.expectedArtifactExtensions = const <String>[],
+    this.expectedArtifactDirs = const <String>[],
+    this.expectedFileCountByExtension = const <String, int>{},
+  });
+
+  final String caseId;
+  final String taskLoadClass;
+  final List<String> requiredArtifactExtensions;
+  final List<String> expectedArtifactExtensions;
+  final List<String> expectedArtifactDirs;
+  final Map<String, int> expectedFileCountByExtension;
 }

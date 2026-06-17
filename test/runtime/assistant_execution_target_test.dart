@@ -1358,7 +1358,7 @@ void main() {
     });
 
     test(
-      'sendChatMessage leaves Gateway task classification to the remote runtime',
+      'sendChatMessage adds explicit case metadata for security video pipelines',
       () async {
         final fakeGoTaskService = _RecordingGoTaskServiceClient();
         final controller = _connectedGatewayController(fakeGoTaskService);
@@ -1376,8 +1376,17 @@ void main() {
 
         expect(fakeGoTaskService.requests, hasLength(1));
         final request = fakeGoTaskService.requests.single;
-        expect(request.metadata, isNot(contains('taskLoadClass')));
-        expect(request.metadata, isNot(contains('expectedArtifactExtensions')));
+        expect(
+          request.metadata['xworkmateCaseId'],
+          'case2-security-evolution-video',
+        );
+        expect(request.metadata['taskLoadClass'], 'complex_chain_task');
+        expect(request.metadata['requiredArtifactExtensions'], <String>['mp4']);
+        expect(request.metadata['expectedArtifactExtensions'], <String>[
+          'mp4',
+          'png',
+          'md',
+        ]);
         expect(request.metadata, contains('xworkmateTaskArtifactContract'));
         final artifactContract =
             (request.metadata['xworkmateTaskArtifactContract'] as Map)
@@ -1388,14 +1397,12 @@ void main() {
         expect(artifactContract['finalDeliverableDetection'], 'remote-runtime');
         expect(artifactContract['requiresExportBeforeFinalResponse'], isTrue);
         expect(artifactContract['expectedArtifactDirs'], const <String>[
-          'artifacts/',
-          'reports/',
-          'exports/',
+          'renders/',
           'assets/',
           'assets/images/',
-          'dist/',
+          'exports/',
         ]);
-        expect(artifactContract, isNot(contains('expectedArtifactExtensions')));
+        expect(artifactContract['requiredArtifactExtensions'], <String>['mp4']);
         expect(request.prompt, isNot(contains('Task load classification:')));
         expect(
           request.prompt,
@@ -1413,7 +1420,7 @@ void main() {
     );
 
     test(
-      'sendChatMessage leaves artifact expectations to the remote runtime',
+      'sendChatMessage adds explicit case metadata for chaptered PDF pipelines',
       () async {
         final fakeGoTaskService = _RecordingGoTaskServiceClient();
         final controller = _connectedGatewayController(fakeGoTaskService);
@@ -1432,8 +1439,16 @@ void main() {
 
         expect(fakeGoTaskService.requests, hasLength(1));
         final request = fakeGoTaskService.requests.single;
-        expect(request.metadata, isNot(contains('taskLoadClass')));
-        expect(request.metadata, isNot(contains('expectedArtifactExtensions')));
+        expect(
+          request.metadata['xworkmateCaseId'],
+          'case5-security-evolution-pdf',
+        );
+        expect(request.metadata['taskLoadClass'], 'complex_chain_task');
+        expect(request.metadata['requiredArtifactExtensions'], <String>[
+          'pdf',
+          'png',
+          'md',
+        ]);
         expect(request.metadata, contains('xworkmateTaskArtifactContract'));
         final artifactContract =
             (request.metadata['xworkmateTaskArtifactContract'] as Map)
@@ -1444,13 +1459,16 @@ void main() {
         expect(artifactContract['scopeKind'], 'task');
         expect(artifactContract['rejectTextOnlyFileClaims'], isTrue);
         expect(artifactContract['expectedArtifactDirs'], const <String>[
-          'artifacts/',
-          'reports/',
           'exports/',
           'assets/',
           'assets/images/',
-          'dist/',
+          'prompts/',
+          'reports/',
         ]);
+        expect(artifactContract['expectedFileCountByExtension'], <String, int>{
+          'pdf': 1,
+          'png': 7,
+        });
         expect(
           artifactContract['currentTaskWorkspace'],
           request.workingDirectory,
