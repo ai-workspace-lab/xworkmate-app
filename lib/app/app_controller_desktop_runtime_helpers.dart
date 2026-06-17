@@ -1303,7 +1303,7 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
         .isNotEmpty) {
       return false;
     }
-    final envToken = runtimeEnvironmentValueInternal('BRIDGE_AUTH_TOKEN');
+    final envToken = _runtimeBridgeAuthEnvTokenInternal();
     return envToken != null && envToken.isNotEmpty;
   }
 
@@ -1421,8 +1421,18 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
       return bridgeToken?.isNotEmpty == true ? bridgeToken : null;
     }
 
-    final envToken = runtimeEnvironmentValueInternal('BRIDGE_AUTH_TOKEN');
+    final envToken = _runtimeBridgeAuthEnvTokenInternal();
     return envToken?.isNotEmpty == true ? envToken : null;
+  }
+
+  String? _runtimeBridgeAuthEnvTokenInternal() {
+    final aiWorkspaceToken = runtimeEnvironmentValueInternal(
+      'AI_WORKSPACE_AUTH_TOKEN',
+    );
+    if (aiWorkspaceToken != null && aiWorkspaceToken.isNotEmpty) {
+      return aiWorkspaceToken;
+    }
+    return runtimeEnvironmentValueInternal('BRIDGE_AUTH_TOKEN');
   }
 
   int? gatewayProfileIndexMatchingEndpointInternal(Uri endpoint) {

@@ -244,6 +244,7 @@ void main() {
               },
             },
             syncPayload: const <String, dynamic>{
+              'AI_WORKSPACE_AUTH_TOKEN': 'ai-workspace-token-from-sync',
               'BRIDGE_AUTH_TOKEN': 'bridge-token-from-sync',
               'BRIDGE_SERVER_URL': 'https://xworkmate-bridge-alt.svc.plus',
             },
@@ -284,16 +285,18 @@ void main() {
           await store.loadAccountManagedSecret(
             target: kAccountManagedSecretTargetBridgeAuthToken,
           ),
-          'bridge-token-from-sync',
+          'ai-workspace-token-from-sync',
         );
         expect(
-          controller.snapshot.toJsonString().contains('bridge-token-from-sync'),
+          controller.snapshot.toJsonString().contains(
+            'ai-workspace-token-from-sync',
+          ),
           isFalse,
         );
         expect(
           jsonEncode(
             controller.accountSyncState!.toJson(),
-          ).contains('bridge-token-from-sync'),
+          ).contains('ai-workspace-token-from-sync'),
           isFalse,
         );
       },
@@ -786,6 +789,221 @@ void main() {
           Uri.parse('$kManagedBridgeServerUrl/acp/rpc'),
         ),
         isNull,
+      );
+    });
+
+    test(
+      'manual bridge save accepts local loopback http with explicit token',
+      () async {
+        final storeRoot = await Directory.systemTemp.createTemp(
+          'xworkmate-manual-bridge-local-validation-',
+        );
+        addTearDown(() async {
+          if (await storeRoot.exists()) {
+            await storeRoot.delete(recursive: true);
+          }
+        });
+
+        final store = SecureConfigStore(
+          secretRootPathResolver: () async => '${storeRoot.path}/secrets',
+          appDataRootPathResolver: () async => '${storeRoot.path}/app-data',
+          supportRootPathResolver: () async => '${storeRoot.path}/support',
+          enableSecureStorage: false,
+        );
+        await store.initialize();
+        final controller = SettingsController(store);
+        addTearDown(controller.dispose);
+        await controller.initialize();
+
+        final nextSettings = await controller.buildSavedAccountProfileSettings(
+          settings: SettingsSnapshot.defaults(),
+          accountBaseUrl: '',
+          accountIdentifier: '',
+          bridgeServerUrl: 'http://127.0.0.1:8787',
+          bridgeToken: 'local-token',
+          isManualBridge: true,
+        );
+
+        expect(
+          nextSettings.acpBridgeServerModeConfig.selfHosted.serverUrl,
+          'http://127.0.0.1:8787',
+        );
+        expect(
+          nextSettings.acpBridgeServerModeConfig.effective.source,
+          'bridge',
+        );
+        expect(
+          await store.loadSecretValueByRef(
+            nextSettings.acpBridgeServerModeConfig.selfHosted.passwordRef,
+          ),
+          'local-token',
+        );
+      },
+    );
+
+    test(
+      'manual bridge save accepts localhost http with explicit token',
+      () async {
+        final storeRoot = await Directory.systemTemp.createTemp(
+          'xworkmate-manual-bridge-localhost-validation-',
+        );
+        addTearDown(() async {
+          if (await storeRoot.exists()) {
+            await storeRoot.delete(recursive: true);
+          }
+        });
+
+        final store = SecureConfigStore(
+          secretRootPathResolver: () async => '${storeRoot.path}/secrets',
+          appDataRootPathResolver: () async => '${storeRoot.path}/app-data',
+          supportRootPathResolver: () async => '${storeRoot.path}/support',
+          enableSecureStorage: false,
+        );
+        await store.initialize();
+        final controller = SettingsController(store);
+        addTearDown(controller.dispose);
+        await controller.initialize();
+
+        final nextSettings = await controller.buildSavedAccountProfileSettings(
+          settings: SettingsSnapshot.defaults(),
+          accountBaseUrl: '',
+          accountIdentifier: '',
+          bridgeServerUrl: 'http://localhost:8787',
+          bridgeToken: 'localhost-token',
+          isManualBridge: true,
+        );
+
+        expect(
+          nextSettings.acpBridgeServerModeConfig.selfHosted.serverUrl,
+          'http://localhost:8787',
+        );
+        expect(
+          nextSettings.acpBridgeServerModeConfig.effective.source,
+          'bridge',
+        );
+        expect(
+          await store.loadSecretValueByRef(
+            nextSettings.acpBridgeServerModeConfig.selfHosted.passwordRef,
+          ),
+          'localhost-token',
+        );
+      },
+    );
+
+    test(
+      'manual bridge save accepts public custom https bridge with token',
+      () async {
+        final storeRoot = await Directory.systemTemp.createTemp(
+          'xworkmate-manual-bridge-https-validation-',
+        );
+        addTearDown(() async {
+          if (await storeRoot.exists()) {
+            await storeRoot.delete(recursive: true);
+          }
+        });
+
+        final store = SecureConfigStore(
+          secretRootPathResolver: () async => '${storeRoot.path}/secrets',
+          appDataRootPathResolver: () async => '${storeRoot.path}/app-data',
+          supportRootPathResolver: () async => '${storeRoot.path}/support',
+          enableSecureStorage: false,
+        );
+        await store.initialize();
+        final controller = SettingsController(store);
+        addTearDown(controller.dispose);
+        await controller.initialize();
+
+        final nextSettings = await controller.buildSavedAccountProfileSettings(
+          settings: SettingsSnapshot.defaults(),
+          accountBaseUrl: '',
+          accountIdentifier: '',
+          bridgeServerUrl: 'https://private-bridge.example.com',
+          bridgeToken: 'public-token',
+          isManualBridge: true,
+        );
+
+        expect(
+          nextSettings.acpBridgeServerModeConfig.selfHosted.serverUrl,
+          'https://private-bridge.example.com',
+        );
+        expect(
+          nextSettings.acpBridgeServerModeConfig.effective.source,
+          'bridge',
+        );
+        expect(
+          await store.loadSecretValueByRef(
+            nextSettings.acpBridgeServerModeConfig.selfHosted.passwordRef,
+          ),
+          'public-token',
+        );
+      },
+    );
+
+    test('manual bridge save rejects non-local http bridge url', () async {
+      final storeRoot = await Directory.systemTemp.createTemp(
+        'xworkmate-manual-bridge-http-reject-',
+      );
+      addTearDown(() async {
+        if (await storeRoot.exists()) {
+          await storeRoot.delete(recursive: true);
+        }
+      });
+
+      final store = SecureConfigStore(
+        secretRootPathResolver: () async => '${storeRoot.path}/secrets',
+        appDataRootPathResolver: () async => '${storeRoot.path}/app-data',
+        supportRootPathResolver: () async => '${storeRoot.path}/support',
+        enableSecureStorage: false,
+      );
+      await store.initialize();
+      final controller = SettingsController(store);
+      addTearDown(controller.dispose);
+      await controller.initialize();
+
+      expect(
+        controller.buildSavedAccountProfileSettings(
+          settings: SettingsSnapshot.defaults(),
+          accountBaseUrl: '',
+          accountIdentifier: '',
+          bridgeServerUrl: 'http://private-bridge.example.com:8787',
+          bridgeToken: 'token',
+          isManualBridge: true,
+        ),
+        throwsArgumentError,
+      );
+    });
+
+    test('manual bridge save requires token authentication', () async {
+      final storeRoot = await Directory.systemTemp.createTemp(
+        'xworkmate-manual-bridge-token-required-',
+      );
+      addTearDown(() async {
+        if (await storeRoot.exists()) {
+          await storeRoot.delete(recursive: true);
+        }
+      });
+
+      final store = SecureConfigStore(
+        secretRootPathResolver: () async => '${storeRoot.path}/secrets',
+        appDataRootPathResolver: () async => '${storeRoot.path}/app-data',
+        supportRootPathResolver: () async => '${storeRoot.path}/support',
+        enableSecureStorage: false,
+      );
+      await store.initialize();
+      final controller = SettingsController(store);
+      addTearDown(controller.dispose);
+      await controller.initialize();
+
+      expect(
+        controller.buildSavedAccountProfileSettings(
+          settings: SettingsSnapshot.defaults(),
+          accountBaseUrl: '',
+          accountIdentifier: '',
+          bridgeServerUrl: 'http://127.0.0.1:8787',
+          bridgeToken: '',
+          isManualBridge: true,
+        ),
+        throwsArgumentError,
       );
     });
 

@@ -72,7 +72,7 @@ void main() {
             AssistantExecutionTarget.gateway,
           ],
           environmentOverride: const <String, String>{
-            'BRIDGE_AUTH_TOKEN': 'bridge-token',
+            'AI_WORKSPACE_AUTH_TOKEN': 'bridge-token',
           },
         );
         addTearDown(controller.dispose);
