@@ -324,6 +324,25 @@ class _SettingsPageState extends State<SettingsPage> {
     await _refreshAboutSnapshot();
   }
 
+  Future<void> _resetManualBridge() async {
+    final current = widget.controller.settings;
+    final passwordRef =
+        current.acpBridgeServerModeConfig.selfHosted.passwordRef;
+    if (passwordRef.trim().isNotEmpty) {
+      await widget.controller.settingsController.storeInternal
+          .clearSecretValueByRef(passwordRef);
+    }
+    final nextSettings = current.copyWith(
+      acpBridgeServerModeConfig: AcpBridgeServerModeConfig.defaults(),
+    );
+    await widget.controller.saveSettings(nextSettings, refreshAfterSave: false);
+    _bridgeUrlController.clear();
+    _bridgeTokenController.clear();
+    _lastSavedBridgeUrl = '';
+    await widget.controller.settingsController.refreshDerivedState();
+    await _refreshAboutSnapshot();
+  }
+
   Future<void> _refreshAboutSnapshot() async {
     if (!mounted) {
       return;
@@ -514,6 +533,7 @@ class _SettingsPageState extends State<SettingsPage> {
                       _verifyAccountMfa(widget.controller.settings),
                   onCancelMfa: _cancelAccountMfa,
                   onSync: () => _syncAccount(widget.controller.settings),
+                  onResetManualBridge: _resetManualBridge,
                   onLogout: _logoutAccount,
                 ),
               ),
