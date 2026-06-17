@@ -16,11 +16,11 @@ legacy `sessionKey` compatibility field.
 
 ## 覆盖目标
 
-- 连续出图：7 张连续风格 PNG。
-- 模板出图：参考附件模板生成 7 张连续 PNG。
-- PDF：拆章节、逐章生成图、汇总排版并输出 PDF。
-- 视频：围绕同一安全演进主线制作测试视频。
-- 视频流水线：拆章节、逐章调用 Codex/GPT Images、汇总排版并制作视频。
+- case1：采集最新 AI 资讯，输出 Markdown 文件。
+- case2：带图片附件制作视频，输出 MP4，并保留素材 manifest。
+- case3：围绕安全演进主线制作 7 张连续风格 PNG。
+- case4：围绕安全演进主线输出 5 份平台 Markdown 文案。
+- case5：安全演进拆 7 章，每章调用 Codex/GPT Images 生成图，汇总排版输出 PDF。
 
 ## 自动化落点
 
@@ -34,6 +34,18 @@ legacy `sessionKey` compatibility field.
 ## 5 个提示词
 
 以下提示词按原始 E2E 输入记录，作为长期回归 case 的 canonical prompt。
+
+### `OPENCLAW-E2E-000` AI 资讯 Markdown
+
+```text
+采集最新AI资讯，保存在md文件
+```
+
+期望结果：
+
+- 输出 `reports/ai-news-digest.md` 和 `reports/sources.md`。
+- 资讯包含日期、来源链接和摘要。
+- 不把浏览器缓存、临时截图或 scratch JSON 当最终 artifact。
 
 ### `OPENCLAW-E2E-001` 连续出图
 
@@ -65,15 +77,15 @@ legacy `sessionKey` compatibility field.
 ### `OPENCLAW-E2E-003` PDF
 
 ```text
+围绕
+从单机权限 → 网络边界 → Web安全 → 云身份 → Zero Trust → AI Agent 身份 → AI模型与知识保护 演进
 拆章节 -> 每章调用 Codex -> 每章 GPT images2 生成图 -> 汇总排版 -> 输出 PDF
-
-右侧 artifact栏 显示的陈旧文件
 ```
 
 期望结果：
 
 - 每章图片素材和最终 PDF 归属当前 task scope。
-- PDF 或相关素材出现在当前任务 artifact 区。
+- 输出 `exports/final.pdf`，并且 `assets/images/` 下有 7 张真实 PNG。
 - 回归缺陷点：右侧 artifact 栏不能显示其他 run 或历史 workspace 的陈旧文件。
 - 如果 OpenClaw 没有实际导出文件，App 显示 no exported artifacts，而不是旧文件。
 
@@ -91,19 +103,19 @@ legacy `sessionKey` compatibility field.
 - 输出视频帧、配置或 MP4 时，artifact 只属于当前任务。
 - 失败时释放 active slot 并继续 drain 后续任务。
 
-### `OPENCLAW-E2E-005` 视频流水线
+### `OPENCLAW-E2E-005` PDF 流水线
 
 ```text
 围绕
 
 从单机权限 → 网络边界 → Web安全 → 云身份 → Zero Trust → AI Agent 身份 → AI模型与知识保护 演进
 
-拆章节 -> 每章调用 Codex -> 每章 GPT images2 生成图 -> 汇总排版 -> 制作视频
+拆章节 -> 每章调用 Codex -> 每章 GPT images2 生成图 -> 汇总排版 -> 输出 PDF
 ```
 
 期望结果：
 
-- 图片、manifest、视频配置、MP4/ffprobe 等产物按当前 run 隔离。
+- 图片、manifest、`article.md`、`workflow.plan.md`、`exports/final.pdf` 等产物按当前 run 隔离。
 - Bridge 和 OpenClaw Gateway 只建立稳定连接，不重复并发握手。
 - 不出现 `invalid handshake: first request must be connect`、`SOCKET_CLOSED`、`ACP_HTTP_CONNECTION_CLOSED`。
 
