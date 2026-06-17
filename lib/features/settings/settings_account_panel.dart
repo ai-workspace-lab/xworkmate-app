@@ -24,6 +24,7 @@ class SettingsAccountPanel extends StatefulWidget {
     required this.onVerifyMfa,
     required this.onCancelMfa,
     required this.onSync,
+    required this.onResetManualBridge,
     required this.onLogout,
   });
 
@@ -46,6 +47,7 @@ class SettingsAccountPanel extends StatefulWidget {
   final Future<void> Function() onVerifyMfa;
   final Future<void> Function() onCancelMfa;
   final Future<void> Function() onSync;
+  final Future<void> Function() onResetManualBridge;
   final Future<void> Function() onLogout;
 
   @override
@@ -89,7 +91,11 @@ class _SettingsAccountPanelState extends State<SettingsAccountPanel>
 
   @override
   Widget build(BuildContext context) {
-    if (!widget.accountSignedIn && !widget.accountMfaRequired) {
+    final isManualBridgeConfigured =
+        widget.settings.acpBridgeServerModeConfig.effective.source == 'bridge';
+    if (!widget.accountSignedIn &&
+        !widget.accountMfaRequired &&
+        !isManualBridgeConfigured) {
       return AnimatedBuilder(
         animation: _signedOutTabController,
         builder: (context, _) {
@@ -151,6 +157,7 @@ class _SettingsAccountPanelState extends State<SettingsAccountPanel>
       accountStatus: widget.accountStatus,
       onSaveAccountProfile: widget.onSaveAccountProfile,
       onSync: widget.onSync,
+      onResetManualBridge: widget.onResetManualBridge,
       onLogout: widget.onLogout,
     );
   }
@@ -464,6 +471,7 @@ class _SignedInAccountPanel extends StatelessWidget {
     required this.accountStatus,
     required this.onSaveAccountProfile,
     required this.onSync,
+    required this.onResetManualBridge,
     required this.onLogout,
   });
 
@@ -475,6 +483,7 @@ class _SignedInAccountPanel extends StatelessWidget {
   final Future<void> Function({required bool isManualBridge})
   onSaveAccountProfile;
   final Future<void> Function() onSync;
+  final Future<void> Function() onResetManualBridge;
   final Future<void> Function() onLogout;
 
   @override
@@ -525,9 +534,8 @@ class _SignedInAccountPanel extends StatelessWidget {
     final primaryActionKey = isAccountSyncMode
         ? 'settings-account-sync-button'
         : 'settings-account-manual-reset-button';
-    final primaryAction = isAccountSyncMode
-        ? onSync
-        : () => onSaveAccountProfile(isManualBridge: true);
+    final primaryAction = isAccountSyncMode ? onSync : onResetManualBridge;
+    final exitAction = isAccountSyncMode ? onLogout : onResetManualBridge;
     final mfaEnabled =
         accountSession?.totpEnabled == true ||
         accountSession?.mfaEnabled == true;
@@ -630,7 +638,7 @@ class _SignedInAccountPanel extends StatelessWidget {
                       ),
                       TextButton(
                         key: const ValueKey('settings-account-logout-button'),
-                        onPressed: accountBusy ? null : () => onLogout(),
+                        onPressed: accountBusy ? null : () => exitAction(),
                         child: Text(appText('退出', 'Exit')),
                       ),
                     ],
@@ -763,6 +771,9 @@ _SignedInAccountMode _signedInAccountModeFromSettings({
   required SettingsSnapshot settings,
   required AccountSyncState? accountState,
 }) {
+  if (settings.acpBridgeServerModeConfig.effective.source == 'bridge') {
+    return _SignedInAccountMode.manualBridge;
+  }
   if (accountState?.profileScope.trim().toLowerCase() == 'bridge') {
     return _SignedInAccountMode.accountSync;
   }
