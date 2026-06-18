@@ -592,10 +592,6 @@ String _extractBridgeServerUrlMetadata(Map<String, dynamic> payload) {
 }
 
 String _extractBridgeAuthTokenMetadata(Map<String, dynamic> payload) {
-  final reviewToken = _stringValue(payload['BRIDGE_REVIEW_AUTH_TOKEN']);
-  if (reviewToken.isNotEmpty) {
-    return reviewToken;
-  }
   final aiWorkspaceToken = _stringValue(payload['AI_WORKSPACE_AUTH_TOKEN']);
   if (aiWorkspaceToken.isNotEmpty) {
     return aiWorkspaceToken;
