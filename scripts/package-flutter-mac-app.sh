@@ -13,9 +13,25 @@ PRODUCTS_DIR_NAME="$(tr '[:lower:]' '[:upper:]' <<< "${BUILD_MODE:0:1}")${BUILD_
 FLUTTER_BUILD_STATE_DIR="${ROOT_DIR}/.dart_tool/flutter_build"
 MACOS_BUILD_DIR="${ROOT_DIR}/build/macos"
 NATIVE_ASSETS_DIR="${ROOT_DIR}/build/native_assets"
+MACOS_PROJECT_FILE="$ROOT_DIR/macos/Runner.xcodeproj/project.pbxproj"
+MACOS_APP_INFO_CONFIG="$ROOT_DIR/macos/Runner/Configs/AppInfo.xcconfig"
 source "$ROOT_DIR/scripts/ci/apple_signing.sh"
 APPLE_SIGNING_CLEANUP_COMMANDS=()
-trap apple_run_cleanup EXIT
+MACOS_SIGNING_PATCH_BACKUPS=()
+
+cleanup_package_macos() {
+  local entry original backup
+  for entry in "${MACOS_SIGNING_PATCH_BACKUPS[@]}"; do
+    original="${entry%%::*}"
+    backup="${entry#*::}"
+    if [[ -f "$backup" ]]; then
+      mv "$backup" "$original"
+    fi
+  done
+  apple_run_cleanup
+}
+
+trap cleanup_package_macos EXIT
 
 remove_tree_with_retries() {
   local path="$1"
@@ -41,6 +57,30 @@ remove_tree_with_retries() {
     sleep "$delay_seconds"
     ((try++))
   done
+}
+
+backup_for_signing_patch() {
+  local path="$1"
+  local backup
+
+  [[ -f "$path" ]] || return 0
+  backup="$(mktemp "${RUNNER_TEMP:-/tmp}/xworkmate-macos-signing.XXXXXX")"
+  cp "$path" "$backup"
+  MACOS_SIGNING_PATCH_BACKUPS+=("${path}::${backup}")
+}
+
+patch_macos_project_for_ad_hoc_signing() {
+  echo "Patching macOS project for ad-hoc signing during unsigned CI build..."
+  backup_for_signing_patch "$MACOS_PROJECT_FILE"
+  backup_for_signing_patch "$MACOS_APP_INFO_CONFIG"
+
+  if [[ -f "$MACOS_PROJECT_FILE" ]]; then
+    perl -0pi -e 's/"CODE_SIGN_IDENTITY\[sdk=macosx\*\]" = "Apple Development";/CODE_SIGN_IDENTITY = "-";/g; s/CODE_SIGN_STYLE = Automatic;/CODE_SIGN_STYLE = Manual;/g; s/DEVELOPMENT_TEAM = [^;]+;/DEVELOPMENT_TEAM = "";/g' "$MACOS_PROJECT_FILE"
+  fi
+
+  if [[ -f "$MACOS_APP_INFO_CONFIG" ]]; then
+    perl -0pi -e 's/^DEVELOPMENT_TEAM = .*$/DEVELOPMENT_TEAM =/mg' "$MACOS_APP_INFO_CONFIG"
+  fi
 }
 
 if [[ ! -f "$PUBSPEC_PATH" ]]; then
@@ -79,7 +119,8 @@ if [[ -n "${APPLE_CERT_P12_BASE64:-}" &&
   echo "Provisioning Apple signing certificate for macOS build..."
   apple_setup_signing_keychain
 else
-  echo "Apple signing secrets not set; using existing local macOS signing context."
+  echo "Apple signing secrets not set; building macOS app with ad-hoc signing."
+  patch_macos_project_for_ad_hoc_signing
 fi
 
 BUILD_ARGS=(
