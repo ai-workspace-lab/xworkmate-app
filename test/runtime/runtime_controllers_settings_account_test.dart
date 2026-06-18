@@ -513,7 +513,7 @@ void main() {
     );
 
     test(
-      'syncAccountSettings prefers review bridge auth token when present',
+      'syncAccountSettings does not persist review token as managed bridge token',
       () async {
         final storeRoot = await Directory.systemTemp.createTemp(
           'xworkmate-account-review-bridge-token-',
@@ -570,7 +570,7 @@ void main() {
           await store.loadAccountManagedSecret(
             target: kAccountManagedSecretTargetBridgeAuthToken,
           ),
-          'review-bridge-token',
+          'multi-tenant-bridge-token',
         );
         expect(client.loadProfileCallCount, 1);
         expect(client.loadXWorkmateProfileSyncCallCount, 1);
