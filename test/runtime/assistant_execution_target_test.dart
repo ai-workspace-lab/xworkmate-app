@@ -244,7 +244,11 @@ void main() {
         );
         addTearDown(() async {
           if (await localHome.exists()) {
-            await localHome.delete(recursive: true);
+            try {
+              await localHome.delete(recursive: true);
+            } on FileSystemException {
+              // The controller may still have transient temp children on some runners.
+            }
           }
         });
         final controller = _sandboxController(
@@ -2526,7 +2530,11 @@ void main() {
             }
             final directory = Directory(workspace);
             if (await directory.exists()) {
-              await directory.delete(recursive: true);
+              try {
+                await directory.delete(recursive: true);
+              } on FileSystemException {
+                // Ignore cleanup races from concurrent temp artifact writes.
+              }
             }
           }
         });
