@@ -68,6 +68,12 @@ is_macho_file() {
   otool -L "$path" >/dev/null 2>&1
 }
 
+list_contains_line() {
+  local list="$1"
+  local needle="$2"
+  grep -Fxq "$needle" <<< "$list"
+}
+
 validate_no_test_only_frameworks() {
   local app_path="$1"
   local frameworks_dir="$app_path/Contents/Frameworks"
@@ -137,7 +143,7 @@ validate_binary() {
   local app_path="$2"
   local executable_dir="$3"
   local failures=0
-  declare -A seen_dependencies=()
+  local seen_dependencies=""
 
   while IFS= read -r line; do
     [[ -n "$line" ]] || continue
@@ -145,8 +151,8 @@ validate_binary() {
     local dependency
     dependency="$(awk '{print $1}' <<< "$line")"
     [[ "$dependency" == "$binary_path" ]] && continue
-    [[ -n "${seen_dependencies[$dependency]:-}" ]] && continue
-    seen_dependencies["$dependency"]=1
+    list_contains_line "$seen_dependencies" "$dependency" && continue
+    seen_dependencies+="${dependency}"$'\n'
     local is_weak=0
     [[ "$line" == *" weak)"* ]] && is_weak=1
 
@@ -205,12 +211,12 @@ if [[ -d "$APP_PATH/Contents/Frameworks" ]]; then
   done < <(find "$APP_PATH/Contents/Frameworks" -type f -print0)
 fi
 
-declare -A seen_binaries=()
+seen_binaries=""
 failures=0
 
 for binary_path in "${macho_files[@]}"; do
-  [[ -n "${seen_binaries[$binary_path]:-}" ]] && continue
-  seen_binaries["$binary_path"]=1
+  list_contains_line "$seen_binaries" "$binary_path" && continue
+  seen_binaries+="${binary_path}"$'\n'
 
   if ! validate_binary "$binary_path" "$APP_PATH" "$EXECUTABLE_DIR"; then
     failures=1
