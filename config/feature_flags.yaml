@@ -175,10 +175,10 @@ desktop:
       description: Desktop archived task management
       ui_surface: settings_page
     remote_desktop:
-      enabled: true
+      enabled: false
       release_tier: stable
-      build_modes: [debug, profile, release]
-      description: Desktop WebRTC Remote Desktop view
+      build_modes: []
+      description: Desktop WebRTC Remote Desktop view temporarily disabled
       ui_surface: settings_page
     logs:
       enabled: true

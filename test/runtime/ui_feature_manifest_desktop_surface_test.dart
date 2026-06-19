@@ -27,6 +27,14 @@ void main() {
         desktop.sanitizeExecutionTarget(AssistantExecutionTarget.agent),
         AssistantExecutionTarget.gateway,
       );
+      expect(
+        desktop.availableSettingsTabs,
+        isNot(contains(SettingsTab.remoteDesktop)),
+      );
+      expect(
+        desktop.sanitizeSettingsTab(SettingsTab.remoteDesktop),
+        SettingsTab.gateway,
+      );
     });
   });
 }
