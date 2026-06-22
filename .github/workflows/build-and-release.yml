@@ -92,39 +92,6 @@ jobs:
         shell: bash
         run: bash ./scripts/ci/run_flutter_ci_suite.sh
 
-  remote_contract:
-    runs-on: ubuntu-22.04
-    needs:
-      - verify
-    if: ${{ github.event_name != 'push' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
-    steps:
-      - name: Checkout source
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
-
-      - name: Load Vault secrets
-        id: vault
-        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
-        uses: hashicorp/vault-action@v2
-        with:
-          url: ${{ env.VAULT_ADDR }}
-          method: jwt
-          role: github-actions-xworkmate-app
-          jwtGithubAudience: vault
-          ignoreNotFound: true
-          secrets: |
-            kv/data/github-actions/xworkmate-app REVIEW_ACCOUNT_LOGIN_PASSWORD | REVIEW_ACCOUNT_LOGIN_PASSWORD
-
-      - name: Export remote contract secrets
-        run: echo "REVIEW_ACCOUNT_LOGIN_PASSWORD=${{ steps.vault.outputs.REVIEW_ACCOUNT_LOGIN_PASSWORD }}" >> "$GITHUB_ENV"
-
-      - name: Verify accounts to bridge provider contract
-        shell: bash
-        env:
-          REVIEW_ACCOUNT_BASE_URL: ${{ vars.REVIEW_ACCOUNT_BASE_URL }}
-          REVIEW_ACCOUNT_LOGIN_NAME: ${{ vars.REVIEW_ACCOUNT_LOGIN_NAME }}
-        run: bash ./scripts/ci/verify_remote_provider_contract.sh
-
-
   build:
     if: ${{ github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main' || (github.event_name == 'pull_request' && github.base_ref == 'main') }}
     name: Build ${{ matrix.platform }} ${{ matrix.package }}
@@ -265,14 +232,54 @@ jobs:
           path: ${{ matrix.artifact_paths }}
           if-no-files-found: error
 
+  remote_contract:
+    name: Test - remote provider contract
+    runs-on: ubuntu-22.04
+    needs:
+      - build
+    # Test-stage quality gate: runs between build and release.
+    # continue-on-error keeps it skippable so a failure never blocks release.
+    continue-on-error: true
+    if: ${{ github.event_name != 'push' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+
+      - name: Load Vault secrets
+        id: vault
+        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+        uses: hashicorp/vault-action@v2
+        with:
+          url: ${{ env.VAULT_ADDR }}
+          method: jwt
+          role: github-actions-xworkmate-app
+          jwtGithubAudience: vault
+          ignoreNotFound: true
+          secrets: |
+            kv/data/github-actions/xworkmate-app REVIEW_ACCOUNT_LOGIN_PASSWORD | REVIEW_ACCOUNT_LOGIN_PASSWORD
+
+      - name: Export remote contract secrets
+        run: echo "REVIEW_ACCOUNT_LOGIN_PASSWORD=${{ steps.vault.outputs.REVIEW_ACCOUNT_LOGIN_PASSWORD }}" >> "$GITHUB_ENV"
+
+      - name: Verify accounts to bridge provider contract
+        shell: bash
+        env:
+          REVIEW_ACCOUNT_BASE_URL: ${{ vars.REVIEW_ACCOUNT_BASE_URL }}
+          REVIEW_ACCOUNT_LOGIN_NAME: ${{ vars.REVIEW_ACCOUNT_LOGIN_NAME }}
+        run: bash ./scripts/ci/verify_remote_provider_contract.sh
+
   release:
-    if: ${{ needs.prepare.outputs.should_release == 'true' }}
+    # always() so release waits for the remote_contract gate to finish but is
+    # never blocked by it being skipped (e.g. push events) or failing.
+    # build/prepare must still genuinely succeed.
+    if: ${{ always() && needs.prepare.outputs.should_release == 'true' && needs.prepare.result == 'success' && needs.build.result == 'success' }}
     runs-on: ubuntu-22.04
     permissions:
       contents: write
     needs:
       - prepare
       - build
+      - remote_contract
     steps:
       - name: Checkout source
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
