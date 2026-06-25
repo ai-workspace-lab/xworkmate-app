@@ -6,10 +6,14 @@ import 'desktop_client.dart';
 import 'desktop_input_handler.dart';
 import '../../app/app_controller.dart';
 import '../../runtime/gateway_acp_client.dart';
+import '../../runtime/runtime_models.dart';
 import '../../widgets/surface_card.dart';
 import '../../i18n/app_language.dart';
 import '../workspace_management/workspace_management_panel.dart';
 import '../workspace_management/workspace_management_i18n.dart';
+
+bool desktopRemoteWorkspaceConnectionEnabled(RuntimeConnectionMode mode) =>
+    mode == RuntimeConnectionMode.remote;
 
 class DesktopView extends StatefulWidget {
   const DesktopView({
@@ -239,8 +243,8 @@ class _DesktopViewState extends State<DesktopView> {
             SnackBar(
               content: Text(
                 appText(
-                  '连接AI工作空间失败: $message',
-                  'Failed to connect AI Workspace: $message',
+                  '连接远程 AI 工作空间失败: $message',
+                  'Failed to connect Remote AI Workspace: $message',
                 ),
               ),
               backgroundColor: Colors.redAccent,
@@ -252,7 +256,10 @@ class _DesktopViewState extends State<DesktopView> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                appText('连接AI工作空间失败: $e', 'Failed to connect AI Workspace: $e'),
+                appText(
+                  '连接远程 AI 工作空间失败: $e',
+                  'Failed to connect Remote AI Workspace: $e',
+                ),
               ),
               backgroundColor: Colors.redAccent,
             ),
@@ -284,6 +291,9 @@ class _DesktopViewState extends State<DesktopView> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final hasVideoFrame = _hasVideoFrame;
+    final canConnectRemoteWorkspace = desktopRemoteWorkspaceConnectionEnabled(
+      widget.controller.connection.mode,
+    );
 
     return Padding(
       padding: const EdgeInsets.all(16.0),
@@ -305,7 +315,9 @@ class _DesktopViewState extends State<DesktopView> {
                       children: [
                         // Connection Button
                         ElevatedButton.icon(
-                          onPressed: _toggleConnection,
+                          onPressed: canConnectRemoteWorkspace
+                              ? _toggleConnection
+                              : null,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: _connectionState == 'connected'
                                 ? Colors.redAccent
@@ -332,8 +344,8 @@ class _DesktopViewState extends State<DesktopView> {
                                 : (_connectionState == 'connecting'
                                       ? appText('正在连接...', 'Connecting...')
                                       : appText(
-                                          '连接AI工作空间',
-                                          'Connect AI Workspace',
+                                          '连接远程 AI 工作空间',
+                                          'Connect Remote AI Workspace',
                                         )),
                             style: const TextStyle(fontWeight: FontWeight.bold),
                           ),
@@ -563,8 +575,8 @@ class _DesktopViewState extends State<DesktopView> {
                                           'Establishing WebRTC connection, please wait...',
                                         )
                                       : appText(
-                                          '未开启 AI 工作空间流。点击“连接AI工作空间”启动视频流。',
-                                          'AI Workspace stream not enabled. Click "Connect AI Workspace" to start the video stream.',
+                                          '未开启远程 AI 工作空间流。点击“连接远程 AI 工作空间”启动视频流。',
+                                          'Remote AI Workspace stream not enabled. Click "Connect Remote AI Workspace" to start the video stream.',
                                         ),
                                   style: TextStyle(
                                     color: theme.colorScheme.onSurface

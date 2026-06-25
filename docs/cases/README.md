@@ -5,6 +5,7 @@
 ## 当前入口
 
 - [核心功能集成测试手动 Case](./core-integration-manual-cases.md)
+- [云端账号与 XWorkmate Bridge 连接手动 Case](./cloud-account-and-bridge-manual-cases.md)
 - [云原生 Service Mesh 网络科普视频调研场景测试用例](./service-mesh-evolution-video-scenario/README.md)
 - [OpenClaw Gateway 5 并发 E2E 回归场景](./openclaw-gateway-e2e-regression/README.md)
 

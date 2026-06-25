@@ -31,6 +31,7 @@ void main() {
         desktop.availableSettingsTabs,
         isNot(contains(SettingsTab.remoteDesktop)),
       );
+      expect(desktop.availableSettingsTabs, contains(SettingsTab.help));
       expect(
         desktop.sanitizeSettingsTab(SettingsTab.remoteDesktop),
         SettingsTab.gateway,

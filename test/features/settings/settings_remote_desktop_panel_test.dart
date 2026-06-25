@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xworkmate/app/app_controller.dart';
+import 'package:xworkmate/features/desktop/desktop_view.dart';
 import 'package:xworkmate/features/settings/settings_remote_desktop_panel.dart';
 import 'package:xworkmate/runtime/secure_config_store.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
@@ -8,12 +9,27 @@ import 'package:xworkmate/theme/app_theme.dart';
 import 'package:xworkmate/widgets/surface_card.dart';
 
 void main() {
+  test('remote workspace connection is enabled only in remote mode', () {
+    expect(
+      desktopRemoteWorkspaceConnectionEnabled(RuntimeConnectionMode.remote),
+      isTrue,
+    );
+    expect(
+      desktopRemoteWorkspaceConnectionEnabled(
+        RuntimeConnectionMode.unconfigured,
+      ),
+      isFalse,
+    );
+  });
+
   group('SettingsRemoteDesktopPanel', () {
-    testWidgets('renders the panel title and connection dashboard', (tester) async {
+    testWidgets('renders the panel title and connection dashboard', (
+      tester,
+    ) async {
       // Set desktop window size
       tester.view.physicalSize = const Size(1280, 900);
       tester.view.devicePixelRatio = 1.0;
-      
+
       final store = _MemorySecureConfigStore();
       final controller = _NoopRefreshAppController(store: store);
       addTearDown(() {
@@ -30,20 +46,13 @@ void main() {
 
       // Verify the panel headers and titles
       expect(find.text('AI工作空间'), findsOneWidget);
-      expect(find.text('连接AI工作空间'), findsOneWidget);
+      expect(find.text('连接远程 AI 工作空间'), findsOneWidget);
+      final connectButton = tester.widget<ElevatedButton>(
+        find.widgetWithText(ElevatedButton, '连接远程 AI 工作空间'),
+      );
+      expect(connectButton.onPressed, isNull);
       expect(find.text('工作空间管理'), findsOneWidget);
 
-      // Verify advanced options are hidden initially
-      expect(find.text('GPU 加速'), findsNothing);
-
-      // Tap to expand advanced options
-      await tester.tap(find.text('高级选项'));
-      await tester.pumpAndSettle();
-
-      // Verify advanced options appear
-      expect(find.text('GPU 加速'), findsOneWidget);
-      expect(find.widgetWithText(TextField, 'Display'), findsOneWidget);
-      expect(find.text('Display'), findsOneWidget);
       expect(find.text('工作空间管理'), findsOneWidget);
     });
   });
@@ -54,10 +63,7 @@ Widget _buildTestApp({required Widget child}) {
     theme: AppTheme.light(),
     home: Material(
       child: Center(
-        child: SizedBox(
-          width: 1100,
-          child: SurfaceCard(child: child),
-        ),
+        child: SizedBox(width: 1100, child: SurfaceCard(child: child)),
       ),
     ),
   );
@@ -65,7 +71,7 @@ Widget _buildTestApp({required Widget child}) {
 
 class _NoopRefreshAppController extends AppController {
   _NoopRefreshAppController({required SecureConfigStore store})
-      : super(environmentOverride: const <String, String>{}, store: store);
+    : super(environmentOverride: const <String, String>{}, store: store);
 
   Future<void> refreshAcpCapabilitiesInternal({
     bool forceRefresh = false,
