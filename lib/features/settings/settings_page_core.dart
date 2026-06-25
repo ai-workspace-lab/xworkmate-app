@@ -17,6 +17,7 @@ import '../../widgets/surface_card.dart';
 import 'settings_account_panel.dart';
 import 'settings_about_panel.dart';
 import 'settings_archived_tasks_panel.dart';
+import 'settings_help_panel.dart';
 import 'settings_logs_panel.dart';
 import 'settings_remote_desktop_panel.dart';
 
@@ -556,6 +557,11 @@ class _SettingsPageState extends State<SettingsPage> {
                   onStop: (sessionKey) => _stopArchivedTask(sessionKey),
                 ),
               ),
+            ] else if (currentTab == SettingsTab.help) ...[
+              SurfaceCard(
+                key: const ValueKey('settings-help-panel-card'),
+                child: const SettingsHelpPanel(),
+              ),
             ] else if (currentTab == SettingsTab.remoteDesktop) ...[
               SurfaceCard(
                 key: const ValueKey('settings-remote-desktop-panel-card'),
@@ -603,9 +609,11 @@ class _SettingsTabSelector extends StatelessWidget {
                     ? Icons.desktop_windows_outlined
                     : (tab == SettingsTab.logs
                           ? Icons.terminal_outlined
-                          : (tab == SettingsTab.archivedTasks
-                                ? Icons.inventory_2_outlined
-                                : Icons.hub_outlined)),
+                          : (tab == SettingsTab.help
+                                ? Icons.help_outline_rounded
+                                : (tab == SettingsTab.archivedTasks
+                                      ? Icons.inventory_2_outlined
+                                      : Icons.hub_outlined))),
               ),
               label: Text(tab.label),
             ),

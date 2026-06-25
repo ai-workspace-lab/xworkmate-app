@@ -10,6 +10,7 @@ import '../../runtime/runtime_controllers.dart';
 import '../../runtime/runtime_models.dart';
 import '../../theme/app_palette.dart';
 import 'mobile_settings_page_widgets.dart';
+import '../settings/settings_help_panel.dart';
 
 class MobileSettingsPage extends StatefulWidget {
   const MobileSettingsPage({super.key, required this.controller});
@@ -185,12 +186,14 @@ class _MobileSettingsPageState extends State<MobileSettingsPage> {
       await controller.refreshSingleAgentCapabilitiesInternal(
         forceRefresh: true,
       );
-    } catch (e, stackTrace) { debugPrint('Error: $e\n$stackTrace');
+    } catch (e, stackTrace) {
+      debugPrint('Error: $e\n$stackTrace');
       // Account login should not fail only because runtime refresh is transient.
     }
     try {
       await controller.refreshAcpCapabilitiesInternal(forceRefresh: true);
-    } catch (e, stackTrace) { debugPrint('Error: $e\n$stackTrace');
+    } catch (e, stackTrace) {
+      debugPrint('Error: $e\n$stackTrace');
       // Runtime capabilities can be refreshed again from Assistant.
     }
   }
@@ -274,6 +277,8 @@ class _MobileSettingsPageState extends State<MobileSettingsPage> {
                       ],
                       if (currentTab == SettingsTab.archivedTasks)
                         _ArchivedTasksSection(controller: controller)
+                      else if (currentTab == SettingsTab.help)
+                        const SettingsHelpPanel()
                       else
                         _AccountSection(
                           settings: settings,

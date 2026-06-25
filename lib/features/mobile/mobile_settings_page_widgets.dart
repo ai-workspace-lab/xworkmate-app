@@ -26,7 +26,9 @@ class MobileSettingsTabSelectorInternal extends StatelessWidget {
             icon: Icon(
               tab == SettingsTab.archivedTasks
                   ? Icons.inventory_2_outlined
-                  : Icons.hub_outlined,
+                  : (tab == SettingsTab.help
+                        ? Icons.help_outline_rounded
+                        : Icons.hub_outlined),
             ),
             label: Text(tab.label),
           ),
