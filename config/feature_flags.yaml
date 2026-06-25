@@ -79,6 +79,12 @@ mobile:
       build_modes: [debug, profile, release]
       description: Mobile runtime logs view
       ui_surface: settings_page
+    help:
+      enabled: true
+      release_tier: stable
+      build_modes: [debug, profile, release]
+      description: Mobile setup help and installation guide
+      ui_surface: settings_page
     account_access:
       enabled: true
       release_tier: stable
@@ -185,6 +191,12 @@ desktop:
       release_tier: stable
       build_modes: [debug, profile, release]
       description: Desktop runtime logs view
+      ui_surface: settings_page
+    help:
+      enabled: true
+      release_tier: stable
+      build_modes: [debug, profile, release]
+      description: Desktop setup help and installation guide
       ui_surface: settings_page
     account_access:
       enabled: true
