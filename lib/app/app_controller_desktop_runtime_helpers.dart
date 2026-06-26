@@ -1008,8 +1008,8 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     final budget =
         kOpenClawRunningPollBudgets[taskLoadClass.trim().toLowerCase()] ??
         kOpenClawRunningPollDefaultBudget;
-    final limitMs =
-        (budget + kOpenClawRunningPollGrace).inMilliseconds.toDouble();
+    final limitMs = (budget + kOpenClawRunningPollGrace).inMilliseconds
+        .toDouble();
     final currentMs = nowMs ?? DateTime.now().millisecondsSinceEpoch.toDouble();
     return currentMs - anchorMs >= limitMs;
   }
@@ -1450,6 +1450,10 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     final normalizedHost = endpoint.host.trim().toLowerCase();
     final bridgeEndpoint = resolveBridgeAcpEndpointInternal();
     final bridgeHost = bridgeEndpoint?.host.trim().toLowerCase() ?? '';
+    final isLoopback =
+        normalizedHost == '127.0.0.1' ||
+        normalizedHost == 'localhost' ||
+        normalizedHost == '::1';
     final accountSyncState = settingsControllerInternal.accountSyncState;
     final managedBridgeReady =
         settingsControllerInternal.accountSessionTokenInternal
@@ -1457,7 +1461,7 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
             .isNotEmpty &&
         accountSyncState?.syncState.trim().toLowerCase() == 'ready' &&
         accountSyncState?.tokenConfigured.bridge == true;
-    if (bridgeHost.isEmpty || normalizedHost != bridgeHost) {
+    if (bridgeHost.isEmpty || (normalizedHost != bridgeHost && !isLoopback)) {
       return null;
     }
 
@@ -1471,6 +1475,10 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     final manualBridgeToken = await _resolveManualBridgeAuthTokenInternal();
     if (manualBridgeToken != null && manualBridgeToken.isNotEmpty) {
       return _normalizeAuthorizationHeaderInternal(manualBridgeToken);
+    }
+    final envBridgeToken = _runtimeBridgeAuthEnvTokenInternal();
+    if (envBridgeToken != null && envBridgeToken.isNotEmpty) {
+      return _normalizeAuthorizationHeaderInternal(envBridgeToken);
     }
     return null;
   }
