@@ -305,9 +305,10 @@ curl -sS -X POST http://127.0.0.1:8787/acp/rpc \
   **验证**：启动日志 `http server listening (6 plugins: … openclaw-multi-session-plugins)`；`inspect` 的 `Source` 变为 `~/.openclaw/extensions/…/dist/index.js`、provenance 警告消失；`xworkmate.session.prepare` 经 bridge 返回**真实插件响应**（`fallback=null`、带 `mapping`、`artifactScope=tasks/draft_s0verify/s0-run`），不再走 bridge 的 `local-session-prepare` 降级。
   收尾：`~/.openclaw/extensions/` 现为真实目录（非 /tmp 软链），重启/重启后不再丢插件；建议把它纳入部署（`deploy_gateway_openclaw`）从仓库 `openclaw-multi-session-plugins` 安装，避免再被软链到临时盘。
 
-- **S1 `expectedArtifactDirs` 为空导致根目录兜底失效** — live 的 session mapping 为 `expectedArtifactDirs:[]`（contract 没派生出期望目录，`orchestrator.go:402/682`）。插件对「agent 把产物写到 workspace 根 `reports/`/`artifacts/` 而非 task scope」的兜底扫描**依赖 `expectedArtifactDirs`**；为空时兜底形同虚设 → 即便 agent 产出也收不到，表现「暂无文件」。
-  改进：bridge 在 `xworkmate.session.prepare` 必带一组缺省 `expectedArtifactDirs`（至少 `reports/`、`artifacts/`，并从 `requiredArtifactExtensions` / prompt 中的目标路径推导）；或插件在 `expectedArtifactDirs` 为空时回扫一组安全缺省目录。
-  验收：agent 写到 workspace 根的 `.md` 能被 `xworkmate.tasks.get/artifacts.export` 纳入产物。
+- **S1 `expectedArtifactDirs` 为空导致根目录兜底失效 — ✅ 已修复并 live 验证（commit `0280893`）**
+  根因：live 的 session mapping 为 `expectedArtifactDirs:[]`，而插件对「agent 把产物写到 workspace 根 `reports/`/`artifacts/` 而非 task scope」的兜底扫描**依赖 `expectedArtifactDirs`**；为空 → 兜底形同虚设 → 即便 agent 产出也收不到，表现「暂无文件」。
+  修复：`orchestrator.go openClawArtifactContractForParams` 在「任务期望产物（`requiresExport` 或推断出 `requiredExts`）但未声明目录」时补缺省 `["reports/","artifacts/","exports/"]` 并置 `requiresExport=true`；纯聊天不受影响（`defaultOpenClawExpectedArtifactDirs`，含单测 `orchestrator_s1_artifact_dirs_test.go`）。
+  验证：提交「采集AI资讯保存md」→ `requiresArtifactExport=true`、`expectedArtifactDirs=['reports/','artifacts/','exports/']`（修复前为 `[]`）。
 
 - **S2 `no_native_task_record` 状态歧义** — `xworkmate.tasks.get` 的真值来自「gateway host task registry 有该 run 的 detached task」**或**「artifact 已存在」。live 中 chat.send 成功但 gateway 无 native task record（agent 可能以 inline chat 执行、未注册可查 task），且无产物 → 插件回 `no_native_task_record`，bridge 只能靠 T7 兜底续轮询到 deadline，**无法区分「还在跑」与「跑完没产物」**。
   改进：①确认 gateway 侧 chat.send 是否应产出 detached task（agent 配置/ `tasks.*` 注册）；②插件/bridge 在 `no_native_task_record` 且超过最小执行时长时，下发更明确的 `running(no-record)` vs `completed(no-artifact)` 语义，配合 §5 T9 deadline 收口。
