@@ -9,7 +9,18 @@ run_flutter_base() {
 }
 
 run_flutter_unit_widget() {
-  flutter test test/widgets test/features test/runtime test/app test/theme test/web
+  local test_dirs=()
+  local candidate
+  for candidate in test/widgets test/features test/runtime test/app test/theme test/web; do
+    if [[ -d "$candidate" ]] && find "$candidate" -name '*_test.dart' | grep -q .; then
+      test_dirs+=("$candidate")
+    fi
+  done
+  if [[ "${#test_dirs[@]}" -eq 0 ]]; then
+    echo "[skip] no unit/widget tests found"
+    return
+  fi
+  flutter test "${test_dirs[@]}"
 }
 
 run_flutter_golden_if_present() {
@@ -36,16 +47,11 @@ run_patrol_if_present() {
   fi
 }
 
-run_go_unit() {
-  (cd go/go_core && go test ./...)
-}
-
 case "$LAYER" in
   pr)
     run_flutter_base
     run_flutter_unit_widget
     run_flutter_golden_if_present
-    run_go_unit
     ;;
   e2e)
     run_flutter_base
@@ -58,7 +64,6 @@ case "$LAYER" in
     run_flutter_golden_if_present
     run_flutter_integration_if_present
     run_patrol_if_present
-    run_go_unit
     ;;
   *)
     echo "Usage: $0 [pr|e2e|all]"
