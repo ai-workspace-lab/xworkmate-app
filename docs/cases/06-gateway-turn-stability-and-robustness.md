@@ -162,6 +162,55 @@ curl -sS -X POST http://127.0.0.1:8787/acp/rpc \
 
 回归要求：每次本地替换 Bridge 后，先用 `/api/ping` 确认 `commit`，再用上面的 `xworkmate.session.prepare` 探针确认返回 `ok:true`；不能只看 App 设置页的 `Status: ok`。
 
+### 2026-06-26 决定性根因：bridge↔gateway `xworkmate.*` 协议命名空间漂移
+
+> 上游只读参照：`/Users/shenlan/workspaces/cloud-neutral-toolkit/openclaw.svc.plus`（`2026.6.2`）。**不改上游**，只在 bridge 侧对齐。
+
+把一次任务线程追到底（`sessionKey=agent:main:draft:1782472127386639-1`，`runId=turn-1782474577492899000`），修正后的完整时序与断点：
+
+```
+T0 App ──SSE /acp/rpc──▶ Bridge                    采集最新AI资讯…  target=gateway
+T1 Bridge  session.prepare ▶ Gateway               gateway 无此方法 → fallback(local-session-prepare) ✅
+T2 Bridge  artifact prepare                         scope=tasks/…/turn-… 要求 .md
+T3 Bridge  "chat.send"(原生) ▶ Gateway              ✅ 25ms 返回 runId；gateway 在 task registry 建 detached task
+T4 Bridge  记 sess.openClaw + DeadlineAt，返回 running 句柄 ▶ App 轮询
+T5 App  "xworkmate.tasks.get" ▶ Bridge ▶ Gateway    ✗ unknown method（INVALID_REQUEST）← 断点①
+T6 即便方法名修对，参数/键仍不符：gateway tasks.get 仅 {taskId}、按 taskId 查；bridge 发胖参数+runId ← 断点②
+T7 完成后取产物 "xworkmate.artifacts.export/read" ▶ Gateway  ✗ 同样 unknown method ← 断点③（md 取不回）
+```
+
+**根因：bridge 转发给 gateway 的方法名几乎全部用了不存在的 `xworkmate.` 命名空间。** 实测证据（gateway 源码 + schema + CHANGELOG）：
+
+| bridge 发送 | gateway 2026.6.2 真实方法 | 出处 |
+|---|---|---|
+| `xworkmate.tasks.get` | `tasks.get`，参数仅 `{taskId}`（`additionalProperties:false`），`getTaskById` | `server-methods.ts:411`、`schema/tasks.ts:73` |
+| `xworkmate.tasks.cancel` | `tasks.cancel`（`{taskId,reason}`） | `server-methods.ts:411` |
+| `agent.cancel`（cancel 路径） | 不存在；原生取消是 `tasks.cancel` | 同上 |
+| `xworkmate.session.prepare` | 不存在（已 fallback，OK） | 全仓无注册 |
+| `xworkmate.artifacts.export` / `xworkmate.artifacts.read` | `artifacts.list` / `artifacts.get` / `artifacts.download` | `server-methods.ts:575` |
+| `chat.send`、`tools.invoke`（原生名） | ✅ 命中，工作正常 | — |
+
+- gateway 对未知方法回 `INVALID_REQUEST: unknown method: <m>`（`server-methods.ts:679`），与现场 `tasks.get` 兜底里看到的 `transportDegradedCode:"INVALID_REQUEST"` 完全吻合。
+- CHANGELOG line 1820 明确 task ledger RPC 面是原生 `tasks.list/tasks.get/tasks.cancel`；全仓**无任何 `xworkmate.*` gateway 适配器**。
+- `TaskSummary` 只含状态（status/progressSummary/terminalSummary），**不含 artifacts**——产物须经独立的 `artifacts.*` 取，这解释了「状态能查到但右栏始终暂无文件」。
+- `taskId ≠ runId`，但 registry 维护 runId→taskId 索引（`task-registry.ts:717 getTasksByRunId`），且 `tasks.list` 同时返回二者 → 可用 `tasks.list` 按 runId 反查 taskId。
+
+修正前我一度判为「push/pull 模型不匹配」，**那是错的**（当时未读到 gateway 源码）：gateway 支持轮询，只是 bridge 用了错的方法名/参数/键。
+
+### 修复方案（bridge 侧对齐，不改上游）
+
+已实现（`fix/gateway-task-protocol-alignment`，`go build` ✅）：
+
+- 新增 `internal/acp/openclaw_gateway_native_task.go`：`xworkmate.tasks.*→tasks.*` 原生名映射；`tasks.list` 按 runId 反查 taskId 并缓存到 `OpenClawTaskRecord.GatewayTaskID`；`TaskSummary.status`（ledger 词表 queued/running/completed/failed/timed_out/cancelled）翻译成既有 task-get pipeline 形态。
+- `rpc_handler.go`：`handleTaskGet` 改用原生 `tasks.get({taskId})`；`handleTaskCancel` 改用原生 `tasks.cancel({taskId,reason})`（替掉不存在的 `agent.cancel`）。
+- 产物仍交由既有 artifact pipeline，从 workspace（与 gateway 同机 `~/.openclaw/workspace`）补齐。
+
+剩余（同一根因，待续）：
+
+- **artifact 协议对齐**：`xworkmate.artifacts.export/read` → 原生 `artifacts.list/get/download`（含参数与结果 reshape）。**这是「能产出 md」的最后一环**，否则任务能到终态但右栏仍无文件。
+- **测试契约迁移**：`routing_test.go` 的 fake gateway 把 artifacts 内联在 `xworkmate.tasks.get` 响应里（旧虚构契约）；需迁移为原生 `tasks.list`/`tasks.get`（状态-only）+ 经 `artifacts.*` 出产物，并更新约 12 处 `Methods()` 断言。属机械但量大，单列一轮做。
+- **会话面**：现场 console 显示 `…:dashboard:bcde1b0f…` 与提交的 `…:draft:…` 不同面；task 实际建在 `draft`（requesterSessionKey），dashboard 仅是 console 自带会话视图，非断点——但需在 live 复核 `tasks.list(sessionKey=draft)` 能命中。
+
 ---
 
 ## 5. 编码改进规划（Stability / Robustness TODO）
