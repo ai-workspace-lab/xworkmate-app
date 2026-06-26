@@ -1225,7 +1225,14 @@ void main() {
           'agent:main:unit-fixture-task-handle',
         );
         expect(taskGetParams.single, isNot(contains('sessionKey')));
-        expect(taskGetParams.single, isNot(contains('artifactScope')));
+        expect(
+          taskGetParams.single['artifactScope'],
+          'tasks/unit-fixture-task-handle/run-running',
+        );
+        expect(
+          taskGetParams.single['artifactDirectory'],
+          '/home/ubuntu/.openclaw/workspace/tasks/unit-fixture-task-handle/run-running',
+        );
         expect(result.success, isTrue);
         expect(result.message, 'completed after task handle');
         expect(result.artifacts.single.relativePath, 'reports/final.md');
