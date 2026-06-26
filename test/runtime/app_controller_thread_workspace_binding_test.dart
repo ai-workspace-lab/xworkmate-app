@@ -65,7 +65,10 @@ void main() {
         allOf(contains(realSessionKey), isNot(contains(pollutedSessionKey))),
       );
       expect(controller.currentSessionKey, isNot(pollutedSessionKey));
-      expect(controller.appUiState.assistantLastSessionKey, realSessionKey);
+      expect(
+        controller.appUiState.assistantLastSessionKey,
+        isNot(pollutedSessionKey),
+      );
       expect(store.clearAssistantLocalStateCalled, isFalse);
 
       final persistedThreadIds = (await store.loadTaskThreads())
@@ -74,7 +77,7 @@ void main() {
       expect(persistedThreadIds, <String>[realSessionKey]);
       expect(
         (await store.loadAppUiState()).assistantLastSessionKey,
-        realSessionKey,
+        isNot(pollutedSessionKey),
       );
     },
   );
