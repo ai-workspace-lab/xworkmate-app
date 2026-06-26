@@ -152,17 +152,24 @@ Gateway 部署出处：`ai-workspace-infra/playbooks/deploy_gateway_openclaw.yml
 
 ### L1 Bridge 持久化（ai-workspace-lab/xworkmate-bridge · 根因修复 · 有协议/状态面改动）
 
-- [ ] **T7 run 关联与 WS 连接解耦**
-  维护 `runId → {status, result, artifacts, deadline}` 的持久 / 独立登记表，由 gateway notification 更新。`onConnLost`（`runtime.go:802`）时**不要把长任务 pending 直接判死**，而是标记 `detached`，重连后用 `runId` 复关联 / 回放完成事件。
-  验收：WS 瞬断 + 重连后，已完成的 run 仍能被 `tasks.get` 查到 terminal + artifacts。
+> ✅ T7/T8/T9 已实现（分支 `fix/gateway-durable-run-registry`）。
+> 实现取舍：**复用已存在的 per-session 持久 store**（`s.sessions[sessionID]` 内的 `task`/`openClaw`/`lastResult`，生命周期独立于 bridge↔gateway WebSocket），把 `tasks.get` 从「强依赖 gateway 应答」改造为「优先用持久 run 仓兜底」。
+> 新增 `internal/acp/openclaw_run_registry.go`（+ `_test.go`），改动 `rpc_handler.go: handleTaskGet` 与 `orchestrator.go: startOpenClawGatewayTask`。
 
-- [ ] **T8 OpenClaw submit 接入 `xworkmate.jobs.*` 持久存储**
-  让 gateway submit 落 `xworkmate.jobs.*`（`rpc_handler.go:73` 已有 submit/get/list/stats），使结果不再只活在内存 `responseCh`。
-  验收：bridge 重启 / 连接抖动后，结果与 artifacts 仍可检索。
+- [x] **T7 run 关联与 WS 连接解耦** — `openClawTaskGetGatewayUnconfirmedFallback`（`openclaw_run_registry.go`）
+  gateway 无法确认（unavailable / socket closed / not_found）但 run 仍在预算内时，按 `runId` 从持久 session store 合成 `running` 句柄让客户端继续轮询，跨越瞬时抖动。
+  **取舍**：未直接改 `gatewayruntime.onConnLost`（`runtime.go:802`）的 pending 判死逻辑——在途请求被判死后会以 gateway error 冒泡到 `handleTaskGet`，新兜底按 runId 续轮询到 deadline 已等价覆盖，且风险远低于重写连接层 pending 关联。chat.send 初次提交若 WS 中断则尚无 runId、无可复关联，客户端重发即可。
+  验收：WS 瞬断 + 重连后，已完成的 run 仍能被 `tasks.get` 查到 terminal + artifacts（见 `TestGatewayUnconfirmedFallbackWithinBudgetKeepsPolling`）。
 
-- [ ] **T9 服务端 DeadlineAt 兜底终态**
-  run 过期且 gateway 无法确认时，bridge 主动回 terminal `interrupted`（而非无限 `running`），给客户端确定终态。与 T3 客户端 deadline 形成双保险。
-  验收：gateway 失联超过 budget 后，`tasks.get` 返回确定 terminal。
+- [x] **T8 终态结果落持久 run 仓** — `cacheOpenClawTaskGetResultIfTerminal` / `cachedTerminalForRunLocked`
+  gateway 确认终态后，把**最终客户端形态**（已 decorate 下载 URL + strip 内联内容）缓存进 `sess.lastResult`，后续轮询直接回放，gateway 之后查不到也不丢。带 `runId` 校验 + 新 turn 复用 session 时重置 `ProgressTerminal`，防旧 run 终态错配新 run。
+  **取舍**：未新建独立 `xworkmate.jobs.*` 落库；现阶段复用 per-session 内存 store（已满足「跨 WS 抖动不丢结果」）。bridge **进程重启**后仍会丢——若需跨重启持久化，再起 T8b 接 `jobs.*` / 磁盘。
+  验收：连接抖动后结果与 artifacts 仍可检索（见 `TestTerminalResultCachedAndServedAfterGatewayLoss`、`TestCachedTerminalNotServedForDifferentRunId`）。
+
+- [x] **T9 服务端 DeadlineAt 兜底终态** — `markOpenClawRunDeadlineInterruptedLocked`
+  run 过期（`sess.task.DeadlineAt`）且 gateway 无法确认时，bridge 主动回 terminal `interrupted`（`OPENCLAW_RUN_DEADLINE_EXCEEDED`），与 T3 客户端 deadline 形成双保险。
+  **取舍**：仅在 gateway **无法确认**时按 deadline 强制终态；gateway 明确回 `running` 时**不**强杀，避免误伤合法长任务（那一侧由客户端 T3 兜底）。
+  验收：gateway 失联超过 budget 后，`tasks.get` 返回确定 terminal（见 `TestGatewayUnconfirmedFallbackPastDeadlineInterrupts`）。
 
 - [ ] **T10 错误语义细化**
   `gatewayRPCError`（`orchestrator.go:1678`）区分"连接断但 run 仍在后台可查" vs "run 确实失败"，前者携带 `runId` + `retryable/poll` 提示，供客户端走 T5 续轮询而非硬失败。
@@ -182,8 +189,8 @@ Gateway 部署出处：`ai-workspace-infra/playbooks/deploy_gateway_openclaw.yml
 
 ## 6. 落地顺序建议
 
-1. **当天止血**：T1 + T2（入口配置）+ T3 + T4 + T6（客户端），消除"30min 必断 / 路由漏配 / 无限 running / 停不掉"。
-2. **本周治本**：T7 + T8 + T9（bridge 持久化与解耦），让"gateway 跑完 = 结果一定拿得到"。
-3. **跟进**：T5 + T10（断连续跑语义）、T11 + T12（可观测性）。
+1. ✅ **当天止血**（已合并 main）：T1 + T2（入口配置）+ T3 + T4 + T6（客户端）+ session.prepare 数字 code 降级，消除"30min 必断 / 路由漏配 / 无限 running / 停不掉 / session.prepare 硬失败"。
+2. ✅ **治本**（分支 `fix/gateway-durable-run-registry`）：T7 + T8 + T9（bridge 持久 run 仓与 WS 解耦），让"gateway 跑完 = 结果一定拿得到"。
+3. **跟进（待办）**：T5 + T10（断连续跑语义）、T11 + T12（可观测性）、T8b（跨进程重启持久化，接 `xworkmate.jobs.*` / 磁盘）。
 
 > 回归对照：本目录 `00-review-env-and-matrix.md` 第 2 节"通用验收标准"中"长任务执行期间状态流 / 取消 / 重试稳定""同一任务重复执行 3 次不卡死"，即本规划的回归出口。
