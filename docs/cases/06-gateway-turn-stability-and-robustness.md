@@ -10,6 +10,11 @@
 > 触发现象：任务进度条 `任务运行中...` 永不结束、`停止` 无效，**实际 OpenClaw gateway 已执行完毕**；
 > 伴随报错 `Bridge 响应读取中断，本轮结果未完成。错误码：ACP_HTTP_CONNECTION_CLOSED`。
 
+> **结论速览（2026-06-26 live 验证后）**
+> - **「采集AI资讯无法产出」的主根因**＝OpenClaw 网关启动时**未加载 `openclaw-multi-session-plugins` 插件**（插件文件在临时路径，网关启动早于文件就位），导致 `xworkmate.*` 网关方法全部 `unknown method`。重启网关即恢复（详见 §4「2026-06-26 决定性根因」）。
+> - 本文 §3/§5 的 **T1–T9** 是**健壮性加固**（入口超时、客户端 deadline/停止、bridge 持久 run 仓），用于让上述故障表现为「有界可恢复」而非「无限运行/丢结果」——它们正确且应保留，但**不是**该故障的根因修复。
+> - ⚠️ 作废：早期「`xworkmate.*` 协议命名空间漂移、需 bridge 改原生 `tasks.get`」的判断**错误**，`fix/gateway-task-protocol-alignment` 分支不要合并。
+
 ---
 
 ## 1. The full chain (one gateway turn)
@@ -93,7 +98,7 @@ Gateway 部署出处：`ai-workspace-infra/playbooks/deploy_gateway_openclaw.yml
 | ⑦ | **Bridge 无持久 run 仓** | 同步 SSE 路径不落 `xworkmate.jobs.*`，结果只活在内存 `responseCh`；连接一断即丢（已存在 jobs.submit/get/list 未被 gateway submit 复用） | `rpc_handler.go:73`（jobs.*）vs http_handler 同步路径 |
 | ⑧ | Gateway 重连丢 run 态 | 重连到新 WS 后 `tasks.get` 经 `ensureProductionGatewayConnected` 落到新连接，查不到 terminal → 回 stale `running` 或 `not_found` | `rpc_handler.go:143-175` |
 | ⑨ | Bridge | `gatewayRPCError` 把可重试错误统一映射为 `OPENCLAW_GATEWAY_SOCKET_CLOSED`，但缺少"run 仍在后台、稍后可查"的语义，客户端只能当硬失败 | `orchestrator.go:1678-1702` |
-| ⑩ | **本机运行态 / 发布同步** | 源码已包含 `xworkmate.session.prepare` fallback，但本机 `launchd` 运行的 `/usr/local/bin/xworkmate-go-core` 可能仍是旧构建或无 commit 元信息；App 会继续报 `-32601/-32002 unknown method: xworkmate.session.prepare` | `curl /api/ping` 的 `commit` 为空或不等于当前修复 commit；`/acp/rpc` 直接探针返回 unknown method |
+| ⑩ | **运行态 ≠ 源码（主根因，见 §4）** | 报 `unknown method: xworkmate.*` 时，根因通常是**网关未加载 `openclaw-multi-session-plugins` 插件**（这些方法由插件注册）；次因是本机 `launchd` 的 bridge 二进制为旧构建 | 网关启动日志 `N plugins` 是否含 `openclaw-multi-session-plugins`；`openclaw plugins inspect`；`curl /api/ping` 的 `commit` |
 
 ---
 
@@ -162,54 +167,29 @@ curl -sS -X POST http://127.0.0.1:8787/acp/rpc \
 
 回归要求：每次本地替换 Bridge 后，先用 `/api/ping` 确认 `commit`，再用上面的 `xworkmate.session.prepare` 探针确认返回 `ok:true`；不能只看 App 设置页的 `Status: ok`。
 
-### 2026-06-26 决定性根因：bridge↔gateway `xworkmate.*` 协议命名空间漂移
+### 2026-06-26 决定性根因（已 live 验证）：OpenClaw gateway 未加载 `openclaw-multi-session-plugins` 插件
 
-> 上游只读参照：`/Users/shenlan/workspaces/cloud-neutral-toolkit/openclaw.svc.plus`（`2026.6.2`）。**不改上游**，只在 bridge 侧对齐。
+> 四层调用链（与 `openclaw-gateway-e2e-regression/ROOT_CAUSE_ANALYSIS.md` 一致）：
+> `App → xworkmate-bridge(Go) → openclaw-multi-session-plugins(TS 插件) → OpenClaw gateway runtime(127.0.0.1:18789)`
 
-把一次任务线程追到底（`sessionKey=agent:main:draft:1782472127386639-1`，`runId=turn-1782474577492899000`），修正后的完整时序与断点：
+**`xworkmate.*` 系列网关方法不是「虚构/漂移」的——它们由 `openclaw-multi-session-plugins` 插件在运行时注册**：
+`index.ts` 里 `api.registerGatewayMethod("xworkmate.session.prepare" | "xworkmate.tasks.get" | "xworkmate.artifacts.export" | ".list" | ".read" | ".collect-and-snapshot")`。所以 bridge 发 `xworkmate.tasks.get` 是**正确契约**，前提是该插件被网关加载。
 
-```
-T0 App ──SSE /acp/rpc──▶ Bridge                    采集最新AI资讯…  target=gateway
-T1 Bridge  session.prepare ▶ Gateway               gateway 无此方法 → fallback(local-session-prepare) ✅
-T2 Bridge  artifact prepare                         scope=tasks/…/turn-… 要求 .md
-T3 Bridge  "chat.send"(原生) ▶ Gateway              ✅ 25ms 返回 runId；gateway 在 task registry 建 detached task
-T4 Bridge  记 sess.openClaw + DeadlineAt，返回 running 句柄 ▶ App 轮询
-T5 App  "xworkmate.tasks.get" ▶ Bridge ▶ Gateway    ✗ unknown method（INVALID_REQUEST）← 断点①
-T6 即便方法名修对，参数/键仍不符：gateway tasks.get 仅 {taskId}、按 taskId 查；bridge 发胖参数+runId ← 断点②
-T7 完成后取产物 "xworkmate.artifacts.export/read" ▶ Gateway  ✗ 同样 unknown method ← 断点③（md 取不回）
-```
+现场实际故障：**运行中的网关没有加载这个插件**，于是所有 `xworkmate.*` 都回 `unknown method`。证据链：
 
-**根因：bridge 转发给 gateway 的方法名几乎全部用了不存在的 `xworkmate.` 命名空间。** 实测证据（gateway 源码 + schema + CHANGELOG）：
+- 网关启动日志：`2026-06-23` 前每次都是 `listening (6 plugins: … openclaw-multi-session-plugins)`；**`2026-06-26 09:21:14` 那次只有 `5 plugins`，缺了 multi-session**。
+- 插件注册的源路径是**临时目录** `/private/tmp/openclaw-multi-session-plugins/dist/index.js`；该文件直到 `18:40` 才被填充——**晚于网关 09:21 启动约 9 小时**。启动时路径不存在 → 插件未加载。
+- `openclaw plugins inspect` 警告：`loaded without install/load-path provenance; treat as untracked local code`（无 install 记录的本地代码）。
 
-| bridge 发送 | gateway 2026.6.2 真实方法 | 出处 |
-|---|---|---|
-| `xworkmate.tasks.get` | `tasks.get`，参数仅 `{taskId}`（`additionalProperties:false`），`getTaskById` | `server-methods.ts:411`、`schema/tasks.ts:73` |
-| `xworkmate.tasks.cancel` | `tasks.cancel`（`{taskId,reason}`） | `server-methods.ts:411` |
-| `agent.cancel`（cancel 路径） | 不存在；原生取消是 `tasks.cancel` | 同上 |
-| `xworkmate.session.prepare` | 不存在（已 fallback，OK） | 全仓无注册 |
-| `xworkmate.artifacts.export` / `xworkmate.artifacts.read` | `artifacts.list` / `artifacts.get` / `artifacts.download` | `server-methods.ts:575` |
-| `chat.send`、`tools.invoke`（原生名） | ✅ 命中，工作正常 | — |
+**修复（已 live 验证通过）**：`launchctl kickstart -k gui/$UID/ai.openclaw.gateway` 重启网关（此时插件文件已就位）→ 日志变 `listening (6 plugins: … openclaw-multi-session-plugins)`；`xworkmate.*` 方法的报错从 `unknown method` 变为**插件内部参数校验**（`xworkmate.session.prepare → appThreadKey required`、`xworkmate.tasks.get → artifactScope does not match sessionKey/runId`）——证明方法已注册、插件正在处理请求。
 
-- gateway 对未知方法回 `INVALID_REQUEST: unknown method: <m>`（`server-methods.ts:679`），与现场 `tasks.get` 兜底里看到的 `transportDegradedCode:"INVALID_REQUEST"` 完全吻合。
-- CHANGELOG line 1820 明确 task ledger RPC 面是原生 `tasks.list/tasks.get/tasks.cancel`；全仓**无任何 `xworkmate.*` gateway 适配器**。
-- `TaskSummary` 只含状态（status/progressSummary/terminalSummary），**不含 artifacts**——产物须经独立的 `artifacts.*` 取，这解释了「状态能查到但右栏始终暂无文件」。
-- `taskId ≠ runId`，但 registry 维护 runId→taskId 索引（`task-registry.ts:717 getTasksByRunId`），且 `tasks.list` 同时返回二者 → 可用 `tasks.list` 按 runId 反查 taskId。
+> ⚠️ **更正**：此前一版本文档曾判为「bridge↔gateway `xworkmate.*` 协议命名空间漂移、需在 bridge 侧改原生 `tasks.get`/`artifacts.*`」——**该结论错误**，源于当时未发现 `openclaw-multi-session-plugins` 插件提供这些方法。对应的 `fix/gateway-task-protocol-alignment` 分支（native 重命名）**作废、不得合并**；bridge 原有 `xworkmate.*` 协议是对的。
 
-修正前我一度判为「push/pull 模型不匹配」，**那是错的**（当时未读到 gateway 源码）：gateway 支持轮询，只是 bridge 用了错的方法名/参数/键。
+#### 残留与加固项
 
-### 修复方案（bridge 侧对齐，不改上游）
-
-已实现（`fix/gateway-task-protocol-alignment`，`go build` ✅）：
-
-- 新增 `internal/acp/openclaw_gateway_native_task.go`：`xworkmate.tasks.*→tasks.*` 原生名映射；`tasks.list` 按 runId 反查 taskId 并缓存到 `OpenClawTaskRecord.GatewayTaskID`；`TaskSummary.status`（ledger 词表 queued/running/completed/failed/timed_out/cancelled）翻译成既有 task-get pipeline 形态。
-- `rpc_handler.go`：`handleTaskGet` 改用原生 `tasks.get({taskId})`；`handleTaskCancel` 改用原生 `tasks.cancel({taskId,reason})`（替掉不存在的 `agent.cancel`）。
-- 产物仍交由既有 artifact pipeline，从 workspace（与 gateway 同机 `~/.openclaw/workspace`）补齐。
-
-剩余（同一根因，待续）：
-
-- **artifact 协议对齐**：`xworkmate.artifacts.export/read` → 原生 `artifacts.list/get/download`（含参数与结果 reshape）。**这是「能产出 md」的最后一环**，否则任务能到终态但右栏仍无文件。
-- **测试契约迁移**：`routing_test.go` 的 fake gateway 把 artifacts 内联在 `xworkmate.tasks.get` 响应里（旧虚构契约）；需迁移为原生 `tasks.list`/`tasks.get`（状态-only）+ 经 `artifacts.*` 出产物，并更新约 12 处 `Methods()` 断言。属机械但量大，单列一轮做。
-- **会话面**：现场 console 显示 `…:dashboard:bcde1b0f…` 与提交的 `…:draft:…` 不同面；task 实际建在 `draft`（requesterSessionKey），dashboard 仅是 console 自带会话视图，非断点——但需在 live 复核 `tasks.list(sessionKey=draft)` 能命中。
+- **插件安装路径必须稳定**：当前注册在 `/private/tmp/…`（重启 / tmp 清理即丢，正是本次故障诱因）。应用 `openclaw plugins install <stable-path>` 从 `~/.openclaw/extensions/openclaw-multi-session-plugins/` 或仓库路径重装，落正式 install 记录，避免再次「启动早于插件就位」。
+- **会话面**：现场 console 的 `…:dashboard:bcde1b0f…` 与提交的 `…:draft:…` 不同面；task 建在 `draft`（requesterSessionKey），dashboard 仅是 console 自带会话视图，非断点。
+- **手工探针注意**：直接构造 `tasks.get` 时 `sessionId` 不要预带 `agent:main:` 前缀——bridge 会再加一层导致 `agent:main:agent:main:…` 双前缀，触发插件的 `artifactScope does not match sessionKey/runId`。app 正常路径传 `draft:<id>`，bridge 补一层。
 
 ---
 
@@ -273,9 +253,11 @@ T7 完成后取产物 "xworkmate.artifacts.export/read" ▶ Gateway  ✗ 同样 
   `gatewayRPCError`（`orchestrator.go:1678`）区分"连接断但 run 仍在后台可查" vs "run 确实失败"，前者携带 `runId` + `retryable/poll` 提示，供客户端走 T5 续轮询而非硬失败。
   验收：客户端能据错误语义区分"重连续跑"与"真失败"。
 
-- [x] **T13 本机 Bridge 运行态同步校验**
-  本机 launchd 服务可能继续使用旧 `/usr/local/bin/xworkmate-go-core`。验收口径改为代码 + 运行态双确认：`/api/ping.commit` 非空且等于目标 commit，`/acp/rpc xworkmate.session.prepare` 对旧 OpenClaw gateway 返回 `ok:true` + `compatibilityMode=local-session-prepare`。
-  验收：App 不再显示 `-32002/-32601 unknown method: xworkmate.session.prepare`；本地 `127.0.0.1:8787` 直接探针通过。
+- [x] **T13 运行态同步校验（bridge 二进制 + 网关插件）**
+  「源码已修但跑的不是它」是反复踩的坑，需双侧确认：
+  - **Bridge**：`/api/ping.commit` 非空且等于目标 commit（本机 launchd 可能仍跑旧 `/usr/local/bin/xworkmate-go-core`）。
+  - **网关插件**：网关启动日志含 `… openclaw-multi-session-plugins`，且 `/acp/rpc xworkmate.session.prepare` **不**返回 `unknown method`（插件已加载时返回真实 mapping；未加载时 bridge 才走 `compatibilityMode=local-session-prepare` 降级）。
+  验收：App 不再显示 `unknown method: xworkmate.*`；网关 `N plugins` 列表含 multi-session。
 
 ### L3 可观测性（横切 · infra/service/lab）
 
@@ -291,8 +273,11 @@ T7 完成后取产物 "xworkmate.artifacts.export/read" ▶ Gateway  ✗ 同样 
 
 ## 6. 落地顺序建议
 
-1. ✅ **当天止血**（已合并 main）：T1 + T2（入口配置）+ T3 + T4 + T6（客户端）+ session.prepare 数字 code 降级，消除"30min 必断 / 路由漏配 / 无限 running / 停不掉 / session.prepare 硬失败"。
-2. ✅ **治本**（本地验证 commit `2333c3e`）：T7 + T8 + T9（bridge 持久 run 仓与 WS 解耦）+ T13（本机运行态同步校验），让"gateway 跑完 = 结果一定拿得到"，并避免源码已修但本机二进制未更新。
-3. **跟进（待办）**：T5 + T10（断连续跑语义）、T11 + T12（可观测性）、T8b（跨进程重启持久化，接 `xworkmate.jobs.*` / 磁盘）。
+0. ✅ **主根因修复**（live 验证）：让 OpenClaw 网关稳定加载 `openclaw-multi-session-plugins`——`openclaw plugins install` 从稳定路径重装 + 重启网关，确认启动日志 `6 plugins … openclaw-multi-session-plugins`、`xworkmate.*` 不再 `unknown method`。这是「采集AI资讯能产出」的前提（详见 §4）。
+1. ✅ **当天止血**（已合并 main）：T1 + T2（入口配置）+ T3 + T4 + T6（客户端）+ session.prepare 数字 code 降级，消除"30min 必断 / 路由漏配 / 无限 running / 停不掉"。
+   说明：session.prepare 数字 code 降级仍有价值——当插件**未**加载时，让 bridge 优雅 fallback 而非硬失败；插件加载后走真实 plugin 路径。
+2. ✅ **健壮性加固**（本地验证 commit `2333c3e`）：T7 + T8 + T9（bridge 持久 run 仓与 WS 解耦），把网关短暂不可达 / 抖动收敛为「有界续轮询 → deadline 终态」，而非无限运行/丢结果。
+3. **跟进（待办）**：T5 + T10（断连续跑语义）、T11 + T12（可观测性）、T8b（跨进程重启持久化，接 `xworkmate.jobs.*` / 磁盘）；运行态校验：每次替换 bridge 二进制 / 网关重启后，核对 `/api/ping.commit` 与网关 `N plugins` 列表。
 
 > 回归对照：本目录 `00-review-env-and-matrix.md` 第 2 节"通用验收标准"中"长任务执行期间状态流 / 取消 / 重试稳定""同一任务重复执行 3 次不卡死"，即本规划的回归出口。
+> 产物交付链（artifact scope / workspace 路径）的独立缺陷与修复，见 `openclaw-gateway-e2e-regression/ROOT_CAUSE_ANALYSIS.md`。
