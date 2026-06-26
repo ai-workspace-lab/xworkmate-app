@@ -299,9 +299,11 @@ curl -sS -X POST http://127.0.0.1:8787/acp/rpc \
 
 > 优先级按「直接决定一次任务能否产出」排序。S1/S2 是本轮 live 新发现。
 
-- **S0 插件稳定安装（最高）** — 网关方法 `xworkmate.*` 全部依赖 `openclaw-multi-session-plugins`。当前注册源是临时路径 `/private/tmp/openclaw-multi-session-plugins/dist/index.js`，**重启/清 tmp 即丢插件**（本次故障正因网关启动早于该路径就位）。
-  改进：`openclaw plugins install ~/.openclaw/extensions/openclaw-multi-session-plugins`（或仓库稳定路径）落正式 install 记录；网关 supervisor 启动顺序保证「插件就位 → 启网关」。
-  验收：网关重启后启动日志稳定含 `… openclaw-multi-session-plugins`；`xworkmate.session.prepare` 不再 `unknown method`。
+- **S0 插件稳定安装（最高）— ✅ 已落实并验证（2026-06-27）**
+  网关方法 `xworkmate.*` 全部依赖 `openclaw-multi-session-plugins`。**精确根因**：`~/.openclaw/extensions/openclaw-multi-session-plugins` 是个**符号链接 → `/tmp/openclaw-multi-session-plugins`**（临时盘，重启/清 tmp 即失效）；`openclaw plugins inspect` 标 `Source: /private/tmp/…` 且警告「loaded without install/load-path provenance（untracked local code）」。网关 09:21 启动早于该 tmp 路径就位 → 当次只加载 5 plugins、`xworkmate.*` 全 `unknown method`。
+  **已执行**：① 删符号链接、把内容复制成真实目录 `~/.openclaw/extensions/openclaw-multi-session-plugins`；② `openclaw plugins install <该路径> --force` 落正式 `path` install 记录；③ `launchctl kickstart -k gui/$UID/ai.openclaw.gateway` 重启。
+  **验证**：启动日志 `http server listening (6 plugins: … openclaw-multi-session-plugins)`；`inspect` 的 `Source` 变为 `~/.openclaw/extensions/…/dist/index.js`、provenance 警告消失；`xworkmate.session.prepare` 经 bridge 返回**真实插件响应**（`fallback=null`、带 `mapping`、`artifactScope=tasks/draft_s0verify/s0-run`），不再走 bridge 的 `local-session-prepare` 降级。
+  收尾：`~/.openclaw/extensions/` 现为真实目录（非 /tmp 软链），重启/重启后不再丢插件；建议把它纳入部署（`deploy_gateway_openclaw`）从仓库 `openclaw-multi-session-plugins` 安装，避免再被软链到临时盘。
 
 - **S1 `expectedArtifactDirs` 为空导致根目录兜底失效** — live 的 session mapping 为 `expectedArtifactDirs:[]`（contract 没派生出期望目录，`orchestrator.go:402/682`）。插件对「agent 把产物写到 workspace 根 `reports/`/`artifacts/` 而非 task scope」的兜底扫描**依赖 `expectedArtifactDirs`**；为空时兜底形同虚设 → 即便 agent 产出也收不到，表现「暂无文件」。
   改进：bridge 在 `xworkmate.session.prepare` 必带一组缺省 `expectedArtifactDirs`（至少 `reports/`、`artifacts/`，并从 `requiredArtifactExtensions` / prompt 中的目标路径推导）；或插件在 `expectedArtifactDirs` 为空时回扫一组安全缺省目录。
