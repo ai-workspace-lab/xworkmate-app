@@ -3656,6 +3656,59 @@ void main() {
     );
 
     test(
+      'abortRun remains locally terminal when bridge cancel fails',
+      () async {
+        final fakeGoTaskService = _BlockingGoTaskServiceClient(
+          failCancel: true,
+        );
+        final controller = _connectedGatewayController(fakeGoTaskService);
+        addTearDown(() {
+          fakeGoTaskService.completeAll();
+          controller.dispose();
+        });
+
+        await _selectGatewaySession(controller, 'cancel-fails-openclaw');
+        final pendingFuture = controller.sendChatMessage('stop despite cancel');
+        await _waitForThreadLifecycleStatus(
+          controller,
+          'cancel-fails-openclaw',
+          'running',
+        );
+
+        await controller.abortRun();
+
+        expect(fakeGoTaskService.cancelledSessionIds, <String>[
+          'cancel-fails-openclaw',
+        ]);
+        expect(
+          controller.assistantSessionHasPendingRun('cancel-fails-openclaw'),
+          isFalse,
+        );
+        expect(
+          controller
+              .requireTaskThreadForSessionInternal('cancel-fails-openclaw')
+              .lifecycleState
+              .lastResultCode,
+          'aborted',
+        );
+
+        fakeGoTaskService.complete(
+          'cancel-fails-openclaw',
+          const GoTaskServiceResult(
+            success: true,
+            message: 'late cancel-failed result',
+            turnId: 'turn-cancel-fails',
+            raw: <String, dynamic>{},
+            errorMessage: '',
+            resolvedModel: '',
+            route: GoTaskServiceRoute.externalAcpSingle,
+          ),
+        );
+        await pendingFuture;
+      },
+    );
+
+    test(
       'continueAssistantTaskInternal requeues a stopped OpenClaw task without clearing queued work',
       () async {
         final fakeGoTaskService = _BlockingGoTaskServiceClient();
@@ -4101,6 +4154,103 @@ void main() {
       expect(
         controller.chatMessages.map((message) => message.text).join('\n'),
         contains('ACP_HTTP_CONNECTION_CLOSED'),
+      );
+    });
+
+    test('OpenClaw running poll times out and clears pending state', () async {
+      final staleStartedAtMs = DateTime.now()
+          .subtract(kOpenClawRunningPollBudgets['short_task']!)
+          .subtract(kOpenClawRunningPollGrace)
+          .subtract(const Duration(seconds: 1))
+          .millisecondsSinceEpoch
+          .toDouble();
+      final fakeGoTaskService = _RecordingGoTaskServiceClient()
+        ..taskOutcomes.add(
+          GoTaskServiceResult(
+            success: true,
+            message: '',
+            turnId: 'turn-openclaw-running-timeout',
+            raw: <String, dynamic>{
+              'success': true,
+              'status': 'running',
+              'sessionId': 'openclaw-running-timeout',
+              'threadId': 'openclaw-running-timeout',
+              'appThreadKey': 'openclaw-running-timeout',
+              'openclawSessionKey': 'agent:main:openclaw-running-timeout',
+              'turnId': 'turn-openclaw-running-timeout',
+              'runId': 'run-openclaw-running-timeout',
+              'artifactScope':
+                  'tasks/agent:main:openclaw-running-timeout/run-openclaw-running-timeout',
+              'artifactDirectory':
+                  '/tmp/tasks/agent:main:openclaw-running-timeout/run-openclaw-running-timeout',
+              'gatewayProviderId': 'openclaw',
+              'startedAtMs': staleStartedAtMs,
+              'taskLoadClass': 'short_task',
+            },
+            errorMessage: '',
+            resolvedModel: '',
+            route: GoTaskServiceRoute.externalAcpSingle,
+          ),
+        );
+      final controller = _connectedGatewayController(fakeGoTaskService);
+      addTearDown(controller.dispose);
+      const association = OpenClawTaskAssociation(
+        sessionId: 'openclaw-running-timeout',
+        threadId: 'openclaw-running-timeout',
+        turnId: 'turn-openclaw-running-timeout',
+        runId: 'run-openclaw-running-timeout',
+        artifactScope:
+            'tasks/agent:main:openclaw-running-timeout/run-openclaw-running-timeout',
+        artifactDirectory:
+            '/tmp/tasks/agent:main:openclaw-running-timeout/run-openclaw-running-timeout',
+        gatewayProviderId: 'openclaw',
+        startedAtMs: 0,
+        status: 'running',
+        appThreadKey: 'openclaw-running-timeout',
+        openclawSessionKey: 'agent:main:openclaw-running-timeout',
+        taskLoadClass: 'short_task',
+      );
+      controller.upsertTaskThreadInternal(
+        'openclaw-running-timeout',
+        executionTarget: AssistantExecutionTarget.gateway,
+        selectedProvider: SingleAgentProvider.openclaw,
+        selectedProviderSource: ThreadSelectionSource.explicit,
+        lifecycleStatus: 'running',
+        lastResultCode: 'running',
+        openClawTaskAssociation: association,
+      );
+      controller.aiGatewayPendingSessionKeysInternal.add(
+        'openclaw-running-timeout',
+      );
+
+      await controller
+          .pollOpenClawTaskAssociationInternal(
+            sessionKey: 'openclaw-running-timeout',
+            target: AssistantExecutionTarget.gateway,
+            association: association,
+          )
+          .timeout(const Duration(seconds: 1));
+
+      final thread = controller.requireTaskThreadForSessionInternal(
+        'openclaw-running-timeout',
+      );
+      expect(thread.lifecycleState.status, 'interrupted');
+      expect(
+        thread.lifecycleState.lastResultCode,
+        kOpenClawRunningPollTimeoutCode,
+      );
+      expect(thread.lastArtifactSyncStatus, 'interrupted');
+      expect(thread.openClawTaskAssociation, isNull);
+      expect(
+        controller.assistantSessionHasPendingRun('openclaw-running-timeout'),
+        isFalse,
+      );
+      expect(
+        controller
+            .localSessionMessagesInternal['openclaw-running-timeout']
+            ?.last
+            .text,
+        contains(kOpenClawRunningPollTimeoutCode),
       );
     });
 
@@ -4944,9 +5094,10 @@ class _RecordingGoTaskServiceClient implements GoTaskServiceClient {
 }
 
 class _BlockingGoTaskServiceClient implements GoTaskServiceClient {
-  _BlockingGoTaskServiceClient({this.onRequest});
+  _BlockingGoTaskServiceClient({this.onRequest, this.failCancel = false});
 
   final void Function(GoTaskServiceRequest request)? onRequest;
+  final bool failCancel;
   final List<GoTaskServiceRequest> requests = <GoTaskServiceRequest>[];
   final List<String> cancelledSessionIds = <String>[];
   final Map<String, Completer<GoTaskServiceResult>> _pending =
@@ -5056,6 +5207,12 @@ class _BlockingGoTaskServiceClient implements GoTaskServiceClient {
     OpenClawTaskAssociation? association,
   }) async {
     cancelledSessionIds.add(sessionId);
+    if (failCancel) {
+      throw const GatewayAcpException(
+        'cancel failed',
+        code: 'OPENCLAW_GATEWAY_SOCKET_CLOSED',
+      );
+    }
   }
 
   @override
