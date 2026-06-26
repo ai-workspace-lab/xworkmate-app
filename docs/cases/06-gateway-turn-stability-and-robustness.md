@@ -93,6 +93,7 @@ Gateway 部署出处：`ai-workspace-infra/playbooks/deploy_gateway_openclaw.yml
 | ⑦ | **Bridge 无持久 run 仓** | 同步 SSE 路径不落 `xworkmate.jobs.*`，结果只活在内存 `responseCh`；连接一断即丢（已存在 jobs.submit/get/list 未被 gateway submit 复用） | `rpc_handler.go:73`（jobs.*）vs http_handler 同步路径 |
 | ⑧ | Gateway 重连丢 run 态 | 重连到新 WS 后 `tasks.get` 经 `ensureProductionGatewayConnected` 落到新连接，查不到 terminal → 回 stale `running` 或 `not_found` | `rpc_handler.go:143-175` |
 | ⑨ | Bridge | `gatewayRPCError` 把可重试错误统一映射为 `OPENCLAW_GATEWAY_SOCKET_CLOSED`，但缺少"run 仍在后台、稍后可查"的语义，客户端只能当硬失败 | `orchestrator.go:1678-1702` |
+| ⑩ | **本机运行态 / 发布同步** | 源码已包含 `xworkmate.session.prepare` fallback，但本机 `launchd` 运行的 `/usr/local/bin/xworkmate-go-core` 可能仍是旧构建或无 commit 元信息；App 会继续报 `-32601/-32002 unknown method: xworkmate.session.prepare` | `curl /api/ping` 的 `commit` 为空或不等于当前修复 commit；`/acp/rpc` 直接探针返回 unknown method |
 
 ---
 
@@ -112,6 +113,54 @@ Gateway 部署出处：`ai-workspace-infra/playbooks/deploy_gateway_openclaw.yml
 3. OpenClaw 后台继续跑完，但 bridge 已丢失该 run 的 pending / 无持久记录；
 4. App 落入 running 轮询（或失败后仍 pending），`tasks.get` 拿不到 terminal；
 5. 进度条永远 `任务运行中...`，`停止` 不本地生效 → 卡死。
+
+### 2026-06-26 本机联合调试结论
+
+本次现场环境：
+
+- App：`Version 1.1.4`，应用构建 commit `fb7e0ac`。
+- 本地 Bridge：`http://127.0.0.1:8787`，launchd 服务 `plus.svc.xworkspace.bridge`。
+- OpenClaw gateway 控制台：`http://127.0.0.1:18789/channels`。
+
+实际复现：
+
+```bash
+curl -sS -X POST http://127.0.0.1:8787/acp/rpc \
+  -H 'Content-Type: application/json' \
+  -H 'Authorization: Bearer $BRIDGE_AUTH_TOKEN' \
+  --data '{"jsonrpc":"2.0","id":"probe","method":"xworkmate.session.prepare","params":{"openclawSessionKey":"probe-session","runId":"probe-run","workspaceDir":"/tmp/xworkmate-probe","gatewayProviderId":"openclaw"}}'
+```
+
+修复前返回：
+
+```json
+{"error":{"code":-32601,"message":"unknown method: xworkmate.session.prepare"},"ok":false}
+```
+
+结论：这不是 OpenClaw gateway 控制台 `18789` 的页面问题，也不是 App 展示误判；`/acp/rpc` 上 `acp.capabilities` 正常而 `xworkmate.session.prepare` 不认识，说明本地 Bridge 运行态没有加载到包含 `handleSessionPrepare` 的新二进制。源码中 `rpc_handler.go` 和 `orchestrator.go` 已有 fallback，但 `/usr/local/bin/xworkmate-go-core` 仍是旧/无元信息构建。
+
+现场处理：
+
+1. 在 `xworkmate-bridge` 当前源码重建 `xworkmate-go-core`。
+2. 备份并替换 `/usr/local/bin/xworkmate-go-core`。
+3. macOS 上移除 `com.apple.provenance` / quarantine 并 `codesign --force --sign -`，否则 launchd 会以 `OS_REASON_CODESIGNING` 拒绝启动。
+4. 重载 `plus.svc.xworkspace.bridge`。
+
+修复后探针：
+
+```json
+{
+  "ok": true,
+  "payload": {
+    "fallback": true,
+    "compatibilityMode": "local-session-prepare",
+    "artifactScope": "tasks/probe-session/probe-run",
+    "artifactDirectory": "/tmp/xworkmate-probe/tasks/probe-session/probe-run"
+  }
+}
+```
+
+回归要求：每次本地替换 Bridge 后，先用 `/api/ping` 确认 `commit`，再用上面的 `xworkmate.session.prepare` 探针确认返回 `ok:true`；不能只看 App 设置页的 `Status: ok`。
 
 ---
 
@@ -152,7 +201,7 @@ Gateway 部署出处：`ai-workspace-infra/playbooks/deploy_gateway_openclaw.yml
 
 ### L1 Bridge 持久化（ai-workspace-lab/xworkmate-bridge · 根因修复 · 有协议/状态面改动）
 
-> ✅ T7/T8/T9 已实现（分支 `fix/gateway-durable-run-registry`）。
+> ✅ T7/T8/T9 已实现（本地验证 commit `2333c3e`，需确保运行态 `/api/ping.commit` 与发布 commit 对齐）。
 > 实现取舍：**复用已存在的 per-session 持久 store**（`s.sessions[sessionID]` 内的 `task`/`openClaw`/`lastResult`，生命周期独立于 bridge↔gateway WebSocket），把 `tasks.get` 从「强依赖 gateway 应答」改造为「优先用持久 run 仓兜底」。
 > 新增 `internal/acp/openclaw_run_registry.go`（+ `_test.go`），改动 `rpc_handler.go: handleTaskGet` 与 `orchestrator.go: startOpenClawGatewayTask`。
 
@@ -175,6 +224,10 @@ Gateway 部署出处：`ai-workspace-infra/playbooks/deploy_gateway_openclaw.yml
   `gatewayRPCError`（`orchestrator.go:1678`）区分"连接断但 run 仍在后台可查" vs "run 确实失败"，前者携带 `runId` + `retryable/poll` 提示，供客户端走 T5 续轮询而非硬失败。
   验收：客户端能据错误语义区分"重连续跑"与"真失败"。
 
+- [x] **T13 本机 Bridge 运行态同步校验**
+  本机 launchd 服务可能继续使用旧 `/usr/local/bin/xworkmate-go-core`。验收口径改为代码 + 运行态双确认：`/api/ping.commit` 非空且等于目标 commit，`/acp/rpc xworkmate.session.prepare` 对旧 OpenClaw gateway 返回 `ok:true` + `compatibilityMode=local-session-prepare`。
+  验收：App 不再显示 `-32002/-32601 unknown method: xworkmate.session.prepare`；本地 `127.0.0.1:8787` 直接探针通过。
+
 ### L3 可观测性（横切 · infra/service/lab）
 
 - [ ] **T11 端到端贯穿 runId**
@@ -190,7 +243,7 @@ Gateway 部署出处：`ai-workspace-infra/playbooks/deploy_gateway_openclaw.yml
 ## 6. 落地顺序建议
 
 1. ✅ **当天止血**（已合并 main）：T1 + T2（入口配置）+ T3 + T4 + T6（客户端）+ session.prepare 数字 code 降级，消除"30min 必断 / 路由漏配 / 无限 running / 停不掉 / session.prepare 硬失败"。
-2. ✅ **治本**（分支 `fix/gateway-durable-run-registry`）：T7 + T8 + T9（bridge 持久 run 仓与 WS 解耦），让"gateway 跑完 = 结果一定拿得到"。
+2. ✅ **治本**（本地验证 commit `2333c3e`）：T7 + T8 + T9（bridge 持久 run 仓与 WS 解耦）+ T13（本机运行态同步校验），让"gateway 跑完 = 结果一定拿得到"，并避免源码已修但本机二进制未更新。
 3. **跟进（待办）**：T5 + T10（断连续跑语义）、T11 + T12（可观测性）、T8b（跨进程重启持久化，接 `xworkmate.jobs.*` / 磁盘）。
 
 > 回归对照：本目录 `00-review-env-and-matrix.md` 第 2 节"通用验收标准"中"长任务执行期间状态流 / 取消 / 重试稳定""同一任务重复执行 3 次不卡死"，即本规划的回归出口。
