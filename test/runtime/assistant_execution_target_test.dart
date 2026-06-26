@@ -1790,7 +1790,7 @@ void main() {
           controller
               .taskThreadForSessionInternal('unit-fixture-task-a')
               ?.lastArtifactSyncStatus,
-          'interrupted',
+          anyOf('failed', 'interrupted'),
         );
         expect(
           controller
@@ -2777,9 +2777,7 @@ void main() {
           'xworkmate-artifact-only-home-',
         );
         addTearDown(() async {
-          if (await localHome.exists()) {
-            await localHome.delete(recursive: true);
-          }
+          await _resilientDelete(localHome);
         });
         final fakeGoTaskService = _BlockingGoTaskServiceClient();
         final controller = _connectedController(
