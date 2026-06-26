@@ -51,6 +51,20 @@ const Duration kOpenClawArtifactSyncMaxDuration = Duration(seconds: 90);
 const String kOpenClawArtifactSyncTimeoutCode =
     'OPENCLAW_ARTIFACT_SYNC_TIMEOUT';
 
+// running 轮询（OpenClaw run handle）兜底截止（T3）：
+// 当 gateway 始终回 running（例如 bridge↔gateway socket 抖动后 run 态丢失）时，防止客户端无限轮询、
+// 进度条永远卡在「任务运行中...」。预算按 taskLoadClass 估算，与 bridge 侧任务预算对齐
+// (xworkmate-bridge/internal/acp/openclaw_async_tasks.go: short=10/long=30/complex=60 min)，再加 grace。
+const Duration kOpenClawRunningPollGrace = Duration(minutes: 5);
+const Duration kOpenClawRunningPollDefaultBudget = Duration(minutes: 30);
+const Map<String, Duration> kOpenClawRunningPollBudgets = <String, Duration>{
+  'short_task': Duration(minutes: 10),
+  'long_task': Duration(minutes: 30),
+  'complex_chain_task': Duration(minutes: 60),
+  'complex_long_chain_task': Duration(minutes: 60),
+};
+const String kOpenClawRunningPollTimeoutCode = 'OPENCLAW_RUN_POLL_TIMEOUT';
+
 bool openClawArtifactPathHasRequiredExtension(String path, String extension) {
   final normalizedPath = path.trim().toLowerCase();
   final normalizedExtension = extension.trim().toLowerCase().replaceFirst(
@@ -975,6 +989,74 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
       lastTaskArtifactRelativePaths: currentTaskArtifactRelativePaths,
       updatedAtMs: syncedAtMs,
     );
+  }
+
+  // T3: running 轮询是否已越过兜底截止。
+  // 预算从 run 开始时间(startedAtMs)起算；startedAtMs 缺失时退化为本轮首次轮询时间(firstPollAtMs)。
+  bool openClawRunningPollDeadlineReachedInternal({
+    required double? startedAtMs,
+    required String taskLoadClass,
+    required double? firstPollAtMs,
+    double? nowMs,
+  }) {
+    final anchorMs = (startedAtMs != null && startedAtMs > 0)
+        ? startedAtMs
+        : firstPollAtMs;
+    if (anchorMs == null || anchorMs <= 0) {
+      return false;
+    }
+    final budget =
+        kOpenClawRunningPollBudgets[taskLoadClass.trim().toLowerCase()] ??
+        kOpenClawRunningPollDefaultBudget;
+    final limitMs =
+        (budget + kOpenClawRunningPollGrace).inMilliseconds.toDouble();
+    final currentMs = nowMs ?? DateTime.now().millisecondsSinceEpoch.toDouble();
+    return currentMs - anchorMs >= limitMs;
+  }
+
+  // T3: running 轮询越过兜底截止时，落到「可恢复的中断」终态并退出轮询。
+  // 注意：服务端可能其实已经跑完，只是结果回传链路断了；因此提示用户可重发以拿回结果。
+  void markOpenClawRunningPollTimeoutInternal({
+    required String sessionKey,
+    required OpenClawTaskAssociation association,
+  }) {
+    final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
+      sessionKey,
+    );
+    final nowMs = DateTime.now().millisecondsSinceEpoch.toDouble();
+    aiGatewayPendingSessionKeysInternal.remove(normalizedSessionKey);
+    clearAiGatewayStreamingTextInternal(normalizedSessionKey);
+    upsertTaskThreadInternal(
+      normalizedSessionKey,
+      lifecycleStatus: 'interrupted',
+      lastResultCode: kOpenClawRunningPollTimeoutCode,
+      lastRunAtMs: nowMs,
+      lastArtifactSyncAtMs: nowMs,
+      lastArtifactSyncStatus: 'interrupted',
+      clearOpenClawTaskAssociation: true,
+      updatedAtMs: nowMs,
+    );
+    appendLocalSessionMessageInternal(
+      normalizedSessionKey,
+      GatewayChatMessage(
+        id: nextLocalMessageIdInternal(),
+        role: 'assistant',
+        text: appText(
+          '任务等待已超过预算上限，已结束本轮等待。任务可能已在后台完成但结果回传中断，请重新发送请求以拿回结果。错误码：OPENCLAW_RUN_POLL_TIMEOUT',
+          'Waiting for the task exceeded its budget, so this round was ended. The task may have finished in the background but its result could not be delivered. Send the request again to retrieve the result. Error code: OPENCLAW_RUN_POLL_TIMEOUT',
+        ),
+        timestampMs: nowMs,
+        toolCallId: null,
+        toolName: null,
+        stopReason: null,
+        pending: false,
+        error: true,
+      ),
+      persistInThreadContext: true,
+    );
+    recomputeTasksInternal();
+    notifyIfActiveInternal();
+    unawaited(flushAssistantThreadPersistenceInternal());
   }
 
   bool openClawArtifactSyncLimitReachedInternal({
