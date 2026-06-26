@@ -753,6 +753,8 @@ extension AppControllerDesktopThreadActions on AppController {
     var firstAttempt = true;
     var artifactSyncAttempts = 0;
     double? artifactSyncStartedAtMs;
+    // T3: running 轮询兜底截止的起算锚点（首次进入 running 轮询的时间）。
+    double? runningPollFirstAtMs;
     final existingThread = taskThreadForSessionInternal(sessionKey);
     if (association.status.trim().toLowerCase() == 'syncing-artifacts') {
       artifactSyncStartedAtMs = existingThread?.lastArtifactSyncAtMs;
@@ -786,6 +788,21 @@ extension AppControllerDesktopThreadActions on AppController {
             );
         current = nextAssociation;
         if (result.isOpenClawRunningTaskHandle) {
+          // T3: 给 running 轮询加兜底截止，避免 gateway 始终回 running 时无限轮询、永远卡「任务运行中...」。
+          final nowMs = DateTime.now().millisecondsSinceEpoch.toDouble();
+          runningPollFirstAtMs ??= nowMs;
+          if (openClawRunningPollDeadlineReachedInternal(
+            startedAtMs: current.startedAtMs,
+            taskLoadClass: current.taskLoadClass,
+            firstPollAtMs: runningPollFirstAtMs,
+            nowMs: nowMs,
+          )) {
+            markOpenClawRunningPollTimeoutInternal(
+              sessionKey: sessionKey,
+              association: current,
+            );
+            return;
+          }
           persistOpenClawTaskAssociationInternal(
             sessionKey: sessionKey,
             association: nextAssociation,
@@ -1615,6 +1632,14 @@ extension AppControllerDesktopThreadActions on AppController {
     required AssistantExecutionTarget target,
     required Object error,
   }) async {
+    // T6: 终态一致性。失败处理器是本轮的终态出口，必须自身权威地清 pending，
+    // 不能依赖各调用方的 finally（runOpenClawGatewayQueuedTurnInternal 的 finally 此前并不清 pending，
+    // 导致「错误已渲染但进度条仍卡在任务运行中」）。对其它已显式 remove 的调用方是幂等的。
+    // pending 集合在不同路径下分别用原始 / 归一化 key，两种都移除以确保彻底清空。
+    aiGatewayPendingSessionKeysInternal.remove(sessionKey);
+    aiGatewayPendingSessionKeysInternal.remove(
+      normalizedAssistantSessionKeyInternal(sessionKey),
+    );
     clearAiGatewayStreamingTextInternal(sessionKey);
     clearPendingToolCallsForGatewaySessionInternal(sessionKey, hasError: true);
     final completedAtMs = DateTime.now().millisecondsSinceEpoch.toDouble();
@@ -1781,27 +1806,47 @@ extension AppControllerDesktopThreadActions on AppController {
       return;
     }
     if (aiGatewayPendingSessionKeysInternal.contains(sessionKey)) {
-      await cancelAssistantTaskForSessionInternal(sessionKey);
+      // T4: 停止本地权威化。先捕获 association，再立刻把本轮标记为 aborted（清 pending / 置终态 /
+      // 让轮询 loop 在下一次迭代退出），UI 立即停止——不依赖 gateway 往返。
+      // 随后 best-effort 下发 tasks.cancel；其失败/挂起都不得阻塞或回滚本地终止。
+      final association = taskThreadForSessionInternal(
+        sessionKey,
+      )?.openClawTaskAssociation;
       removeQueuedOpenClawGatewayTurnsForSessionInternal(sessionKey);
       removeActiveOpenClawGatewayTurnsForSessionInternal(sessionKey);
       markOpenClawGatewayTurnAbortedInternal(sessionKey);
       drainOpenClawGatewayQueueInternal();
+      unawaited(
+        cancelAssistantTaskForSessionInternal(
+          sessionKey,
+          association: association,
+        ),
+      );
       return;
     }
   }
 
-  Future<void> cancelAssistantTaskForSessionInternal(String sessionKey) async {
+  Future<void> cancelAssistantTaskForSessionInternal(
+    String sessionKey, {
+    OpenClawTaskAssociation? association,
+  }) async {
     final normalized = normalizedAssistantSessionKeyInternal(sessionKey);
-    final association = taskThreadForSessionInternal(
-      normalized,
-    )?.openClawTaskAssociation;
-    await goTaskServiceClientInternal.cancelTask(
-      route: GoTaskServiceRoute.externalAcpSingle,
-      target: assistantExecutionTargetForSession(normalized),
-      sessionId: normalized,
-      threadId: normalized,
-      association: association,
-    );
+    // association 可能已被本地终止清空，故允许调用方预先捕获后传入。
+    final effectiveAssociation =
+        association ??
+        taskThreadForSessionInternal(normalized)?.openClawTaskAssociation;
+    // best-effort：gateway 不可达 / run 已不存在时不得抛出，避免阻塞停止流程。
+    try {
+      await goTaskServiceClientInternal.cancelTask(
+        route: GoTaskServiceRoute.externalAcpSingle,
+        target: assistantExecutionTargetForSession(normalized),
+        sessionId: normalized,
+        threadId: normalized,
+        association: effectiveAssociation,
+      );
+    } catch (error) {
+      debugPrint('cancelAssistantTaskForSession best-effort failed: $error');
+    }
   }
 
   Future<void> prepareForExit() async {
