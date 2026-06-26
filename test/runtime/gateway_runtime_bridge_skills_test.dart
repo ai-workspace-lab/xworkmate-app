@@ -10,6 +10,9 @@ import 'package:xworkmate/runtime/runtime_models.dart';
 import 'package:xworkmate/runtime/secure_config_store.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  HttpOverrides.global = null;
+
   test(
     'SkillsController loads OpenClaw skills through bridge request without legacy gateway connect',
     () async {
