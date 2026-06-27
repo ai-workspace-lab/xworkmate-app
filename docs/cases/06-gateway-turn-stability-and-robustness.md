@@ -211,34 +211,32 @@ curl -sS -X POST http://127.0.0.1:8787/acp/rpc \
 
 ### L0 入口配置（ai-workspace-infra · 改配置即可 · 当天可上）
 
-- [ ] **T1 对齐入口与 bridge 的超时上限**
-  `caddy.j2` `/acp*` 的 `read_timeout` / `write_timeout` 提到 **≥ bridge `openClawAgentWaitMaxTimeout`（60min）+ 余量**。
-  最好让入口超时与 `orchestrator.go` 的上限**由同一变量 / 同源常量**渲染，避免再次漂移。
-  验收：budget=60min 的 complex_chain_task 全程 SSE 不被入口掐断。
+- [x] **T1 对齐入口与 bridge 的超时上限** — ✅ 已实现并加断言（playbooks）
+  `xworkmate-bridge-site.caddy.j2` 全部 route 的 `read_timeout`/`write_timeout` 由**单一变量** `xworkmate_bridge_acp_stream_timeout`（`defaults/main.yml:36` = `70m` ≥ bridge `openClawAgentWaitMaxTimeout` 60min + 余量）渲染，消除入口/bridge 漂移；`tasks/validate.yml:39-41` 断言渲染结果含该超时。
+  验收：budget=60min 的 complex_chain_task 全程 SSE 不被入口掐断。✓
 
-- [ ] **T2 收敛 / 补齐非 /acp 路由的流式配置**
-  给 `/api*`（及任何承载 `tasks.get` 轮询、流式响应的路由）补 `flush_interval -1` + 同样长超时；或显式把所有 gateway 流量收敛到 `/acp*`。
-  验收：轮询 / 流式不再依赖 Caddy 默认短超时。
+- [x] **T2 收敛 / 补齐非 /acp 路由的流式配置** — ✅ 已实现（playbooks）
+  `/api*`、`/artifacts/*`、`/acp*`、`/` 四条 handle 现统一带 `flush_interval -1` + 同一 `xworkmate_bridge_acp_stream_timeout`（`caddy.j2:16-60`），不再有任何路由回落 Caddy 默认短超时。
+  验收：轮询 / 流式不再依赖 Caddy 默认短超时。✓
 
 ### L2 App 客户端止血（ai-workspace-lab/xworkmate-app · 纯客户端 · 零协议变更）
 
-- [ ] **T3 running 轮询加硬截止**
-  在 `pollOpenClawTaskAssociationInternal` 的 running-handle 分支（`thread_actions.dart:788`）引入 deadline / maxAttempts，复用 bridge 下发的 `deadlineAt`（`openclaw_async_tasks.go:92`）+ grace；到点落 `interrupted`（可恢复态，`isRecoverableAssistantTaskStateInternal` 已支持），退出 loop。
-  参照同函数 `:831` artifact-sync 分支的封顶写法 `openClawArtifactSyncLimitReachedInternal`。
-  验收：gateway 始终回 `running` 时，客户端在 deadline 后必终止，不再无限轮询。
+- [x] **T3 running 轮询加硬截止** — ✅ 已实现（xworkmate-app）
+  running-handle 分支经 `openClawRunningPollDeadlineReachedInternal`（`thread_actions.dart:799`）按 bridge 下发的 deadline + grace 封顶；到点落 `interrupted`（可恢复态，`isRecoverableAssistantTaskStateInternal` 已支持）并退出 loop。
+  验收：gateway 始终回 `running` 时，客户端在 deadline 后必终止，不再无限轮询。✓
 
-- [ ] **T4 `停止` 本地权威化**
-  `abortRun` / `cancelAssistantTaskForSessionInternal`（`:1793`）改为：**先**乐观清 `aiGatewayPendingSessionKeysInternal`、置 lifecycle=`aborted`、退出 loop，**再** best-effort 发 `tasks.cancel`。UI 终止不得依赖 gateway 往返。
-  验收：gateway 不可达时点 `停止` 仍能立刻停下。
+- [x] **T4 `停止` 本地权威化** — ✅ 已实现（xworkmate-app）
+  `abortRun`（`thread_actions.dart:1819`）**先**乐观清 `aiGatewayPendingSessionKeysInternal`、置终止态、退出 loop，**再** best-effort 发 `tasks.cancel`（注释：「其失败/挂起都不得阻塞或回滚本地终止」）。UI 终止不依赖 gateway 往返。
+  验收：gateway 不可达时点 `停止` 仍能立刻停下。✓
 
 - [x] **T5 传输中断降级为"后台续跑·重连中"** — `pollOpenClawTaskAssociationInternal` catch（`thread_actions.dart`）
   轮询期间 App↔bridge 传输瞬断（`ACP_HTTP_CONNECTION_CLOSED`）时，不硬失败丢结果，而是**有界重试续轮询**：连续瞬断 `< kOpenClawPollTransientRetryLimit(=5)` 则保持 running、2s 后重试下一次 `getTask`；每次成功重置计数；超限才落终态。bridge 侧 T7/T9 负责网关侧抖动，这里只兜 App↔bridge 这一跳。
   **取舍**：未引入新的「重连中」UI 相位（避免改进度条布局）；任务保持「运行中」即降级态。未走 `resumeOpenClawTaskAssociationsInternal` 全量恢复（那是 thread 重载路径），而是就地有界重试，风险更低、不会无限重连。
   验收：轮询瞬断 ≤5 次能自动续轮询；持续不可达则在有界次数后落终态。
 
-- [ ] **T6 失败路径与 pending 清理一致性**
-  审计 `applyGatewayChatFailureInternal`（`:1613`，置 `ready` 但不清 pending）与调用方 `finally`（`:715` 仅 `!handedOffToBridgeTask` 才清 pending）之间的竞态，确保任一终态路径都能确定性地清 pending，杜绝"错误已渲染但仍 running"。
-  验收：失败 / 中断 / 取消三类终态后，`pending` 必为 false。
+- [x] **T6 失败路径与 pending 清理一致性** — ✅ 已实现（xworkmate-app）
+  失败 / 中断 / 取消三条终态路径均确定性清 `aiGatewayPendingSessionKeysInternal`（`thread_actions.dart:716/903/932/1657-1658`、`runtime_helpers.dart:1032/1112`），消除"错误已渲染但仍 running"竞态。
+  验收：失败 / 中断 / 取消三类终态后，`pending` 必为 false。✓
 
 ### L1 Bridge 持久化（ai-workspace-lab/xworkmate-bridge · 根因修复 · 有协议/状态面改动）
 
@@ -366,3 +364,46 @@ curl -sS -X POST http://127.0.0.1:8787/acp/rpc \
 - `xworkmate-app` 已完成最终提交并推送：`66fd0e4 fix(gateway): harden OpenClaw polling and acceptance notes`。
 - `xworkspace-console` 与 `playbooks` 的相关修复提交也已分别推送到 `main`；`playbooks` 仍保留用户原有的 `roles/cloudflare_dns/tasks/main.yml` 本地改动，未触碰。
 - `.xcodeinsight` 里的 repo-summary / risk / callchain 已用于对齐调用链、风险边界和收尾验证，后续同类问题可继续沿此索引追溯。
+
+---
+
+## 9. 2026-06-27 全链路状态总览与剩余稳定性 backlog（跨 4 仓 main 已合并）
+
+> 本节是「重新梳理」的收口：把 §3 失效点 → §5 编码 TODO → §7 live 改进三条线索，对齐到**当前各仓 main 的真实代码状态**，并给出剩余项的精确验收口径。前文 §5 个别 checkbox 曾滞后于 §2/§6，本节为权威状态。
+
+### 9.1 四仓 main 基线（全部已提交并推送）
+
+| 仓库 | main HEAD | 本轮关键内容 |
+|---|---|---|
+| `xworkmate-app` | `82d25de` docs(case06): close out acceptance log（代码基线 `66fd0e4`） | T3/T4/T5/T6 客户端止血；本案文档 |
+| `xworkmate-bridge` | `0a50621` fix(acp): remove orphaned S1 test — keep main compiling | T7/T8/T9 持久 run 仓、T10 错误语义、T11/T12 可观测；**S1 已回退** |
+| `openclaw-multi-session-plugins` | `1fe544c` ci(runtime-release): publish stable runtime-latest tag | 插件 `xworkmate.*` 方法源；CI 改 npm 构建 + `runtime-latest` 稳定发布 URL |
+| `ai-workspace-infra/playbooks` | `5c74feb` fix(cloudflare_dns): prefer CLOUDFLARE_API_TOKEN | T1/T2 入口超时+flush 全 route 对齐（`70m`，validate 断言）；cloudflare token 优先级 |
+
+> 旁路修复另在 `xworkspace-console/main`（`50c2d85` + `5093e21`）：macOS 稳定插件目录幂等迁移、provider key 走 `append_secret_var`。
+
+### 9.2 已完成（一次任务能否「有界、可恢复、能产出」的全部止血+加固）
+
+四层链路（App → bridge → 插件 → gateway）的稳定性闭环已落地：
+
+- **入口层（T1/T2，playbooks）**：所有 route `flush_interval -1` + 单源 `70m` 超时 ≥ bridge 60min，长任务不再 30min 必断。
+- **客户端层（T3/T4/T5/T6，app）**：running 轮询有 deadline 封顶、`停止`本地权威、传输瞬断有界续轮询（≤5）、三终态确定清 pending。「无限运行 / 停不掉 / 瞬断丢结果」根除。
+- **bridge 层（T7/T8/T9/T10，bridge）**：per-session 持久 run 仓与 WS 解耦，网关瞬断/抖动收敛为「有界续轮询 → deadline 终态」，终态结果回放不丢；socket-closed 带 `retryable/poll` 语义。
+- **可观测（T11/T12/T13）**：`runId` 贯穿四层日志；`/api/ping.metrics` 暴露三类不稳定计数；运行态双侧校验（bridge `commit` + 网关 `N plugins`）。
+- **主根因（S0）**：插件稳定安装到 `~/.openclaw/extensions/` 真实目录（非 /tmp 软链）+ `plugins install --force` provenance，重启不再丢插件、`xworkmate.*` 不再 `unknown method`。
+
+### 9.3 剩余 backlog（按「直接决定产出」排序）
+
+| 项 | 仓库 | 状态 | 问题 | 正确做法 / 验收 |
+|---|---|---|---|---|
+| **S1** 缺省 `expectedArtifactDirs` 兜底扫描 | bridge(+插件) | ⚠️ 已回退（`0280893`→`81f65e3`），**待重做** | 旧实现把「有 expectedArtifactDirs」等同「必须阻塞导出」，无产物的成功 run 卡在「等待导出」，E2E 转红 | **解耦**「扫描提示」与「阻塞式导出」：缺省目录只驱动插件兜底扫描、**不**触发 bridge 等待导出；或仅当客户端显式声明 `requiredArtifactExtensions` 才启用阻塞。验收：全 E2E 套件绿 + 「agent 写产物到 workspace 根」能被收集 |
+| **S2** `no_native_task_record` 状态歧义 | 插件 + bridge | 🔬 待改进 | chat.send 成功但 gateway 无 detached task 且无产物时，无法区分「还在跑」与「跑完没产物」，只能 degraded 续轮询到 deadline | ①核对 chat.send 是否应注册 detached task（agent/`tasks.*` 配置）；②超过最小执行时长后下发明确 `running(no-record)` vs `completed(no-artifact)`，配合 T9 deadline 收口。验收：正常执行 `tasks.get` 能 running→completed；异常给确定终态 |
+| **T8b** 跨进程重启持久化 | bridge | ⏸️ 已知边际项 | 现 per-session run 仓为内存，覆盖「WS 抖动/网关瞬断」，但 bridge **进程重启**仍丢终态 | 把 run 仓落磁盘 / 接 `xworkmate.jobs.*`（序列化 + 启动加载 + 过期清理 + 并发）。独立一轮带测试。验收：bridge 重启后 `tasks.get` 仍能回放终态 |
+
+### 9.4 稳定性改进建议（防回归 / 运维侧）
+
+1. **运行态≠源码 的常态化校验**：把 §5 T13 的双侧检查做成健康探针/CI gate——bridge `/api/ping.commit` 等于发布 commit、网关启动日志 `N plugins` 含 `openclaw-multi-session-plugins`、`openclaw plugins inspect` 无 provenance 警告。三者任一不满足即告警，避免再次「修了但跑的不是它」。
+2. **插件安装纳入部署**：把 `openclaw-multi-session-plugins` 的稳定目录安装收敛进 `deploy_gateway_openclaw`（从仓库构建产物 install，非软链 /tmp），让 S0 修复不依赖手工。
+3. **超时同源不可漂移**：入口 `xworkmate_bridge_acp_stream_timeout` 与 bridge `openClawAgentWaitMaxTimeout` 已分两侧定义，建议在 validate/CI 加一条「入口 ≥ bridge + 余量」的交叉断言，防未来单侧改值再漂移。
+4. **S1 重做前先补测**：先写「有 expectedArtifactDirs 但 run 无产物」与「agent 写产物到 workspace 根」两类对照 E2E，再改实现，避免重蹈 `0280893` 回退。
+5. **`/api/ping.metrics` 接告警**：`gatewaySocketClosed`/`taskGetUnconfirmedFallback`/`runDeadlineInterrupt` 三计数接监控，使「不稳定」可被观测而非靠用户截图。
