@@ -85,10 +85,21 @@ App.executeTask ──SSE POST /acp/rpc──▶ Bridge.handleRequest
    workspace ~/.openclaw/workspace/tasks/<sani(sessionKey)>/<runId>/  → 产物(.md 等)
 ```
 
-**live 验证状态（2026-06-26 23:xx）**：
-- ✅ 网关加载 `6 plugins … openclaw-multi-session-plugins`（重启后；详见 §4）。
-- ✅ `/api/ping` commit=2333c3e；session.prepare 回真实 mapping；chat.send 成功返回 runId。
-- ⚠️ `xworkmate.tasks.get` → `no_native_task_record`、scope 目录空：链路通到插件，但本轮 agent 未注册可查 task / 未落产物（第 4 层执行问题）。
+### 四层完整 live 评估（2026-06-27，8787 commit `188ca4b`）— **端到端 PASS** ✅
+
+一次 gateway turn（`sessionId=draft:eval-…`，prompt「总结今天AI新闻并保存到 summary.md」）逐层实测：
+
+| 层 | 跳 | 验证方式 | 实测结果 |
+|---|---|---|---|
+| L1 App→Bridge | `session.start`(target=gateway) | `/acp/rpc` | ✅ 回 running 句柄：`runId`、`openclawSessionKey=agent:main:draft:eval-…`、`artifactScope=tasks/agent_main_draft_eval-…/turn-…`、budget=30min(long_task) |
+| L2 Bridge→Plugin | `xworkmate.session.prepare` | bridge log + payload | ✅ 插件 `recordXWorkmateSessionMapping` + `prepareXWorkmateArtifacts`；网关 `res ✓ xworkmate.session.prepare 569ms` |
+| L2→3 Bridge→Gateway | `chat.send`(原生) | bridge/gateway log | ✅ 派发 agent，`runId=turn-1782533120263890000` |
+| L3 Plugin tasks 快照 | `xworkmate.tasks.get` | `/acp/rpc` | ✅ `getXWorkmateTaskSnapshot` → **`status=completed, success=True, constraintSatisfied=True`**、`hasMapping=True`、无 degraded |
+| L3↔4 插件↔网关 | `xworkmate.*` 全家 | 网关 `[ws] ⇄ res` | ✅ `session.prepare ✓` / `artifacts.export ✓ 70ms`(×2) / `tasks.get ✓ 63ms` |
+| L4 Gateway | 6 plugins + agent 执行 | 网关启动日志 | ✅ `listening (6 plugins: … openclaw-multi-session-plugins)`；agent(deepseek-v4-flash) 产出 |
+| 产物 | 落盘 + 取回 | tasks.get artifacts + fs | ✅ `summary.md` `text/markdown` **438B** 落在 `~/.openclaw/workspace/tasks/agent_main_draft_eval-…/turn-…/`，并经 `xworkmate.artifacts.export` 回到 tasks.get 的 `artifacts[]` |
+
+**结论**：S0 把插件从稳定路径装好后，一次 gateway turn **全链路打通** —— task 到 `completed`、md 正确落在 task scope、`constraintSatisfied=True`、产物可经 tasks.get 取回；T12 三项指标全 `0`（本轮无需任何 resilience 兜底）。此前 `no_native_task_record` / 「暂无文件」均为**插件未加载**（§4 符号链接根因）的派生症状，已消除。
 
 旁路（`ai-workspace-service`）：`accounts.svc.plus`（登录/Token）、`console.svc.plus`（openclaw assistant route）、`litellm`/`AI-Relay-Kit`/`codex-relay`（模型出口）、`qmd`（记忆）——不在主链，但 Token/出口异常以「连接中断」形态出现，用 `runId` 区分。
 
