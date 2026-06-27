@@ -331,6 +331,11 @@ curl -sS -X POST http://127.0.0.1:8787/acp/rpc \
 
 - **S4 运行态可观测** — 沿用 §5 T11/T12：bridge `/api/ping.commit`、网关 `N plugins` 列表、`openclaw plugins inspect` 三处纳入健康检查；`runId` 贯穿 App→bridge→插件→gateway 日志，便于定位断点落在四层中的哪一层。
 
+- **S5 工作区上下文精简（2026-06-27 已实现）— 避免多个冲突路径阻断对话续跑** ✅
+  现象：每个 gateway turn 的 prompt 前缀 `TaskThread workspace context` 同时塞 `currentTaskWorkspace` + `localWorkspace` + `remoteWorkspaceHint` 三个近似重复的绝对路径，其中 **`localWorkspace` 是 App 本机线程目录（`~/.xworkmate/threads/…`），网关 agent 的文件系统根本访问不到**；`remoteWorkspaceHint` 又与 `currentTaskWorkspace` 重复。多个相互冲突的路径让 agent 不知该在哪工作 → 对话任务可能无法继续执行。
+  改进（`app_controller_desktop_thread_actions.dart taskWorkspaceContextPromptInternal`）：网关任务**只给 `currentTaskWorkspace` 一个工作目录**（artifact scope 由插件托管）；`localWorkspace` 仅在非网关（本地 agent 实际运行于此）保留；`remoteWorkspaceHint` 与 `currentTaskWorkspace` 相同则去重。`sessionKey` 保留（短、非路径、不致冲突）。
+  不破坏 UI：聊天气泡显示原始用户消息，prompt 调试视图只特判 `Execution context`/`Preferred skills`/`Attached files` 块，工作区块按正文渲染。验收：`assistant_execution_target_test.dart` 全绿（网关 prompt 断言 `isNot(localWorkspace)` / `isNot(remoteWorkspaceHint)`，保留 `currentTaskWorkspace`/`sessionKey`）。
+
 ---
 
 ## 8. 2026-06-27 Cases 00–05 全面验收执行日志（进行中）
