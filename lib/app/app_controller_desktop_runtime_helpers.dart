@@ -1163,19 +1163,34 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     if (rawDownloadUrl.isEmpty) {
       return const _ArtifactBytesResult.skipped();
     }
-    final uri = Uri.tryParse(rawDownloadUrl);
+    var uri = Uri.tryParse(rawDownloadUrl);
     if (uri == null || (uri.scheme != 'http' && uri.scheme != 'https')) {
       return const _ArtifactBytesResult.skipped();
     }
     final bridgeEndpoint = resolveBridgeAcpEndpointInternal();
     final bridgeHost = bridgeEndpoint?.host.trim().toLowerCase() ?? '';
-    final downloadHost = uri.host.trim().toLowerCase();
+    var downloadHost = uri.host.trim().toLowerCase();
     final isLoopback =
         downloadHost == '127.0.0.1' ||
         downloadHost == 'localhost' ||
         downloadHost == '::1';
-    final sameBridgeHost =
+    var sameBridgeHost =
         bridgeEndpoint != null && (downloadHost == bridgeHost || isLoopback);
+    // A local/self-hosted bridge can decorate artifacts with its configured
+    // public URL. Keep the signed path/query, but download through the bridge
+    // endpoint the user actually selected so credentials never go cross-host.
+    if (!sameBridgeHost &&
+        bridgeEndpoint != null &&
+        uri.path == '/artifacts/openclaw/download' &&
+        uri.queryParameters['sig']?.trim().isNotEmpty == true) {
+      uri = uri.replace(
+        scheme: bridgeEndpoint.scheme,
+        host: bridgeEndpoint.host,
+        port: bridgeEndpoint.hasPort ? bridgeEndpoint.port : null,
+      );
+      downloadHost = uri.host.trim().toLowerCase();
+      sameBridgeHost = downloadHost == bridgeHost;
+    }
     if (!sameBridgeHost) {
       return const _ArtifactBytesResult.skipped();
     }
