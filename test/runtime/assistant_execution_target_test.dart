@@ -1588,7 +1588,10 @@ void main() {
         expect(request.workingDirectory, startsWith('/owners/'));
         expect(request.workingDirectory, isNot(localWorkspace));
         expect(request.remoteWorkingDirectoryHint, request.workingDirectory);
-        expect(request.prompt, contains('- localWorkspace: $localWorkspace'));
+        // 精简：网关任务不再注入 App 本机 localWorkspace（agent 无法访问、徒增混淆），
+        // 且 remoteWorkspaceHint 与 currentTaskWorkspace 相同被去重。agent 只认 currentTaskWorkspace。
+        expect(request.prompt, isNot(contains('- localWorkspace:')));
+        expect(request.prompt, isNot(contains('- remoteWorkspaceHint:')));
         expect(
           request.prompt,
           contains('- currentTaskWorkspace: ${request.workingDirectory}'),
