@@ -127,6 +127,7 @@ public class FileSelectorPlugin: NSObject, FlutterPlugin, FileSelectorApi {
           panel.setValue(allowedTypes, forKey: "allowedFileTypes")
         }
       }
+    }
 
     if let canCreateDirectories = options.canCreateDirectories {
       panel.canCreateDirectories = canCreateDirectories
