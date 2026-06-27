@@ -4087,56 +4087,131 @@ void main() {
       },
     );
 
-    test('OpenClaw task snapshot failure records a terminal result', () async {
+    test('OpenClaw task snapshot transient failure retries and recovers', () async {
       final fakeGoTaskService = _RecordingGoTaskServiceClient()
-        ..outcomes.add(
-          const GoTaskServiceResult(
-            success: true,
-            message: '',
-            turnId: 'turn-openclaw-poll-failed',
-            raw: <String, dynamic>{
-              'success': true,
-              'status': 'running',
-              'sessionId': 'openclaw-poll-failed-task',
-              'threadId': 'openclaw-poll-failed-task',
-              'appThreadKey': 'openclaw-poll-failed-task',
-              'openclawSessionKey': 'agent:main:openclaw-poll-failed-task',
-              'turnId': 'turn-openclaw-poll-failed',
-              'runId': 'run-openclaw-poll-failed',
-              'artifactScope':
-                  'tasks/agent:main:openclaw-poll-failed-task/run-openclaw-poll-failed',
-              'artifactDirectory':
-                  '/tmp/tasks/agent:main:openclaw-poll-failed-task/run-openclaw-poll-failed',
-              'gatewayProviderId': 'openclaw',
-              'runtimeBudgetMinutes': 1,
-            },
-            errorMessage: '',
-            resolvedModel: '',
-            route: GoTaskServiceRoute.externalAcpSingle,
-          ),
-        )
         ..taskOutcomes.add(
           const GatewayAcpException(
             'ACP HTTP connection closed before the OpenClaw task snapshot returned',
             code: 'ACP_HTTP_CONNECTION_CLOSED',
           ),
+        )
+        ..taskOutcomes.add(
+          const GoTaskServiceResult(
+            success: true,
+            message: 'recovered task result',
+            turnId: 'turn-openclaw-poll-recovered',
+            raw: <String, dynamic>{
+              'success': true,
+              'status': 'completed',
+              'turnId': 'turn-openclaw-poll-recovered',
+              'runId': 'run-openclaw-poll-recovered',
+              'output': 'recovered task result',
+            },
+            errorMessage: '',
+            resolvedModel: '',
+            route: GoTaskServiceRoute.externalAcpSingle,
+          ),
         );
       final controller = _connectedGatewayController(fakeGoTaskService);
       addTearDown(controller.dispose);
+      const association = OpenClawTaskAssociation(
+        sessionId: 'openclaw-poll-recovered',
+        threadId: 'openclaw-poll-recovered',
+        turnId: 'turn-openclaw-poll-recovered',
+        runId: 'run-openclaw-poll-recovered',
+        artifactScope:
+            'tasks/agent:main:openclaw-poll-recovered/run-openclaw-poll-recovered',
+        artifactDirectory:
+            '/tmp/tasks/agent:main:openclaw-poll-recovered/run-openclaw-poll-recovered',
+        gatewayProviderId: 'openclaw',
+        startedAtMs: 0,
+        status: 'running',
+        appThreadKey: 'openclaw-poll-recovered',
+        openclawSessionKey: 'agent:main:openclaw-poll-recovered',
+      );
+      controller.upsertTaskThreadInternal(
+        association.sessionId,
+        executionTarget: AssistantExecutionTarget.gateway,
+        selectedProvider: SingleAgentProvider.openclaw,
+        lifecycleStatus: 'running',
+        lastResultCode: 'running',
+        openClawTaskAssociation: association,
+      );
+      controller.aiGatewayPendingSessionKeysInternal.add(association.sessionId);
 
-      await _selectGatewaySession(controller, 'openclaw-poll-failed-task');
-
-      await expectLater(
-        controller
-            .sendChatMessage('输出 PDF')
-            .timeout(const Duration(seconds: 2)),
-        completes,
+      await controller.pollOpenClawTaskAssociationInternal(
+        sessionKey: association.sessionId,
+        target: AssistantExecutionTarget.gateway,
+        association: association,
+        pollInterval: Duration.zero,
       );
 
-      await Future<void>.delayed(const Duration(milliseconds: 100));
+      final recoveredThread = controller.requireTaskThreadForSessionInternal(
+        association.sessionId,
+      );
+      expect(fakeGoTaskService.getTaskCount, 2);
+      expect(recoveredThread.lifecycleState.status, 'ready');
+      expect(recoveredThread.lifecycleState.lastResultCode, 'success');
+      expect(
+        controller.assistantSessionHasPendingRun(association.sessionId),
+        isFalse,
+      );
+    });
+
+    test('OpenClaw task snapshot retry exhaustion is terminal', () async {
+      final fakeGoTaskService = _RecordingGoTaskServiceClient();
+      for (
+        var attempt = 0;
+        attempt <= kOpenClawPollTransientRetryLimit;
+        attempt += 1
+      ) {
+        fakeGoTaskService.taskOutcomes.add(
+          const GatewayAcpException(
+            'ACP HTTP connection closed before the OpenClaw task snapshot returned',
+            code: 'ACP_HTTP_CONNECTION_CLOSED',
+          ),
+        );
+      }
+      final controller = _connectedGatewayController(fakeGoTaskService);
+      addTearDown(controller.dispose);
+      const association = OpenClawTaskAssociation(
+        sessionId: 'openclaw-poll-exhausted',
+        threadId: 'openclaw-poll-exhausted',
+        turnId: 'turn-openclaw-poll-exhausted',
+        runId: 'run-openclaw-poll-exhausted',
+        artifactScope:
+            'tasks/agent:main:openclaw-poll-exhausted/run-openclaw-poll-exhausted',
+        artifactDirectory:
+            '/tmp/tasks/agent:main:openclaw-poll-exhausted/run-openclaw-poll-exhausted',
+        gatewayProviderId: 'openclaw',
+        startedAtMs: 0,
+        status: 'running',
+        appThreadKey: 'openclaw-poll-exhausted',
+        openclawSessionKey: 'agent:main:openclaw-poll-exhausted',
+      );
+      controller.upsertTaskThreadInternal(
+        association.sessionId,
+        executionTarget: AssistantExecutionTarget.gateway,
+        selectedProvider: SingleAgentProvider.openclaw,
+        lifecycleStatus: 'running',
+        lastResultCode: 'running',
+        openClawTaskAssociation: association,
+      );
+      controller.aiGatewayPendingSessionKeysInternal.add(association.sessionId);
+
+      await controller.pollOpenClawTaskAssociationInternal(
+        sessionKey: association.sessionId,
+        target: AssistantExecutionTarget.gateway,
+        association: association,
+        pollInterval: Duration.zero,
+      );
 
       final failedThread = controller.requireTaskThreadForSessionInternal(
-        'openclaw-poll-failed-task',
+        association.sessionId,
+      );
+      expect(
+        fakeGoTaskService.getTaskCount,
+        kOpenClawPollTransientRetryLimit + 1,
       );
       expect(failedThread.lifecycleState.status, 'ready');
       expect(
@@ -4146,12 +4221,8 @@ void main() {
       expect(failedThread.lastArtifactSyncStatus, 'failed');
       expect(failedThread.openClawTaskAssociation, isNull);
       expect(
-        controller.assistantSessionHasPendingRun('openclaw-poll-failed-task'),
+        controller.assistantSessionHasPendingRun(association.sessionId),
         isFalse,
-      );
-      expect(
-        controller.chatMessages.map((message) => message.text).join('\n'),
-        contains('ACP_HTTP_CONNECTION_CLOSED'),
       );
     });
 
@@ -4999,6 +5070,7 @@ Future<void> _waitForThreadLastResultCode(
 
 class _RecordingGoTaskServiceClient implements GoTaskServiceClient {
   int executeCount = 0;
+  int getTaskCount = 0;
   final List<GoTaskServiceRequest> requests = <GoTaskServiceRequest>[];
   final List<GoTaskServiceUpdate> updatesBeforeNextOutcome =
       <GoTaskServiceUpdate>[];
@@ -5054,6 +5126,7 @@ class _RecordingGoTaskServiceClient implements GoTaskServiceClient {
     required OpenClawTaskAssociation association,
     required GoTaskServiceRoute route,
   }) async {
+    getTaskCount += 1;
     if (taskOutcomes.isNotEmpty) {
       final outcome = taskOutcomes.removeAt(0);
       if (outcome is GoTaskServiceResult) {

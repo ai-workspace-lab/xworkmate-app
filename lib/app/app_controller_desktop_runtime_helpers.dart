@@ -65,6 +65,11 @@ const Map<String, Duration> kOpenClawRunningPollBudgets = <String, Duration>{
 };
 const String kOpenClawRunningPollTimeoutCode = 'OPENCLAW_RUN_POLL_TIMEOUT';
 
+// T5（docs/cases/06 §5）：轮询期间 App↔bridge 传输瞬断（ACP_HTTP_CONNECTION_CLOSED）时，
+// 不直接硬失败，而是有界重试续轮询（降级为「后台续跑·重连中」）。连续瞬断超过该上限才落终态，
+// 避免桥/网关真正不可达时无限重连。每次成功 getTask 会重置计数，仅累计「连续」瞬断。
+const int kOpenClawPollTransientRetryLimit = 5;
+
 bool openClawArtifactPathHasRequiredExtension(String path, String extension) {
   final normalizedPath = path.trim().toLowerCase();
   final normalizedExtension = extension.trim().toLowerCase().replaceFirst(

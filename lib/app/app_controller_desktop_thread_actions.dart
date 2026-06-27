@@ -748,6 +748,7 @@ extension AppControllerDesktopThreadActions on AppController {
     required String sessionKey,
     required AssistantExecutionTarget target,
     required OpenClawTaskAssociation association,
+    Duration pollInterval = const Duration(seconds: 2),
   }) async {
     var current = association;
     var firstAttempt = true;
@@ -755,6 +756,8 @@ extension AppControllerDesktopThreadActions on AppController {
     double? artifactSyncStartedAtMs;
     // T3: running 轮询兜底截止的起算锚点（首次进入 running 轮询的时间）。
     double? runningPollFirstAtMs;
+    // T5: 连续传输瞬断计数（每次成功 getTask 重置）。
+    var transientRetries = 0;
     final existingThread = taskThreadForSessionInternal(sessionKey);
     if (association.status.trim().toLowerCase() == 'syncing-artifacts') {
       artifactSyncStartedAtMs = existingThread?.lastArtifactSyncAtMs;
@@ -767,7 +770,7 @@ extension AppControllerDesktopThreadActions on AppController {
         return;
       }
       if (!firstAttempt) {
-        await Future<void>.delayed(const Duration(seconds: 2));
+        await Future<void>.delayed(pollInterval);
       }
       firstAttempt = false;
       try {
@@ -779,6 +782,8 @@ extension AppControllerDesktopThreadActions on AppController {
         if (disposedInternal) {
           return;
         }
+        // T5: 成功一次即重置连续瞬断计数。
+        transientRetries = 0;
         final nextAssociation =
             result.openClawTaskAssociation ??
             current.copyWith(
@@ -903,6 +908,19 @@ extension AppControllerDesktopThreadActions on AppController {
       } catch (error) {
         if (disposedInternal) {
           return;
+        }
+        // T5: 轮询期间 App↔bridge 传输瞬断（ACP_HTTP_CONNECTION_CLOSED）时，有界重试续轮询，
+        // 降级为「后台续跑·重连中」而非硬失败丢结果。bridge 侧 T7/T9 会在网关侧抖动时保持 run
+        // 可查/到点收口；这里只兜 App↔bridge 这一跳的瞬断。连续超过上限才落终态。
+        if (aiGatewayPendingSessionKeysInternal.contains(sessionKey) &&
+            interruptedAcpHttpTransportCodeInternal(error) ==
+                'ACP_HTTP_CONNECTION_CLOSED' &&
+            transientRetries < kOpenClawPollTransientRetryLimit) {
+          transientRetries += 1;
+          // 不清 pending、不落终态：任务保持「运行中」，循环顶部 2s 延迟后重试下一次 getTask。
+          recomputeTasksInternal();
+          notifyIfActiveInternal();
+          continue;
         }
         if (aiGatewayPendingSessionKeysInternal.contains(sessionKey)) {
           await applyGatewayChatFailureInternal(

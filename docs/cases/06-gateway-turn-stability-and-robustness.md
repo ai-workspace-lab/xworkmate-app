@@ -231,9 +231,10 @@ curl -sS -X POST http://127.0.0.1:8787/acp/rpc \
   `abortRun` / `cancelAssistantTaskForSessionInternal`（`:1793`）改为：**先**乐观清 `aiGatewayPendingSessionKeysInternal`、置 lifecycle=`aborted`、退出 loop，**再** best-effort 发 `tasks.cancel`。UI 终止不得依赖 gateway 往返。
   验收：gateway 不可达时点 `停止` 仍能立刻停下。
 
-- [ ] **T5 传输中断降级为"后台续跑·重连中"**
-  收到实时 `ACP_HTTP_CONNECTION_CLOSED` 时，不直接当硬失败把任务留在 running，而是降级为"已转后台 / 重连中"，触发 `resumeOpenClawTaskAssociationsInternal`（`:906`，目前仅在 thread 加载时触发）续轮询。
-  验收：SSE 瞬断后，任务能自动恢复轮询并最终拿到终态或明确终止。
+- [x] **T5 传输中断降级为"后台续跑·重连中"** — `pollOpenClawTaskAssociationInternal` catch（`thread_actions.dart`）
+  轮询期间 App↔bridge 传输瞬断（`ACP_HTTP_CONNECTION_CLOSED`）时，不硬失败丢结果，而是**有界重试续轮询**：连续瞬断 `< kOpenClawPollTransientRetryLimit(=5)` 则保持 running、2s 后重试下一次 `getTask`；每次成功重置计数；超限才落终态。bridge 侧 T7/T9 负责网关侧抖动，这里只兜 App↔bridge 这一跳。
+  **取舍**：未引入新的「重连中」UI 相位（避免改进度条布局）；任务保持「运行中」即降级态。未走 `resumeOpenClawTaskAssociationsInternal` 全量恢复（那是 thread 重载路径），而是就地有界重试，风险更低、不会无限重连。
+  验收：轮询瞬断 ≤5 次能自动续轮询；持续不可达则在有界次数后落终态。
 
 - [ ] **T6 失败路径与 pending 清理一致性**
   审计 `applyGatewayChatFailureInternal`（`:1613`，置 `ready` 但不清 pending）与调用方 `finally`（`:715` 仅 `!handedOffToBridgeTask` 才清 pending）之间的竞态，确保任一终态路径都能确定性地清 pending，杜绝"错误已渲染但仍 running"。
@@ -260,9 +261,9 @@ curl -sS -X POST http://127.0.0.1:8787/acp/rpc \
   **取舍**：仅在 gateway **无法确认**时按 deadline 强制终态；gateway 明确回 `running` 时**不**强杀，避免误伤合法长任务（那一侧由客户端 T3 兜底）。
   验收：gateway 失联超过 budget 后，`tasks.get` 返回确定 terminal（见 `TestGatewayUnconfirmedFallbackPastDeadlineInterrupts`）。
 
-- [ ] **T10 错误语义细化**
-  `gatewayRPCError`（`orchestrator.go:1678`）区分"连接断但 run 仍在后台可查" vs "run 确实失败"，前者携带 `runId` + `retryable/poll` 提示，供客户端走 T5 续轮询而非硬失败。
-  验收：客户端能据错误语义区分"重连续跑"与"真失败"。
+- [x] **T10 错误语义细化** — `gatewayRPCError`（`orchestrator.go`）
+  对 `OPENCLAW_GATEWAY_SOCKET_CLOSED` 在 Data 中带 `retryable=true`、`poll=true`，表达「连接断但 run 可能仍在后台、可续轮询」语义，供客户端 T5 据此续轮询而非硬失败。
+  验收：socket-closed 错误带 retryable/poll 标记。
 
 - [x] **T13 运行态同步校验（bridge 二进制 + 网关插件）**
   「源码已修但跑的不是它」是反复踩的坑，需双侧确认：
@@ -272,13 +273,13 @@ curl -sS -X POST http://127.0.0.1:8787/acp/rpc \
 
 ### L3 可观测性（横切 · infra/service/lab）
 
-- [ ] **T11 端到端贯穿 runId**
-  App 日志 → Caddy access log → bridge SSE 日志（已有 `component=acp_sse`，`http_handler.go:221`）→ gateway run，全链路带同一 `runId`，便于定位"入口断"还是"WS 断"。
-  验收：任一 `runId` 可在四层日志串联。
+- [x] **T11 端到端贯穿 runId** — `openclaw_run_registry.go`
+  在 `tasks_get_unconfirmed_fallback`、`run_deadline_interrupt` 两处加 `runId`/`openclawSessionKey` 标记的 warn 日志，可与 App→bridge→插件→gateway 按 `runId` 串联（既有 `component=acp_sse` 已带 requestId）。
+  验收：socket 抖动 / deadline 终态在 bridge 日志可按 runId 定位。
 
-- [ ] **T12 关键指标 + 告警**
-  bridge 暴露：`SOCKET_CLOSED 在途任务数`、gateway WS 重连计数、running 轮询超 deadline 计数。
-  验收：⑥ 类事件发生即在监控可见，无需靠用户截图。
+- [x] **T12 关键指标** — `internal/acp/metrics.go`，经 `/api/ping.metrics` 暴露
+  进程内计数：`gatewaySocketClosed`、`taskGetUnconfirmedFallback`、`runDeadlineInterrupt`。live 验证 `/api/ping` 已返回 `metrics` 字段（commit `0a50621`）。
+  验收：三类不稳定事件可监控，无需靠用户截图。（告警接入留运维侧）
 
 ---
 
@@ -287,8 +288,11 @@ curl -sS -X POST http://127.0.0.1:8787/acp/rpc \
 0. ✅ **主根因修复**（live 验证）：让 OpenClaw 网关稳定加载 `openclaw-multi-session-plugins`——`openclaw plugins install` 从稳定路径重装 + 重启网关，确认启动日志 `6 plugins … openclaw-multi-session-plugins`、`xworkmate.*` 不再 `unknown method`。这是「采集AI资讯能产出」的前提（详见 §4）。
 1. ✅ **当天止血**（已合并 main）：T1 + T2（入口配置）+ T3 + T4 + T6（客户端）+ session.prepare 数字 code 降级，消除"30min 必断 / 路由漏配 / 无限 running / 停不掉"。
    说明：session.prepare 数字 code 降级仍有价值——当插件**未**加载时，让 bridge 优雅 fallback 而非硬失败；插件加载后走真实 plugin 路径。
-2. ✅ **健壮性加固**（本地验证 commit `2333c3e`）：T7 + T8 + T9（bridge 持久 run 仓与 WS 解耦），把网关短暂不可达 / 抖动收敛为「有界续轮询 → deadline 终态」，而非无限运行/丢结果。
-3. **跟进（待办）**：T5 + T10（断连续跑语义）、T11 + T12（可观测性）、T8b（跨进程重启持久化，接 `xworkmate.jobs.*` / 磁盘）；运行态校验：每次替换 bridge 二进制 / 网关重启后，核对 `/api/ping.commit` 与网关 `N plugins` 列表。
+2. ✅ **健壮性加固**（commit `2333c3e`）：T7 + T8 + T9（bridge 持久 run 仓与 WS 解耦），把网关短暂不可达 / 抖动收敛为「有界续轮询 → deadline 终态」，而非无限运行/丢结果。
+3. ✅ **断连语义 + 可观测**（commit `0a50621`）：T10（socket-closed 带 retryable/poll）+ T5（App 轮询瞬断有界续轮询）+ T11（runId 日志）+ T12（`/api/ping.metrics` 计数）。
+4. **剩余**：
+   - **S1（已回退，待重做）**：缺省 `expectedArtifactDirs` 会让「期望产物但实际无产物」的 run 卡在「等待导出」（破坏 E2E 测试）。根因是 `openClawTaskGetRequiresArtifactExport` 把「有 expectedArtifactDirs」等同「必须导出/阻塞」。**正确做法**：解耦「扫描提示」与「阻塞式导出要求」——让缺省目录只驱动插件的兜底扫描、不触发 bridge 的等待导出。需单独一轮、对全 E2E 套件验证。
+   - **T8b（跨进程重启持久化）**：把 per-session run 仓落磁盘 / 接 `xworkmate.jobs.*`，让 bridge **进程重启**后仍能回放终态。当前内存仓已覆盖「WS 抖动 / 网关瞬断」（同进程内），跨重启是较小边际收益、较大复杂度（序列化 / 启动加载 / 过期清理 / 并发），建议作为独立一轮带测试做。
 
 > 回归对照：本目录 `00-review-env-and-matrix.md` 第 2 节"通用验收标准"中"长任务执行期间状态流 / 取消 / 重试稳定""同一任务重复执行 3 次不卡死"，即本规划的回归出口。
 > 产物交付链（artifact scope / workspace 路径）的独立缺陷与修复，见 `openclaw-gateway-e2e-regression/ROOT_CAUSE_ANALYSIS.md`。
@@ -305,10 +309,10 @@ curl -sS -X POST http://127.0.0.1:8787/acp/rpc \
   **验证**：启动日志 `http server listening (6 plugins: … openclaw-multi-session-plugins)`；`inspect` 的 `Source` 变为 `~/.openclaw/extensions/…/dist/index.js`、provenance 警告消失；`xworkmate.session.prepare` 经 bridge 返回**真实插件响应**（`fallback=null`、带 `mapping`、`artifactScope=tasks/draft_s0verify/s0-run`），不再走 bridge 的 `local-session-prepare` 降级。
   收尾：`~/.openclaw/extensions/` 现为真实目录（非 /tmp 软链），重启/重启后不再丢插件；建议把它纳入部署（`deploy_gateway_openclaw`）从仓库 `openclaw-multi-session-plugins` 安装，避免再被软链到临时盘。
 
-- **S1 `expectedArtifactDirs` 为空导致根目录兜底失效 — ✅ 已修复并 live 验证（commit `0280893`）**
+- **S1 `expectedArtifactDirs` 为空导致根目录兜底失效 — ⚠️ 一版本已合并后回退（commit `0280893` → 回退于 `81f65e3`）**
   根因：live 的 session mapping 为 `expectedArtifactDirs:[]`，而插件对「agent 把产物写到 workspace 根 `reports/`/`artifacts/` 而非 task scope」的兜底扫描**依赖 `expectedArtifactDirs`**；为空 → 兜底形同虚设 → 即便 agent 产出也收不到，表现「暂无文件」。
-  修复：`orchestrator.go openClawArtifactContractForParams` 在「任务期望产物（`requiresExport` 或推断出 `requiredExts`）但未声明目录」时补缺省 `["reports/","artifacts/","exports/"]` 并置 `requiresExport=true`；纯聊天不受影响（`defaultOpenClawExpectedArtifactDirs`，含单测 `orchestrator_s1_artifact_dirs_test.go`）。
-  验证：提交「采集AI资讯保存md」→ `requiresArtifactExport=true`、`expectedArtifactDirs=['reports/','artifacts/','exports/']`（修复前为 `[]`）。
+  **回退原因**：当时的实现给所有「推断出 requiredExts」的任务补缺省目录并置 `requiresExport=true`，导致 gateway run 成功但**实际无产物**时卡在「等待 artifact 导出」（`TestHTTPHandlerGatewayOpenClawHandlesFiveConcurrentE2ECases` 等转红）。阻塞来自 `openClawTaskGetRequiresArtifactExport` 把「有 expectedArtifactDirs」等同「必须导出」。
+  **正确做法（待重做）**：解耦「扫描提示」与「阻塞式导出」——缺省目录只驱动插件兜底扫描、不触发 bridge 等待导出；或仅在客户端**显式**声明 `requiredArtifactExtensions` 时启用。需单独一轮、对全 E2E 套件验证后再上。
 
 - **S2 `no_native_task_record` 状态歧义** — `xworkmate.tasks.get` 的真值来自「gateway host task registry 有该 run 的 detached task」**或**「artifact 已存在」。live 中 chat.send 成功但 gateway 无 native task record（agent 可能以 inline chat 执行、未注册可查 task），且无产物 → 插件回 `no_native_task_record`，bridge 只能靠 T7 兜底续轮询到 deadline，**无法区分「还在跑」与「跑完没产物」**。
   改进：①确认 gateway 侧 chat.send 是否应产出 detached task（agent 配置/ `tasks.*` 注册）；②插件/bridge 在 `no_native_task_record` 且超过最小执行时长时，下发更明确的 `running(no-record)` vs `completed(no-artifact)` 语义，配合 §5 T9 deadline 收口。
@@ -317,3 +321,42 @@ curl -sS -X POST http://127.0.0.1:8787/acp/rpc \
 - **S3 三元组一致性（已知约束）** — 插件严校 `sessionKey/runId/artifactScope` 三者一致（`exportArtifacts.ts:126`），且 bridge 的 openclawSessionKey 由 `agent:main:` + appThreadKey 组成。**调用方/探针不要预带 `agent:main:` 前缀**（否则双前缀 → `artifactScope does not match`）。bridge `taskGetParamsWithSessionScope` 已负责补齐；保持其为唯一可信来源，App/探针只传 `sessionId=draft:<id>` + `runId`。
 
 - **S4 运行态可观测** — 沿用 §5 T11/T12：bridge `/api/ping.commit`、网关 `N plugins` 列表、`openclaw plugins inspect` 三处纳入健康检查；`runId` 贯穿 App→bridge→插件→gateway 日志，便于定位断点落在四层中的哪一层。
+
+---
+
+## 8. 2026-06-27 Cases 00–05 全面验收执行日志（进行中）
+
+> 执行计划：`docs/plans/2026-06-27-cases-00-05-gateway-turn-acceptance.md`。本节只记录脱敏后的运行证据；API Key、Bridge Token、账号密码不写入仓库。
+> 追溯参考：`.xcodeinsight/context/repo-summary.md`、`.xcodeinsight/index/risk-index.md`、`.xcodeinsight/index/callchain-index.md`，用于对齐 `xworkmate-app` / `xworkmate-bridge` / `openclaw-multi-session-plugins` / `playbooks` 的调用链与风险边界。
+
+### 8.1 当前目标与状态
+
+| 阶段 | 状态 | 当前证据 / 下一步 |
+|---|---|---|
+| 仓库与运行态基线 | 🟡 进行中 | App `main=ca9cba6`；存在本轮未提交的 T5 + 文档改动，保留并纳入测试 |
+| 本地 all-in-one 部署 | 🟡 进行中 | 首轮在稳定插件目录幂等迁移处失败；修复已提交 `xworkspace-console` main（`50c2d85` + `5093e21`），本地修复版正在重跑 |
+| Gateway Turn 定向回归 | 🟢 已通过 | T5 两条新增定向测试通过；完整 `assistant_execution_target_test.dart` 74 条通过 |
+| Cases 00–05 真实任务 | ⏳ 待执行 | 每项记录 runId、终态、耗时、结构/Artifact、重复与失败收口 |
+| 提交 / push / CI | ⏳ 待执行 | 完成全量回归后提交；网络瞬态失败自动有界重试 |
+
+### 8.2 08:47 CST 基线快照
+
+- Bridge：`127.0.0.1:8787` 正在监听，launchd `plus.svc.xworkspace.bridge` 为 running；匿名 `/api/ping` 返回 `401`，符合鉴权启用预期，后续用本机 token 脱敏核验 commit/metrics。
+- Gateway：`127.0.0.1:18789` 正在监听，launchd `ai.openclaw.gateway` 为 running。
+- 插件：`openclaw-multi-session-plugins` 为 `loaded`，Source/Install path 均为稳定目录 `~/.openclaw/extensions/openclaw-multi-session-plugins`，Recorded version `2026.6.1`；S0 的临时目录问题当前未复发。
+- 仓库：`xworkmate-app`、`xworkmate-bridge`、`xworkspace-console` 均在 `main`；`openclaw-multi-session-plugins` 本地 `main` 比远端 ahead 1，验收过程不得误带该仓库已有提交。
+- 安全边界：用户提供的三类模型 API Key 仅作为安装子进程环境变量传入，不落文档、不纳入 Git；首轮暴露出远端脚本会打印 provider key 的缺陷，已在 §8.3 记录并修复本地源码。
+
+### 8.3 08:54 CST 首轮发现与修复
+
+- **T5 测试缺口已补**：旧测试仍断言 OpenClaw `tasks.get` 第一次 `ACP_HTTP_CONNECTION_CLOSED` 就立即失败，与「有界续轮询」新契约冲突。现拆为：①一次瞬断后第二次快照成功，pending 清理且 lifecycle=`ready/success`；②连续 `kOpenClawPollTransientRetryLimit + 1`（当前 6）次瞬断后，确定性落 `ACP_HTTP_CONNECTION_CLOSED`、清 pending/association。两条定向测试均 `All tests passed!`。
+- **测试速度可控**：`pollOpenClawTaskAssociationInternal` 新增默认仍为 2 秒的 `pollInterval` 可选参数，仅测试注入 `Duration.zero`，生产重试节奏不变。
+- **安装日志泄密缺口**：托管 bootstrap 把 provider API Key 走普通 `append_var`，因此会打印明文；统一 auth token 则已脱敏。这不是模型调用失败原因，但违反安装安全边界。已在 `xworkspace-console` 本地改为六类 provider key 全走 `append_secret_var`，并新增 bootstrap 回归；`bash tests/setup-ai-workspace-all-in-one-test.sh` 全部通过。当前正在运行的脚本来自修复前远端，最终文档不记录任何 key 值。
+
+### 8.4 08:59 CST 部署幂等修复与 App 完整定向回归
+
+- 首轮 all-in-one 在 `Link openclaw-multi-session-plugins to extensions (macOS)` 失败：S0 已把目标改成稳定真实目录，而旧 patch 仍强制 `state: link` 指向 `/tmp`/源码目录；Ansible 正确拒绝 directory→symlink。自动重跑无法修复结构性错误，因此中止第二轮。
+- `xworkspace-console` 修复：macOS patch 现在会识别并移除旧临时 symlink、确保 `~/.openclaw/extensions/openclaw-multi-session-plugins` 为真实目录、只复制构建产物/manifest，并执行 `openclaw plugins install <stable-path> --force` 记录 provenance；不再把 S0 修复倒退成临时链接。
+- bootstrap 本地执行优先采用同 checkout 的 `patch-macos-playbooks.py`，远端 fallback 增加 cache-busting，避免 main 刚提交后又下载到 5 分钟 CDN 旧版本。
+- 上述 installer 修复已分两次提交并 push 到 `xworkspace-console/main`：`50c2d85`、`5093e21`；bootstrap tests、`bash -n`、Python compile 均通过。
+- App 完整定向回归：`flutter test test/runtime/assistant_execution_target_test.dart` → **74 tests / All tests passed**。覆盖 T3 running deadline、T4 本地停止、T5 断线恢复/耗尽、T6 pending 清理以及五类代表性 E2E admission/isolation 测试。
