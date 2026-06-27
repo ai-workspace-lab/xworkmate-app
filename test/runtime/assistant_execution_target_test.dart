@@ -4161,6 +4161,86 @@ void main() {
       );
     });
 
+    test(
+      'OpenClaw running snapshot without decoration keeps polling',
+      () async {
+        final fakeGoTaskService = _RecordingGoTaskServiceClient()
+          ..taskOutcomes.add(
+            const GoTaskServiceResult(
+              success: true,
+              message: '',
+              turnId: 'turn-running-undecorated',
+              raw: <String, dynamic>{
+                'success': true,
+                'status': 'running',
+                'runId': 'run-running-undecorated',
+              },
+              errorMessage: '',
+              resolvedModel: '',
+              route: GoTaskServiceRoute.externalAcpSingle,
+            ),
+          )
+          ..taskOutcomes.add(
+            const GoTaskServiceResult(
+              success: true,
+              message: 'terminal output',
+              turnId: 'turn-running-undecorated',
+              raw: <String, dynamic>{
+                'success': true,
+                'status': 'completed',
+                'runId': 'run-running-undecorated',
+                'output': 'terminal output',
+              },
+              errorMessage: '',
+              resolvedModel: '',
+              route: GoTaskServiceRoute.externalAcpSingle,
+            ),
+          );
+        final controller = _connectedGatewayController(fakeGoTaskService);
+        addTearDown(controller.dispose);
+        const association = OpenClawTaskAssociation(
+          sessionId: 'running-undecorated',
+          threadId: 'running-undecorated',
+          turnId: 'turn-running-undecorated',
+          runId: 'run-running-undecorated',
+          artifactScope: 'tasks/running-undecorated/run-running-undecorated',
+          artifactDirectory:
+              '/tmp/tasks/running-undecorated/run-running-undecorated',
+          gatewayProviderId: 'openclaw',
+          startedAtMs: 0,
+          status: 'running',
+          appThreadKey: 'running-undecorated',
+          openclawSessionKey: 'agent:main:running-undecorated',
+        );
+        controller.upsertTaskThreadInternal(
+          association.sessionId,
+          executionTarget: AssistantExecutionTarget.gateway,
+          selectedProvider: SingleAgentProvider.openclaw,
+          lifecycleStatus: 'running',
+          lastResultCode: 'running',
+          openClawTaskAssociation: association,
+        );
+        controller.aiGatewayPendingSessionKeysInternal.add(
+          association.sessionId,
+        );
+
+        await controller.pollOpenClawTaskAssociationInternal(
+          sessionKey: association.sessionId,
+          target: AssistantExecutionTarget.gateway,
+          association: association,
+          pollInterval: Duration.zero,
+        );
+
+        expect(fakeGoTaskService.getTaskCount, 2);
+        expect(
+          controller.localSessionMessagesInternal[association.sessionId]!.map(
+            (message) => message.text,
+          ),
+          contains('terminal output'),
+        );
+      },
+    );
+
     test('OpenClaw task snapshot retry exhaustion is terminal', () async {
       final fakeGoTaskService = _RecordingGoTaskServiceClient();
       for (

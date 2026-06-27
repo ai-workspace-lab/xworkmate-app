@@ -792,7 +792,11 @@ extension AppControllerDesktopThreadActions on AppController {
                   : result.status.trim(),
             );
         current = nextAssociation;
-        if (result.isOpenClawRunningTaskHandle) {
+        // A tasks.get response may temporarily omit association decoration
+        // while the plugin/runtime is reconnecting. The explicit status is
+        // authoritative; never finalize a running task as an empty success.
+        if (result.status.trim().toLowerCase() == 'running' ||
+            result.isOpenClawRunningTaskHandle) {
           // T3: 给 running 轮询加兜底截止，避免 gateway 始终回 running 时无限轮询、永远卡「任务运行中...」。
           final nowMs = DateTime.now().millisecondsSinceEpoch.toDouble();
           runningPollFirstAtMs ??= nowMs;
