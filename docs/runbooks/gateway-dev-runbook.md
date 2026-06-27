@@ -220,3 +220,37 @@ If a device-run test hangs instead of failing with an assertion, record it as ma
 3. Approve that request from [https://openclaw.svc.plus/nodes](https://openclaw.svc.plus/nodes).
 4. Reconnect and verify the same `deviceId` is now listed under `Paired`.
 5. Restart the app and verify remote reconnect does not create a fresh pending request.
+
+## Dev Runbook Case: Gateway Turn Stability and Output Recovery
+
+Date: `2026-06-27`
+
+This case captures the full recovery path for the gateway-turn stability issue that surfaced as:
+
+- `GoTaskService 没有返回可显示的输出。`
+- `Bridge 连接失败，本轮请求未确认，可重试。错误码：ACP_HTTP_CONNECT_FAILED`
+- `Bridge 响应读取中断，本轮结果未完成。错误码：ACP_HTTP_CONNECTION_CLOSED`
+
+What we verified in the live chain:
+
+- `openclaw-multi-session-plugins` must be loaded from a stable install path so `xworkmate.*` methods are actually registered.
+- `xworkmate.tasks.get` must return durable terminal output, not just status.
+- Artifact download URLs must be rewritten through the active bridge origin, not a stale public host.
+- An undecorated `status=running` snapshot must keep polling instead of being treated as an empty terminal success.
+
+The detailed cross-repo diagnosis lives in:
+
+- [docs/cases/06-gateway-turn-stability-and-robustness.md](../cases/06-gateway-turn-stability-and-robustness.md)
+
+Validation from the successful run:
+
+- Session: `draft:1782533844776376-2`
+- Run: `turn-1782533847906698000`
+- Artifact: `AI最新资讯-2025年6月.md`
+- Result: `tasks.get` returned `completed`, durable `output`, and `artifactCount=1`
+
+Operational takeaway:
+
+1. Keep the gateway plugin installed from the stable `~/.openclaw/extensions/openclaw-multi-session-plugins` path.
+2. Keep bridge and app polling semantics aligned with the durable task snapshot contract.
+3. Treat `GoTaskService 没有返回可显示的输出。` as a display-contract failure until the upstream snapshot/output path is confirmed.
