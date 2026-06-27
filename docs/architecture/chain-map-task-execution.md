@@ -135,6 +135,11 @@ openclaw-multi-session-plugins
       │   └─ ["openclaw-multi-session-plugins"]["xworkmate.sessionMapping"]
       └─ Fail closed on appThreadKey/openclawSessionKey conflicts
 
+    Durable run terminal state
+      ├─ session.prepare records xworkmate.taskRuns[runId] = running
+      ├─ agent_end records completed/failed + sanitized error in SessionEntry.pluginExtensions
+      └─ xworkmate.tasks.get uses this record when chat.send has no native detached-task record
+
     prepareXWorkmateArtifacts()
       ├─ resolveWorkspaceDir() → workspace root
       ├─ safeScopeSegment(openclawSessionKey) → sanitize
@@ -201,9 +206,13 @@ now copied into tasks/<session>/<run>/artifacts/ before export.
     Bridge forwards typed lookup to the plugin/native task-registry.
     The request uses the persisted association:
       {appThreadKey, openclawSessionKey, runId/taskId}
-    Terminal state comes from native task records only. Missing native records
-    return structured errors such as no_native_task_record instead of inferring
-    success from artifacts or reconstructing a Bridge task dictionary.
+    Terminal state comes from native task records first, then from the plugin's
+    durable agent_end run record. Missing both returns structured errors such as
+    no_native_task_record instead of inferring success from artifacts.
+
+    expectedArtifactDirs only drive workspace-root discovery. They never keep a
+    terminal run in syncing-artifacts. Only explicit export flags or
+    requiredArtifactExtensions are blocking delivery contracts.
 
   Back to xworkmate-app:
     ExternalCodeAgentAcpDesktopTransport
@@ -264,3 +273,4 @@ etc.), not by extending the task execution lifecycle.
 5. **F5: Bridge restart** — In-memory sessions lost → app must detect and recover
 6. **F6: Artifact ref key rotation** — Secret change invalidates all signed refs
 7. **F7: SSE stream interruption** — Recovery polling must align with bridge task deadlines and must apply terminal snapshots immediately
+8. **F8: chat.send is not a detached task** — agent_end state must remain queryable by runId even when the native task registry has no record
