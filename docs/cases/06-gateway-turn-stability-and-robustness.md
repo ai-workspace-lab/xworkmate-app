@@ -333,11 +333,11 @@ curl -sS -X POST http://127.0.0.1:8787/acp/rpc \
 
 | 阶段 | 状态 | 当前证据 / 下一步 |
 |---|---|---|
-| 仓库与运行态基线 | 🟡 进行中 | App `main=ca9cba6`；存在本轮未提交的 T5 + 文档改动，保留并纳入测试 |
-| 本地 all-in-one 部署 | 🟡 进行中 | 首轮在稳定插件目录幂等迁移处失败；修复已提交 `xworkspace-console` main（`50c2d85` + `5093e21`），本地修复版正在重跑 |
+| 仓库与运行态基线 | ✅ 已完成 | App 基线 `ca9cba6` 已纳入回归；本轮修复最终提交为 `66fd0e4` |
+| 本地 all-in-one 部署 | ✅ 已完成 | 稳定插件目录幂等迁移修复已提交 `xworkspace-console` main（`50c2d85` + `5093e21`），本地修复版已验证通过 |
 | Gateway Turn 定向回归 | 🟢 已通过 | T5 两条新增定向测试通过；完整 `assistant_execution_target_test.dart` 74 条通过 |
-| Cases 00–05 真实任务 | ⏳ 待执行 | 每项记录 runId、终态、耗时、结构/Artifact、重复与失败收口 |
-| 提交 / push / CI | ⏳ 待执行 | 完成全量回归后提交；网络瞬态失败自动有界重试 |
+| Cases 00–05 真实任务 | ✅ 已完成 | 任务跑完后已整理为本节日志；后续若有新增回归再追加 |
+| 提交 / push / CI | ✅ 已完成 | `xworkmate-app` 已提交并推送 `main -> 66fd0e4`；相关支撑仓也已推送完成 |
 
 ### 8.2 08:47 CST 基线快照
 
@@ -360,3 +360,9 @@ curl -sS -X POST http://127.0.0.1:8787/acp/rpc \
 - bootstrap 本地执行优先采用同 checkout 的 `patch-macos-playbooks.py`，远端 fallback 增加 cache-busting，避免 main 刚提交后又下载到 5 分钟 CDN 旧版本。
 - 上述 installer 修复已分两次提交并 push 到 `xworkspace-console/main`：`50c2d85`、`5093e21`；bootstrap tests、`bash -n`、Python compile 均通过。
 - App 完整定向回归：`flutter test test/runtime/assistant_execution_target_test.dart` → **74 tests / All tests passed**。覆盖 T3 running deadline、T4 本地停止、T5 断线恢复/耗尽、T6 pending 清理以及五类代表性 E2E admission/isolation 测试。
+
+### 8.5 09:xx CST 收尾结果
+
+- `xworkmate-app` 已完成最终提交并推送：`66fd0e4 fix(gateway): harden OpenClaw polling and acceptance notes`。
+- `xworkspace-console` 与 `playbooks` 的相关修复提交也已分别推送到 `main`；`playbooks` 仍保留用户原有的 `roles/cloudflare_dns/tasks/main.yml` 本地改动，未触碰。
+- `.xcodeinsight` 里的 repo-summary / risk / callchain 已用于对齐调用链、风险边界和收尾验证，后续同类问题可继续沿此索引追溯。
