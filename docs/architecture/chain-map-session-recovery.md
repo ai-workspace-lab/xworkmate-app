@@ -86,6 +86,21 @@ App side:
      └─ TaskThread lifecycleStatus → ready
 ```
 
+### S4a: Agent fails before producing output
+
+```
+OpenClaw agent_end(success=false, runId, error)
+  └─ openclaw-multi-session-plugins persists xworkmate.taskRuns[runId]
+     └─ App polls xworkmate.tasks.get
+        └─ Native detached-task record absent
+           └─ Plugin returns durable status=failed + sanitized error
+              └─ Bridge preserves terminal failure (no artifact wait)
+                 └─ App clears pending and shows the model/provider error
+
+expectedArtifactDirs remain scan hints. An empty reports/ or artifacts/
+directory cannot convert this terminal failure back to running.
+```
+
 ### S5: App resend on OpenClaw lane busy
 
 ```
@@ -165,7 +180,7 @@ No persistence:
 
 | Method | Params | Returns |
 |--------|--------|---------|
-| `xworkmate.tasks.get` | appThreadKey, openclawSessionKey, runId/taskId | Native task-registry snapshot or structured lookup error |
+| `xworkmate.tasks.get` | appThreadKey, openclawSessionKey, runId/taskId | Native task snapshot, durable agent_end run snapshot, or structured lookup error |
 | `xworkmate.tasks.cancel` | appThreadKey, openclawSessionKey, runId/taskId | Cancel confirmation |
 | Removed: Bridge task reassociation | artifactScope/runId-derived taskHandle | No longer supported; route through native task registry |
 
@@ -207,4 +222,4 @@ resolveGatewayThreadConnectionState(thread)
 
 4. **R4: Polling parameters**: Hardcoded poll interval/retry values in `ExternalCodeAgentAcpDesktopTransport` need to align with bridge's task deadlines (10/30/60 min). If polling stops before deadline, app marks failed while task is still running.
 
-5. **R5: OpenClaw handle expiration**: The bridge's `OpenClawTaskRecord` has no persistent storage. If the app stores a runId and later queries it after bridge restart, the lookup fails silently.
+5. **R5: OpenClaw handle expiration**: The bridge's in-memory `OpenClawTaskRecord` is not authoritative after restart. The plugin's SessionEntry-backed agent_end record preserves known terminal states; runs that ended before this record was written still fall back to the bounded deadline path.
