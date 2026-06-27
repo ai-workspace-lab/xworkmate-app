@@ -44,6 +44,10 @@ dependency_overrides:
   # a matching dSYM for App Store symbol upload.
   objective_c:
     path: third_party/objective_c
+  # Patch the macOS file selector plugin to avoid a deprecated API warning
+  # on current macOS toolchains while preserving older-OS behavior.
+  file_selector_macos:
+    path: third_party/file_selector_macos
   # Use a local patch so Cargokit can recover from transient GitHub asset
   # download failures during macOS packaging.
   super_native_extensions:
