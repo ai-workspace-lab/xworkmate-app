@@ -1017,17 +1017,24 @@ extension AppControllerDesktopThreadActions on AppController {
         : (target.isGateway
               ? r'$XWORKMATE_ARTIFACT_DIRECTORY'
               : workingDirectory.trim());
+    // 精简工作区上下文：只给 agent 一个明确的工作目录。
+    // 此前同时塞 sessionKey + currentTaskWorkspace + localWorkspace + remoteWorkspaceHint
+    // 三个近似重复的绝对路径——其中 localWorkspace 是 App 本机线程目录（`~/.xworkmate/threads/…`），
+    // 与网关 agent 的文件系统无关；remoteWorkspaceHint 又与 currentTaskWorkspace 重复。
+    // 多个相互冲突的路径会让 agent 不知该在哪工作，导致对话任务无法继续执行。
     final buffer = StringBuffer()
       ..writeln('TaskThread workspace context:')
       ..writeln('- sessionKey: $sessionKey')
       ..writeln('- currentTaskWorkspace: $currentTaskWorkspace');
-    if (workingDirectory.trim().isNotEmpty) {
+    // 网关任务由插件托管 artifact scope，agent 只需认 currentTaskWorkspace；
+    // 本机线程目录对网关 agent 无意义，仅在非网关（本地 agent 实际运行于此）时给出。
+    if (!target.isGateway && workingDirectory.trim().isNotEmpty) {
       buffer.writeln('- localWorkspace: ${workingDirectory.trim()}');
     }
-    if (remoteWorkingDirectoryHint.trim().isNotEmpty) {
-      buffer.writeln(
-        '- remoteWorkspaceHint: ${remoteWorkingDirectoryHint.trim()}',
-      );
+    // remoteWorkspaceHint 仅在与 currentTaskWorkspace 不同时才输出（去重）。
+    final remoteHint = remoteWorkingDirectoryHint.trim();
+    if (remoteHint.isNotEmpty && remoteHint != currentTaskWorkspace) {
+      buffer.writeln('- remoteWorkspaceHint: $remoteHint');
     }
     final visibleTaskInputAttachments = taskInputAttachments
         .where((item) => item.name.trim().isNotEmpty && item.key.isNotEmpty)
