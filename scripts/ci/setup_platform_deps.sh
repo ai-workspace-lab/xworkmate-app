@@ -16,10 +16,12 @@ case "$platform" in
       pkg-config \
       libx11-dev \
       libgl1-mesa-dev \
+      libgl1-mesa-dri \
       libayatana-appindicator3-dev \
       dpkg-dev \
       rpm \
-      imagemagick
+      imagemagick \
+      xvfb
     ;;
   android)
     sudo apt-get update
