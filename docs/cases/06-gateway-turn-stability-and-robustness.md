@@ -423,3 +423,11 @@ curl -sS -X POST http://127.0.0.1:8787/acp/rpc \
 3. **超时同源不可漂移**：入口 `xworkmate_bridge_acp_stream_timeout` 与 bridge `openClawAgentWaitMaxTimeout` 已分两侧定义，建议在 validate/CI 加一条「入口 ≥ bridge + 余量」的交叉断言，防未来单侧改值再漂移。
 4. **S1 重做前先补测**：先写「有 expectedArtifactDirs 但 run 无产物」与「agent 写产物到 workspace 根」两类对照 E2E，再改实现，避免重蹈 `0280893` 回退。
 5. **`/api/ping.metrics` 接告警**：`gatewaySocketClosed`/`taskGetUnconfirmedFallback`/`runDeadlineInterrupt` 三计数接监控，使「不稳定」可被观测而非靠用户截图。
+
+### 9.5 本次验收摘要
+
+这次 case 的结论可以压缩成三句话：
+
+1. 不是 `LiteLLM` 余量问题，而是 gateway-turn 的契约链路里，插件加载、运行态快照和结果回传先后顺序出了偏差。
+2. `openclaw-multi-session-plugins` 稳定加载后，`xworkmate.tasks.get` 能回到可持续轮询的终态语义，`GoTaskService 没有返回可显示的输出。` 也随之恢复为可显示结果。
+3. 当前验收标准是：任务能完成、能产出 `.md`、`tasks.get` 能返回 `completed + durable output + artifacts`，并且 App 不再把 undecorated `running` 快照误判成空终态。
