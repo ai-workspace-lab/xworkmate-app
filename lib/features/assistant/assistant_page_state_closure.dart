@@ -17,6 +17,7 @@ import '../../app/ui_feature_manifest.dart';
 import '../../i18n/app_language.dart';
 import '../../models/app_models.dart';
 import '../../runtime/gateway_acp_client.dart';
+import '../../runtime/local_file_revealer.dart';
 import '../../runtime/runtime_models.dart';
 import '../../theme/app_palette.dart';
 import '../../theme/app_theme.dart';
@@ -404,21 +405,7 @@ extension AssistantPageStateClosureInternal on AssistantPageStateInternal {
                             entry.relativePath.contains(':\\')
                         ? entry.relativePath
                         : '${workspacePath.replaceAll(RegExp(r'[\\/]+$'), '')}${Platform.pathSeparator}${entry.relativePath}';
-                    if (Platform.isMacOS) {
-                      await Process.run('open', <String>['-R', targetPath]);
-                      return;
-                    }
-                    if (Platform.isLinux) {
-                      await Process.run('xdg-open', <String>[
-                        File(targetPath).parent.path,
-                      ]);
-                      return;
-                    }
-                    if (Platform.isWindows) {
-                      await Process.run('explorer.exe', <String>[
-                        '/select,$targetPath',
-                      ]);
-                    }
+                    await revealLocalFile(targetPath);
                   },
                   loadSnapshot: () => controller.loadAssistantArtifactSnapshot(
                     sessionKey: activeSessionKey,
