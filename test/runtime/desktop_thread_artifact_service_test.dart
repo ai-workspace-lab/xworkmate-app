@@ -66,6 +66,49 @@ void main() {
   );
 
   test(
+    'loadSnapshot shows the root PDF deliverable before supporting files',
+    () async {
+      final workspace = await Directory.systemTemp.createTemp(
+        'xworkmate-pdf-artifact-order-',
+      );
+      addTearDown(() async {
+        if (await workspace.exists()) {
+          await workspace.delete(recursive: true);
+        }
+      });
+      await Directory(
+        '${workspace.path}/assets/diagrams',
+      ).create(recursive: true);
+      await File(
+        '${workspace.path}/assets/diagrams/chapter.png',
+      ).writeAsBytes(<int>[1, 2, 3]);
+      await File(
+        '${workspace.path}/assets/安全架构演进白皮书.pdf',
+      ).writeAsBytes(<int>[4, 5, 6]);
+      await File(
+        '${workspace.path}/安全架构演进白皮书.pdf',
+      ).writeAsBytes(<int>[4, 5, 6]);
+
+      final snapshot = await DesktopThreadArtifactService().loadSnapshot(
+        workspacePath: workspace.path,
+        workspaceKind: WorkspaceRefKind.localPath,
+        artifactRelativePaths: const <String>[
+          'assets/diagrams/chapter.png',
+          'assets/安全架构演进白皮书.pdf',
+          '安全架构演进白皮书.pdf',
+        ],
+      );
+
+      expect(snapshot.fileEntries.map((entry) => entry.relativePath), <String>[
+        '安全架构演进白皮书.pdf',
+        'assets/安全架构演进白皮书.pdf',
+        'assets/diagrams/chapter.png',
+      ]);
+      expect(snapshot.resultEntries.first.mimeType, 'application/pdf');
+    },
+  );
+
+  test(
     'loadPreview rejects historical files outside current task artifacts',
     () async {
       final workspace = await Directory.systemTemp.createTemp(
