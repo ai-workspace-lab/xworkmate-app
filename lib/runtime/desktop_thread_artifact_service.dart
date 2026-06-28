@@ -270,6 +270,20 @@ class DesktopThreadArtifactService {
       }
     }
     entries.sort((a, b) {
+      final deliveryCompare = artifactDisplayPriorityInternal(
+        a.relativePath,
+      ).compareTo(artifactDisplayPriorityInternal(b.relativePath));
+      if (deliveryCompare != 0) {
+        return deliveryCompare;
+      }
+      if (fileExtensionInternal(a.relativePath) == 'pdf') {
+        final depthCompare = artifactPathDepthInternal(
+          a.relativePath,
+        ).compareTo(artifactPathDepthInternal(b.relativePath));
+        if (depthCompare != 0) {
+          return depthCompare;
+        }
+      }
       final updatedCompare = (b.updatedAtMs ?? 0).compareTo(a.updatedAtMs ?? 0);
       if (updatedCompare != 0) {
         return updatedCompare;
@@ -277,6 +291,16 @@ class DesktopThreadArtifactService {
       return a.relativePath.compareTo(b.relativePath);
     });
     return entries;
+  }
+
+  static int artifactDisplayPriorityInternal(String relativePath) {
+    return fileExtensionInternal(relativePath) == 'pdf' ? 0 : 1;
+  }
+
+  static int artifactPathDepthInternal(String relativePath) {
+    return normalizeArtifactPathInternal(
+      relativePath,
+    ).split('/').where((segment) => segment.isNotEmpty).length;
   }
 
   Future<List<AssistantArtifactEntry>> buildResultEntriesInternal({
