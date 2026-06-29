@@ -144,7 +144,11 @@ jobs:
           - platform: macos
             arch: arm64
             package: app-store-pkg
-            release_only: true
+            # Quoted so the `matrix.release_only != 'true'` guard compares
+            # string-to-string. A YAML boolean here coerces to a number in
+            # GitHub expressions (true -> 1, 'true' -> NaN), making the guard
+            # always true and building this release-only leg on every PR.
+            release_only: "true"
             runs_on: macos-14
             artifact_name: build-macos-arm64-pkg
             artifact_paths: |
