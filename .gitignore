@@ -1,5 +1,10 @@
 # Miscellaneous
+# Secrets / local env — never commit real credentials. .env.example is the tracked template.
 .env
+.env.*
+!.env.example
+*.local.env
+secrets.env
 .playwright-mcp/
 *.py
 null/

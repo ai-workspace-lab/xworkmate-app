@@ -4,6 +4,10 @@
 
 ## 1. 测试账号与连接参数
 
+> **凭据注入约定（必读）**：本文档**不保存任何明文密码或 Token**。所有 secret 从本地 `.env`
+> （已 gitignore）或 secret store 注入，变量名见仓库根目录 `.env.example`。执行用例前先
+> `set -a; source .env; set +a`，下表只记录变量名与非敏感的端点信息。
+
 ### 1.1 云端账号
 
 | 项目 | 内容 |
@@ -11,32 +15,28 @@
 | 账号类型 | 只读评审账号（Apple 审核专用） |
 | 服务地址 | `https://accounts.svc.plus` |
 | 邮箱 / 账号 | `review@svc.plus` |
-| 密码 | 参考 vault.svc.plus kv/data/accounts.svc.plus/REVIEW_ACCOUNT_LOGIN_PASSWORD |
-
+| 密码 | 见 `.env`：`$REVIEW_ACCOUNT_LOGIN_PASSWORD`（勿写明文） |
 
 ### 1.2 公网 xworkmate-bridge 组合 1
 
 | 环境变量 | 值 |
 |----------|----|
 | `BRIDGE_SERVER_URL` | `https://xworkmate-bridge.svc.plus` |
-| `BRIDGE_AUTH_TOKEN` | `参考 vault.svc.plus kv/data/accounts.svc.plus/INTERNAL_SERVICE_TOKEN` |
-
+| `BRIDGE_AUTH_TOKEN` | 见 `.env`：`$BRIDGE_AUTH_TOKEN`（勿写明文） |
 
 ### 1.3 公网 xworkmate-bridge 组合 2
 
 | 环境变量 | 值 |
 |----------|----|
 | `BRIDGE_SERVER_URL` | `https://xworkmate-bridge.svc.plus` |
-| `BRIDGE_REVIEW_AUTH_TOKEN` | `参考 vault.svc.plus kv/data/accounts.svc.plus/BRIDGE_REVIEW_AUTH_TOKEN` |
-
+| `BRIDGE_REVIEW_AUTH_TOKEN` | 见 `.env`：`$BRIDGE_REVIEW_AUTH_TOKEN`（勿写明文） |
 
 ### 1.4 本地 xworkmate-bridge
 
 | 环境变量 | 值 |
 |----------|----|
 | `BRIDGE_SERVER_URL` | `http://127.0.0.1:8787` |
-| `BRIDGE_AUTH_TOKEN` | `cat ~/.ai_workspace_auth_token` |
-
+| `BRIDGE_AUTH_TOKEN` | 见 `.env`：`$BRIDGE_AUTH_TOKEN`（勿写明文） |
 
 ---
 
@@ -189,7 +189,7 @@
   2. 切换到 `svc.plus 云端同步`
   3. 在 `服务地址` 输入 `https://accounts.svc.plus`
   4. 在 `邮箱或账号` 输入 `review@svc.plus`
-  5. 在 `密码` 输入 `只读评审账号密码`
+  5. 在 `密码` 输入 `$REVIEW_ACCOUNT_LOGIN_PASSWORD`（从 `.env` 读取，勿写明文）
   6. 点击 `登录`
   7. 等待账号同步完成
 - 期望结果
@@ -212,7 +212,7 @@
   1. 在设置页退出当前账号
   2. 关闭或返回设置页
   3. 再次进入 `Settings -> Integrations -> svc.plus 云端同步`
-  4. 使用 `review@svc.plus` / `只读评审账号密码` 重新登录
+  4. 使用 `review@svc.plus` / `$REVIEW_ACCOUNT_LOGIN_PASSWORD`（从 `.env` 读取）重新登录
   5. 观察同步状态与本地配置状态
 - 期望结果
   - 退出后不会继续显示已登录状态
@@ -260,7 +260,7 @@
   1. 打开 `Settings -> Integrations`
   2. 切换到 `AI 智能体工作空间`
   3. 在 `Bridge 地址` 输入 `https://xworkmate-bridge.svc.plus`
-  4. 在 `鉴权令牌 (TOKEN)` 输入 `对应 BRIDGE_AUTH_TOKEN`
+  4. 在 `鉴权令牌 (TOKEN)` 输入 `$BRIDGE_AUTH_TOKEN`（从 `.env` 读取，勿写明文）
   5. 点击 `保存配置`
   6. 重新进入设置页确认配置仍然存在
   7. 发起一次需要 AI 智能体工作空间的任务，确认可建立连接
@@ -284,7 +284,7 @@
 - 操作步骤
   1. 打开 `Settings -> Integrations -> AI 智能体工作空间`
   2. 在 `Bridge 地址` 输入 `https://xworkmate-bridge.svc.plus`
-  3. 在 `鉴权令牌 (TOKEN)` 输入 `BRIDGE_REVIEW_AUTH_TOKEN`
+  3. 在 `鉴权令牌 (TOKEN)` 输入 `$BRIDGE_REVIEW_AUTH_TOKEN`（从 `.env` 读取，勿写明文）
   4. 点击 `保存配置`
   5. 重新进入设置页确认配置稳定
   6. 发起一次 AI 智能体工作空间任务
@@ -357,7 +357,7 @@
 - 操作步骤
   1. 打开 `Settings -> Integrations -> AI 智能体工作空间`
   2. 在 `Bridge 地址` 输入 `http://127.0.0.1:8787`
-  3. 在 `鉴权令牌 (TOKEN)` 输入 `BRIDGE_AUTH_TOKEN`
+  3. 在 `鉴权令牌 (TOKEN)` 输入 `$BRIDGE_AUTH_TOKEN`（从 `.env` 读取，勿写明文）
   4. 点击 `保存配置`
   5. 发起一次 AI 智能体工作空间任务
   6. 对照本地 bridge 日志确认请求到达
@@ -490,4 +490,5 @@
 | 公网 bridge 组合 2 | ✅ | ✅ | ✅ | ✅ | ✅ |
 | 本地 bridge | ✅ | ✅ | ✅ | ✅ | ✅ |
 
-> 注意：以上 token 为评审 / 测试用途。执行测试时不得将 token 明文贴入公开 issue、公开日志或截图备注。
+> 注意：以上密码 / token 均为评审 / 测试用途，仅从 `.env`（已 gitignore）或 secret store 注入，
+> **禁止**明文写入本文档、git 历史、公开 issue、公开日志或截图备注。一旦发生明文泄漏，先**轮换凭据**，再清理。
