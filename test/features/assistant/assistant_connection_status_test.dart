@@ -128,6 +128,45 @@ void main() {
       expect(state.gatewayTokenMissing, isFalse);
     });
 
+    test(
+      'manual bridge discovery does not require a svc.plus account session',
+      () {
+        final state = resolveGatewayThreadConnectionStateInternal(
+          target: AssistantExecutionTarget.gateway,
+          bridgeReady: false,
+          bridgeLabel: 'private-bridge.example.com',
+          accountSyncState: null,
+          accountSignedIn: false,
+          bridgeConfigured: true,
+        );
+
+        expect(state.connected, isFalse);
+        expect(state.status, RuntimeConnectionStatus.offline);
+        expect(state.primaryLabel, '正在发现');
+        expect(state.detailLabel, '正在加载 Bridge 能力...');
+        expect(state.detailLabel, isNot(contains('svc.plus')));
+      },
+    );
+
+    test('manual bridge discovery failure is shown while signed out', () {
+      final state = resolveGatewayThreadConnectionStateInternal(
+        target: AssistantExecutionTarget.gateway,
+        bridgeReady: false,
+        bridgeLabel: 'private-bridge.example.com',
+        accountSyncState: null,
+        accountSignedIn: false,
+        bridgeConfigured: true,
+        bridgeDiscoveryAttempted: true,
+        bridgeDiscoveryError: 'ACP_HTTP_CONNECT_FAILED',
+        providerCatalogEmpty: true,
+      );
+
+      expect(state.status, RuntimeConnectionStatus.error);
+      expect(state.primaryLabel, '连接失败');
+      expect(state.detailLabel, 'ACP_HTTP_CONNECT_FAILED');
+      expect(state.detailLabel, isNot(contains('svc.plus')));
+    });
+
     test('surfaces failed discovery after capability refresh is attempted', () {
       final state = resolveGatewayThreadConnectionStateInternal(
         target: AssistantExecutionTarget.gateway,
