@@ -1,0 +1,26 @@
+# gitleaks config for xworkmate-app
+# Keeps all default rules, and allowlists known non-secret findings:
+#   - vendored third-party code (cargokit ships a *public* verification key)
+#   - unit-test fixtures (hardcoded "device-1" / "token" test vectors)
+# Real leaked credentials are NOT allowlisted here — they are purged from
+# history and rotated.
+
+title = "xworkmate-app gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Vendored third-party code and unit-test fixtures (no real secrets)"
+paths = [
+  # cargokit (super_native_extensions) ships a public binary-verification key
+  '''third_party/.*''',
+  # Dart unit-test fixtures: obfuscated "token" / fake TF password assertions
+  '''test/features/workspace_management/workspace_management_unit_test\.dart''',
+  # Go unit-test fixtures: hardcoded "device-1" identity key pair
+  '''go/go_core/internal/gatewayruntime/runtime_test\.go''',
+]
+regexes = [
+  # cargokit public key value, in case it is referenced outside third_party/
+  '''3a257ef1c7d72d84225ac4658d24812ada50a7a7a8a2138c2a91353389fdc514''',
+]
