@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+real_lipo="$(xcrun --find lipo)"
+args=("$@")
+verify_index=-1
+
+for ((index = 0; index < ${#args[@]}; index++)); do
+  if [[ "${args[index]}" == "-verify_arch" ]]; then
+    verify_index=$index
+    break
+  fi
+done
+
+# Xcode 27 accepts one architecture per -verify_arch invocation. Flutter
+# passes all requested architectures at once, so verify each one separately.
+if ((verify_index >= 0 && ${#args[@]} - verify_index > 2)); then
+  command_prefix=("${args[@]:0:verify_index}")
+  architectures=("${args[@]:verify_index+1}")
+  for architecture in "${architectures[@]}"; do
+    "$real_lipo" "${command_prefix[@]}" -verify_arch "$architecture"
+  done
+  exit 0
+fi
+
+exec "$real_lipo" "$@"

@@ -30,6 +30,11 @@ on:
       - ".github/actions/setup-flutter-sdk/action.yml"
       - ".github/workflows/build-and-release.yml"
   workflow_dispatch:
+    inputs:
+      enable_testflight:
+        description: "Build & upload TestFlight (macOS/iOS App Store) artifacts"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -49,6 +54,7 @@ jobs:
       contents: write
     outputs:
       should_release: ${{ steps.flags.outputs.should_release }}
+      testflight_enabled: ${{ steps.flags.outputs.testflight_enabled }}
       release_tag: ${{ steps.meta.outputs.release_tag }}
       release_title: ${{ steps.meta.outputs.release_title }}
       release_notes: ${{ steps.meta.outputs.release_notes }}
@@ -61,11 +67,24 @@ jobs:
       - name: Determine release mode
         id: flags
         shell: bash
+        env:
+          ENABLE_TESTFLIGHT_INPUT: ${{ github.event.inputs.enable_testflight }}
+          ENABLE_TESTFLIGHT_VAR: ${{ vars.ENABLE_TESTFLIGHT }}
         run: |
           if [[ "${GITHUB_REF:-}" == refs/tags/v* || "${GITHUB_EVENT_NAME:-}" == "workflow_dispatch" || "${GITHUB_REF:-}" == "refs/heads/main" ]]; then
             echo "should_release=true" >> "$GITHUB_OUTPUT"
           else
             echo "should_release=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          # TestFlight is opt-in (default OFF). Enabled only when explicitly
+          # requested via the workflow_dispatch input or the ENABLE_TESTFLIGHT
+          # repo/org variable. Keeps missing Apple signing secrets from failing
+          # the normal DMG/IPA release path.
+          if [[ "${ENABLE_TESTFLIGHT_INPUT:-}" == "true" || "${ENABLE_TESTFLIGHT_VAR:-}" == "true" ]]; then
+            echo "testflight_enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "testflight_enabled=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Compute release metadata
@@ -258,12 +277,12 @@ jobs:
           go-version: "1.24.1"
 
       - name: Build platform artifacts
-        if: ${{ steps.preflight.outputs.should_build_platform == 'true' && (matrix.release_only != 'true' || env.SHOULD_RELEASE == 'true') }}
+        if: ${{ steps.preflight.outputs.should_build_platform == 'true' && (matrix.release_only != 'true' || env.SHOULD_RELEASE == 'true') && (matrix.package != 'app-store-pkg' || needs.prepare.outputs.testflight_enabled == 'true') }}
         shell: bash
         run: bash ./scripts/ci/build_matrix_artifacts.sh "$PLATFORM" "$ARCH" "${{ matrix.package }}" "$SHOULD_RELEASE"
 
       - name: Upload build artifacts
-        if: ${{ steps.preflight.outputs.should_build_platform == 'true' && (matrix.release_only != 'true' || env.SHOULD_RELEASE == 'true') }}
+        if: ${{ steps.preflight.outputs.should_build_platform == 'true' && (matrix.release_only != 'true' || env.SHOULD_RELEASE == 'true') && (matrix.package != 'app-store-pkg' || needs.prepare.outputs.testflight_enabled == 'true') }}
         uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.artifact_name }}
@@ -339,7 +358,7 @@ jobs:
 
       - name: Load App Store Connect secrets
         id: vault
-        if: ${{ matrix.target != 'github_release' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+        if: ${{ matrix.target != 'github_release' && needs.prepare.outputs.testflight_enabled == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
         uses: hashicorp/vault-action@v4
         with:
           url: ${{ env.VAULT_ADDR }}
@@ -353,7 +372,7 @@ jobs:
             kv/data/github-actions/xworkmate-app APP_STORE_CONNECT_API_KEY_P8_BASE64 | APP_STORE_CONNECT_API_KEY_P8_BASE64
 
       - name: Export App Store Connect secrets
-        if: ${{ matrix.target != 'github_release' }}
+        if: ${{ matrix.target != 'github_release' && needs.prepare.outputs.testflight_enabled == 'true' }}
         run: |
           {
             echo "APP_STORE_CONNECT_API_KEY_ID=${{ steps.vault.outputs.APP_STORE_CONNECT_API_KEY_ID }}"
@@ -378,13 +397,13 @@ jobs:
           RELEASE_NOTES: ${{ needs.prepare.outputs.release_notes }}
 
       - name: Download TestFlight artifact
-        if: ${{ matrix.target != 'github_release' }}
+        if: ${{ matrix.target != 'github_release' && needs.prepare.outputs.testflight_enabled == 'true' }}
         uses: actions/download-artifact@v8
         with:
           name: ${{ matrix.artifact_name }}
           path: ${{ matrix.artifact_path }}
 
       - name: Upload to TestFlight
-        if: ${{ matrix.target != 'github_release' }}
+        if: ${{ matrix.target != 'github_release' && needs.prepare.outputs.testflight_enabled == 'true' }}
         shell: bash
         run: bash ./scripts/ci/testflight_upload.sh "${{ matrix.testflight_platform }}" "${{ matrix.artifact_path }}"
