@@ -10,7 +10,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:markdown/markdown.dart' as md;
 import 'package:path_provider/path_provider.dart';
-import 'package:super_clipboard/super_clipboard.dart';
+import 'package:pasteboard/pasteboard.dart';
 import '../../app/app_controller.dart';
 import '../../app/app_metadata.dart';
 import '../../app/ui_feature_manifest.dart';
@@ -82,88 +82,24 @@ class AssistantPasteIntent extends Intent {
 }
 
 Future<XFile?> readClipboardImageAsXFileInternal() async {
-  final clipboard = SystemClipboard.instance;
-  if (clipboard == null) {
+  // pasteboard normalizes clipboard images to PNG bytes across platforms.
+  Uint8List? bytes;
+  try {
+    bytes = await Pasteboard.image;
+  } catch (error, stackTrace) {
+    debugPrint('Error reading clipboard image: $error\n$stackTrace');
     return null;
   }
-  final reader = await clipboard.read();
-  return await readClipboardImageForFormatInternal(
-        reader,
-        format: Formats.png,
-        extension: 'png',
-        mimeType: 'image/png',
-      ) ??
-      await readClipboardImageForFormatInternal(
-        reader,
-        format: Formats.jpeg,
-        extension: 'jpg',
-        mimeType: 'image/jpeg',
-      ) ??
-      await readClipboardImageForFormatInternal(
-        reader,
-        format: Formats.gif,
-        extension: 'gif',
-        mimeType: 'image/gif',
-      ) ??
-      await readClipboardImageForFormatInternal(
-        reader,
-        format: Formats.webp,
-        extension: 'webp',
-        mimeType: 'image/webp',
-      );
-}
-
-Future<XFile?> readClipboardImageForFormatInternal(
-  ClipboardReader reader, {
-  required FileFormat format,
-  required String extension,
-  required String mimeType,
-}) async {
-  if (!reader.canProvide(format)) {
-    return null;
-  }
-  final bytes = await readClipboardFileBytesInternal(reader, format);
   if (bytes == null || bytes.isEmpty) {
     return null;
   }
   final temporaryDirectory =
       await resolveClipboardAttachmentTempDirectoryInternal();
   final fileName =
-      'clipboard-image-${DateTime.now().microsecondsSinceEpoch}.$extension';
+      'clipboard-image-${DateTime.now().microsecondsSinceEpoch}.png';
   final file = File('${temporaryDirectory.path}/$fileName');
   await file.writeAsBytes(bytes, flush: true);
-  return XFile(file.path, mimeType: mimeType, name: fileName);
-}
-
-Future<Uint8List?> readClipboardFileBytesInternal(
-  ClipboardReader reader,
-  FileFormat format,
-) {
-  final completer = Completer<Uint8List?>();
-  final progress = reader.getFile(
-    format,
-    (file) async {
-      try {
-        final bytes = await file.readAll();
-        if (!completer.isCompleted) {
-          completer.complete(bytes);
-        }
-      } catch (error, stackTrace) {
-        if (!completer.isCompleted) {
-          completer.completeError(error, stackTrace);
-        }
-      }
-    },
-    onError: (error) {
-      if (!completer.isCompleted) {
-        completer.completeError(error);
-      }
-    },
-  );
-  if (progress == null) {
-    return Future<Uint8List?>.value(null);
-  }
-  return completer.future;
+  return XFile(file.path, mimeType: 'image/png', name: fileName);
 }
 
 Future<Directory> resolveClipboardAttachmentTempDirectoryInternal() async {
