@@ -100,8 +100,8 @@ curl -sfL https://install.svc.plus/ai-workspace | bash -s -- uninstall --purge
               defaultVerticalAlignment: TableCellVerticalAlignment.middle,
               children: [
                 _tableRow('macOS (Apple Silicon / Intel)', '已测试'),
-                _tableRow('Debian 11/12', '已测试'),
-                _tableRow('Ubuntu 22.04/24.04', '已测试'),
+                _tableRow('Debian 13 amd64', '已测试'),
+                _tableRow('Ubuntu 26.04 amd64', '已测试'),
                 _tableRow('其他 Linux 发行版', '未测试'),
               ],
             ),

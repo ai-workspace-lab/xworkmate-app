@@ -178,11 +178,6 @@ jobs:
             kv/data/github-actions/xworkmate-app APPLE_KEYCHAIN_PASSWORD | APPLE_KEYCHAIN_PASSWORD ;
             kv/data/github-actions/xworkmate-app APPLE_EXPORT_METHOD | APPLE_EXPORT_METHOD
 
-      # App Store Connect keys (APP_STORE_CONNECT_*) are intentionally NOT loaded
-      # here: only scripts/ci/testflight_upload.sh consumes them, and that runs in
-      # the release job (which loads them on its own). Keeping them out means the
-      # build matrix never depends on them.
-
       - name: Load Vault secrets (Windows)
         id: vault_windows
         if: ${{ matrix.platform == 'windows' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
@@ -222,7 +217,6 @@ jobs:
             echo "APPLE_CERT_P12_BASE64=${{ steps.vault_apple.outputs.APPLE_CERT_P12_BASE64 }}"
             echo "APPLE_CERT_PASSWORD=${{ steps.vault_apple.outputs.APPLE_CERT_PASSWORD }}"
             echo "APPLE_PROVISION_PROFILE_BASE64=${{ steps.vault_apple.outputs.APPLE_PROVISION_PROFILE_BASE64 }}"
-            echo "APPLE_MAC_PROVISION_PROFILE_BASE64=${{ steps.vault_apple.outputs.APPLE_MAC_PROVISION_PROFILE_BASE64 }}"
             echo "APPLE_KEYCHAIN_PASSWORD=${{ steps.vault_apple.outputs.APPLE_KEYCHAIN_PASSWORD }}"
             echo "APPLE_EXPORT_METHOD=${{ steps.vault_apple.outputs.APPLE_EXPORT_METHOD }}"
             echo "WINDOWS_PFX_BASE64=${{ steps.vault_windows.outputs.WINDOWS_PFX_BASE64 }}"

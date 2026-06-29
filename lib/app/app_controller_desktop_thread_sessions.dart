@@ -73,7 +73,7 @@ AssistantThreadConnectionState resolveGatewayThreadConnectionStateInternal({
     );
   }
 
-  if (!accountSignedIn) {
+  if (!accountSignedIn && !bridgeConfigured) {
     return AssistantThreadConnectionState(
       executionTarget: target,
       status: RuntimeConnectionStatus.offline,
@@ -93,7 +93,7 @@ AssistantThreadConnectionState resolveGatewayThreadConnectionStateInternal({
   final failed = blocked && !tokenMissing && !endpointMissing;
 
   // SyncBlocked logic
-  if (tokenMissing || failed || blocked) {
+  if (accountSignedIn && (tokenMissing || failed || blocked)) {
     final status = RuntimeConnectionStatus.error;
     final primaryLabel = tokenMissing
         ? appText('缺少令牌', 'Missing Token')
