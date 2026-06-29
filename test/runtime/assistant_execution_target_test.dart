@@ -322,9 +322,7 @@ void main() {
         'xworkmate-no-runtime-main-home-',
       );
       addTearDown(() async {
-        if (await localHome.exists()) {
-          await localHome.delete(recursive: true);
-        }
+        await _resilientDelete(localHome);
       });
       final controller = _sandboxController(
         environmentOverride: const <String, String>{},
@@ -358,9 +356,7 @@ void main() {
           'xworkmate-refresh-no-session-one-',
         );
         addTearDown(() async {
-          if (await localHome.exists()) {
-            await localHome.delete(recursive: true);
-          }
+          await _resilientDelete(localHome);
         });
         final controller = _sandboxController(
           environmentOverride: const <String, String>{},
@@ -439,9 +435,7 @@ void main() {
           'xworkmate-stable-task-selection-home-',
         );
         addTearDown(() async {
-          if (await localHome.exists()) {
-            await localHome.delete(recursive: true);
-          }
+          await _resilientDelete(localHome);
         });
         final controller = _sandboxController(
           environmentOverride: const <String, String>{},
@@ -1716,9 +1710,7 @@ void main() {
           'xworkmate-acp-interrupt-artifacts-',
         );
         addTearDown(() async {
-          if (await localWorkspace.exists()) {
-            await localWorkspace.delete(recursive: true);
-          }
+          await _resilientDelete(localWorkspace);
         });
         final fakeGoTaskService = _RecordingGoTaskServiceClient()
           ..onExecuteTask = ((request) async {
@@ -2017,9 +2009,7 @@ void main() {
           'xworkmate-acp-handshake-interrupt-artifacts-',
         );
         addTearDown(() async {
-          if (await localWorkspace.exists()) {
-            await localWorkspace.delete(recursive: true);
-          }
+          await _resilientDelete(localWorkspace);
         });
         final fakeGoTaskService = _RecordingGoTaskServiceClient()
           ..updatesBeforeNextOutcome.add(
@@ -2383,9 +2373,7 @@ void main() {
           'xworkmate-background-completion-home-',
         );
         addTearDown(() async {
-          if (await localHome.exists()) {
-            await localHome.delete(recursive: true);
-          }
+          await _resilientDelete(localHome);
         });
         final fakeGoTaskService = _BlockingGoTaskServiceClient();
         final controller = _connectedController(
@@ -2508,9 +2496,7 @@ void main() {
           'xworkmate-same-prompt-home-',
         );
         addTearDown(() async {
-          if (await localHome.exists()) {
-            await localHome.delete(recursive: true);
-          }
+          await _resilientDelete(localHome);
         });
         final fakeGoTaskService = _BlockingGoTaskServiceClient();
         final controller = _connectedController(
@@ -2683,9 +2669,7 @@ void main() {
           'xworkmate-same-prompt-empty-home-',
         );
         addTearDown(() async {
-          if (await localHome.exists()) {
-            await localHome.delete(recursive: true);
-          }
+          await _resilientDelete(localHome);
         });
         final fakeGoTaskService = _BlockingGoTaskServiceClient();
         final controller = _connectedController(
@@ -2707,9 +2691,7 @@ void main() {
               continue;
             }
             final directory = Directory(workspace);
-            if (await directory.exists()) {
-              await directory.delete(recursive: true);
-            }
+            await _resilientDelete(directory);
           }
         });
 
@@ -2845,9 +2827,7 @@ void main() {
           'xworkmate-terminal-failure-home-',
         );
         addTearDown(() async {
-          if (await localHome.exists()) {
-            await localHome.delete(recursive: true);
-          }
+          await _resilientDelete(localHome);
         });
         final fakeGoTaskService = _BlockingGoTaskServiceClient();
         final controller = _connectedController(
@@ -2925,9 +2905,7 @@ void main() {
           'xworkmate-empty-output-home-',
         );
         addTearDown(() async {
-          if (await localHome.exists()) {
-            await localHome.delete(recursive: true);
-          }
+          await _resilientDelete(localHome);
         });
         final fakeGoTaskService = _BlockingGoTaskServiceClient();
         final controller = _connectedController(
@@ -3297,9 +3275,7 @@ void main() {
         addTearDown(() async {
           fakeGoTaskService.completeAll();
           controller.dispose();
-          if (await localHome.exists()) {
-            await localHome.delete(recursive: true);
-          }
+          await _resilientDelete(localHome);
         });
 
         for (
@@ -4902,19 +4878,28 @@ UiFeatureManifest _defaultDesktopManifest() {
 }
 
 Future<void> _resilientDelete(Directory dir) async {
-  if (!await dir.exists()) {
-    return;
-  }
   for (var attempt = 0; attempt < 8; attempt++) {
+    if (!await dir.exists()) {
+      return;
+    }
     try {
       await dir.delete(recursive: true);
       return;
     } catch (error) {
+      // A background flush (e.g. controller dispose still persisting state)
+      // may keep writing into the temp dir, so a recursive delete can race
+      // and fail with "Directory not empty". Retry a few times.
       debugPrint('Temporary directory delete retry: $error');
       await Future<void>.delayed(const Duration(milliseconds: 50));
     }
   }
-  await dir.delete(recursive: true);
+  // Best-effort cleanup: never fail a test over leftover temp files; the OS
+  // reclaims the temp directory regardless.
+  try {
+    await dir.delete(recursive: true);
+  } catch (error) {
+    debugPrint('Giving up on temporary directory cleanup: $error');
+  }
 }
 
 AppController _sandboxController({

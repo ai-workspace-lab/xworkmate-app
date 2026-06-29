@@ -1,4 +1,4 @@
-platform :osx, '14.0'
+platform :osx, '15.6'
 
 # CocoaPods analytics sends network stats synchronously affecting flutter build latency.
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
@@ -97,7 +97,8 @@ post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_macos_build_settings(target)
     target.build_configurations.each do |config|
-      config.build_settings['MACOSX_DEPLOYMENT_TARGET'] = '14.0'
+      # Xcode 27 rejects dependency targets below the app's 15.6 minimum.
+      config.build_settings['MACOSX_DEPLOYMENT_TARGET'] = '15.6'
 
       next unless ['Pods-Runner', 'Pods-RunnerTests', 'WebRTC-SDK', 'flutter_webrtc'].include?(target.name)
 
