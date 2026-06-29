@@ -122,6 +122,14 @@ jobs:
             artifact_name: build-macos-arm64-dmg
             artifact_paths: |
               dist/macos/*.dmg
+          - platform: macos
+            arch: arm64
+            package: app-store-pkg
+            release_only: true
+            runs_on: macos-14
+            artifact_name: build-macos-arm64-pkg
+            artifact_paths: |
+              dist/macos-app-store/*.pkg
           - platform: ios
             arch: arm64
             package: ipa
@@ -166,6 +174,7 @@ jobs:
             kv/data/github-actions/xworkmate-app APPLE_CERT_P12_BASE64 | APPLE_CERT_P12_BASE64 ;
             kv/data/github-actions/xworkmate-app APPLE_CERT_PASSWORD | APPLE_CERT_PASSWORD ;
             kv/data/github-actions/xworkmate-app APPLE_PROVISION_PROFILE_BASE64 | APPLE_PROVISION_PROFILE_BASE64 ;
+            kv/data/github-actions/xworkmate-app APPLE_MAC_PROVISION_PROFILE_BASE64 | APPLE_MAC_PROVISION_PROFILE_BASE64 ;
             kv/data/github-actions/xworkmate-app APPLE_KEYCHAIN_PASSWORD | APPLE_KEYCHAIN_PASSWORD ;
             kv/data/github-actions/xworkmate-app APPLE_EXPORT_METHOD | APPLE_EXPORT_METHOD
 
@@ -248,12 +257,12 @@ jobs:
           go-version: "1.24.1"
 
       - name: Build platform artifacts
-        if: ${{ steps.preflight.outputs.should_build_platform == 'true' }}
+        if: ${{ steps.preflight.outputs.should_build_platform == 'true' && (matrix.release_only != 'true' || env.SHOULD_RELEASE == 'true') }}
         shell: bash
-        run: bash ./scripts/ci/build_matrix_artifacts.sh "$PLATFORM" "$ARCH" "$SHOULD_RELEASE"
+        run: bash ./scripts/ci/build_matrix_artifacts.sh "$PLATFORM" "$ARCH" "${{ matrix.package }}" "$SHOULD_RELEASE"
 
       - name: Upload build artifacts
-        if: ${{ steps.preflight.outputs.should_build_platform == 'true' }}
+        if: ${{ steps.preflight.outputs.should_build_platform == 'true' && (matrix.release_only != 'true' || env.SHOULD_RELEASE == 'true') }}
         uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.artifact_name }}
@@ -301,7 +310,23 @@ jobs:
     # never blocked by it being skipped (e.g. push events) or failing.
     # build/prepare must still genuinely succeed.
     if: ${{ always() && needs.prepare.outputs.should_release == 'true' && needs.prepare.result == 'success' && needs.build.result == 'success' }}
-    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: github_release
+            runs_on: ubuntu-22.04
+          - target: testflight_ios
+            runs_on: macos-14
+            artifact_name: build-ios-arm64-ipa
+            artifact_path: release-artifacts/build-ios-arm64-ipa
+            testflight_platform: ios
+          - target: testflight_macos
+            runs_on: macos-14
+            artifact_name: build-macos-arm64-pkg
+            artifact_path: release-artifacts/build-macos-arm64-pkg
+            testflight_platform: macos
+    runs-on: ${{ matrix.runs_on }}
     permissions:
       contents: write
     needs:
@@ -312,12 +337,46 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@v7
 
+      - name: Load App Store Connect secrets
+        id: vault
+        if: ${{ matrix.target != 'github_release' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+        uses: hashicorp/vault-action@v4
+        with:
+          url: ${{ env.VAULT_ADDR }}
+          method: jwt
+          role: github-actions-xworkmate-app
+          jwtGithubAudience: vault
+          ignoreNotFound: true
+          secrets: |
+            kv/data/github-actions/xworkmate-app APPLE_CERT_P12_BASE64 | APPLE_CERT_P12_BASE64 ;
+            kv/data/github-actions/xworkmate-app APPLE_CERT_PASSWORD | APPLE_CERT_PASSWORD ;
+            kv/data/github-actions/xworkmate-app APPLE_MAC_PROVISION_PROFILE_BASE64 | APPLE_MAC_PROVISION_PROFILE_BASE64 ;
+            kv/data/github-actions/xworkmate-app APPLE_KEYCHAIN_PASSWORD | APPLE_KEYCHAIN_PASSWORD ;
+            kv/data/github-actions/xworkmate-app APP_STORE_CONNECT_API_KEY_ID | APP_STORE_CONNECT_API_KEY_ID ;
+            kv/data/github-actions/xworkmate-app APP_STORE_CONNECT_ISSUER_ID | APP_STORE_CONNECT_ISSUER_ID ;
+            kv/data/github-actions/xworkmate-app APP_STORE_CONNECT_API_KEY_P8_BASE64 | APP_STORE_CONNECT_API_KEY_P8_BASE64
+
+      - name: Export App Store Connect secrets
+        if: ${{ matrix.target != 'github_release' }}
+        run: |
+          {
+            echo "APPLE_CERT_P12_BASE64=${{ steps.vault.outputs.APPLE_CERT_P12_BASE64 }}"
+            echo "APPLE_CERT_PASSWORD=${{ steps.vault.outputs.APPLE_CERT_PASSWORD }}"
+            echo "APPLE_MAC_PROVISION_PROFILE_BASE64=${{ steps.vault.outputs.APPLE_MAC_PROVISION_PROFILE_BASE64 }}"
+            echo "APPLE_KEYCHAIN_PASSWORD=${{ steps.vault.outputs.APPLE_KEYCHAIN_PASSWORD }}"
+            echo "APP_STORE_CONNECT_API_KEY_ID=${{ steps.vault.outputs.APP_STORE_CONNECT_API_KEY_ID }}"
+            echo "APP_STORE_CONNECT_ISSUER_ID=${{ steps.vault.outputs.APP_STORE_CONNECT_ISSUER_ID }}"
+            echo "APP_STORE_CONNECT_API_KEY_P8_BASE64=${{ steps.vault.outputs.APP_STORE_CONNECT_API_KEY_P8_BASE64 }}"
+          } >> "$GITHUB_ENV"
+
       - name: Download all artifacts
+        if: ${{ matrix.target == 'github_release' }}
         uses: actions/download-artifact@v8
         with:
           path: release-artifacts
 
       - name: Upload assets to GitHub Release
+        if: ${{ matrix.target == 'github_release' }}
         shell: bash
         run: bash ./scripts/ci/github_release_upload.sh release-artifacts
         env:
@@ -325,3 +384,15 @@ jobs:
           RELEASE_TAG: ${{ needs.prepare.outputs.release_tag }}
           RELEASE_TITLE: ${{ needs.prepare.outputs.release_title }}
           RELEASE_NOTES: ${{ needs.prepare.outputs.release_notes }}
+
+      - name: Download TestFlight artifact
+        if: ${{ matrix.target != 'github_release' }}
+        uses: actions/download-artifact@v8
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.artifact_path }}
+
+      - name: Upload to TestFlight
+        if: ${{ matrix.target != 'github_release' }}
+        shell: bash
+        run: bash ./scripts/ci/testflight_upload.sh "${{ matrix.testflight_platform }}" "${{ matrix.artifact_path }}"

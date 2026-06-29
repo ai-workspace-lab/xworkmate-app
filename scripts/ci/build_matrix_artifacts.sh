@@ -6,7 +6,8 @@ cd "$repo_root"
 eval "$(python3 "$repo_root/scripts/ci/build_version.py" --format shell)"
 platform="${1:?platform is required}"
 arch="${2:?arch is required}"
-should_release="${3:-false}"
+package_kind="${3:-}"
+should_release="${4:-false}"
 
 flutter pub get
 
@@ -15,9 +16,22 @@ case "$platform" in
     bash ./scripts/package-linux.sh
     ;;
   macos)
-    bash ./scripts/package-flutter-mac-app.sh
-    mkdir -p dist/macos
-    find dist -maxdepth 1 -name '*.dmg' -exec mv {} dist/macos/ \;
+    case "$package_kind" in
+      dmg)
+        bash ./scripts/package-flutter-mac-app.sh
+        mkdir -p dist/macos
+        find dist -maxdepth 1 -name '*.dmg' -exec mv {} dist/macos/ \;
+        ;;
+      app-store-pkg)
+        bash ./scripts/package-macos-app-store-pkg.sh
+        mkdir -p dist/macos-app-store
+        find dist -maxdepth 1 -name '*.pkg' -exec mv {} dist/macos-app-store/ \;
+        ;;
+      *)
+        echo "Unsupported macOS package kind: $package_kind" >&2
+        exit 1
+        ;;
+    esac
     ;;
   windows)
     flutter build windows --release \
