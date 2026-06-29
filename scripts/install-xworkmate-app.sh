@@ -5,8 +5,12 @@ REPO=${XWORKMATE_INSTALL_REPO:-"x-evor/xworkmate-app"}
 RELEASE_TAG=${XWORKMATE_INSTALL_RELEASE_TAG:-"latest"}
 GITHUB_API=${XWORKMATE_INSTALL_GITHUB_API:-"https://api.github.com"}
 TMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/xworkmate-install.XXXXXX")"
+MOUNT_POINT=""
 
 cleanup() {
+  if [[ -n "$MOUNT_POINT" ]]; then
+    hdiutil detach "$MOUNT_POINT" -quiet >/dev/null 2>&1 || true
+  fi
   rm -rf "$TMP_DIR"
 }
 trap cleanup EXIT
@@ -74,17 +78,16 @@ download_asset() {
 install_macos_dmg() {
   local dmg_url="$1"
   local dmg_path="$TMP_DIR/XWorkmate.dmg"
-  local mount_point="$TMP_DIR/mount"
   local target_app="/Applications/XWorkmate.app"
 
-  mkdir -p "$mount_point"
+  MOUNT_POINT="$TMP_DIR/mount"
+  mkdir -p "$MOUNT_POINT"
   info "Downloading macOS DMG..."
   download_asset "$dmg_url" "$dmg_path"
   info "Mounting DMG..."
-  hdiutil attach "$dmg_path" -mountpoint "$mount_point" -nobrowse -readonly -quiet
-  trap 'hdiutil detach "$mount_point" -quiet >/dev/null 2>&1 || true; cleanup' EXIT
+  hdiutil attach "$dmg_path" -mountpoint "$MOUNT_POINT" -nobrowse -readonly -quiet
 
-  local source_app="$mount_point/XWorkmate.app"
+  local source_app="$MOUNT_POINT/XWorkmate.app"
   [[ -d "$source_app" ]] || die "DMG does not contain XWorkmate.app"
   if [[ -d "$target_app" ]]; then
     info "Replacing existing app at $target_app"
