@@ -34,11 +34,18 @@ Last Updated: 2026-04-22
 - 可选 `BRIDGE_SERVER_URLS`，用于接口脚本同时验证多个 bridge host
 - 可选 `REVIEW_ACCOUNT_BASE_URL`
 
-推荐直接在命令前临时注入：
+凭据从本地 `.env`（已 gitignore）或 secret store 注入，**不要把明文密码/Token 写进文档或命令历史**。先准备 `.env`（参考仓库根目录 `.env.example`），再 `source` 后运行：
 
 ```bash
-REVIEW_ACCOUNT_LOGIN_PASSWORD='***REMOVED-CREDENTIAL***' \
-BRIDGE_AUTH_TOKEN='<bridge token>' \
+set -a; source .env; set +a   # 载入 REVIEW_ACCOUNT_LOGIN_PASSWORD / BRIDGE_AUTH_TOKEN 等
+bash scripts/ci/verify_api_interface_contract.sh
+```
+
+如需单条命令显式注入，使用变量引用而非明文：
+
+```bash
+REVIEW_ACCOUNT_LOGIN_PASSWORD="$REVIEW_ACCOUNT_LOGIN_PASSWORD" \
+BRIDGE_AUTH_TOKEN="$BRIDGE_AUTH_TOKEN" \
 BRIDGE_SERVER_URL='https://xworkmate-bridge.svc.plus' \
 bash scripts/ci/verify_api_interface_contract.sh
 ```
@@ -46,7 +53,7 @@ bash scripts/ci/verify_api_interface_contract.sh
 双入口验证示例：
 
 ```bash
-REVIEW_ACCOUNT_LOGIN_PASSWORD='***REMOVED-CREDENTIAL***' \
+REVIEW_ACCOUNT_LOGIN_PASSWORD="$REVIEW_ACCOUNT_LOGIN_PASSWORD" \
 BRIDGE_SERVER_URLS='https://xworkmate-bridge.svc.plus,https://cn-xworkmate-bridge.svc.plus' \
 bash scripts/ci/verify_api_interface_contract.sh
 ```

@@ -53,7 +53,7 @@ Last Updated: 2026-04-22
 
 - `url`: `https://accounts.svc.plus`
 - `login_name`: `review@svc.plus`
-- `login_password`: `***REMOVED-CREDENTIAL***`
+- `login_password`: 从 `.env` / secret store 注入 `REVIEW_ACCOUNT_LOGIN_PASSWORD`（勿写明文）
 
 ### 2.3 鉴权规则
 
@@ -98,7 +98,7 @@ Last Updated: 2026-04-22
 ```json
 {
   "identifier": "review@svc.plus",
-  "password": "***REMOVED-CREDENTIAL***"
+  "password": "${REVIEW_ACCOUNT_LOGIN_PASSWORD}"
 }
 ```
 
