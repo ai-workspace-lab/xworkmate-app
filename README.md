@@ -51,6 +51,12 @@ flutter build macos
 make build-macos
 ```
 
+For a one-line install from the latest GitHub release:
+
+```bash
+curl -sfL https://install.svc.plus/xworkmate-app | bash -
+```
+
 ## Downloads
 
 | Platform | Download |
