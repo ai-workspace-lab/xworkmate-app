@@ -156,9 +156,12 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@v7
 
-      - name: Load Vault secrets
-        id: vault
-        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+      # Secrets are loaded per-platform so a missing/extra field for one OS
+      # family never fails the matrix legs of the others (vault-action's
+      # ignoreNotFound does NOT suppress field-level "No match data" errors).
+      - name: Load Vault secrets (Apple)
+        id: vault_apple
+        if: ${{ (matrix.platform == 'macos' || matrix.platform == 'ios') && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
         uses: hashicorp/vault-action@v4
         with:
           url: ${{ env.VAULT_ADDR }}
@@ -168,43 +171,67 @@ jobs:
           ignoreNotFound: true
           secrets: |
             kv/data/github-actions/xworkmate-app XWORKMATE_SIGN_IDENTITY | XWORKMATE_SIGN_IDENTITY ;
-            kv/data/github-actions/xworkmate-app WINDOWS_PFX_BASE64 | WINDOWS_PFX_BASE64 ;
-            kv/data/github-actions/xworkmate-app WINDOWS_PFX_PASSWORD | WINDOWS_PFX_PASSWORD ;
-            kv/data/github-actions/xworkmate-app WINDOWS_CODESIGN_SUBJECT | WINDOWS_CODESIGN_SUBJECT ;
             kv/data/github-actions/xworkmate-app APPLE_CERT_P12_BASE64 | APPLE_CERT_P12_BASE64 ;
             kv/data/github-actions/xworkmate-app APPLE_CERT_PASSWORD | APPLE_CERT_PASSWORD ;
             kv/data/github-actions/xworkmate-app APPLE_PROVISION_PROFILE_BASE64 | APPLE_PROVISION_PROFILE_BASE64 ;
             kv/data/github-actions/xworkmate-app APPLE_MAC_PROVISION_PROFILE_BASE64 | APPLE_MAC_PROVISION_PROFILE_BASE64 ;
             kv/data/github-actions/xworkmate-app APPLE_KEYCHAIN_PASSWORD | APPLE_KEYCHAIN_PASSWORD ;
-            kv/data/github-actions/xworkmate-app APPLE_EXPORT_METHOD | APPLE_EXPORT_METHOD ;
-            kv/data/github-actions/xworkmate-app APP_STORE_CONNECT_API_KEY_ID | APP_STORE_CONNECT_API_KEY_ID ;
-            kv/data/github-actions/xworkmate-app APP_STORE_CONNECT_ISSUER_ID | APP_STORE_CONNECT_ISSUER_ID ;
-            kv/data/github-actions/xworkmate-app APP_STORE_CONNECT_API_KEY_P8_BASE64 | APP_STORE_CONNECT_API_KEY_P8_BASE64 ;
+            kv/data/github-actions/xworkmate-app APPLE_EXPORT_METHOD | APPLE_EXPORT_METHOD
+
+      # App Store Connect keys (APP_STORE_CONNECT_*) are intentionally NOT loaded
+      # here: only scripts/ci/testflight_upload.sh consumes them, and that runs in
+      # the release job (which loads them on its own). Keeping them out means the
+      # build matrix never depends on them.
+
+      - name: Load Vault secrets (Windows)
+        id: vault_windows
+        if: ${{ matrix.platform == 'windows' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+        uses: hashicorp/vault-action@v4
+        with:
+          url: ${{ env.VAULT_ADDR }}
+          method: jwt
+          role: github-actions-xworkmate-app
+          jwtGithubAudience: vault
+          ignoreNotFound: true
+          secrets: |
+            kv/data/github-actions/xworkmate-app WINDOWS_PFX_BASE64 | WINDOWS_PFX_BASE64 ;
+            kv/data/github-actions/xworkmate-app WINDOWS_PFX_PASSWORD | WINDOWS_PFX_PASSWORD ;
+            kv/data/github-actions/xworkmate-app WINDOWS_CODESIGN_SUBJECT | WINDOWS_CODESIGN_SUBJECT
+
+      - name: Load Vault secrets (Android)
+        id: vault_android
+        if: ${{ matrix.platform == 'android' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+        uses: hashicorp/vault-action@v4
+        with:
+          url: ${{ env.VAULT_ADDR }}
+          method: jwt
+          role: github-actions-xworkmate-app
+          jwtGithubAudience: vault
+          ignoreNotFound: true
+          secrets: |
             kv/data/github-actions/xworkmate-app ANDROID_KEYSTORE_BASE64 | ANDROID_KEYSTORE_BASE64 ;
             kv/data/github-actions/xworkmate-app ANDROID_KEYSTORE_PASSWORD | ANDROID_KEYSTORE_PASSWORD ;
             kv/data/github-actions/xworkmate-app ANDROID_KEY_ALIAS | ANDROID_KEY_ALIAS ;
             kv/data/github-actions/xworkmate-app ANDROID_KEY_PASSWORD | ANDROID_KEY_PASSWORD
 
       - name: Export signing secrets
+        shell: bash
         run: |
           {
-            echo "XWORKMATE_SIGN_IDENTITY=${{ steps.vault.outputs.XWORKMATE_SIGN_IDENTITY }}"
-            echo "WINDOWS_PFX_BASE64=${{ steps.vault.outputs.WINDOWS_PFX_BASE64 }}"
-            echo "WINDOWS_PFX_PASSWORD=${{ steps.vault.outputs.WINDOWS_PFX_PASSWORD }}"
-            echo "WINDOWS_CODESIGN_SUBJECT=${{ steps.vault.outputs.WINDOWS_CODESIGN_SUBJECT }}"
-            echo "APPLE_CERT_P12_BASE64=${{ steps.vault.outputs.APPLE_CERT_P12_BASE64 }}"
-            echo "APPLE_CERT_PASSWORD=${{ steps.vault.outputs.APPLE_CERT_PASSWORD }}"
-            echo "APPLE_PROVISION_PROFILE_BASE64=${{ steps.vault.outputs.APPLE_PROVISION_PROFILE_BASE64 }}"
-            echo "APPLE_MAC_PROVISION_PROFILE_BASE64=${{ steps.vault.outputs.APPLE_MAC_PROVISION_PROFILE_BASE64 }}"
-            echo "APPLE_KEYCHAIN_PASSWORD=${{ steps.vault.outputs.APPLE_KEYCHAIN_PASSWORD }}"
-            echo "APPLE_EXPORT_METHOD=${{ steps.vault.outputs.APPLE_EXPORT_METHOD }}"
-            echo "APP_STORE_CONNECT_API_KEY_ID=${{ steps.vault.outputs.APP_STORE_CONNECT_API_KEY_ID }}"
-            echo "APP_STORE_CONNECT_ISSUER_ID=${{ steps.vault.outputs.APP_STORE_CONNECT_ISSUER_ID }}"
-            echo "APP_STORE_CONNECT_API_KEY_P8_BASE64=${{ steps.vault.outputs.APP_STORE_CONNECT_API_KEY_P8_BASE64 }}"
-            echo "ANDROID_KEYSTORE_BASE64=${{ steps.vault.outputs.ANDROID_KEYSTORE_BASE64 }}"
-            echo "ANDROID_KEYSTORE_PASSWORD=${{ steps.vault.outputs.ANDROID_KEYSTORE_PASSWORD }}"
-            echo "ANDROID_KEY_ALIAS=${{ steps.vault.outputs.ANDROID_KEY_ALIAS }}"
-            echo "ANDROID_KEY_PASSWORD=${{ steps.vault.outputs.ANDROID_KEY_PASSWORD }}"
+            echo "XWORKMATE_SIGN_IDENTITY=${{ steps.vault_apple.outputs.XWORKMATE_SIGN_IDENTITY }}"
+            echo "APPLE_CERT_P12_BASE64=${{ steps.vault_apple.outputs.APPLE_CERT_P12_BASE64 }}"
+            echo "APPLE_CERT_PASSWORD=${{ steps.vault_apple.outputs.APPLE_CERT_PASSWORD }}"
+            echo "APPLE_PROVISION_PROFILE_BASE64=${{ steps.vault_apple.outputs.APPLE_PROVISION_PROFILE_BASE64 }}"
+            echo "APPLE_MAC_PROVISION_PROFILE_BASE64=${{ steps.vault_apple.outputs.APPLE_MAC_PROVISION_PROFILE_BASE64 }}"
+            echo "APPLE_KEYCHAIN_PASSWORD=${{ steps.vault_apple.outputs.APPLE_KEYCHAIN_PASSWORD }}"
+            echo "APPLE_EXPORT_METHOD=${{ steps.vault_apple.outputs.APPLE_EXPORT_METHOD }}"
+            echo "WINDOWS_PFX_BASE64=${{ steps.vault_windows.outputs.WINDOWS_PFX_BASE64 }}"
+            echo "WINDOWS_PFX_PASSWORD=${{ steps.vault_windows.outputs.WINDOWS_PFX_PASSWORD }}"
+            echo "WINDOWS_CODESIGN_SUBJECT=${{ steps.vault_windows.outputs.WINDOWS_CODESIGN_SUBJECT }}"
+            echo "ANDROID_KEYSTORE_BASE64=${{ steps.vault_android.outputs.ANDROID_KEYSTORE_BASE64 }}"
+            echo "ANDROID_KEYSTORE_PASSWORD=${{ steps.vault_android.outputs.ANDROID_KEYSTORE_PASSWORD }}"
+            echo "ANDROID_KEY_ALIAS=${{ steps.vault_android.outputs.ANDROID_KEY_ALIAS }}"
+            echo "ANDROID_KEY_PASSWORD=${{ steps.vault_android.outputs.ANDROID_KEY_PASSWORD }}"
           } >> "$GITHUB_ENV"
 
       - name: Set up Flutter SDK
