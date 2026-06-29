@@ -157,7 +157,13 @@ BRIDGE_PORT_443_OPEN=yes
       final yaml = controller.exportYaml();
 
       expect(yaml, contains('server_address: 203.0.113.10'));
-      expect(yaml, contains('ssh_password_fixture: "example"'));
+      const sshPasswordKey = 'ssh_password';
+      expect(
+        yaml,
+        contains(
+          '$sshPasswordKey: "${WorkspaceProvisionController.redactedValue}"',
+        ),
+      );
       expect(yaml, contains('extra_configs:'));
       expect(yaml, contains('key: DEEPSEEK_API_KEY'));
       expect(yaml, contains('value: "__redacted__"'));
@@ -407,7 +413,7 @@ ssh_port: 22
 install_path: /opt/xworkspace/playbooks
 show_advanced: true
 logs_expanded: false
-ssh_password_fixture: "example"
+ssh_password: "${WorkspaceProvisionController.redactedValue}"
 extra_configs:
   - key: DEEPSEEK_API_KEY
     value: "deepseek-new"
