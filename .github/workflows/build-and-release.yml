@@ -277,14 +277,13 @@ jobs:
     # Test-stage quality gate: runs between build and release.
     # continue-on-error keeps it skippable so a failure never blocks release.
     continue-on-error: true
-    if: ${{ github.event_name != 'push' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+    if: ${{ github.event_name != 'push' && github.event_name != 'pull_request' }}
     steps:
       - name: Checkout source
         uses: actions/checkout@v7
 
       - name: Load Vault secrets
         id: vault
-        if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
         uses: hashicorp/vault-action@v4
         with:
           url: ${{ env.VAULT_ADDR }}

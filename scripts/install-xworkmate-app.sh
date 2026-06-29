@@ -5,8 +5,12 @@ REPO=${XWORKMATE_INSTALL_REPO:-"x-evor/xworkmate-app"}
 RELEASE_TAG=${XWORKMATE_INSTALL_RELEASE_TAG:-"latest"}
 GITHUB_API=${XWORKMATE_INSTALL_GITHUB_API:-"https://api.github.com"}
 TMP_DIR="$(mktemp -d "${TMPDIR:-/tmp}/xworkmate-install.XXXXXX")"
+MOUNT_POINT=""
 
 cleanup() {
+  if [[ -n "$MOUNT_POINT" ]]; then
+    hdiutil detach "$MOUNT_POINT" -quiet >/dev/null 2>&1 || true
+  fi
   rm -rf "$TMP_DIR"
 }
 trap cleanup EXIT
@@ -26,7 +30,22 @@ release_json_url() {
   fi
 }
 
-pick_asset_url() {
+github_curl() {
+  local accept="$1"
+  shift
+  local token="${GH_TOKEN:-${GITHUB_TOKEN:-}}"
+  local -a headers=(
+    -H "Accept: $accept"
+    -H "X-GitHub-Api-Version: 2022-11-28"
+  )
+
+  if [[ -n "$token" ]]; then
+    headers+=(-H "Authorization: Bearer $token")
+  fi
+  curl "${headers[@]}" "$@"
+}
+
+pick_asset() {
   local metadata_file="$1"
   local pattern="$2"
   python3 - "$metadata_file" "$pattern" <<'PY'
@@ -41,26 +60,34 @@ data = json.loads(metadata_path.read_text(encoding="utf-8"))
 for asset in data.get("assets", []):
     name = asset.get("name", "")
     if pattern.search(name):
-        print(asset.get("browser_download_url", ""))
+        print(f'{asset.get("url", "")}\t{name}')
         raise SystemExit(0)
 raise SystemExit(1)
 PY
 }
 
+download_asset() {
+  local asset_url="$1"
+  local output_path="$2"
+
+  github_curl application/octet-stream \
+    -fL --retry 5 --retry-all-errors --continue-at - \
+    -o "$output_path" "$asset_url"
+}
+
 install_macos_dmg() {
   local dmg_url="$1"
   local dmg_path="$TMP_DIR/XWorkmate.dmg"
-  local mount_point="$TMP_DIR/mount"
   local target_app="/Applications/XWorkmate.app"
 
-  mkdir -p "$mount_point"
+  MOUNT_POINT="$TMP_DIR/mount"
+  mkdir -p "$MOUNT_POINT"
   info "Downloading macOS DMG..."
-  curl -fL --retry 5 --retry-all-errors -o "$dmg_path" "$dmg_url"
+  download_asset "$dmg_url" "$dmg_path"
   info "Mounting DMG..."
-  hdiutil attach "$dmg_path" -mountpoint "$mount_point" -nobrowse -readonly -quiet
-  trap 'hdiutil detach "$mount_point" -quiet >/dev/null 2>&1 || true; cleanup' EXIT
+  hdiutil attach "$dmg_path" -mountpoint "$MOUNT_POINT" -nobrowse -readonly -quiet
 
-  local source_app="$mount_point/XWorkmate.app"
+  local source_app="$MOUNT_POINT/XWorkmate.app"
   [[ -d "$source_app" ]] || die "DMG does not contain XWorkmate.app"
   if [[ -d "$target_app" ]]; then
     info "Replacing existing app at $target_app"
@@ -74,14 +101,15 @@ install_macos_dmg() {
 
 install_linux_pkg() {
   local pkg_url="$1"
+  local pkg_name="$2"
   local pkg_path="$TMP_DIR/package"
 
-  curl -fL --retry 5 --retry-all-errors -o "$pkg_path" "$pkg_url"
+  download_asset "$pkg_url" "$pkg_path"
   need sudo
-  if [[ "$pkg_url" == *.deb ]]; then
+  if [[ "$pkg_name" == *.deb ]]; then
     info "Installing Debian package..."
     sudo dpkg -i "$pkg_path" || sudo apt-get -f install -y
-  elif [[ "$pkg_url" == *.rpm ]]; then
+  elif [[ "$pkg_name" == *.rpm ]]; then
     info "Installing RPM package..."
     if command -v dnf >/dev/null 2>&1; then
       sudo dnf install -y "$pkg_path"
@@ -89,20 +117,23 @@ install_linux_pkg() {
       sudo rpm -Uvh "$pkg_path"
     fi
   else
-    die "Unsupported Linux asset: $pkg_url"
+    die "Unsupported Linux asset: $pkg_name"
   fi
 }
 
 main() {
   local release_json_path="$TMP_DIR/release.json"
   local asset_name_pattern
+  local asset
+  local asset_name
   local asset_url
 
   need curl
   need python3
 
   info "Resolving release for $REPO"
-  curl -fsSL "$(release_json_url)" -o "$release_json_path"
+  github_curl application/vnd.github+json \
+    -fsSL "$(release_json_url)" -o "$release_json_path"
 
   case "$(uname -s)" in
     Darwin)
@@ -126,13 +157,15 @@ main() {
       ;;
   esac
 
-  asset_url="$(pick_asset_url "$release_json_path" "$asset_name_pattern")" ||
+  asset="$(pick_asset "$release_json_path" "$asset_name_pattern")" ||
     die "Could not find a matching release asset"
-  [[ -n "$asset_url" ]] || die "Matching release asset has no download URL"
+  IFS=$'\t' read -r asset_url asset_name <<<"$asset"
+  [[ -n "$asset_url" ]] || die "Matching release asset has no API download URL"
+  [[ -n "$asset_name" ]] || die "Matching release asset has no name"
 
   case "$(uname -s)" in
     Darwin) install_macos_dmg "$asset_url" ;;
-    Linux) install_linux_pkg "$asset_url" ;;
+    Linux) install_linux_pkg "$asset_url" "$asset_name" ;;
   esac
 }
 
