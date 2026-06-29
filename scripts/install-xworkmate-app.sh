@@ -71,7 +71,7 @@ download_asset() {
   local output_path="$2"
 
   github_curl application/octet-stream \
-    -fL --retry 5 --retry-all-errors \
+    -fL --retry 5 --retry-all-errors --continue-at - \
     -o "$output_path" "$asset_url"
 }
 
