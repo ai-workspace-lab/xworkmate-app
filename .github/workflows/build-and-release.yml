@@ -217,6 +217,7 @@ jobs:
             echo "APPLE_CERT_P12_BASE64=${{ steps.vault_apple.outputs.APPLE_CERT_P12_BASE64 }}"
             echo "APPLE_CERT_PASSWORD=${{ steps.vault_apple.outputs.APPLE_CERT_PASSWORD }}"
             echo "APPLE_PROVISION_PROFILE_BASE64=${{ steps.vault_apple.outputs.APPLE_PROVISION_PROFILE_BASE64 }}"
+            echo "APPLE_MAC_PROVISION_PROFILE_BASE64=${{ steps.vault_apple.outputs.APPLE_MAC_PROVISION_PROFILE_BASE64 }}"
             echo "APPLE_KEYCHAIN_PASSWORD=${{ steps.vault_apple.outputs.APPLE_KEYCHAIN_PASSWORD }}"
             echo "APPLE_EXPORT_METHOD=${{ steps.vault_apple.outputs.APPLE_EXPORT_METHOD }}"
             echo "WINDOWS_PFX_BASE64=${{ steps.vault_windows.outputs.WINDOWS_PFX_BASE64 }}"
@@ -347,10 +348,6 @@ jobs:
           jwtGithubAudience: vault
           ignoreNotFound: true
           secrets: |
-            kv/data/github-actions/xworkmate-app APPLE_CERT_P12_BASE64 | APPLE_CERT_P12_BASE64 ;
-            kv/data/github-actions/xworkmate-app APPLE_CERT_PASSWORD | APPLE_CERT_PASSWORD ;
-            kv/data/github-actions/xworkmate-app APPLE_MAC_PROVISION_PROFILE_BASE64 | APPLE_MAC_PROVISION_PROFILE_BASE64 ;
-            kv/data/github-actions/xworkmate-app APPLE_KEYCHAIN_PASSWORD | APPLE_KEYCHAIN_PASSWORD ;
             kv/data/github-actions/xworkmate-app APP_STORE_CONNECT_API_KEY_ID | APP_STORE_CONNECT_API_KEY_ID ;
             kv/data/github-actions/xworkmate-app APP_STORE_CONNECT_ISSUER_ID | APP_STORE_CONNECT_ISSUER_ID ;
             kv/data/github-actions/xworkmate-app APP_STORE_CONNECT_API_KEY_P8_BASE64 | APP_STORE_CONNECT_API_KEY_P8_BASE64
@@ -359,10 +356,6 @@ jobs:
         if: ${{ matrix.target != 'github_release' }}
         run: |
           {
-            echo "APPLE_CERT_P12_BASE64=${{ steps.vault.outputs.APPLE_CERT_P12_BASE64 }}"
-            echo "APPLE_CERT_PASSWORD=${{ steps.vault.outputs.APPLE_CERT_PASSWORD }}"
-            echo "APPLE_MAC_PROVISION_PROFILE_BASE64=${{ steps.vault.outputs.APPLE_MAC_PROVISION_PROFILE_BASE64 }}"
-            echo "APPLE_KEYCHAIN_PASSWORD=${{ steps.vault.outputs.APPLE_KEYCHAIN_PASSWORD }}"
             echo "APP_STORE_CONNECT_API_KEY_ID=${{ steps.vault.outputs.APP_STORE_CONNECT_API_KEY_ID }}"
             echo "APP_STORE_CONNECT_ISSUER_ID=${{ steps.vault.outputs.APP_STORE_CONNECT_ISSUER_ID }}"
             echo "APP_STORE_CONNECT_API_KEY_P8_BASE64=${{ steps.vault.outputs.APP_STORE_CONNECT_API_KEY_P8_BASE64 }}"

@@ -82,3 +82,47 @@ apple_install_provision_profile() {
   export APPLE_SIGNING_PROFILE_PATH="$profile_path"
   apple_register_cleanup "rm -f \"$profile_path\""
 }
+
+apple_install_base64_provision_profile() {
+  local source_var="${1:?base64 source variable is required}"
+  local expected_bundle_id="${2:-}"
+
+  apple_require_signing_vars "$source_var"
+
+  local tmp_dir
+  tmp_dir="$(mktemp -d "${RUNNER_TEMP:-/tmp}/xworkmate-profile.XXXXXX")"
+  local tmp_profile="$tmp_dir/profile.provisionprofile"
+  local profile_plist="$tmp_dir/profile.plist"
+  apple_register_cleanup "rm -rf \"$tmp_dir\""
+
+  printf '%s' "${!source_var}" | apple_decode_base64 > "$tmp_profile"
+  security cms -D -i "$tmp_profile" > "$profile_plist"
+
+  local profile_uuid profile_name profile_team profile_app_id profile_platform
+  profile_uuid="$(/usr/libexec/PlistBuddy -c 'Print :UUID' "$profile_plist")"
+  profile_name="$(/usr/libexec/PlistBuddy -c 'Print :Name' "$profile_plist")"
+  profile_team="$(/usr/libexec/PlistBuddy -c 'Print :TeamIdentifier:0' "$profile_plist")"
+  profile_app_id="$(/usr/libexec/PlistBuddy -c 'Print :Entitlements:com.apple.application-identifier' "$profile_plist")"
+  profile_platform="$(/usr/libexec/PlistBuddy -c 'Print :Platform:0' "$profile_plist")"
+
+  if [[ "$profile_platform" != "OSX" ]]; then
+    echo "Provisioning profile '$profile_name' targets '$profile_platform', expected 'OSX'." >&2
+    return 1
+  fi
+  if [[ -n "$expected_bundle_id" && "$profile_app_id" != "$profile_team.$expected_bundle_id" ]]; then
+    echo "Provisioning profile '$profile_name' has app identifier '$profile_app_id', expected '$profile_team.$expected_bundle_id'." >&2
+    return 1
+  fi
+
+  local profile_dir="$HOME/Library/MobileDevice/Provisioning Profiles"
+  local profile_path="$profile_dir/$profile_uuid.provisionprofile"
+  mkdir -p "$profile_dir"
+  mv "$tmp_profile" "$profile_path"
+
+  export APPLE_SIGNING_PROFILE_PATH="$profile_path"
+  export APPLE_SIGNING_PROFILE_UUID="$profile_uuid"
+  export APPLE_SIGNING_PROFILE_NAME="$profile_name"
+  export APPLE_SIGNING_PROFILE_TEAM="$profile_team"
+  apple_register_cleanup "rm -f \"$profile_path\""
+  echo "Installed macOS provisioning profile: $profile_name ($profile_uuid)"
+}
