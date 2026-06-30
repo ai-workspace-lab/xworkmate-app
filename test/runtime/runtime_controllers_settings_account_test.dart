@@ -1,3 +1,4 @@
+import "../mock_plugins.dart";
 import 'dart:convert';
 import 'dart:io';
 
