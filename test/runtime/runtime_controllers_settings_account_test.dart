@@ -1,3 +1,4 @@
+import "../mock_plugins.dart";
 import 'dart:convert';
 import 'dart:io';
 
@@ -9,6 +10,8 @@ import 'package:xworkmate/runtime/runtime_models.dart';
 import 'package:xworkmate/runtime/secure_config_store.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+  mockPlugins();
   group('SettingsController account sync', () {
     test(
       'prefers managed bridge token over stale profile token for remote gateway auth',
