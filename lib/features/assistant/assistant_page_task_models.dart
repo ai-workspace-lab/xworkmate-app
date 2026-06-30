@@ -10,7 +10,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:markdown/markdown.dart' as md;
 import 'package:path_provider/path_provider.dart';
-import 'package:super_clipboard/super_clipboard.dart';
 import '../../app/app_controller.dart';
 import '../../app/app_metadata.dart';
 import '../../app/ui_feature_manifest.dart';
