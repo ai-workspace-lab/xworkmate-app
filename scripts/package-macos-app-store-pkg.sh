@@ -40,7 +40,10 @@ app_build_commit="${GIT_BUILD_COMMIT:-${BUILD_ID_LINE:-unknown}}"
 
 tmp_dir="$(mktemp -d "${RUNNER_TEMP:-/tmp}/xworkmate-macos-app-store.XXXXXX")"
 cleanup() {
+  local status=$?
   rm -rf "$tmp_dir"
+  apple_run_cleanup
+  return "$status"
 }
 trap cleanup EXIT
 
@@ -80,12 +83,15 @@ xcodebuild archive \
   -scheme Runner \
   -configuration Release \
   -archivePath "$archive_path" \
+  -allowProvisioningUpdates \
+  -allowProvisioningDeviceRegistration \
   DEVELOPMENT_TEAM="N3G9T67W78"
 
 xcodebuild -exportArchive \
   -archivePath "$archive_path" \
   -exportPath "$DIST_DIR" \
-  -exportOptionsPlist "$export_options_path"
+  -exportOptionsPlist "$export_options_path" \
+  -allowProvisioningUpdates
 
 if ! compgen -G "$DIST_DIR/*.pkg" >/dev/null; then
   echo "No macOS TestFlight pkg was produced under $DIST_DIR" >&2
