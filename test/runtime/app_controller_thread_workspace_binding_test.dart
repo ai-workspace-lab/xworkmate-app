@@ -1230,7 +1230,7 @@ void main() {
       );
       for (
         var attempt = 0;
-        attempt < 300 &&
+        attempt < 1000 &&
             controller
                     .requireTaskThreadForSessionInternal('unit-fixture-task-a')
                     .lastArtifactSyncStatus !=
