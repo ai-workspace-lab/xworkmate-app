@@ -46,3 +46,11 @@ for framework_path in "${frameworks_dir}"/*.framework; do
     rm -rf "${dsym_path}" || true
   fi
 done
+
+# Workaround for App Store Connect bug where it expects the DWARF file for App.framework to be named "A"
+# because the binary is located at App.framework/Versions/A/App.
+app_dwarf_dir="${DWARF_DSYM_FOLDER_PATH}/App.framework.dSYM/Contents/Resources/DWARF"
+if [[ -d "${app_dwarf_dir}" && -f "${app_dwarf_dir}/App" && ! -f "${app_dwarf_dir}/A" ]]; then
+  echo "Applying workaround: Copying App DWARF file to A for App Store Connect validation"
+  cp "${app_dwarf_dir}/App" "${app_dwarf_dir}/A"
+fi
