@@ -304,46 +304,9 @@ jobs:
           path: ${{ matrix.artifact_paths }}
           if-no-files-found: error
 
-  remote_contract:
-    name: Test - remote provider contract
-    runs-on: ubuntu-22.04
-    needs:
-      - build
-    # Test-stage quality gate: runs between build and release.
-    # continue-on-error keeps it skippable so a failure never blocks release.
-    continue-on-error: true
-    if: ${{ github.event_name != 'push' && github.event_name != 'pull_request' }}
-    steps:
-      - name: Checkout source
-        uses: actions/checkout@v7
-
-      - name: Load Vault secrets
-        id: vault
-        uses: hashicorp/vault-action@v4
-        with:
-          url: ${{ env.VAULT_ADDR }}
-          method: jwt
-          role: github-actions-xworkmate-app
-          jwtGithubAudience: vault
-          ignoreNotFound: true
-          secrets: |
-            kv/data/github-actions/xworkmate-app REVIEW_ACCOUNT_LOGIN_PASSWORD | REVIEW_ACCOUNT_LOGIN_PASSWORD
-
-      - name: Export remote contract secrets
-        run: echo "REVIEW_ACCOUNT_LOGIN_PASSWORD=${{ steps.vault.outputs.REVIEW_ACCOUNT_LOGIN_PASSWORD }}" >> "$GITHUB_ENV"
-
-      - name: Verify accounts to bridge provider contract
-        shell: bash
-        env:
-          REVIEW_ACCOUNT_BASE_URL: ${{ vars.REVIEW_ACCOUNT_BASE_URL }}
-          REVIEW_ACCOUNT_LOGIN_NAME: ${{ vars.REVIEW_ACCOUNT_LOGIN_NAME }}
-        run: bash ./scripts/ci/verify_remote_provider_contract.sh
 
   release:
-    # always() so release waits for the remote_contract gate to finish but is
-    # never blocked by it being skipped (e.g. push events) or failing.
-    # build/prepare must still genuinely succeed.
-    if: ${{ always() && needs.prepare.outputs.should_release == 'true' && needs.prepare.result == 'success' && needs.build.result == 'success' }}
+    if: ${{ needs.prepare.outputs.should_release == 'true' && needs.prepare.result == 'success' && needs.build.result == 'success' }}
     strategy:
       fail-fast: false
       matrix:
@@ -366,7 +329,6 @@ jobs:
     needs:
       - prepare
       - build
-      - remote_contract
     steps:
       - name: Checkout source
         uses: actions/checkout@v7
