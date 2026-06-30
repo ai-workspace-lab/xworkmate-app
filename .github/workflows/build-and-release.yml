@@ -35,6 +35,10 @@ on:
         description: "Build & upload TestFlight (macOS/iOS App Store) artifacts"
         type: boolean
         default: false
+      enable_github_release:
+        description: "Upload assets to GitHub Release"
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -54,6 +58,7 @@ jobs:
       contents: write
     outputs:
       should_release: ${{ steps.flags.outputs.should_release }}
+      github_release_enabled: ${{ steps.flags.outputs.github_release_enabled }}
       testflight_enabled: ${{ steps.flags.outputs.testflight_enabled }}
       release_tag: ${{ steps.meta.outputs.release_tag }}
       release_title: ${{ steps.meta.outputs.release_title }}
@@ -68,6 +73,7 @@ jobs:
         id: flags
         shell: bash
         env:
+          ENABLE_GITHUB_RELEASE_INPUT: ${{ github.event.inputs.enable_github_release }}
           ENABLE_TESTFLIGHT_INPUT: ${{ github.event.inputs.enable_testflight }}
           ENABLE_TESTFLIGHT_VAR: ${{ vars.ENABLE_TESTFLIGHT }}
         run: |
@@ -75,6 +81,12 @@ jobs:
             echo "should_release=true" >> "$GITHUB_OUTPUT"
           else
             echo "should_release=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          if [[ "${GITHUB_EVENT_NAME:-}" == "workflow_dispatch" && "${ENABLE_GITHUB_RELEASE_INPUT:-}" == "false" ]]; then
+            echo "github_release_enabled=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "github_release_enabled=true" >> "$GITHUB_OUTPUT"
           fi
 
           # TestFlight is opt-in (default OFF). Enabled only when explicitly
