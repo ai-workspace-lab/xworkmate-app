@@ -31,6 +31,10 @@ on:
       - ".github/workflows/build-and-release.yml"
   workflow_dispatch:
     inputs:
+      enable_github_release:
+        description: "Upload assets to GitHub Release"
+        type: boolean
+        default: true
       enable_testflight:
         description: "Build & upload TestFlight (macOS/iOS App Store) artifacts"
         type: boolean
@@ -55,6 +59,7 @@ jobs:
     outputs:
       should_release: ${{ steps.flags.outputs.should_release }}
       testflight_enabled: ${{ steps.flags.outputs.testflight_enabled }}
+      github_release_enabled: ${{ steps.flags.outputs.github_release_enabled }}
       release_tag: ${{ steps.meta.outputs.release_tag }}
       release_title: ${{ steps.meta.outputs.release_title }}
       release_notes: ${{ steps.meta.outputs.release_notes }}
@@ -70,6 +75,7 @@ jobs:
         env:
           ENABLE_TESTFLIGHT_INPUT: ${{ github.event.inputs.enable_testflight }}
           ENABLE_TESTFLIGHT_VAR: ${{ vars.ENABLE_TESTFLIGHT }}
+          ENABLE_GITHUB_RELEASE_INPUT: ${{ github.event.inputs.enable_github_release }}
         run: |
           if [[ "${GITHUB_REF:-}" == refs/tags/v* || "${GITHUB_EVENT_NAME:-}" == "workflow_dispatch" || "${GITHUB_REF:-}" == "refs/heads/main" ]]; then
             echo "should_release=true" >> "$GITHUB_OUTPUT"
@@ -85,6 +91,12 @@ jobs:
             echo "testflight_enabled=true" >> "$GITHUB_OUTPUT"
           else
             echo "testflight_enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          if [[ "${GITHUB_EVENT_NAME:-}" == "workflow_dispatch" && "${ENABLE_GITHUB_RELEASE_INPUT:-}" == "false" ]]; then
+            echo "github_release_enabled=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "github_release_enabled=true" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Compute release metadata
@@ -392,13 +404,13 @@ jobs:
           } >> "$GITHUB_ENV"
 
       - name: Download all artifacts
-        if: ${{ matrix.target == 'github_release' }}
+        if: ${{ matrix.target == 'github_release' && needs.prepare.outputs.github_release_enabled == 'true' }}
         uses: actions/download-artifact@v8
         with:
           path: release-artifacts
 
       - name: Upload assets to GitHub Release
-        if: ${{ matrix.target == 'github_release' }}
+        if: ${{ matrix.target == 'github_release' && needs.prepare.outputs.github_release_enabled == 'true' }}
         shell: bash
         run: bash ./scripts/ci/github_release_upload.sh release-artifacts
         env:
