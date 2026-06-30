@@ -1,9 +1,21 @@
 #!/bin/bash
 set -e
 
-# Extract current version from pubspec.yaml if not provided
-# but here the user requested: version: 1.1.5+2
-TARGET_VERSION="1.1.5+2"
+if [ -n "$1" ]; then
+  TARGET_VERSION="$1"
+else
+  # Extract current version from pubspec.yaml
+  CURRENT_VERSION=$(grep "^version: " pubspec.yaml | awk '{print $2}')
+  
+  if [[ "$CURRENT_VERSION" == *"+"* ]]; then
+    BASE_VERSION=$(echo "$CURRENT_VERSION" | cut -d'+' -f1)
+    BUILD_NUM=$(echo "$CURRENT_VERSION" | cut -d'+' -f2)
+    NEXT_BUILD_NUM=$((BUILD_NUM + 1))
+    TARGET_VERSION="${BASE_VERSION}+${NEXT_BUILD_NUM}"
+  else
+    TARGET_VERSION="${CURRENT_VERSION}+1"
+  fi
+fi
 DATE=$(date +%Y-%m-%d)
 COMMIT=$(git rev-parse --short HEAD)
 
