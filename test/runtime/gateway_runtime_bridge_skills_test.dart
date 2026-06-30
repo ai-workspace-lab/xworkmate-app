@@ -1,3 +1,4 @@
+import "../mock_plugins.dart";
 import 'dart:convert';
 import 'dart:io';
 
@@ -11,6 +12,7 @@ import 'package:xworkmate/runtime/secure_config_store.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  mockPlugins();
   HttpOverrides.global = null;
 
   test(
