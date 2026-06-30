@@ -5,8 +5,7 @@
 list(APPEND FLUTTER_PLUGIN_LIST
   file_selector_linux
   flutter_webrtc
-  irondash_engine_context
-  super_native_extensions
+  pasteboard
 )
 
 list(APPEND FLUTTER_FFI_PLUGIN_LIST
