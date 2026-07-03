@@ -2,6 +2,18 @@
 
 Flutter-based AI workspace shell for running assistant threads with local and remote gateway task execution via ACP bridge.
 
+## Development TL;DR
+
+- `main` is the time axis.
+- `tag` marks a release snapshot.
+- `release/*` is the LTS maintenance line.
+- Short-lived branches only: `feature/*`, `bugfix/*`, `hotfix/*`, `backport/*`, `cherry-pick/*`.
+- `feature/*` and `bugfix/*` land in `main`.
+- `hotfix/*` lands in `release/*`.
+- `backport/*` goes from `main` to `release/*`.
+- `cherry-pick/*` goes from `release/*` to `main`.
+- Secret leaks: revoke first, then rewrite history.
+
 ## Architecture
 
 Single execution path: **Flutter → GoTaskServiceClient → ACP Transport → xworkmate-bridge → Remote Provider**

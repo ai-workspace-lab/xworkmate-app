@@ -72,3 +72,40 @@ Do not mark the change complete if any of these remain true:
 - remote transport silently dropped TLS
 - a new entitlement was added without justification
 - auth or secret handling changed without regression coverage
+
+## 8. Secret Leak Response
+
+If a secret, token, password, certificate, or private key is accidentally
+committed, treat the incident as a security event and follow this order:
+
+1. Revoke the leaked credential immediately.
+2. Generate or rotate a replacement credential.
+3. Review access logs and related audit trails for suspicious use.
+4. Remove the secret from Git history only after the credential is no longer
+   valid.
+
+When history cleanup is required, use `git filter-repo` to remove the secret
+from all reachable history, for example:
+
+```bash
+git filter-repo --path path/to/secret.env --invert-paths
+```
+
+After rewriting history, force-push the cleaned branch and tags to origin:
+
+```bash
+git push origin --force --all
+git push origin --force --tags
+```
+
+- Do not start with history rewriting.
+- Do not rely on commit deletion alone.
+- Assume the leaked secret is exposed until revocation is confirmed.
+
+## 9. Secret Leak Policy
+
+- Sensitive information contamination must be handled by credential revocation
+  plus Git history rewriting.
+- Rewriting history without revoking the leaked secret is incomplete.
+- Revoking the secret without cleaning the history leaves the repository
+  contaminated.
