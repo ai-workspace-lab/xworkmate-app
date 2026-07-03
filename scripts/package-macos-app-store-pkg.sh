@@ -35,8 +35,9 @@ BUILD_DATE_LINE="$(sed -n 's/^build-date:[[:space:]]*//p' "$ROOT_DIR/pubspec.yam
 BUILD_ID_LINE="$(sed -n 's/^build-id:[[:space:]]*//p' "$ROOT_DIR/pubspec.yaml" | head -n 1)"
 GIT_BUILD_DATE="$(cd "$ROOT_DIR" && git show -s --format=%cs HEAD 2>/dev/null || true)"
 GIT_BUILD_COMMIT="$(cd "$ROOT_DIR" && git rev-parse --short HEAD 2>/dev/null || true)"
+BUILD_COMMIT="${BUILD_COMMIT:-${GIT_BUILD_COMMIT:-${BUILD_ID_LINE:-unknown}}}"
 app_build_date="${GIT_BUILD_DATE:-${BUILD_DATE_LINE:-unknown}}"
-app_build_commit="${GIT_BUILD_COMMIT:-${BUILD_ID_LINE:-unknown}}"
+app_build_commit="$BUILD_COMMIT"
 
 tmp_dir="$(mktemp -d "${RUNNER_TEMP:-/tmp}/xworkmate-macos-app-store.XXXXXX")"
 cleanup() {

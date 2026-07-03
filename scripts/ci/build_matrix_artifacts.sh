@@ -8,6 +8,7 @@ platform="${1:?platform is required}"
 arch="${2:?arch is required}"
 package_kind="${3:-}"
 should_release="${4:-false}"
+export BUILD_COMMIT="${BUILD_COMMIT:-${GITHUB_SHA:-$(git rev-parse --short HEAD 2>/dev/null || true)}}"
 
 flutter pub get
 
