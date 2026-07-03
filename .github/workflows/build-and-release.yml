@@ -73,9 +73,9 @@ jobs:
         id: flags
         shell: bash
         env:
+          ENABLE_GITHUB_RELEASE_INPUT: ${{ github.event.inputs.enable_github_release }}
           ENABLE_TESTFLIGHT_INPUT: ${{ github.event.inputs.enable_testflight }}
           ENABLE_TESTFLIGHT_VAR: ${{ vars.ENABLE_TESTFLIGHT }}
-          ENABLE_GITHUB_RELEASE_INPUT: ${{ github.event.inputs.enable_github_release }}
         run: |
           if [[ "${GITHUB_REF:-}" == refs/tags/v* || "${GITHUB_EVENT_NAME:-}" == "workflow_dispatch" || "${GITHUB_REF:-}" == "refs/heads/main" ]]; then
             echo "should_release=true" >> "$GITHUB_OUTPUT"

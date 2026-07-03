@@ -4,7 +4,7 @@ publish_to: 'none'
 
 version: 1.1.5+2
 build-date: 2026-06-30
-build-id: 402da5f
+build-id: a876e3b0
 
 environment:
   sdk: ^3.11.0
