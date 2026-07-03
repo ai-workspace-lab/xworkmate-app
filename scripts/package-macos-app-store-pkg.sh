@@ -48,14 +48,20 @@ cleanup() {
 trap cleanup EXIT
 
 apple_setup_signing_keychain
-apple_install_base64_provision_profile \
-  APPLE_MAC_PROVISION_PROFILE_BASE64 \
-  plus.svc.xworkmate
 
-if [[ "$APPLE_SIGNING_PROFILE_TEAM" != "N3G9T67W78" ]]; then
-  echo "Provisioning profile team '$APPLE_SIGNING_PROFILE_TEAM' does not match expected team 'N3G9T67W78'." >&2
-  exit 1
-fi
+apple_decode_base64() {
+  if base64 --help 2>&1 | grep -q -- '--decode'; then
+    base64 --decode
+  else
+    base64 -D
+  fi
+}
+
+profile_dir="$HOME/Library/MobileDevice/Provisioning Profiles"
+profile_path="$profile_dir/xworkmate-macos.mobileprovision"
+mkdir -p "$profile_dir"
+printf '%s' "$APPLE_MAC_PROVISION_PROFILE_BASE64" | apple_decode_base64 > "$profile_path"
+apple_register_cleanup "rm -f \"$profile_path\""
 
 mkdir -p "$DIST_DIR"
 archive_path="$tmp_dir/$APP_NAME.xcarchive"

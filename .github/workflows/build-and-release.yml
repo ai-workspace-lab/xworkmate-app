@@ -56,13 +56,14 @@ jobs:
       - verify
     permissions:
       contents: write
-    outputs:
-      should_release: ${{ steps.flags.outputs.should_release }}
-      testflight_enabled: ${{ steps.flags.outputs.testflight_enabled }}
-      github_release_enabled: ${{ steps.flags.outputs.github_release_enabled }}
+    outputs:    
       release_tag: ${{ steps.meta.outputs.release_tag }}
       release_title: ${{ steps.meta.outputs.release_title }}
       release_notes: ${{ steps.meta.outputs.release_notes }}
+      should_release: ${{ steps.flags.outputs.should_release }}
+      testflight_enabled: ${{ steps.flags.outputs.testflight_enabled }}
+      github_release_enabled: ${{ steps.flags.outputs.github_release_enabled }}    
+
     steps:
       - name: Checkout source
         uses: actions/checkout@v7
