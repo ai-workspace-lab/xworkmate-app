@@ -7,6 +7,7 @@ PNPM ?= pnpm
 DART ?= dart
 DEVICE ?= macos
 APP_STORE_DART_DEFINE ?= --dart-define=XWORKMATE_APP_STORE=true
+BUILD_COMMIT ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
 PUBSPEC_VERSION_LINE := $(shell sed -n 's/^version:[[:space:]]*//p' pubspec.yaml | head -n 1)
 PUBSPEC_BUILD_DATE := $(shell sed -n 's/^build-date:[[:space:]]*//p' pubspec.yaml | head -n 1)
 PUBSPEC_BUILD_ID := $(shell sed -n 's/^build-id:[[:space:]]*//p' pubspec.yaml | head -n 1)
@@ -83,6 +84,7 @@ docs-public-api: ## Generate the public API inventory docs payload
 	python3 scripts/docs/extract_public_api_inventory.py
 
 sync-version: ## Sync Flutter/Xcode build metadata from pubspec.yaml
+	BUILD_COMMIT=$(BUILD_COMMIT) bash scripts/sync-version.sh --version $(PUBSPEC_VERSION_LINE) --commit $(BUILD_COMMIT)
 	$(FLUTTER) build macos --config-only --build-name=$(APP_VERSION) --build-number=$(APP_BUILD_NUMBER) $(APP_DART_DEFINE_VERSION) $(APP_DART_DEFINE_BUILD) $(APP_DART_DEFINE_BUILD_DATE) $(APP_DART_DEFINE_BUILD_COMMIT)
 	@echo "version=$(APP_VERSION)"
 	@echo "build=$(APP_BUILD_NUMBER)"
