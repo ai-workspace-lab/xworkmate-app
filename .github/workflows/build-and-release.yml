@@ -31,14 +31,14 @@ on:
       - ".github/workflows/build-and-release.yml"
   workflow_dispatch:
     inputs:
-      enable_testflight:
-        description: "Build & upload TestFlight (macOS/iOS App Store) artifacts"
-        type: boolean
-        default: false
       enable_github_release:
         description: "Upload assets to GitHub Release"
         type: boolean
         default: true
+      enable_testflight:
+        description: "Build & upload TestFlight (macOS/iOS App Store) artifacts"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -56,13 +56,14 @@ jobs:
       - verify
     permissions:
       contents: write
-    outputs:
-      should_release: ${{ steps.flags.outputs.should_release }}
-      github_release_enabled: ${{ steps.flags.outputs.github_release_enabled }}
-      testflight_enabled: ${{ steps.flags.outputs.testflight_enabled }}
+    outputs:    
       release_tag: ${{ steps.meta.outputs.release_tag }}
       release_title: ${{ steps.meta.outputs.release_title }}
       release_notes: ${{ steps.meta.outputs.release_notes }}
+      should_release: ${{ steps.flags.outputs.should_release }}
+      testflight_enabled: ${{ steps.flags.outputs.testflight_enabled }}
+      github_release_enabled: ${{ steps.flags.outputs.github_release_enabled }}    
+
     steps:
       - name: Checkout source
         uses: actions/checkout@v7
@@ -83,12 +84,6 @@ jobs:
             echo "should_release=false" >> "$GITHUB_OUTPUT"
           fi
 
-          if [[ "${GITHUB_EVENT_NAME:-}" == "workflow_dispatch" && "${ENABLE_GITHUB_RELEASE_INPUT:-}" == "false" ]]; then
-            echo "github_release_enabled=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "github_release_enabled=true" >> "$GITHUB_OUTPUT"
-          fi
-
           # TestFlight is opt-in (default OFF). Enabled only when explicitly
           # requested via the workflow_dispatch input or the ENABLE_TESTFLIGHT
           # repo/org variable. Keeps missing Apple signing secrets from failing
@@ -97,6 +92,12 @@ jobs:
             echo "testflight_enabled=true" >> "$GITHUB_OUTPUT"
           else
             echo "testflight_enabled=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          if [[ "${GITHUB_EVENT_NAME:-}" == "workflow_dispatch" && "${ENABLE_GITHUB_RELEASE_INPUT:-}" == "false" ]]; then
+            echo "github_release_enabled=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "github_release_enabled=true" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Compute release metadata
@@ -252,6 +253,7 @@ jobs:
             echo "APPLE_CERT_P12_BASE64=${{ steps.vault_apple.outputs.APPLE_CERT_P12_BASE64 }}"
             echo "APPLE_CERT_PASSWORD=${{ steps.vault_apple.outputs.APPLE_CERT_PASSWORD }}"
             echo "APPLE_PROVISION_PROFILE_BASE64=${{ steps.vault_apple.outputs.APPLE_PROVISION_PROFILE_BASE64 }}"
+            echo "APPLE_MAC_PROVISION_PROFILE_BASE64=${{ steps.vault_apple.outputs.APPLE_MAC_PROVISION_PROFILE_BASE64 }}"
             echo "APPLE_KEYCHAIN_PASSWORD=${{ steps.vault_apple.outputs.APPLE_KEYCHAIN_PASSWORD }}"
             echo "APPLE_EXPORT_METHOD=${{ steps.vault_apple.outputs.APPLE_EXPORT_METHOD }}"
             echo "WINDOWS_PFX_BASE64=${{ steps.vault_windows.outputs.WINDOWS_PFX_BASE64 }}"
@@ -344,10 +346,6 @@ jobs:
           jwtGithubAudience: vault
           ignoreNotFound: true
           secrets: |
-            kv/data/github-actions/xworkmate-app APPLE_CERT_P12_BASE64 | APPLE_CERT_P12_BASE64 ;
-            kv/data/github-actions/xworkmate-app APPLE_CERT_PASSWORD | APPLE_CERT_PASSWORD ;
-            kv/data/github-actions/xworkmate-app APPLE_MAC_PROVISION_PROFILE_BASE64 | APPLE_MAC_PROVISION_PROFILE_BASE64 ;
-            kv/data/github-actions/xworkmate-app APPLE_KEYCHAIN_PASSWORD | APPLE_KEYCHAIN_PASSWORD ;
             kv/data/github-actions/xworkmate-app APP_STORE_CONNECT_API_KEY_ID | APP_STORE_CONNECT_API_KEY_ID ;
             kv/data/github-actions/xworkmate-app APP_STORE_CONNECT_ISSUER_ID | APP_STORE_CONNECT_ISSUER_ID ;
             kv/data/github-actions/xworkmate-app APP_STORE_CONNECT_API_KEY_P8_BASE64 | APP_STORE_CONNECT_API_KEY_P8_BASE64
@@ -356,23 +354,19 @@ jobs:
         if: ${{ matrix.target != 'github_release' && needs.prepare.outputs.testflight_enabled == 'true' }}
         run: |
           {
-            echo "APPLE_CERT_P12_BASE64=${{ steps.vault.outputs.APPLE_CERT_P12_BASE64 }}"
-            echo "APPLE_CERT_PASSWORD=${{ steps.vault.outputs.APPLE_CERT_PASSWORD }}"
-            echo "APPLE_MAC_PROVISION_PROFILE_BASE64=${{ steps.vault.outputs.APPLE_MAC_PROVISION_PROFILE_BASE64 }}"
-            echo "APPLE_KEYCHAIN_PASSWORD=${{ steps.vault.outputs.APPLE_KEYCHAIN_PASSWORD }}"
             echo "APP_STORE_CONNECT_API_KEY_ID=${{ steps.vault.outputs.APP_STORE_CONNECT_API_KEY_ID }}"
             echo "APP_STORE_CONNECT_ISSUER_ID=${{ steps.vault.outputs.APP_STORE_CONNECT_ISSUER_ID }}"
             echo "APP_STORE_CONNECT_API_KEY_P8_BASE64=${{ steps.vault.outputs.APP_STORE_CONNECT_API_KEY_P8_BASE64 }}"
           } >> "$GITHUB_ENV"
 
       - name: Download all artifacts
-        if: ${{ matrix.target == 'github_release' }}
+        if: ${{ matrix.target == 'github_release' && needs.prepare.outputs.github_release_enabled == 'true' }}
         uses: actions/download-artifact@v8
         with:
           path: release-artifacts
 
       - name: Upload assets to GitHub Release
-        if: ${{ matrix.target == 'github_release' }}
+        if: ${{ matrix.target == 'github_release' && needs.prepare.outputs.github_release_enabled == 'true' }}
         shell: bash
         run: bash ./scripts/ci/github_release_upload.sh release-artifacts
         env:
