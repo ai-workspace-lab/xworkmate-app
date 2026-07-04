@@ -105,6 +105,7 @@
 - **M2**：插件启用状态持久化；文档/表格插件端到端打通（依赖 xworkspace-core-skills 的 docx/pdf/xlsx 技能包）；产物在 artifact 边栏归类展示。
 - **M3**：PPT 流水线打通（image-svg-pptx-pro-skill + xiaobei-skill-image-to-vba，失败降级）；图片批量生成与网格预览；mobile/web 开放入口。
 - **M4**：视频流水线（hyperframe / it-infra-evolution-video-v2 集成，预设模板 + 字幕口播 + BGM 覆盖）；插件市场化（第三方插件清单、安装管理）；flag 切 stable。
+- **M5（架构演进，规划中）**：插件模型从「一段提示词模板」升级为「轻量级 workflow 状态机」，插件与 App 主机解耦、可独立升级；接入 Hermes/OpenClaw 侧的重复任务自动总结能力，沉淀新 skill / 新 workflow 状态机插件。详见 §8，本批次不落地。
 
 ## 6. 风险与对策
 
@@ -118,3 +119,18 @@
 - `test/runtime/builtin_plugin_catalog_test.dart`：目录完整性（5 个插件、id 唯一、PPT/视频依赖技能包正确、模板非空）。
 - `test/runtime/ui_feature_manifest_plugins_tab_test.dart`：desktop debug 暴露 plugins tab、release 隐藏、mobile 不暴露；`sanitizeSettingsTab` 回退正确。
 - 手动回归：设置页 tab 切换不影响既有面板；composer 顶部按钮行溢出滚动正常。
+
+## 8. 架构演进方向（M5+，规划中，本文档仅记录方向，不在本批次落地）
+
+2026-07-04 讨论确认：当前 M1-M4 的插件模型是「结构化提示词模板」——`BuiltinPluginDescriptor` 本质是一段随任务下发的静态 prompt，且作为 `BuiltinPluginCatalog.firstBatch` 编译进 Flutter 二进制。后续方向：
+
+1. **数据模型：提示词模板 → 轻量级 workflow 状态机**
+   插件不再是一段 prompt，而是有显式状态（states）、转移条件（transitions）、每步产物与失败/重试语义的状态机描述（类似 §3 里各插件流水线图示的形式化版本）。执行端按状态机逐步推进，而不是把整段流程塞进一次性提示词里，从而支持单步重试、断点续跑、进度可视化。
+
+2. **插件与 App 主机解耦，独立升级**
+   插件定义（状态机描述 + 依赖技能包清单）从「编译进 App 的静态 Dart 列表」变为「运行时从 Gateway/Bridge 或插件仓库拉取的外部清单」，版本与 App 发布节奏脱钩，可单独发布/回滚某个插件而不需要发新版 App。需要设计插件清单格式、拉取/缓存/校验机制，以及与现有 `BuiltinPluginCatalog` 的兼容/迁移路径。
+
+3. **重复任务自动总结生成新插件（对齐 Hermes/OpenClaw 记忆机制）**
+   借鉴 AI workspace 中 Hermes Agent 对重复任务的自动总结能力（[[x-memory-hub-v1-plan]] 相关基础设施），当同类对话任务反复出现相近的结构化流程时，由总结机制沉淀为新的 skill 或新的 workflow 状态机插件，反哺插件目录。这一环依赖 X Memory Hub / openclaw-workspace 侧已有的记忆与总结能力，超出 xworkmate-app 本仓库范围，需要跨仓库协同设计。
+
+**风险**：以上三项是相对独立的架构决策，工作量与影响面均显著大于 M1-M4 的 UI 脚手架，需要单独立项、分阶段设计评审后再排入具体里程碑，不能作为一次性「微调」交付。
