@@ -143,6 +143,20 @@
 1. **数据模型：提示词模板 → 轻量级 workflow 状态机**
    插件不再是一段 prompt，而是有显式状态（states）、转移条件（transitions）、每步产物与失败/重试语义的状态机描述（类似 §3 里各插件流水线图示的形式化版本）。执行端按状态机逐步推进，而不是把整段流程塞进一次性提示词里，从而支持单步重试、断点续跑、进度可视化。
 
+   **重构批次 1（2026-07-04 已落地）**：新增 `builtin_plugin_workflow.dart`——
+   `BuiltinPluginWorkflowStep`（id、双语标题/指令、每步 `outputFormats` /
+   `requiredSkills`、`retryable`、失败降级 `fallbackZh/En`）+
+   `BuiltinPluginWorkflow`（goal + 线性 steps + inputPrompt，JSON 序列化
+   `schemaVersion: 1`）。5 个插件全部迁移为 workflow 定义，descriptor 的
+   `composerTemplate` / `outputFormats` / `requiredSkills` / `pipelineStepsZh`
+   改为从 workflow 派生（单一事实来源），对外 API 不变、UI 零改动。批次 1
+   限定线性推进 + 单步降级；非线性转移（分支/汇合/显式 guard）与执行端逐步
+   推进（重试/断点/进度）放后续批次。JSON 序列化即 §8.2 外部清单的地基。
+   **重构批次 2（待做）**：插件清单外部化——workflow JSON 从 Gateway/Bridge
+   或插件仓库运行时拉取（拉取/缓存/校验 + 与内置目录的合并回退）。
+   **重构批次 3（待做）**：执行端按状态机逐步推进：单步重试、断点续跑、
+   任务面板进度可视化。
+
 2. **插件与 App 主机解耦，独立升级**
    插件定义（状态机描述 + 依赖技能包清单）从「编译进 App 的静态 Dart 列表」变为「运行时从 Gateway/Bridge 或插件仓库拉取的外部清单」，版本与 App 发布节奏脱钩，可单独发布/回滚某个插件而不需要发新版 App。需要设计插件清单格式、拉取/缓存/校验机制，以及与现有 `BuiltinPluginCatalog` 的兼容/迁移路径。
 
