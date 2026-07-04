@@ -146,7 +146,17 @@
 2. **插件与 App 主机解耦，独立升级**
    插件定义（状态机描述 + 依赖技能包清单）从「编译进 App 的静态 Dart 列表」变为「运行时从 Gateway/Bridge 或插件仓库拉取的外部清单」，版本与 App 发布节奏脱钩，可单独发布/回滚某个插件而不需要发新版 App。需要设计插件清单格式、拉取/缓存/校验机制，以及与现有 `BuiltinPluginCatalog` 的兼容/迁移路径。
 
-3. **重复任务自动总结生成新插件（对齐 Hermes/OpenClaw 记忆机制）**
-   借鉴 AI workspace 中 Hermes Agent 对重复任务的自动总结能力（[[x-memory-hub-v1-plan]] 相关基础设施），当同类对话任务反复出现相近的结构化流程时，由总结机制沉淀为新的 skill 或新的 workflow 状态机插件，反哺插件目录。这一环依赖 X Memory Hub / openclaw-workspace 侧已有的记忆与总结能力，超出 xworkmate-app 本仓库范围，需要跨仓库协同设计。
+3. **重复任务自动总结生成新插件（直接复用对接 AI workspace 已有基础设施）**
 
-**风险**：以上三项是相对独立的架构决策，工作量与影响面均显著大于 M1-M4 的 UI 脚手架，需要单独立项、分阶段设计评审后再排入具体里程碑，不能作为一次性「微调」交付。
+   不自研记忆与总结能力，直接复用对接四块已有组件，形成「采集 → 识别 → 沉淀 → 分发」闭环：
+
+   | 环节 | 复用组件 | 对接方式 |
+   | ---- | -------- | -------- |
+   | 记忆采集 | **Hermes MemoryProvider 插件接口**（上游 hermes-agent `agent/memory_provider.py`：可插拔外部记忆后端，`plugins/memory/<name>/` + `memory.provider` 配置激活；每轮对话后 `sync_turn` 异步写入、每轮前 `prefetch` 召回） | 把 qmd / X-Memory-Hub 封装成一个 MemoryProvider 插件（上游限制同时只挂一个外部 provider），插件任务的每轮摘要（sessionKey、插件 id、流程、产物、成败）随 `sync_turn` 自动入库，无需额外埋点 |
+   | 中心记忆存储 | **X-Memory-Hub 中心记忆系统**（Fastify + PG17：pgvector + pg_jieba + pg_trgm，端口 8790，已并入 all-in-one 部署 `roles/vhosts/x_memory_hub`）+ **qmd PostgreSQL memory bridge**（`QMD_BACKEND=pg`，MCP 工具 `memory_add/search/get/list`，pg_jieba 词法 + pgvector 向量 RRF 混合检索） | Gateway 侧 agent 经 qmd MCP 工具读写、Hermes 经 provider 插件读写，同一 PG 库；认证沿用统一 `AI_WORKSPACE_AUTH_TOKEN` 链路，xworkmate-app 内不新增记忆客户端 |
+   | 重复模式识别与总结 | **Hermes Agent 内置 learning loop**（上游 `agent/turn_finalizer.py`：`skill_manage` 工具 + `_skill_nudge_interval` 阈值在响应送达后触发后台 skill review，自主创建/改进 skill；skill 格式兼容 agentskills.io 开放标准） | 直接复用该 loop——插件任务的轮次记忆积累到阈值即触发后台 review，从重复流程中沉淀候选 skill 或 workflow 状态机插件描述，不与用户任务争抢模型算力 |
+   | 沉淀与分发 | **OpenClaw gateway 能力**（技能包加载：openclaw-workspace / xworkspace-core-skills；任务工作区与 TaskThread workspace context） | Hermes 产出的新技能包进入 gateway 工作区（与现有 skill picker 同一加载机制，agentskills.io 兼容格式可直接落盘），或落为插件清单条目经 §8.2 的解耦目录分发到 App；新插件执行时又产生新记忆，闭环迭代 |
+
+   xworkmate-app 侧只需两件事：a) 插件任务完成事件带上可供采集的结构化摘要（本仓库范围内）；b) 解耦后的插件目录能消费 Hermes 沉淀出的新插件条目（依赖 §8.2）。记忆存储、检索、总结全部在 X-Memory-Hub / qmd / Hermes / OpenClaw gateway 侧完成。跨仓库需要新建的唯一组件是「qmd/X-Memory-Hub 的 Hermes MemoryProvider 插件」；上游 hermes-agent 代码仅作参考对接，不修改（本地路径 `~/workspaces/ai-workspace-lab/hermes-agent`）。相关基础设施状态见 [[x-memory-hub-v1-plan]] 与 [[qmd-pg-memory-bridge]]。
+
+**风险**：以上三项是相对独立的架构决策，工作量与影响面均显著大于 M1-M4 的 UI 脚手架，需要单独立项、分阶段设计评审后再排入具体里程碑，不能作为一次性「微调」交付。其中第 3 项虽然全部复用已有组件，但仍属跨仓库协同（xworkmate-app / X-Memory-Hub / qmd / openclaw-workspace / playbooks），且依赖 §8.2 插件目录解耦先行落地；X-Memory-Hub 侧尚有已知待办（NVIDIA embedding key 过期导致向量回填暂停，词法检索不受影响），设计评审时需确认记忆检索仅靠 pg_jieba 词法是否满足聚类精度。
