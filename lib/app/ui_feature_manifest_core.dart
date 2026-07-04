@@ -44,10 +44,12 @@ abstract final class UiFeatureKeys {
   static const assistantFileAttachments = 'assistant.file_attachments';
   static const assistantMultiAgent = 'assistant.multi_agent';
   static const assistantLocalRuntime = 'assistant.local_runtime';
+  static const assistantBuiltinPlugins = 'assistant.builtin_plugins';
 
   static const settingsGateway = 'settings.gateway';
   static const settingsArchivedTasks = 'settings.archived_tasks';
   static const settingsRemoteDesktop = 'settings.remote_desktop';
+  static const settingsPlugins = 'settings.plugins';
   static const settingsLogs = 'settings.logs';
   static const settingsHelp = 'settings.help';
   static const settingsAccountAccess = 'settings.account_access';
@@ -370,6 +372,7 @@ class UiFeatureAccess {
         UiFeatureKeys.settingsGateway: SettingsTab.gateway,
         UiFeatureKeys.settingsArchivedTasks: SettingsTab.archivedTasks,
         UiFeatureKeys.settingsRemoteDesktop: SettingsTab.remoteDesktop,
+        UiFeatureKeys.settingsPlugins: SettingsTab.plugins,
         UiFeatureKeys.settingsLogs: SettingsTab.logs,
         UiFeatureKeys.settingsHelp: SettingsTab.help,
       };
@@ -420,6 +423,9 @@ class UiFeatureAccess {
 
   bool get supportsMultiAgent =>
       isEnabledPath(UiFeatureKeys.assistantMultiAgent);
+
+  bool get supportsBuiltinPlugins =>
+      isEnabledPath(UiFeatureKeys.assistantBuiltinPlugins);
 
   bool get supportsDesktopRuntime =>
       platform == UiFeaturePlatform.desktop &&
