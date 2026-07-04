@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../i18n/app_language.dart';
 import '../../theme/app_palette.dart';
 import '../plugins/builtin_plugin_catalog.dart';
+import '../plugins/builtin_plugin_visuals.dart';
 
 /// Settings panel listing the first batch of built-in plugins.
 ///
@@ -99,7 +100,7 @@ class _BuiltinPluginCard extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(plugin.icon, color: palette.accent, size: 24),
+                BuiltinPluginIconTile(plugin: plugin, size: 32),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
@@ -114,6 +115,7 @@ class _BuiltinPluginCard extends StatelessWidget {
                               overflow: TextOverflow.ellipsis,
                               style: theme.textTheme.titleMedium?.copyWith(
                                 fontWeight: FontWeight.w700,
+                                color: builtinPluginBrandColor(plugin.kind),
                               ),
                             ),
                           ),
