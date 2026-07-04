@@ -32,6 +32,7 @@ import 'assistant_page_task_models.dart';
 import 'assistant_page_composer_skill_picker.dart';
 import 'assistant_page_composer_clipboard.dart';
 import '../plugins/builtin_plugin_catalog.dart';
+import '../plugins/builtin_plugin_visuals.dart';
 import 'assistant_page_components_core.dart';
 import 'assistant_page_task_dialog_controls.dart';
 
@@ -112,6 +113,11 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
   late final FocusNode skillPickerSearchFocusNodeInternal;
   bool handlingPasteShortcutInternal = false;
   String skillPickerQueryInternal = '';
+
+  /// Built-in plugins picked for the next send. Selecting a plugin adds a
+  /// chip instead of pasting its template; the templates are injected into
+  /// the prompt right before dispatch (see [handleSendInternal]).
+  final List<String> selectedBuiltinPluginIdsInternal = <String>[];
 
   @override
   void initState() {
@@ -307,6 +313,47 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
     );
   }
 
+  void toggleBuiltinPluginInternal(String pluginId) {
+    setState(() {
+      if (!selectedBuiltinPluginIdsInternal.remove(pluginId)) {
+        selectedBuiltinPluginIdsInternal.add(pluginId);
+      }
+    });
+    widget.focusNode.requestFocus();
+  }
+
+  /// Injects the selected plugins' templates ahead of the typed prompt and
+  /// clears the chips, so the dispatched task carries the workflow template
+  /// while the input box stays clean during editing.
+  void applySelectedBuiltinPluginsToInputInternal() {
+    if (selectedBuiltinPluginIdsInternal.isEmpty) {
+      return;
+    }
+    final templates = selectedBuiltinPluginIdsInternal
+        .map(BuiltinPluginCatalog.byId)
+        .whereType<BuiltinPluginDescriptor>()
+        .map((plugin) => plugin.composerTemplate)
+        .toList(growable: false);
+    setState(selectedBuiltinPluginIdsInternal.clear);
+    if (templates.isEmpty) {
+      return;
+    }
+    final typed = widget.inputController.text.trim();
+    final combined = typed.isEmpty
+        ? templates.join('\n\n')
+        : '${templates.join('\n\n')}\n$typed';
+    widget.inputController.value = TextEditingValue(
+      text: combined,
+      selection: TextSelection.collapsed(offset: combined.length),
+      composing: TextRange.empty,
+    );
+  }
+
+  Future<void> handleSendInternal() async {
+    applySelectedBuiltinPluginsToInputInternal();
+    await widget.onSend();
+  }
+
   void resetSkillPickerSearchInternal() {
     skillPickerSearchControllerInternal.clear();
     skillPickerQueryInternal = '';
@@ -376,30 +423,61 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
                   key: const Key('assistant-builtin-plugin-menu-button'),
                   tooltip: appText('内置插件', 'Built-in plugins'),
                   offset: const Offset(0, 48),
-                  onSelected: (pluginId) {
-                    final plugin = BuiltinPluginCatalog.byId(pluginId);
-                    if (plugin == null) {
-                      return;
-                    }
-                    insertTextAtSelectionInternal(plugin.composerTemplate);
-                    widget.focusNode.requestFocus();
-                  },
+                  constraints: const BoxConstraints(
+                    minWidth: 320,
+                    maxWidth: 420,
+                  ),
+                  onSelected: toggleBuiltinPluginInternal,
                   itemBuilder: (context) => [
+                    PopupMenuItem<String>(
+                      enabled: false,
+                      height: 30,
+                      child: Text(
+                        appText('插件', 'Plugins'),
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                              color: palette.textMuted,
+                              fontWeight: FontWeight.w600,
+                            ),
+                      ),
+                    ),
                     for (final plugin in BuiltinPluginCatalog.firstBatch)
                       PopupMenuItem<String>(
                         key: Key(
                           'assistant-builtin-plugin-item-${plugin.id}',
                         ),
                         value: plugin.id,
-                        child: ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          leading: Icon(plugin.icon),
-                          title: Text(plugin.name),
-                          subtitle: Text(
-                            plugin.formatSummary,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                        child: Row(
+                          children: [
+                            BuiltinPluginIconTile(plugin: plugin),
+                            const SizedBox(width: 10),
+                            Text(
+                              plugin.name,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                plugin.description,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.copyWith(color: palette.textMuted),
+                              ),
+                            ),
+                            if (selectedBuiltinPluginIdsInternal
+                                .contains(plugin.id)) ...[
+                              const SizedBox(width: 6),
+                              Icon(
+                                Icons.check_rounded,
+                                size: 16,
+                                color: palette.accent,
+                              ),
+                            ],
+                          ],
                         ),
                       ),
                   ],
@@ -515,7 +593,7 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
                       'Describe the task or add context. XWorkmate keeps the current task context.',
                     ),
                   ),
-                  onSubmitted: (_) => widget.onSend(),
+                  onSubmitted: (_) => handleSendInternal(),
                 ),
               ),
             ),
@@ -524,22 +602,33 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
             key: const Key('assistant-composer-resize-handle'),
             onDelta: resizeInputInternal,
           ),
-          if (selectedSkills.isNotEmpty) ...[
+          if (selectedSkills.isNotEmpty ||
+              selectedBuiltinPluginIdsInternal.isNotEmpty) ...[
             const SizedBox(height: 6),
             Wrap(
               spacing: 6,
               runSpacing: 6,
-              children: selectedSkills
-                  .map(
-                    (skill) => ComposerSelectedSkillChipInternal(
+              children: [
+                for (final pluginId in selectedBuiltinPluginIdsInternal)
+                  if (BuiltinPluginCatalog.byId(pluginId)
+                      case final plugin?)
+                    ComposerSelectedPluginChipInternal(
                       key: ValueKey<String>(
-                        'assistant-selected-skill-${skill.key}',
+                        'assistant-selected-plugin-$pluginId',
                       ),
-                      option: skill,
-                      onDeleted: () => widget.onToggleSkill(skill.key),
+                      plugin: plugin,
+                      onDeleted: () => toggleBuiltinPluginInternal(pluginId),
                     ),
-                  )
-                  .toList(growable: false),
+                ...selectedSkills.map(
+                  (skill) => ComposerSelectedSkillChipInternal(
+                    key: ValueKey<String>(
+                      'assistant-selected-skill-${skill.key}',
+                    ),
+                    option: skill,
+                    onDeleted: () => widget.onToggleSkill(skill.key),
+                  ),
+                ),
+              ],
             ),
           ],
           const SizedBox(height: 6),
@@ -651,7 +740,7 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
                 message: submitLabel,
                 child: FilledButton(
                   key: const Key('assistant-send-button'),
-                  onPressed: widget.onSend,
+                  onPressed: handleSendInternal,
                   style: FilledButton.styleFrom(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 10,

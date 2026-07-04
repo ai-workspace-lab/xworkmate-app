@@ -33,6 +33,43 @@ import 'assistant_page_message_widgets.dart';
 import 'assistant_page_task_models.dart';
 import 'assistant_page_composer_clipboard.dart';
 import 'assistant_page_components_core.dart';
+import '../plugins/builtin_plugin_catalog.dart';
+import '../plugins/builtin_plugin_visuals.dart';
+
+/// Chip for a built-in plugin picked for the next send: brand icon tile +
+/// brand-colored name, styled after the reference skill chips.
+class ComposerSelectedPluginChipInternal extends StatelessWidget {
+  const ComposerSelectedPluginChipInternal({
+    super.key,
+    required this.plugin,
+    required this.onDeleted,
+  });
+
+  final BuiltinPluginDescriptor plugin;
+  final VoidCallback onDeleted;
+
+  @override
+  Widget build(BuildContext context) {
+    final brandColor = builtinPluginBrandColor(plugin.kind);
+    return Tooltip(
+      message: plugin.description,
+      child: InputChip(
+        avatar: BuiltinPluginIconTile(plugin: plugin, size: 18),
+        label: Text(
+          plugin.name,
+          style: TextStyle(color: brandColor, fontWeight: FontWeight.w600),
+        ),
+        onDeleted: onDeleted,
+        side: BorderSide.none,
+        backgroundColor: context.palette.surfaceSecondary,
+        deleteIconColor: context.palette.textMuted,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.chip),
+        ),
+      ),
+    );
+  }
+}
 
 class ComposerSelectedSkillChipInternal extends StatelessWidget {
   const ComposerSelectedSkillChipInternal({
