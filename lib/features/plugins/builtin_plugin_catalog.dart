@@ -71,8 +71,13 @@ class BuiltinPluginDescriptor {
 
   String get description => appText(descriptionZh, descriptionEn);
 
-  String get composerTemplate =>
-      appText(composerTemplateZh, composerTemplateEn);
+  /// Composer text with the shared TaskThread context binding prepended, so
+  /// every plugin automatically anchors to the conversation thread and its
+  /// task workspace (see [BuiltinPluginCatalog.contextBindingZh]).
+  String get composerTemplate => appText(
+        '${BuiltinPluginCatalog.contextBindingZh}\n$composerTemplateZh',
+        '${BuiltinPluginCatalog.contextBindingEn}\n$composerTemplateEn',
+      );
 
   String get formatSummary =>
       outputFormats.map((format) => format.toUpperCase()).join(' / ');
@@ -80,6 +85,24 @@ class BuiltinPluginDescriptor {
 
 /// Catalog of the first batch of built-in plugins.
 abstract final class BuiltinPluginCatalog {
+  /// Shared context binding prepended to every plugin's composer template.
+  ///
+  /// Every dispatched task is wrapped with a `TaskThread workspace context:`
+  /// block (sessionKey + currentTaskWorkspace, injected by
+  /// `taskWorkspaceContextPromptInternal`). This line tells the agent to use
+  /// that block: read this thread's conversation as the source material and
+  /// write all plugin outputs into `currentTaskWorkspace` instead of guessing
+  /// a directory.
+  static const String contextBindingZh =
+      '基于当前任务线程执行：以本线程对话上下文为素材来源；'
+      '随任务自动下发的 TaskThread workspace context 中的 '
+      'currentTaskWorkspace 即产物输出目录。';
+  static const String contextBindingEn =
+      'Run against the current task thread: use this thread\'s conversation '
+      'as the source material, and write all outputs into the '
+      'currentTaskWorkspace given by the auto-injected TaskThread workspace '
+      'context.';
+
   static const String documentId = 'builtin.document';
   static const String spreadsheetId = 'builtin.spreadsheet';
   static const String presentationId = 'builtin.presentation';

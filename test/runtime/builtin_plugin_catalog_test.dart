@@ -29,6 +29,27 @@ void main() {
       }
     });
 
+    test('every plugin template binds to the TaskThread workspace context',
+        () {
+      for (final plugin in BuiltinPluginCatalog.firstBatch) {
+        expect(
+          plugin.composerTemplate,
+          contains('TaskThread workspace context'),
+          reason: plugin.id,
+        );
+        expect(
+          plugin.composerTemplate,
+          contains('currentTaskWorkspace'),
+          reason: plugin.id,
+        );
+        expect(
+          plugin.composerTemplate,
+          startsWith(BuiltinPluginCatalog.contextBindingZh),
+          reason: plugin.id,
+        );
+      }
+    });
+
     test('document plugin exports markdown, pdf, and word', () {
       final plugin = BuiltinPluginCatalog.byId(
         BuiltinPluginCatalog.documentId,

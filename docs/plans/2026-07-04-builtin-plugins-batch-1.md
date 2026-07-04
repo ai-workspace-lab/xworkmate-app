@@ -27,6 +27,22 @@
 2. **执行层（Gateway/Bridge）**：任务执行时按模板调用对应技能包（与现有 skill picker 相同的技能加载机制，来源 openclaw-workspace / xworkspace-core-skills）。
 3. **产物层（App 内）**：生成的文件走现有 artifact 通道，在右侧边栏（assistant_artifact_sidebar）阅览，可继续对话修改。
 
+### TaskThread workspace context 自动集成（2026-07-04 补充）
+
+每个插件任务自动继承当前任务线程的会话上下文，分两层实现：
+
+1. **传输层（已有机制）**：所有任务下发时由 `taskWorkspaceContextPromptInternal`
+   （`app_controller_desktop_thread_actions.dart`）自动包裹
+   `TaskThread workspace context:` 块——`sessionKey`、`currentTaskWorkspace`
+   （网关任务即 OpenClaw 的 `~/.openclaw/workspace/tasks/<agent>/turn-…` 目录）、
+   非网关任务附 `localWorkspace`、以及 `taskInputAttachments` 清单。插件任务
+   与普通消息走同一路径，无需插件侧额外接入。
+2. **插件层（本次补充）**：`BuiltinPluginCatalog.contextBindingZh/En` 作为共享
+   前导语自动前置到每个插件的 `composerTemplate`，显式指示执行端 agent：
+   以本线程对话上下文为素材来源，产物写入 TaskThread workspace context 中的
+   `currentTaskWorkspace`，而不是自行猜测输出目录。新插件加入目录后自动继承，
+   无需逐个重复声明。
+
 ### UI 接入点（本 PR 脚手架）
 
 | 接入点 | 位置 | 方式 | 布局影响 |
