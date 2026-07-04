@@ -11,18 +11,24 @@ if ! command -v gh >/dev/null 2>&1; then
   exit 1
 fi
 
-if ! gh release view "$tag" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
-  gh release create "$tag" --repo "${GITHUB_REPOSITORY}" --title "$title" --notes "$notes"
-else
-  gh release edit "$tag" --repo "${GITHUB_REPOSITORY}" --title "$title" --notes "$notes"
-fi
-
 mapfile -d '' files < <(find "$artifact_dir" -type f -print0)
 
 if [[ "${#files[@]}" -eq 0 ]]; then
   echo "No release artifacts found in $artifact_dir" >&2
   exit 1
 fi
+
+if ! gh release view "$tag" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+  gh release create "$tag" --repo "${GITHUB_REPOSITORY}" --title "$title" --notes "$notes" "${files[@]}"
+  exit 0
+fi
+
+if gh release view "$tag" --repo "${GITHUB_REPOSITORY}" --json immutable --jq '.immutable' | grep -q '^true$'; then
+  echo "Release $tag is immutable; skipping asset upload." >&2
+  exit 0
+fi
+
+gh release edit "$tag" --repo "${GITHUB_REPOSITORY}" --title "$title" --notes "$notes"
 
 for file in "${files[@]}"; do
   gh release upload "$tag" "$file" --repo "${GITHUB_REPOSITORY}" --clobber
