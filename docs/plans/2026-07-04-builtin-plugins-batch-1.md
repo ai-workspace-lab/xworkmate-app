@@ -146,7 +146,17 @@
 2. **插件与 App 主机解耦，独立升级**
    插件定义（状态机描述 + 依赖技能包清单）从「编译进 App 的静态 Dart 列表」变为「运行时从 Gateway/Bridge 或插件仓库拉取的外部清单」，版本与 App 发布节奏脱钩，可单独发布/回滚某个插件而不需要发新版 App。需要设计插件清单格式、拉取/缓存/校验机制，以及与现有 `BuiltinPluginCatalog` 的兼容/迁移路径。
 
-3. **重复任务自动总结生成新插件（对齐 Hermes/OpenClaw 记忆机制）**
-   借鉴 AI workspace 中 Hermes Agent 对重复任务的自动总结能力（[[x-memory-hub-v1-plan]] 相关基础设施），当同类对话任务反复出现相近的结构化流程时，由总结机制沉淀为新的 skill 或新的 workflow 状态机插件，反哺插件目录。这一环依赖 X Memory Hub / openclaw-workspace 侧已有的记忆与总结能力，超出 xworkmate-app 本仓库范围，需要跨仓库协同设计。
+3. **重复任务自动总结生成新插件（直接复用对接 AI workspace 已有基础设施）**
 
-**风险**：以上三项是相对独立的架构决策，工作量与影响面均显著大于 M1-M4 的 UI 脚手架，需要单独立项、分阶段设计评审后再排入具体里程碑，不能作为一次性「微调」交付。
+   不自研记忆与总结能力，直接复用对接四块已有组件，形成「采集 → 识别 → 沉淀 → 分发」闭环：
+
+   | 环节 | 复用组件 | 对接方式 |
+   | ---- | -------- | -------- |
+   | 记忆采集 | **X-Memory-Hub 中心记忆系统**（Fastify + PG17：pgvector + pg_jieba + pg_trgm，端口 8790，已并入 all-in-one 部署 `roles/vhosts/x_memory_hub`） | 每次插件任务完成后，把任务摘要（sessionKey、插件 id、结构化流程、产物清单、成败）作为记忆写入 Hub；认证沿用统一 `AI_WORKSPACE_AUTH_TOKEN` 链路 |
+   | 记忆读写通道 | **Hermes/OpenClaw 记忆机制**（qmd PostgreSQL memory bridge：`QMD_BACKEND=pg`，MCP 工具 `memory_add/search/get/list`，pg_jieba 词法 + pgvector 向量 RRF 混合检索） | Gateway 侧 agent 通过 qmd MCP 工具读写记忆，无需在 xworkmate-app 内新增任何记忆客户端 |
+   | 重复模式识别与总结 | **Hermes Agent 能力**（重复任务自动总结） | Hermes 周期性对 Hub 中同类插件任务记忆做混合检索聚类；同一结构化流程反复出现（如 N 次以上）即触发总结，产出候选 skill 定义或 workflow 状态机插件描述 |
+   | 沉淀与分发 | **OpenClaw gateway 能力**（技能包加载：openclaw-workspace / xworkspace-core-skills；任务工作区与 TaskThread workspace context） | 总结产物落为新技能包进入 gateway 工作区（与现有 skill picker 同一加载机制），或落为插件清单条目经 §8.2 的解耦目录分发到 App；新插件执行时又产生新记忆，闭环迭代 |
+
+   xworkmate-app 侧只需两件事：a) 插件任务完成事件带上可供采集的结构化摘要（本仓库范围内）；b) 解耦后的插件目录能消费 Hermes 沉淀出的新插件条目（依赖 §8.2）。记忆存储、检索、总结全部在 X-Memory-Hub / qmd / Hermes / OpenClaw gateway 侧完成，相关基础设施状态见 [[x-memory-hub-v1-plan]] 与 [[qmd-pg-memory-bridge]]。
+
+**风险**：以上三项是相对独立的架构决策，工作量与影响面均显著大于 M1-M4 的 UI 脚手架，需要单独立项、分阶段设计评审后再排入具体里程碑，不能作为一次性「微调」交付。其中第 3 项虽然全部复用已有组件，但仍属跨仓库协同（xworkmate-app / X-Memory-Hub / qmd / openclaw-workspace / playbooks），且依赖 §8.2 插件目录解耦先行落地；X-Memory-Hub 侧尚有已知待办（NVIDIA embedding key 过期导致向量回填暂停，词法检索不受影响），设计评审时需确认记忆检索仅靠 pg_jieba 词法是否满足聚类精度。
