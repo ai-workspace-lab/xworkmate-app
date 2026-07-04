@@ -181,7 +181,7 @@ desktop:
       ui_surface: assistant_page
     builtin_plugins:
       enabled: true
-      release_tier: beta
+      release_tier: stable
       build_modes: [debug, profile, release]
       description: Desktop built-in plugin entry in assistant composer (batch 1)
       ui_surface: assistant_page
@@ -206,7 +206,7 @@ desktop:
       ui_surface: settings_page
     plugins:
       enabled: true
-      release_tier: beta
+      release_tier: stable
       build_modes: [debug, profile, release]
       description: Desktop built-in plugins management tab (batch 1)
       ui_surface: settings_page

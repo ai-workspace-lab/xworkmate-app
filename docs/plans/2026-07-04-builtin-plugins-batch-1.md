@@ -36,7 +36,7 @@
 
 ### Feature flags（config/feature_flags.yaml）
 
-- `desktop.assistant.builtin_plugins`：enabled，`release_tier: beta`（debug/profile 可见，release 隐藏，GA 时切 stable）
+- `desktop.assistant.builtin_plugins`：enabled，`release_tier: stable`（默认开启，debug/profile/release 全部可见，2026-07-04 决定跳过 beta 门槛直接放开）
 - `desktop.settings.plugins`：同上
 - mobile / web：本批次 `enabled: false`（移动端 settings 的 tab 分支与 composer 结构不同，放入 M3）
 
@@ -101,7 +101,7 @@
 
 ## 5. 里程碑
 
-- **M1（本 PR）**：规划文档 + 目录/描述符 + 设置页「插件」标签页 + composer 插件入口（模板注入）+ 单元测试。全部 beta flag，release 构建不可见。
+- **M1（本 PR）**：规划文档 + 目录/描述符 + 设置页「插件」标签页 + composer 插件入口（模板注入）+ 单元测试。desktop flag 为 stable 档，debug/profile/release 均默认开启；mobile/web 仍禁用。
 - **M2**：插件启用状态持久化；文档/表格插件端到端打通（依赖 xworkspace-core-skills 的 docx/pdf/xlsx 技能包）；产物在 artifact 边栏归类展示。
 - **M3**：PPT 流水线打通（image-svg-pptx-pro-skill + xiaobei-skill-image-to-vba，失败降级）；图片批量生成与网格预览；mobile/web 开放入口。
 - **M4**：视频流水线（hyperframe / it-infra-evolution-video-v2 集成，预设模板 + 字幕口播 + BGM 覆盖）；插件市场化（第三方插件清单、安装管理）；flag 切 stable。
@@ -110,7 +110,7 @@
 
 - **技能包缺失**：Gateway 未安装对应技能包时，模板中要求执行端显式报告缺失项（沿用 skill picker 的「技能来源于 Gateway 工作区」提示语义）；设置页插件卡片展示依赖清单便于排查。
 - **PPT 还原保真度**：双技能包互补（SVG 矢量优先，VBA 形状兜底），页级降级为图片占位。
-- **release 构建污染**：全部入口挂 beta flag，release_policy 已保证 release 仅暴露 stable。
+- **release 构建污染**：desktop flag 已切 stable，随 release 构建默认开启（2026-07-04 决定）；若后续需要收紧，可随时回退 `release_tier` 到 `beta`。
 - **移动端布局**：本批次不启用，避免 mobile settings else 分支误落入账号面板。
 
 ## 7. 测试
