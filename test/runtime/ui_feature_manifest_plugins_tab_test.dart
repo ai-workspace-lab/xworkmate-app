@@ -21,20 +21,13 @@ void main() {
       expect(desktop.supportsBuiltinPlugins, isTrue);
     });
 
-    test('desktop release keeps batch 1 hidden (beta tier)', () {
+    test('desktop release exposes batch 1 by default (stable tier)', () {
       final desktop = loadManifest().forPlatform(
         UiFeaturePlatform.desktop,
         buildMode: UiFeatureBuildMode.release,
       );
-      expect(
-        desktop.availableSettingsTabs,
-        isNot(contains(SettingsTab.plugins)),
-      );
-      expect(desktop.supportsBuiltinPlugins, isFalse);
-      expect(
-        desktop.sanitizeSettingsTab(SettingsTab.plugins),
-        SettingsTab.gateway,
-      );
+      expect(desktop.availableSettingsTabs, contains(SettingsTab.plugins));
+      expect(desktop.supportsBuiltinPlugins, isTrue);
     });
 
     test('mobile and web stay untouched in batch 1', () {
