@@ -54,6 +54,12 @@ mobile:
       build_modes: []
       description: Mobile does not expose desktop runtime controls
       ui_surface: assistant_page
+    builtin_plugins:
+      enabled: false
+      release_tier: beta
+      build_modes: []
+      description: Mobile built-in plugin composer entry (batch 1 lands desktop-first)
+      ui_surface: assistant_page
   settings:
     gateway:
       enabled: true
@@ -72,6 +78,12 @@ mobile:
       release_tier: stable
       build_modes: [debug, profile, release]
       description: Mobile WebRTC Remote Desktop view
+      ui_surface: settings_page
+    plugins:
+      enabled: false
+      release_tier: beta
+      build_modes: []
+      description: Mobile built-in plugins management tab (batch 1 lands desktop-first)
       ui_surface: settings_page
     logs:
       enabled: true
@@ -167,6 +179,12 @@ desktop:
       build_modes: [debug, profile, release]
       description: Desktop local runtime and gateway orchestration controls
       ui_surface: assistant_page
+    builtin_plugins:
+      enabled: true
+      release_tier: beta
+      build_modes: [debug, profile, release]
+      description: Desktop built-in plugin entry in assistant composer (batch 1)
+      ui_surface: assistant_page
   settings:
     gateway:
       enabled: true
@@ -185,6 +203,12 @@ desktop:
       release_tier: stable
       build_modes: []
       description: Desktop WebRTC Remote Desktop view temporarily disabled
+      ui_surface: settings_page
+    plugins:
+      enabled: true
+      release_tier: beta
+      build_modes: [debug, profile, release]
+      description: Desktop built-in plugins management tab (batch 1)
       ui_surface: settings_page
     logs:
       enabled: true
@@ -280,6 +304,12 @@ web:
       build_modes: []
       description: Web does not expose local runtime controls
       ui_surface: assistant_page
+    builtin_plugins:
+      enabled: false
+      release_tier: beta
+      build_modes: []
+      description: Web built-in plugin composer entry (batch 1 lands desktop-first)
+      ui_surface: assistant_page
   settings:
     gateway:
       enabled: true
@@ -292,6 +322,12 @@ web:
       release_tier: stable
       build_modes: [debug, profile, release]
       description: Web archived task management
+      ui_surface: settings_page
+    plugins:
+      enabled: false
+      release_tier: beta
+      build_modes: []
+      description: Web built-in plugins management tab (batch 1 lands desktop-first)
       ui_surface: settings_page
     logs:
       enabled: true

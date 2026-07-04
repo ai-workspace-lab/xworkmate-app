@@ -149,13 +149,14 @@ extension AssistantModeCopy on AssistantMode {
   };
 }
 
-enum SettingsTab { gateway, archivedTasks, remoteDesktop, logs, help }
+enum SettingsTab { gateway, archivedTasks, remoteDesktop, plugins, logs, help }
 
 extension SettingsTabCopy on SettingsTab {
   String get label => switch (this) {
     SettingsTab.gateway => appText('集成', 'Integrations'),
     SettingsTab.archivedTasks => appText('归档任务', 'Archived tasks'),
     SettingsTab.remoteDesktop => appText('AI工作空间', 'AI Workspace'),
+    SettingsTab.plugins => appText('插件', 'Plugins'),
     SettingsTab.logs => appText('运行日志', 'Runtime Logs'),
     SettingsTab.help => appText('帮助', 'Help'),
   };

@@ -31,6 +31,7 @@ import 'assistant_page_message_widgets.dart';
 import 'assistant_page_task_models.dart';
 import 'assistant_page_composer_skill_picker.dart';
 import 'assistant_page_composer_clipboard.dart';
+import '../plugins/builtin_plugin_catalog.dart';
 import 'assistant_page_components_core.dart';
 import 'assistant_page_task_dialog_controls.dart';
 
@@ -366,6 +367,44 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
                   ],
                   child: const ComposerIconButtonInternal(
                     icon: Icons.add_rounded,
+                  ),
+                ),
+                const SizedBox(width: 6),
+              ],
+              if (uiFeatures.supportsBuiltinPlugins) ...[
+                PopupMenuButton<String>(
+                  key: const Key('assistant-builtin-plugin-menu-button'),
+                  tooltip: appText('内置插件', 'Built-in plugins'),
+                  offset: const Offset(0, 48),
+                  onSelected: (pluginId) {
+                    final plugin = BuiltinPluginCatalog.byId(pluginId);
+                    if (plugin == null) {
+                      return;
+                    }
+                    insertTextAtSelectionInternal(plugin.composerTemplate);
+                    widget.focusNode.requestFocus();
+                  },
+                  itemBuilder: (context) => [
+                    for (final plugin in BuiltinPluginCatalog.firstBatch)
+                      PopupMenuItem<String>(
+                        key: Key(
+                          'assistant-builtin-plugin-item-${plugin.id}',
+                        ),
+                        value: plugin.id,
+                        child: ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: Icon(plugin.icon),
+                          title: Text(plugin.name),
+                          subtitle: Text(
+                            plugin.formatSummary,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ),
+                  ],
+                  child: const ComposerIconButtonInternal(
+                    icon: Icons.extension_rounded,
                   ),
                 ),
                 const SizedBox(width: 6),
