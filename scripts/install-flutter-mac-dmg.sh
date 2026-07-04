@@ -76,7 +76,10 @@ validate_app_bundle "$SOURCE_APP"
 
 if [[ -d "$TARGET_APP" ]]; then
   echo "Replacing existing app at $TARGET_APP"
-  rm -rf "$TARGET_APP"
+  if ! rm -rf "$TARGET_APP" 2>/dev/null; then
+    echo "Existing app at $TARGET_APP has restrictive ownership (e.g. a prior sudo/pkg install); retrying removal with sudo..." >&2
+    sudo rm -rf "$TARGET_APP"
+  fi
 fi
 
 rm -rf "$STAGING_APP"
