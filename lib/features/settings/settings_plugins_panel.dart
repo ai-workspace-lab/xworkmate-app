@@ -44,13 +44,32 @@ class SettingsPluginsPanel extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 18),
-          for (final plugin in items) ...[
-            _BuiltinPluginCard(
-              key: ValueKey<String>('settings-plugin-card-${plugin.id}'),
-              plugin: plugin,
-            ),
-            const SizedBox(height: 12),
-          ],
+          LayoutBuilder(
+            builder: (context, constraints) {
+              const spacing = 16.0;
+              final columns = constraints.maxWidth >= 720 ? 2 : 1;
+              final cardWidth = columns == 1
+                  ? constraints.maxWidth
+                  : (constraints.maxWidth - spacing * (columns - 1)) /
+                        columns;
+              return Wrap(
+                spacing: spacing,
+                runSpacing: spacing,
+                children: [
+                  for (final plugin in items)
+                    SizedBox(
+                      width: cardWidth,
+                      child: _BuiltinPluginCard(
+                        key: ValueKey<String>(
+                          'settings-plugin-card-${plugin.id}',
+                        ),
+                        plugin: plugin,
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
         ],
       ),
     );
@@ -68,7 +87,7 @@ class _BuiltinPluginCard extends StatelessWidget {
     final palette = context.palette;
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: palette.surfacePrimary,
+        color: palette.surfaceSecondary,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: palette.strokeSoft),
       ),
@@ -169,7 +188,7 @@ class _PluginTag extends StatelessWidget {
     final color = emphasized ? palette.accent : palette.textSecondary;
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: palette.surfaceSecondary,
+        color: palette.surfacePrimary,
         borderRadius: BorderRadius.circular(999),
       ),
       child: Padding(
