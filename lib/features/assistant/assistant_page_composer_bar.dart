@@ -338,10 +338,18 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
     widget.focusNode.requestFocus();
   }
 
+  /// Heading of the structured prompt block carrying plugin templates.
+  ///
+  /// The block rides in front of the typed prompt like `Preferred skills:` /
+  /// `Execution context:` do: `composePromptInternal` hoists it ahead of the
+  /// mode wrapper and the message renderer collapses it behind the meta
+  /// toggle, so the template text never shows verbatim in the conversation.
+  static const String builtinPluginsBlockHeading = 'Builtin plugins';
+
   /// Injects the current session's selected plugin templates ahead of the
-  /// typed prompt at send time. Selections are NOT cleared — the chips stay
-  /// shown so the plugins remain active for the session (mirroring how
-  /// per-session skills re-apply on every message).
+  /// typed prompt at send time, as a `Builtin plugins:` block. Selections are
+  /// NOT cleared — the chips stay shown so the plugins remain active for the
+  /// session (mirroring how per-session skills re-apply on every message).
   void applySelectedBuiltinPluginsToInputInternal() {
     final templates = selectedBuiltinPluginIdsInternal
         .map(BuiltinPluginCatalog.byId)
@@ -352,9 +360,8 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
       return;
     }
     final typed = widget.inputController.text.trim();
-    final combined = typed.isEmpty
-        ? templates.join('\n\n')
-        : '${templates.join('\n\n')}\n$typed';
+    final block = '$builtinPluginsBlockHeading:\n${templates.join('\n')}';
+    final combined = typed.isEmpty ? block : '$block\n\n$typed';
     widget.inputController.value = TextEditingValue(
       text: combined,
       selection: TextSelection.collapsed(offset: combined.length),
