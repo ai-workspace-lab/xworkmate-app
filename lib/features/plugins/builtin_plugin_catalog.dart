@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../i18n/app_language.dart';
+import 'builtin_plugin_runtime.dart';
 import 'builtin_plugin_workflow.dart';
 
 /// First-batch built-in plugin kinds.
@@ -41,6 +42,7 @@ class BuiltinPluginDescriptor {
     required this.descriptionZh,
     required this.descriptionEn,
     required this.workflow,
+    this.runtime = BuiltinPluginRuntimeBinding.builtinDart,
     this.status = BuiltinPluginStatus.preview,
   });
 
@@ -55,6 +57,12 @@ class BuiltinPluginDescriptor {
   /// The plugin's workflow state machine — single source of truth for the
   /// composer template, output formats, pipeline list, and skill deps.
   final BuiltinPluginWorkflow workflow;
+
+  /// Where this plugin's definition comes from (plan §8.4). First-batch
+  /// plugins are compiled-in Dart; manifest / FFI / sidecar runtimes let
+  /// third-party plugins written in other languages plug into the same
+  /// catalog without an app release.
+  final BuiltinPluginRuntimeBinding runtime;
 
   final BuiltinPluginStatus status;
 
@@ -281,6 +289,9 @@ abstract final class BuiltinPluginCatalog {
                   'image-svg-pptx-pro-skill',
                   'xiaobei-skill-image-to-vba',
                 ],
+                // Reconstruction is the flakiest step: budget two retries
+                // before degrading to full-page image placeholders.
+                maxRetries: 2,
                 fallbackZh: '某页还原失败时用整页图片占位，不阻塞整份文件',
                 fallbackEn:
                     'fall back to a full-page image for slides that cannot '

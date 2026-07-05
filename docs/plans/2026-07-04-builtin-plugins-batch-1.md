@@ -152,10 +152,21 @@
    改为从 workflow 派生（单一事实来源），对外 API 不变、UI 零改动。批次 1
    限定线性推进 + 单步降级；非线性转移（分支/汇合/显式 guard）与执行端逐步
    推进（重试/断点/进度）放后续批次。JSON 序列化即 §8.2 外部清单的地基。
-   **重构批次 2（待做）**：插件清单外部化——workflow JSON 从 Gateway/Bridge
-   或插件仓库运行时拉取（拉取/缓存/校验 + 与内置目录的合并回退）。
-   **重构批次 3（待做）**：执行端按状态机逐步推进：单步重试、断点续跑、
-   任务面板进度可视化。
+   **重构批次 2（2026-07-05 已落地）**：显式状态与转移语义 + 运行态跟踪器——
+   - Step 新增 `maxRetries`（重试预算，替代 v1 布尔 `retryable`，旧清单兼容解析）
+     与 `failurePolicy`（degrade / skip / abort；缺省按「有 fallback → degrade，
+     否则 abort」推导）；`schemaVersion` 升至 2
+   - 新增 `builtin_plugin_workflow_run.dart`：`BuiltinPluginWorkflowRun`
+     逐步推进状态机（步骤状态 pending/running/succeeded/degraded/skipped/failed），
+     失败先耗尽重试预算再按策略降级/跳过/中止；运行态 JSON 序列化支持
+     **断点续跑**（步骤 id 校验不匹配时安全回退全新运行，mid-flight 步骤重置
+     pending）；`progress` 供任务面板进度可视化
+   - PPT reconstruct 步骤配置 `maxRetries: 2` + degrade（还原失败整页图占位）
+   **重构批次 3（待做）**：插件清单外部化——workflow JSON 从 Gateway/Bridge
+   或插件仓库运行时拉取（拉取/缓存/校验 + 与内置目录的合并回退），复用
+   §8.4 的 `BuiltinPluginRuntimeBinding.manifest`。
+   **重构批次 4（待做）**：执行端接入 `BuiltinPluginWorkflowRun`：任务下发按
+   步骤拆分、单步重试与断点续跑走真实执行链路、任务面板渲染 run 进度。
 
 2. **插件与 App 主机解耦，独立升级**
    插件定义（状态机描述 + 依赖技能包清单）从「编译进 App 的静态 Dart 列表」变为「运行时从 Gateway/Bridge 或插件仓库拉取的外部清单」，版本与 App 发布节奏脱钩，可单独发布/回滚某个插件而不需要发新版 App。需要设计插件清单格式、拉取/缓存/校验机制，以及与现有 `BuiltinPluginCatalog` 的兼容/迁移路径。
@@ -173,4 +184,23 @@
 
    xworkmate-app 侧只需两件事：a) 插件任务完成事件带上可供采集的结构化摘要（本仓库范围内）；b) 解耦后的插件目录能消费 Hermes 沉淀出的新插件条目（依赖 §8.2）。记忆存储、检索、总结全部在 X-Memory-Hub / qmd / Hermes / OpenClaw gateway 侧完成。跨仓库需要新建的唯一组件是「qmd/X-Memory-Hub 的 Hermes MemoryProvider 插件」；上游 hermes-agent 代码仅作参考对接，不修改（本地路径 `~/workspaces/ai-workspace-lab/hermes-agent`）。相关基础设施状态见 [[x-memory-hub-v1-plan]] 与 [[qmd-pg-memory-bridge]]。
 
-**风险**：以上三项是相对独立的架构决策，工作量与影响面均显著大于 M1-M4 的 UI 脚手架，需要单独立项、分阶段设计评审后再排入具体里程碑，不能作为一次性「微调」交付。其中第 3 项虽然全部复用已有组件，但仍属跨仓库协同（xworkmate-app / X-Memory-Hub / qmd / openclaw-workspace / playbooks），且依赖 §8.2 插件目录解耦先行落地；X-Memory-Hub 侧尚有已知待办（NVIDIA embedding key 过期导致向量回填暂停，词法检索不受影响），设计评审时需确认记忆检索仅靠 pg_jieba 词法是否满足聚类精度。
+4. **多语言第三方插件运行时（FFI 桥接方向，2026-07-05 脚手架落地）**
+
+   为支持用更多语言编写插件、移植第三方插件，插件定义与（可选的）本地处理
+   钩子的来源抽象为 `BuiltinPluginRuntimeBinding`
+   （`lib/features/plugins/builtin_plugin_runtime.dart`），四种运行时：
+
+   | 运行时 | 适用语言 | 说明 |
+   | ------ | -------- | ---- |
+   | `builtinDart` | Dart | 编译进 App 的第一批目录（现状，缺省值） |
+   | `manifest` | 任意（声明式） | 外部 workflow JSON 清单，运行时拉取（§8.2 / 重构批次 3） |
+   | `nativeFfi` | Rust / C / C++ / Go / Zig 等 C-ABI 语言 | `dart:ffi` 加载动态库；C-ABI 契约：`xwm_plugin_abi_version()`、`xwm_plugin_manifest()`（返回 UTF-8 workflow JSON）、`xwm_plugin_step_run(step_id, context_json)`（可选本地步骤处理器） |
+   | `sidecarProcess` | Python / Node.js 等 VM 语言 | 外部进程 stdio JSON 协议 |
+
+   边界与安全：运行时绑定只决定「插件定义（workflow 清单）与可选本地钩子从哪来」，
+   **重负载执行仍统一走既有 Gateway 管线**（不开新执行通道）；绑定携带
+   `version` 与 `sha256`，加载前校验完整性，与 §8.2 的独立发布/回滚衔接。
+   本批仅落数据模型脚手架（枚举 + 绑定描述符 + JSON + descriptor.runtime 字段），
+   dylib 实际加载器与 sidecar 协议实现放后续批次。
+
+**风险**：以上各项是相对独立的架构决策，工作量与影响面均显著大于 M1-M4 的 UI 脚手架，需要单独立项、分阶段设计评审后再排入具体里程碑，不能作为一次性「微调」交付。其中第 3 项虽然全部复用已有组件，但仍属跨仓库协同（xworkmate-app / X-Memory-Hub / qmd / openclaw-workspace / playbooks），且依赖 §8.2 插件目录解耦先行落地；X-Memory-Hub 侧尚有已知待办（NVIDIA embedding key 过期导致向量回填暂停，词法检索不受影响），设计评审时需确认记忆检索仅靠 pg_jieba 词法是否满足聚类精度。第 4 项 FFI/sidecar 引入本地代码执行面，需要在加载器批次配套签名校验与权限提示。

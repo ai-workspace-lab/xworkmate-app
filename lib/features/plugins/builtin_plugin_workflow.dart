@@ -2,15 +2,29 @@ import 'package:flutter/foundation.dart';
 
 import '../../i18n/app_language.dart';
 
-/// Lightweight workflow state machine for built-in plugins (plan §8.1,
-/// batch 1).
+/// What the executor does with a step once its retries are exhausted.
+enum BuiltinPluginStepFailurePolicy {
+  /// Mark the step degraded (its [BuiltinPluginWorkflowStep.fallbackZh]
+  /// semantics apply) and continue with the next step.
+  degrade,
+
+  /// Skip the step's output and continue with the next step.
+  skip,
+
+  /// Abort the whole workflow run.
+  abort,
+}
+
+/// Lightweight workflow state machine for built-in plugins (plan §8.1).
 ///
-/// Batch 1 is deliberately linear: steps run in list order, and a step
-/// either completes, retries, or degrades via its [BuiltinPluginWorkflowStep.fallbackZh]
-/// semantics. Non-linear transitions (branches / joins / explicit
-/// transition guards) are a later batch. The model is JSON-serializable so
-/// a future batch can load plugin definitions from an external manifest
-/// instead of compiling them into the app (plan §8.2).
+/// Batch 1 delivered the linear step list + JSON serialization. Batch 2 adds
+/// explicit transition semantics — per-step retry budget ([BuiltinPluginWorkflowStep.maxRetries])
+/// and an exhaustion policy ([BuiltinPluginWorkflowStep.failurePolicy]) — plus
+/// a runtime tracker (`BuiltinPluginWorkflowRun`) that advances step by step
+/// with single-step retry, resume, and progress reporting. Non-linear
+/// transitions (branches / joins / guards) remain a later batch. The model is
+/// JSON-serializable so plugin definitions can come from external manifests
+/// (plan §8.2) or foreign-language runtimes bridged over FFI (plan §8.4).
 @immutable
 class BuiltinPluginWorkflowStep {
   const BuiltinPluginWorkflowStep({
@@ -21,10 +35,11 @@ class BuiltinPluginWorkflowStep {
     required this.instructionEn,
     this.outputFormats = const <String>[],
     this.requiredSkills = const <String>[],
-    this.retryable = true,
+    this.maxRetries = 1,
+    BuiltinPluginStepFailurePolicy? failurePolicy,
     this.fallbackZh = '',
     this.fallbackEn = '',
-  });
+  }) : explicitFailurePolicy = failurePolicy;
 
   /// Stable step id, unique within one workflow (e.g. `outline`, `export`).
   final String id;
@@ -43,10 +58,15 @@ class BuiltinPluginWorkflowStep {
   /// Skill packages this step invokes on the gateway side.
   final List<String> requiredSkills;
 
-  /// Whether the executor may retry this step on failure before degrading.
-  final bool retryable;
+  /// How many retry attempts the executor may make after the first failure
+  /// before applying [failurePolicy]. `0` disables retries.
+  final int maxRetries;
 
-  /// Degradation semantics when the step keeps failing; empty = abort.
+  /// Explicit exhaustion policy, or null to derive one from [hasFallback]
+  /// (fallback present → degrade, otherwise abort). See [failurePolicy].
+  final BuiltinPluginStepFailurePolicy? explicitFailurePolicy;
+
+  /// Degradation semantics applied when the step degrades.
   final String fallbackZh;
   final String fallbackEn;
 
@@ -57,6 +77,17 @@ class BuiltinPluginWorkflowStep {
   bool get hasFallback =>
       fallbackZh.trim().isNotEmpty || fallbackEn.trim().isNotEmpty;
 
+  /// Whether the executor may retry this step on failure.
+  bool get retryable => maxRetries > 0;
+
+  /// Effective exhaustion policy: the explicit one when set, otherwise
+  /// degrade when a fallback exists and abort when none does.
+  BuiltinPluginStepFailurePolicy get failurePolicy =>
+      explicitFailurePolicy ??
+      (hasFallback
+          ? BuiltinPluginStepFailurePolicy.degrade
+          : BuiltinPluginStepFailurePolicy.abort);
+
   Map<String, dynamic> toJson() => <String, dynamic>{
         'id': id,
         'titleZh': titleZh,
@@ -65,7 +96,9 @@ class BuiltinPluginWorkflowStep {
         'instructionEn': instructionEn,
         if (outputFormats.isNotEmpty) 'outputFormats': outputFormats,
         if (requiredSkills.isNotEmpty) 'requiredSkills': requiredSkills,
-        'retryable': retryable,
+        'maxRetries': maxRetries,
+        if (explicitFailurePolicy != null)
+          'failurePolicy': explicitFailurePolicy!.name,
         if (fallbackZh.isNotEmpty) 'fallbackZh': fallbackZh,
         if (fallbackEn.isNotEmpty) 'fallbackEn': fallbackEn,
       };
@@ -74,6 +107,16 @@ class BuiltinPluginWorkflowStep {
     List<String> stringList(Object? value) => value is List
         ? value.map((item) => item.toString()).toList(growable: false)
         : const <String>[];
+    final rawPolicy = (json['failurePolicy'] as String?)?.trim() ?? '';
+    final policy = BuiltinPluginStepFailurePolicy.values
+        .where((value) => value.name == rawPolicy)
+        .firstOrNull;
+    // Schema v1 manifests carried a boolean `retryable` instead of a retry
+    // budget; map it onto the v2 field so old manifests keep loading.
+    final legacyRetryable = json['retryable'] as bool?;
+    final maxRetries =
+        (json['maxRetries'] as num?)?.toInt() ??
+        (legacyRetryable == null ? 1 : (legacyRetryable ? 1 : 0));
     return BuiltinPluginWorkflowStep(
       id: (json['id'] as String?)?.trim() ?? '',
       titleZh: json['titleZh'] as String? ?? '',
@@ -82,7 +125,8 @@ class BuiltinPluginWorkflowStep {
       instructionEn: json['instructionEn'] as String? ?? '',
       outputFormats: stringList(json['outputFormats']),
       requiredSkills: stringList(json['requiredSkills']),
-      retryable: json['retryable'] as bool? ?? true,
+      maxRetries: maxRetries < 0 ? 0 : maxRetries,
+      failurePolicy: policy,
       fallbackZh: json['fallbackZh'] as String? ?? '',
       fallbackEn: json['fallbackEn'] as String? ?? '',
     );
@@ -101,7 +145,11 @@ class BuiltinPluginWorkflow {
   });
 
   /// Serialization schema version for external manifests (plan §8.2).
-  static const int schemaVersion = 1;
+  ///
+  /// v2 (batch 2): per-step `maxRetries` + `failurePolicy` replace the v1
+  /// boolean `retryable`; v1 manifests still parse (legacy mapping in
+  /// [BuiltinPluginWorkflowStep.fromJson]).
+  static const int schemaVersion = 2;
 
   /// Opening line of the composer template, states the overall goal.
   final String goalZh;
