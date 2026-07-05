@@ -114,10 +114,18 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
   bool handlingPasteShortcutInternal = false;
   String skillPickerQueryInternal = '';
 
-  /// Built-in plugins picked for the next send. Selecting a plugin adds a
-  /// chip instead of pasting its template; the templates are injected into
-  /// the prompt right before dispatch (see [handleSendInternal]).
-  final List<String> selectedBuiltinPluginIdsInternal = <String>[];
+  /// Built-in plugins active for each task session, keyed by session key so
+  /// every conversation keeps its own selection (mirrors per-session skills).
+  /// Selections persist across sends — the chips stay shown and the templates
+  /// are re-injected on each dispatch until the user removes them.
+  final Map<String, List<String>> selectedBuiltinPluginIdsBySessionInternal =
+      <String, List<String>>{};
+
+  /// The current session's selected plugin ids (empty when none).
+  List<String> get selectedBuiltinPluginIdsInternal =>
+      selectedBuiltinPluginIdsBySessionInternal[
+          widget.controller.currentSessionKey] ??
+      const <String>[];
 
   @override
   void initState() {
@@ -314,27 +322,32 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
   }
 
   void toggleBuiltinPluginInternal(String pluginId) {
+    final sessionKey = widget.controller.currentSessionKey;
     setState(() {
-      if (!selectedBuiltinPluginIdsInternal.remove(pluginId)) {
-        selectedBuiltinPluginIdsInternal.add(pluginId);
+      final current = selectedBuiltinPluginIdsBySessionInternal.putIfAbsent(
+        sessionKey,
+        () => <String>[],
+      );
+      if (!current.remove(pluginId)) {
+        current.add(pluginId);
+      }
+      if (current.isEmpty) {
+        selectedBuiltinPluginIdsBySessionInternal.remove(sessionKey);
       }
     });
     widget.focusNode.requestFocus();
   }
 
-  /// Injects the selected plugins' templates ahead of the typed prompt and
-  /// clears the chips, so the dispatched task carries the workflow template
-  /// while the input box stays clean during editing.
+  /// Injects the current session's selected plugin templates ahead of the
+  /// typed prompt at send time. Selections are NOT cleared — the chips stay
+  /// shown so the plugins remain active for the session (mirroring how
+  /// per-session skills re-apply on every message).
   void applySelectedBuiltinPluginsToInputInternal() {
-    if (selectedBuiltinPluginIdsInternal.isEmpty) {
-      return;
-    }
     final templates = selectedBuiltinPluginIdsInternal
         .map(BuiltinPluginCatalog.byId)
         .whereType<BuiltinPluginDescriptor>()
         .map((plugin) => plugin.composerTemplate)
         .toList(growable: false);
-    setState(selectedBuiltinPluginIdsInternal.clear);
     if (templates.isEmpty) {
       return;
     }
