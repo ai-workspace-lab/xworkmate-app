@@ -1780,13 +1780,13 @@ void main() {
     final startedAtMs = DateTime.now().millisecondsSinceEpoch.toDouble();
     await Future<void>.delayed(const Duration(milliseconds: 20));
     await Directory('${localWorkspace.path}/tmp').create();
-    await Directory(
-      '${localWorkspace.path}/renders/tmp',
-    ).create(recursive: true);
+    // `snapshots/` is ignored by the video skill policy only, while `tmp/`
+    // is treated as global workspace noise for every task.
+    await Directory('${localWorkspace.path}/snapshots').create();
     await Directory('${localWorkspace.path}/renders').create();
     await File('${localWorkspace.path}/tmp/build.log').writeAsString('log');
     await File(
-      '${localWorkspace.path}/renders/tmp/scratch.png',
+      '${localWorkspace.path}/snapshots/scratch.png',
     ).writeAsBytes(<int>[1, 2, 3]);
     await File(
       '${localWorkspace.path}/renders/final.mp4',
@@ -1852,7 +1852,7 @@ void main() {
         .requireTaskThreadForSessionInternal('unit-fixture-task-b');
     expect(unselectedSkillThread.lastTaskArtifactRelativePaths, <String>[
       'renders/final.mp4',
-      'renders/tmp/scratch.png',
+      'snapshots/scratch.png',
     ]);
   });
 

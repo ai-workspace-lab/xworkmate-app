@@ -134,7 +134,7 @@ extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
         title:
             taskSeedsInternal[submittedSessionKey]?.title ??
             fallbackSessionTitleInternal(submittedSessionKey),
-        preview: rawPrompt,
+        preview: taskSeedPreviewTextInternal(rawPrompt),
         status: controller.hasAssistantPendingRun || connectionState.connected
             ? 'running'
             : 'queued',
@@ -309,6 +309,20 @@ extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
         .toList(growable: false);
   }
 
+  /// Task-list preview for a submitted prompt: strips the structured blocks
+  /// (plugin templates, etc.) so the list shows what the user actually typed.
+  String taskSeedPreviewTextInternal(String rawPrompt) {
+    final body = PromptDebugSnapshotInternal.fromMessage(rawPrompt).bodyText;
+    if (body.isNotEmpty) {
+      return body;
+    }
+    return rawPrompt.startsWith(
+      '${ComposerBarStateInternal.builtinPluginsBlockHeading}:\n',
+    )
+        ? appText('内置插件任务', 'Built-in plugin task')
+        : rawPrompt;
+  }
+
   String composePromptInternal({
     required String mode,
     required String prompt,
@@ -328,14 +342,34 @@ extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
         '- target: ${executionTarget.promptValue}\n'
         '- permission: ${permissionLevel.promptValue}\n\n';
 
+    // Hoist a leading `Builtin plugins:` block (injected by the composer at
+    // send time) out of the typed prompt so it sits with the other structured
+    // blocks instead of being swallowed by the craft/plan mode prefix. The
+    // message renderer collapses these blocks behind the meta toggle, keeping
+    // the plugin template out of the visible conversation.
+    var pluginBlock = '';
+    var body = prompt;
+    const pluginHeadingPrefix =
+        '${ComposerBarStateInternal.builtinPluginsBlockHeading}:\n';
+    if (body.startsWith(pluginHeadingPrefix)) {
+      final divider = body.indexOf('\n\n');
+      if (divider == -1) {
+        pluginBlock = '$body\n\n';
+        body = '';
+      } else {
+        pluginBlock = '${body.substring(0, divider)}\n\n';
+        body = body.substring(divider + 2);
+      }
+    }
+
     return switch (mode) {
       'craft' =>
-        '$attachmentBlock$skillBlock$executionContext'
-            'Craft a polished result for this request:\n$prompt',
+        '$attachmentBlock$skillBlock$executionContext$pluginBlock'
+            'Craft a polished result for this request:\n$body',
       'plan' =>
-        '$attachmentBlock$skillBlock$executionContext'
-            'Create a clear execution plan for this task:\n$prompt',
-      _ => '$attachmentBlock$skillBlock$executionContext$prompt',
+        '$attachmentBlock$skillBlock$executionContext$pluginBlock'
+            'Create a clear execution plan for this task:\n$body',
+      _ => '$attachmentBlock$skillBlock$executionContext$pluginBlock$body',
     };
   }
 

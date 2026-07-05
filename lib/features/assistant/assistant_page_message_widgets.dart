@@ -334,6 +334,7 @@ class PromptDebugSnapshotInternal {
     String? attachments;
     String? preferredSkills;
     String? executionContext;
+    String? builtinPlugins;
 
     void skipLeadingNewlines() {
       while (cursor < text.length && text[cursor] == '\n') {
@@ -373,11 +374,20 @@ class PromptDebugSnapshotInternal {
         executionContext = executionBlock;
         continue;
       }
+      final builtinPluginsBlock = consumeBlock('Builtin plugins');
+      if (builtinPluginsBlock != null) {
+        builtinPlugins = builtinPluginsBlock;
+        continue;
+      }
       break;
     }
 
     final remainder = text.substring(cursor).trimLeft();
-    final executionContextParts = <String>[?preferredSkills, ?executionContext];
+    final executionContextParts = <String>[
+      ?preferredSkills,
+      ?executionContext,
+      ?builtinPlugins,
+    ];
 
     return PromptDebugSnapshotInternal(
       bodyText: remainder.trim(),

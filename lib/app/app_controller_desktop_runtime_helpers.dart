@@ -1616,6 +1616,7 @@ Future<List<String>> _existingWorkspaceArtifactPathsInternal(
         DesktopThreadArtifactService.relativePathInternal(root.path, file.path);
     if (resolvedRelativePath != null &&
         resolvedRelativePath.isNotEmpty &&
+        !_isWorkspaceArtifactNoisePathInternal(resolvedRelativePath) &&
         !policy.ignores(resolvedRelativePath)) {
       paths.add(resolvedRelativePath);
     }
@@ -1664,9 +1665,76 @@ Future<List<String>> _workspaceArtifactPathsModifiedSinceInternal(
   return paths;
 }
 
+/// Directory segments that hold intermediate/process files, never final
+/// task deliverables.
+const Set<String> _workspaceArtifactNoiseDirectorySegmentsInternal = <String>{
+  'tmp',
+  'temp',
+  'cache',
+  'caches',
+  'logs',
+  '__pycache__',
+  'node_modules',
+  'venv',
+};
+
+/// File extensions that mark temporary/in-progress files.
+const Set<String> _workspaceArtifactNoiseExtensionsInternal = <String>{
+  'tmp',
+  'temp',
+  'part',
+  'partial',
+  'crdownload',
+  'download',
+  'lock',
+  'swp',
+  'swx',
+  'bak',
+  'old',
+  'log',
+  'pyc',
+};
+
+/// Whether [relativePath] looks like a temporary/intermediate file rather
+/// than a final task result. Applied when the app scans the task workspace
+/// to attribute files to the current run (empty-artifact fallback and
+/// directory-scope artifact expansion) so the artifact pane only surfaces
+/// final deliverables — explicit gateway-exported artifacts are not
+/// filtered by this heuristic.
 bool _isWorkspaceArtifactNoisePathInternal(String relativePath) {
-  return DesktopThreadArtifactService.baseNameInternal(relativePath) ==
-      '.DS_Store';
+  final segments = relativePath
+      .split('/')
+      .where((segment) => segment.isNotEmpty)
+      .toList(growable: false);
+  if (segments.isEmpty) {
+    return true;
+  }
+  for (final segment in segments) {
+    // Hidden files/directories (.DS_Store, .cache/, .git-ish leftovers).
+    if (segment.startsWith('.')) {
+      return true;
+    }
+    // Editor backup files ("report.md~").
+    if (segment.endsWith('~')) {
+      return true;
+    }
+  }
+  for (final segment in segments.sublist(0, segments.length - 1)) {
+    if (_workspaceArtifactNoiseDirectorySegmentsInternal.contains(
+      segment.toLowerCase(),
+    )) {
+      return true;
+    }
+  }
+  final baseName = segments.last;
+  final dotIndex = baseName.lastIndexOf('.');
+  if (dotIndex > 0 && dotIndex < baseName.length - 1) {
+    final extension = baseName.substring(dotIndex + 1).toLowerCase();
+    if (_workspaceArtifactNoiseExtensionsInternal.contains(extension)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 Future<_ArtifactSyncPolicy> _loadArtifactSyncPolicyInternal(
