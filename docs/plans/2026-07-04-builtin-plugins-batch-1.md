@@ -203,4 +203,10 @@
    本批仅落数据模型脚手架（枚举 + 绑定描述符 + JSON + descriptor.runtime 字段），
    dylib 实际加载器与 sidecar 协议实现放后续批次。
 
+   **详细设计**见专门规划文档
+   `docs/plans/2026-07-05-plugin-ffi-runtime.md`：C-ABI 契约全文（内存所有权
+   `xwm_plugin_free`、后台 isolate 线程模型、错误→failurePolicy 映射、崩溃
+   隔离策略）、sidecar JSON-RPC 协议与生命周期、`.xwmplugin` 包结构与多平台
+   构件分发、F0-F4 里程碑（F0 脚手架已完成）与风险清单。
+
 **风险**：以上各项是相对独立的架构决策，工作量与影响面均显著大于 M1-M4 的 UI 脚手架，需要单独立项、分阶段设计评审后再排入具体里程碑，不能作为一次性「微调」交付。其中第 3 项虽然全部复用已有组件，但仍属跨仓库协同（xworkmate-app / X-Memory-Hub / qmd / openclaw-workspace / playbooks），且依赖 §8.2 插件目录解耦先行落地；X-Memory-Hub 侧尚有已知待办（NVIDIA embedding key 过期导致向量回填暂停，词法检索不受影响），设计评审时需确认记忆检索仅靠 pg_jieba 词法是否满足聚类精度。第 4 项 FFI/sidecar 引入本地代码执行面，需要在加载器批次配套签名校验与权限提示。
