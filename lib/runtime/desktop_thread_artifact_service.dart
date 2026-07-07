@@ -135,8 +135,9 @@ class DesktopThreadArtifactService {
     final taskArtifactPaths = normalizeTaskArtifactPathsInternal(
       artifactRelativePaths,
     );
-    if (taskArtifactPaths.isEmpty ||
-        !taskArtifactPaths.contains(entryRelativePath)) {
+    final isAllowed = taskArtifactPaths.any((path) =>
+        entryRelativePath == path || entryRelativePath.startsWith('$path/'));
+    if (taskArtifactPaths.isEmpty || !isAllowed) {
       return const AssistantArtifactPreview.empty(
         message: 'The selected file is not part of the current task artifacts.',
       );
@@ -221,19 +222,32 @@ class DesktopThreadArtifactService {
   ) async {
     final files = <File>[];
     for (final relativePath in artifactRelativePaths) {
-      final target = File(resolveAbsolutePathInternal(root.path, relativePath));
+      final absolutePath = resolveAbsolutePathInternal(root.path, relativePath);
       try {
-        if (!await target.exists()) {
-          continue;
+        final type = await FileSystemEntity.type(absolutePath, followLinks: true);
+        if (type == FileSystemEntityType.file) {
+          final target = File(absolutePath);
+          final resolvedRelativePath = relativePathInternal(
+            workspacePath,
+            target.path,
+          );
+          if (resolvedRelativePath == null || resolvedRelativePath.isEmpty) {
+            continue;
+          }
+          files.add(target);
+        } else if (type == FileSystemEntityType.directory) {
+          final collected = await collectFilesInternal(Directory(absolutePath));
+          for (final file in collected) {
+            final resolvedRelativePath = relativePathInternal(
+              workspacePath,
+              file.path,
+            );
+            if (resolvedRelativePath == null || resolvedRelativePath.isEmpty) {
+              continue;
+            }
+            files.add(file);
+          }
         }
-        final resolvedRelativePath = relativePathInternal(
-          workspacePath,
-          target.path,
-        );
-        if (resolvedRelativePath == null || resolvedRelativePath.isEmpty) {
-          continue;
-        }
-        files.add(target);
       } on FileSystemException {
         continue;
       }
@@ -377,7 +391,10 @@ class DesktopThreadArtifactService {
         if (relativePath == null || relativePath.isEmpty) {
           continue;
         }
-        if (allowedPaths.isNotEmpty && !allowedPaths.contains(relativePath)) {
+        final isAllowed = allowedPaths.isEmpty ||
+            allowedPaths.any((path) =>
+                relativePath == path || relativePath.startsWith('$path/'));
+        if (!isAllowed) {
           continue;
         }
         items.add(
