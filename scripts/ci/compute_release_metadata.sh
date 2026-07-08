@@ -17,10 +17,14 @@ elif [[ "${GITHUB_EVENT_NAME:-}" == "workflow_dispatch" ]]; then
   release_tag="manual-${GITHUB_RUN_NUMBER:-0}"
   release_title="Manual Build ${GITHUB_RUN_NUMBER:-0} (${DISPLAY_VERSION})"
   release_notes="Automated manual build ${DISPLAY_VERSION} from ${GITHUB_SHA:-unknown}"
-elif [[ "${GITHUB_REF:-}" == "refs/heads/main" ]]; then
+elif [[ "${GITHUB_REF:-}" == refs/heads/main ]]; then
   release_tag="latest"
   release_title="Latest"
   release_notes="Automated latest main build ${DISPLAY_VERSION} from ${GITHUB_SHA:-unknown}"
+elif [[ "${GITHUB_REF:-}" == refs/heads/release/* ]]; then
+  release_tag="stable"
+  release_title="Stable"
+  release_notes="Automated stable release build ${DISPLAY_VERSION} from ${GITHUB_SHA:-unknown}"
 else
   release_tag="main-${GITHUB_RUN_NUMBER:-0}"
   release_title="Main Build ${GITHUB_RUN_NUMBER:-0} (${DISPLAY_VERSION})"
