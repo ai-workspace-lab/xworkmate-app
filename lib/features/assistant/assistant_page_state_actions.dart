@@ -127,8 +127,6 @@ extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
     setState(() {
       lastAutoAgentLabelInternal =
           autoAgent?.name ?? conversationOwnerLabelInternal(controller);
-      attachmentsInternal = const <ComposerAttachmentInternal>[];
-      clearComposerAttachmentsForSessionInternal(submittedSessionKey);
       touchTaskSeedInternal(
         sessionKey: submittedSessionKey,
         title:
