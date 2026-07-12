@@ -337,14 +337,6 @@ class AssistantPageStateInternal extends State<AssistantPage> {
     );
   }
 
-  void clearComposerAttachmentsForSessionInternal(String sessionKey) {
-    final normalizedSessionKey = sessionKey.trim();
-    if (normalizedSessionKey.isEmpty) {
-      return;
-    }
-    composerAttachmentsBySessionKeyInternal.remove(normalizedSessionKey);
-  }
-
   void syncComposerDraftForActiveSessionInternal(String sessionKey) {
     final normalizedSessionKey = sessionKey.trim();
     if (normalizedSessionKey.isEmpty ||
