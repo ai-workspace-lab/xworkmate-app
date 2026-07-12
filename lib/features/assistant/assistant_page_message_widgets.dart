@@ -13,6 +13,11 @@ import 'package:path_provider/path_provider.dart';
 import '../../app/app_controller.dart';
 import '../../app/app_metadata.dart';
 import '../../app/ui_feature_manifest.dart';
+// PromptDebugSnapshotInternal moved to a dependency-free module so the app
+// controller can reuse it without importing this UI file (which would cycle).
+// Re-exported here to keep existing importers of this file working unchanged.
+import 'prompt_structured_blocks.dart';
+export 'prompt_structured_blocks.dart';
 import '../../i18n/app_language.dart';
 import '../../models/app_models.dart';
 import '../../runtime/runtime_models.dart';
@@ -314,87 +319,6 @@ class MessageBubbleBodyStateInternal extends State<MessageBubbleBodyInternal> {
         ),
       ),
       onTapLink: (text, href, title) {},
-    );
-  }
-}
-
-class PromptDebugSnapshotInternal {
-  const PromptDebugSnapshotInternal({
-    required this.bodyText,
-    this.attachmentsBlock,
-    this.executionContextBlock,
-  });
-
-  final String bodyText;
-  final String? attachmentsBlock;
-  final String? executionContextBlock;
-
-  static PromptDebugSnapshotInternal fromMessage(String text) {
-    var cursor = 0;
-    String? attachments;
-    String? preferredSkills;
-    String? executionContext;
-    String? builtinPlugins;
-
-    void skipLeadingNewlines() {
-      while (cursor < text.length && text[cursor] == '\n') {
-        cursor++;
-      }
-    }
-
-    String? consumeBlock(String heading) {
-      final prefix = '$heading:\n';
-      if (!text.startsWith(prefix, cursor)) {
-        return null;
-      }
-      final blockStart = cursor;
-      final divider = text.indexOf('\n\n', blockStart);
-      if (divider == -1) {
-        cursor = text.length;
-        return text.substring(blockStart).trimRight();
-      }
-      cursor = divider + 2;
-      return text.substring(blockStart, divider).trimRight();
-    }
-
-    while (cursor < text.length) {
-      skipLeadingNewlines();
-      final attachmentBlock = consumeBlock('Attached files');
-      if (attachmentBlock != null) {
-        attachments = attachmentBlock;
-        continue;
-      }
-      final skillBlock = consumeBlock('Preferred skills');
-      if (skillBlock != null) {
-        preferredSkills = skillBlock;
-        continue;
-      }
-      final executionBlock = consumeBlock('Execution context');
-      if (executionBlock != null) {
-        executionContext = executionBlock;
-        continue;
-      }
-      final builtinPluginsBlock = consumeBlock('Builtin plugins');
-      if (builtinPluginsBlock != null) {
-        builtinPlugins = builtinPluginsBlock;
-        continue;
-      }
-      break;
-    }
-
-    final remainder = text.substring(cursor).trimLeft();
-    final executionContextParts = <String>[
-      ?preferredSkills,
-      ?executionContext,
-      ?builtinPlugins,
-    ];
-
-    return PromptDebugSnapshotInternal(
-      bodyText: remainder.trim(),
-      attachmentsBlock: attachments,
-      executionContextBlock: executionContextParts.isEmpty
-          ? null
-          : executionContextParts.join('\n\n'),
     );
   }
 }

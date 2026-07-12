@@ -11,6 +11,7 @@ import 'app_store_policy.dart';
 import 'ui_feature_manifest.dart';
 import '../i18n/app_language.dart';
 import '../models/app_models.dart';
+import '../features/assistant/prompt_structured_blocks.dart';
 import '../runtime/device_identity_store.dart';
 
 import '../runtime/runtime_bootstrap.dart';
@@ -1007,9 +1008,15 @@ extension AppControllerDesktopThreadActions on AppController {
     List<TaskInputAttachmentRecord> taskInputAttachments =
         const <TaskInputAttachmentRecord>[],
   }) {
-    final requestText = userPrompt.trim().isEmpty
-        ? 'See attached.'
-        : userPrompt.trim();
+    // The composer prepends structured blocks (Execution context, Attached
+    // files, Preferred skills, Builtin plugins) to the typed text. Those must
+    // sit as siblings of the workspace context below, not nested under
+    // "User request:" — otherwise the real ask is buried after the metadata and
+    // the agent reads the context framing as the request. Hoist them out and
+    // keep only the user's actual text under "User request:".
+    final promptSnapshot = PromptDebugSnapshotInternal.fromMessage(userPrompt);
+    final requestBody = promptSnapshot.bodyText.trim();
+    final requestText = requestBody.isEmpty ? 'See attached.' : requestBody;
     final executionWorkspace =
         executionWorkingDirectory?.trim().isNotEmpty == true
         ? executionWorkingDirectory!.trim()
@@ -1052,6 +1059,17 @@ extension AppControllerDesktopThreadActions on AppController {
           '  - ${attachment.name.trim()} (${attachment.mimeType.trim()}, sha256: ${attachment.key}$pathSuffix)',
         );
       }
+    }
+    // Structured blocks hoisted out of the composed prompt, emitted as
+    // siblings of the workspace context so they no longer bury the request.
+    final attachmentsBlock = promptSnapshot.attachmentsBlock?.trim() ?? '';
+    if (attachmentsBlock.isNotEmpty) {
+      buffer.writeln(attachmentsBlock);
+    }
+    final executionContextBlock =
+        promptSnapshot.executionContextBlock?.trim() ?? '';
+    if (executionContextBlock.isNotEmpty) {
+      buffer.writeln(executionContextBlock);
     }
     buffer
       ..writeln('User request:')

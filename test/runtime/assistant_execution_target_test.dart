@@ -1502,6 +1502,36 @@ void main() {
     );
 
     test(
+      'sendChatMessage hoists the Execution context block out of User request',
+      () async {
+        final fakeGoTaskService = _RecordingGoTaskServiceClient();
+        final controller = _connectedGatewayController(fakeGoTaskService);
+        addTearDown(controller.dispose);
+
+        await controller.ensureActiveAssistantThreadInternal();
+        await controller.setAssistantExecutionTarget(
+          AssistantExecutionTarget.gateway,
+        );
+        // Mirrors the composer output: an Execution context block prepended to
+        // the typed text (composePromptInternal runs before sendChatMessage).
+        await controller.sendChatMessage(
+          'Execution context:\n'
+          '- target: gateway\n'
+          '- permission: default\n\n'
+          '采集AI咨询',
+        );
+
+        expect(fakeGoTaskService.requests, hasLength(1));
+        final prompt = fakeGoTaskService.requests.single.prompt;
+        // Execution context sits as a sibling block; the real ask leads
+        // "User request:" and is no longer buried behind the metadata.
+        expect(prompt, contains('Execution context:\n- target: gateway'));
+        expect(prompt, contains('User request:\n采集AI咨询'));
+        expect(prompt, isNot(contains('User request:\nExecution context:')));
+      },
+    );
+
+    test(
       'sendChatMessage sends artifact output without local class metadata',
       () async {
         final fakeGoTaskService = _RecordingGoTaskServiceClient();
