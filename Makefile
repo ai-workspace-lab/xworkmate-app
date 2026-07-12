@@ -134,7 +134,11 @@ install-mac: package-mac ## Package and install the macOS app into /Applications
 	bash scripts/install-flutter-mac-dmg.sh
 
 clean: ## Remove generated artifacts
-	$(FLUTTER) clean
+	@if command -v $(FLUTTER) >/dev/null 2>&1; then \
+		$(FLUTTER) clean; \
+	else \
+		echo "flutter not found; skipping flutter clean"; \
+	fi
 	rm -rf build dist
 
 check-export-compliance: ## Verify source and built Apple plist export-compliance flags
