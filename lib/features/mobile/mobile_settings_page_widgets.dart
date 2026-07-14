@@ -17,28 +17,31 @@ class MobileSettingsTabSelectorInternal extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SegmentedButton<SettingsTab>(
-      key: const Key('mobile-settings-tab-selector'),
-      segments: [
-        for (final tab in availableTabs)
-          ButtonSegment<SettingsTab>(
-            value: tab,
-            icon: Icon(
-              tab == SettingsTab.archivedTasks
-                  ? Icons.inventory_2_outlined
-                  : (tab == SettingsTab.help
-                        ? Icons.help_outline_rounded
-                        : Icons.hub_outlined),
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: SegmentedButton<SettingsTab>(
+        key: const Key('mobile-settings-tab-selector'),
+        segments: [
+          for (final tab in availableTabs)
+            ButtonSegment<SettingsTab>(
+              value: tab,
+              icon: Icon(
+                tab == SettingsTab.archivedTasks
+                    ? Icons.inventory_2_outlined
+                    : (tab == SettingsTab.help
+                          ? Icons.help_outline_rounded
+                          : Icons.hub_outlined),
+              ),
+              label: Text(tab.label),
             ),
-            label: Text(tab.label),
-          ),
-      ],
-      selected: <SettingsTab>{currentTab},
-      onSelectionChanged: (selection) {
-        if (selection.isNotEmpty) {
-          onChanged(selection.first);
-        }
-      },
+        ],
+        selected: <SettingsTab>{currentTab},
+        onSelectionChanged: (selection) {
+          if (selection.isNotEmpty) {
+            onChanged(selection.first);
+          }
+        },
+      ),
     );
   }
 }
@@ -63,11 +66,11 @@ class MobileSettingsCardInternal extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         color: palette.surfacePrimary,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: palette.strokeSoft),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

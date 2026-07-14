@@ -34,6 +34,12 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('mobile-assistant-page')), findsOneWidget);
+      expect(find.text('你想让我帮你做什么？'), findsOneWidget);
+      expect(
+        find.byKey(const Key('mobile-assistant-open-menu-button')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('mobile-assistant-input')), findsOneWidget);
       expect(
         find.byKey(const Key('assistant-conversation-shell')),
         findsNothing,
@@ -48,7 +54,92 @@ void main() {
       );
     });
 
-    testWidgets('disconnected state shows a mobile Bridge connect CTA', (
+    testWidgets('mobile menu opens task navigation with home breadcrumb', (
+      tester,
+    ) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(430, 932);
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final controller = AppController(
+        environmentOverride: const <String, String>{},
+      );
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light().copyWith(platform: TargetPlatform.iOS),
+          home: AppShell(controller: controller),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(
+        find.byKey(const Key('mobile-assistant-open-menu-button')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('返回对话主页'), findsOneWidget);
+      expect(find.text('XWorkmate'), findsOneWidget);
+      expect(find.text('集成配置'), findsOneWidget);
+      expect(find.text('工作区'), findsNothing);
+      expect(find.text('AI 工作空间'), findsNothing);
+      expect(
+        find.byKey(const Key('mobile-assistant-fab-create')),
+        findsOneWidget,
+      );
+
+      await tester.tap(find.text('返回对话主页'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('你想让我帮你做什么？'), findsOneWidget);
+    });
+
+    testWidgets('mobile history opens quick task switcher', (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(430, 932);
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final controller = AppController(
+        environmentOverride: const <String, String>{},
+      );
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light().copyWith(platform: TargetPlatform.iOS),
+          home: AppShell(controller: controller),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(
+        find.byKey(const Key('mobile-assistant-open-history-button')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('切换任务会话'), findsOneWidget);
+      expect(
+        find.byKey(const Key('mobile-session-switcher-new-task')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('mobile-session-switcher-full-list')),
+        findsOneWidget,
+      );
+
+      await tester.tap(
+        find.byKey(const Key('mobile-session-switcher-full-list')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('返回对话主页'), findsOneWidget);
+      expect(find.text('XWorkmate'), findsOneWidget);
+    });
+
+    testWidgets('disconnected state guides to integration settings', (
       tester,
     ) async {
       final controller = AppController(
@@ -59,7 +150,8 @@ void main() {
       await tester.pumpWidget(_buildTestApp(controller: controller));
       await tester.pumpAndSettle();
 
-      expect(find.text('先连接 Bridge'), findsWidgets);
+      expect(find.text('先配置集成连接'), findsWidgets);
+      expect(find.text('去配置集成'), findsOneWidget);
       expect(
         find.byKey(const Key('mobile-assistant-connect-bridge-button')),
         findsOneWidget,
