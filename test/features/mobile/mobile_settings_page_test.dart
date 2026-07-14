@@ -239,6 +239,10 @@ void main() {
         find.byKey(const Key('mobile-settings-account-signed-in-card')),
         findsOneWidget,
       );
+      expect(
+        find.byKey(const Key('mobile-settings-manual-bridge-card')),
+        findsNothing,
+      );
       expect(find.text('mobile@svc.plus'), findsOneWidget);
     });
 
@@ -311,6 +315,15 @@ void main() {
           Uri.parse('http://127.0.0.1:1/acp/rpc'),
         ),
         'mobile-manual-token',
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('mobile-settings-manual-bridge-card')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('mobile-settings-account-login-card')),
+        findsNothing,
       );
     });
   });
