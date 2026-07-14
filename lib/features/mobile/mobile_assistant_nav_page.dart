@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 
 import '../../app/app_controller.dart';
 import '../../app/workspace_page_registry.dart';
+import '../../i18n/app_language.dart';
 import '../../models/app_models.dart';
 import 'mobile_assistant_list_page.dart';
 import 'mobile_assistant_page_core.dart';
@@ -25,6 +26,14 @@ class MobileAssistantNavPage extends StatefulWidget {
 class _MobileAssistantNavPageState extends State<MobileAssistantNavPage> {
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
 
+  void _openTaskList() {
+    _navigatorKey.currentState?.pushNamed('/tasks');
+  }
+
+  void _returnHome() {
+    _navigatorKey.currentState?.popUntil((route) => route.isFirst);
+  }
+
   @override
   Widget build(BuildContext context) {
     return KeyedSubtree(
@@ -32,35 +41,41 @@ class _MobileAssistantNavPageState extends State<MobileAssistantNavPage> {
       child: Navigator(
         key: _navigatorKey,
         initialRoute: '/',
-      onGenerateRoute: (RouteSettings settings) {
-        WidgetBuilder builder;
-        switch (settings.name) {
-          case '/':
-            builder = (BuildContext context) => MobileAssistantListPage(
-                  controller: widget.controller,
-                  onSelectTask: (sessionKey) async {
-                    await widget.controller.switchSession(sessionKey);
-                    if (!mounted) return;
-                    _navigatorKey.currentState?.pushNamed('/detail');
-                  },
-                );
-            break;
-          case '/detail':
-            builder = (BuildContext context) => MobileAssistantDetailPage(
-                  controller: widget.controller,
-                  onOpenDetail: widget.onOpenDetail,
-                  mobileActions: widget.mobileActions,
-                  onBack: () => _navigatorKey.currentState?.pop(),
-                );
-            break;
-          default:
-            builder = (BuildContext context) => const SizedBox();
-        }
-        return CupertinoPageRoute(
-          builder: builder,
-          settings: settings,
-        );
-      },
-    ));
+        onGenerateRoute: (RouteSettings settings) {
+          WidgetBuilder builder;
+          switch (settings.name) {
+            case '/':
+              builder = (BuildContext context) => MobileAssistantDetailPage(
+                controller: widget.controller,
+                onOpenDetail: widget.onOpenDetail,
+                mobileActions: widget.mobileActions,
+                onBack: _openTaskList,
+              );
+              break;
+            case '/tasks':
+              builder = (BuildContext context) => MobileAssistantListPage(
+                controller: widget.controller,
+                onBackHome: _returnHome,
+                onSelectTask: (sessionKey) async {
+                  await widget.controller.switchSession(sessionKey);
+                  if (!mounted) {
+                    return;
+                  }
+                  _returnHome();
+                },
+              );
+              break;
+            default:
+              builder = (BuildContext context) => Center(
+                child: CupertinoButton(
+                  onPressed: _returnHome,
+                  child: Text(appText('返回对话主页', 'Back to Chat')),
+                ),
+              );
+          }
+          return CupertinoPageRoute(builder: builder, settings: settings);
+        },
+      ),
+    );
   }
 }
