@@ -416,6 +416,8 @@ class _AccountSection extends StatelessWidget {
         ],
       );
     }
+    final manualBridgeConfigured =
+        settings.acpBridgeServerModeConfig.effective.source == 'bridge';
     if (accountSignedIn) {
       final email = accountSession?.email.trim().isNotEmpty == true
           ? accountSession!.email.trim()
@@ -462,14 +464,15 @@ class _AccountSection extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          _ManualBridgeCard(
-            accountBusy: accountBusy,
-            bridgeUrlController: bridgeUrlController,
-            bridgeTokenController: bridgeTokenController,
-            onSaveManualBridge: onSaveManualBridge,
-          ),
         ],
+      );
+    }
+    if (manualBridgeConfigured) {
+      return _ManualBridgeCard(
+        accountBusy: accountBusy,
+        bridgeUrlController: bridgeUrlController,
+        bridgeTokenController: bridgeTokenController,
+        onSaveManualBridge: onSaveManualBridge,
       );
     }
     return Column(
