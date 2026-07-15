@@ -1,6 +1,7 @@
 // ignore_for_file: unused_import, unnecessary_import
 
 import 'dart:convert';
+import 'dart:io';
 import '../i18n/app_language.dart';
 import '../models/app_models.dart';
 import 'runtime_models_connection.dart';
@@ -933,6 +934,7 @@ class OpenClawTaskAssociation {
     this.requiredArtifactExtensions = const <String>[],
     this.expectedArtifactExtensions = const <String>[],
     this.requiresArtifactExport = false,
+    this.artifactStatus = '',
   });
 
   final String sessionId;
@@ -950,6 +952,7 @@ class OpenClawTaskAssociation {
   final List<String> requiredArtifactExtensions;
   final List<String> expectedArtifactExtensions;
   final bool requiresArtifactExport;
+  final String artifactStatus;
 
   bool get isTerminal {
     final normalized = status.trim().toLowerCase();
@@ -976,6 +979,7 @@ class OpenClawTaskAssociation {
       requiredArtifactExtensions: requiredArtifactExtensions,
       expectedArtifactExtensions: expectedArtifactExtensions,
       requiresArtifactExport: requiresArtifactExport,
+      artifactStatus: artifactStatus,
     );
   }
 
@@ -996,6 +1000,7 @@ class OpenClawTaskAssociation {
       'requiredArtifactExtensions': requiredArtifactExtensions,
       'expectedArtifactExtensions': expectedArtifactExtensions,
       'requiresArtifactExport': requiresArtifactExport,
+      if (artifactStatus.isNotEmpty) 'artifactStatus': artifactStatus,
     };
   }
 
@@ -1010,7 +1015,8 @@ class OpenClawTaskAssociation {
         'artifactDirectory': artifactDirectory,
       if (gatewayProviderId.trim().isNotEmpty)
         'gatewayProviderId': gatewayProviderId,
-      if (requiresArtifactExport) 'requiresArtifactExport': true,
+      if (requiresArtifactExport || Platform.isIOS || Platform.isAndroid)
+        'requiresArtifactExport': true,
       if (expectedArtifactExtensions.isNotEmpty)
         'expectedArtifactExtensions': expectedArtifactExtensions,
       if (requiredArtifactExtensions.isNotEmpty)
@@ -1068,6 +1074,8 @@ class OpenClawTaskAssociation {
           _boolFromJson(json['requiresArtifactExport']) ??
           _boolFromJson(json['requiresExportBeforeFinalResponse']) ??
           false,
+      artifactStatus:
+          json['artifactStatus']?.toString().trim().toLowerCase() ?? '',
     );
   }
 }

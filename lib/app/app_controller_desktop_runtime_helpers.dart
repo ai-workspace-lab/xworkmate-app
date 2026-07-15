@@ -783,6 +783,36 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
       existingThread.selectedSkillKeys,
     );
     final artifacts = result.artifacts;
+    final isMobile = Platform.isIOS || Platform.isAndroid;
+    if (isMobile && result.artifactStatus.isNotEmpty) {
+      final status = result.artifactStatus;
+      if (status == 'none') {
+        upsertTaskThreadInternal(
+          normalizedSessionKey,
+          lastArtifactSyncAtMs: syncedAtMs,
+          lastArtifactSyncStatus: 'no-artifacts',
+          updatedAtMs: syncedAtMs,
+        );
+        return;
+      } else if (status == 'failed') {
+        upsertTaskThreadInternal(
+          normalizedSessionKey,
+          lastArtifactSyncAtMs: syncedAtMs,
+          lastArtifactSyncStatus: 'failed',
+          updatedAtMs: syncedAtMs,
+        );
+        return;
+      } else if (status == 'exporting') {
+        upsertTaskThreadInternal(
+          normalizedSessionKey,
+          lastArtifactSyncAtMs: syncedAtMs,
+          lastArtifactSyncStatus: 'syncing',
+          updatedAtMs: syncedAtMs,
+        );
+        return;
+      }
+    }
+
     if (artifacts.isEmpty) {
       final association = existingThread.openClawTaskAssociation;
       final waitingForOpenClawArtifacts =
