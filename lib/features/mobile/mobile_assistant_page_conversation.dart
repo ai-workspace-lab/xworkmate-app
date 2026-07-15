@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/cupertino.dart';
@@ -8,6 +9,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../app/app_controller.dart';
 import '../../i18n/app_language.dart';
 import '../../runtime/runtime_models.dart';
+import '../../runtime/assistant_artifacts.dart';
 import '../../theme/app_palette.dart';
 import '../../widgets/assistant_task_progress_bar.dart';
 import 'mobile_builtin_plugin_scenes.dart';
@@ -49,9 +51,12 @@ class MobileAssistantConversation extends StatelessWidget {
       controller: scrollController,
       physics: const BouncingScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(22, 6, 22, 18),
-      itemCount: itemCount,
+      itemCount: itemCount + 1,
       separatorBuilder: (_, _) => const SizedBox(height: 18),
       itemBuilder: (context, index) {
+        if (index == itemCount) {
+          return _MobileSessionArtifacts(controller: controller);
+        }
         if (index >= messages.length) {
           return const _MobileExecutionProgressCard();
         }
@@ -212,39 +217,6 @@ class _MobileAssistantMessageCard extends StatelessWidget {
                 const SizedBox(height: 18),
               ],
               _MobileBridgeInlineStatus(connected: !message.error),
-              const SizedBox(height: 18),
-              _MobileGeneratedArtifactCard(
-                onTap: () async {
-                  try {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text(appText('正在准备文件...', 'Preparing file...'))),
-                    );
-                    final snapshot = await controller.loadAssistantArtifactSnapshot();
-                    if (!context.mounted) return;
-                    if (snapshot.fileEntries.isEmpty) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text(appText('暂无可用结果', 'No results available'))),
-                      );
-                      return;
-                    }
-                    final entry = snapshot.fileEntries.first;
-                    final preview = await controller.loadAssistantArtifactPreview(entry);
-                    
-                    final dir = await getTemporaryDirectory();
-                    final file = File('${dir.path}/${entry.label}');
-                    await file.writeAsString(preview.content);
-                    
-                    await Share.shareXFiles([XFile(file.path)], text: entry.label);
-                  } catch (e) {
-                    if (!context.mounted) return;
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('下载失败: $e')),
-                    );
-                  }
-                },
-              ),
-              const SizedBox(height: 12),
-              _MobileLogButton(),
             ],
           ),
         ),
@@ -281,8 +253,8 @@ class _MobileExecutionProgressCard extends StatelessWidget {
             Expanded(
               child: Text(
                 appText(
-                  '正在生成中...你可以随时查看日志或取消任务。',
-                  'Generating... you can view logs or cancel anytime.',
+                  '正在执行中...',
+                  'Executing...',
                 ),
                 style: Theme.of(
                   context,
@@ -793,9 +765,14 @@ class _MobileBridgeInlineStatus extends StatelessWidget {
 }
 
 class _MobileGeneratedArtifactCard extends StatelessWidget {
-  const _MobileGeneratedArtifactCard({this.onTap});
+  const _MobileGeneratedArtifactCard({
+    required this.title,
+    required this.onTap,
+    super.key,
+  });
 
-  final VoidCallback? onTap;
+  final String title;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -834,7 +811,7 @@ class _MobileGeneratedArtifactCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    appText('任务结果.md', 'Task result.md'),
+                    title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.titleSmall?.copyWith(
@@ -861,35 +838,73 @@ class _MobileGeneratedArtifactCard extends StatelessWidget {
   }
 }
 
-class _MobileLogButton extends StatelessWidget {
+class _MobileSessionArtifacts extends StatefulWidget {
+  const _MobileSessionArtifacts({super.key, required this.controller});
+  final AppController controller;
+
+  @override
+  State<_MobileSessionArtifacts> createState() => _MobileSessionArtifactsState();
+}
+
+class _MobileSessionArtifactsState extends State<_MobileSessionArtifacts> {
+  AssistantArtifactSnapshot? _snapshot;
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+    _timer = Timer.periodic(const Duration(seconds: 3), (_) => _load());
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    try {
+      final s = await widget.controller.loadAssistantArtifactSnapshot();
+      if (mounted) setState(() => _snapshot = s);
+    } catch (_) {}
+  }
+
   @override
   Widget build(BuildContext context) {
-    final palette = context.palette;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: palette.surfacePrimary,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: palette.strokeSoft),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        child: Row(
-          children: [
-            Icon(Icons.list_rounded, color: palette.textSecondary, size: 20),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Text(
-                appText('查看运行日志', 'View run logs'),
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: palette.textPrimary,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
+    if (_snapshot == null || _snapshot!.fileEntries.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        for (final entry in _snapshot!.fileEntries)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: _MobileGeneratedArtifactCard(
+              title: entry.label,
+              onTap: () async {
+                try {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(appText('正在准备文件...', 'Preparing file...'))),
+                  );
+                  final preview = await widget.controller.loadAssistantArtifactPreview(entry);
+                  if (!context.mounted) return;
+                  final dir = await getTemporaryDirectory();
+                  final file = File('${dir.path}/${entry.label}');
+                  await file.writeAsString(preview.content);
+                  await Share.shareXFiles([XFile(file.path)], text: entry.label);
+                } catch (e) {
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('下载失败: $e')),
+                  );
+                }
+              },
             ),
-            Icon(Icons.chevron_right_rounded, color: palette.textSecondary),
-          ],
-        ),
-      ),
+          ),
+      ],
     );
   }
 }
