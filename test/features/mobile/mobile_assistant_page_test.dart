@@ -214,6 +214,46 @@ void main() {
       );
     });
 
+    testWidgets('composer add sheet keeps plugins and skills compact', (
+      tester,
+    ) async {
+      final controller = AppController(
+        environmentOverride: const <String, String>{},
+      );
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(_buildTestApp(controller: controller));
+      await tester.pumpAndSettle();
+
+      await tester.tap(
+        find.byKey(const Key('mobile-assistant-composer-add-button')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('会话配置'), findsOneWidget);
+      expect(find.text('内置插件'), findsOneWidget);
+      expect(find.text('技能选择'), findsOneWidget);
+      expect(
+        find.byKey(const Key('mobile-assistant-plugin-chip-builtin.document')),
+        findsOneWidget,
+      );
+      expect(find.text('当前没有已加载技能。'), findsOneWidget);
+
+      await tester.tap(
+        find.byKey(const Key('mobile-assistant-plugin-chip-builtin.document')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('mobile-assistant-sheet-close')));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(
+          const Key('mobile-assistant-selected-plugin-builtin.document'),
+        ),
+        findsOneWidget,
+      );
+    });
+
     testWidgets('provider sheet fails closed when capabilities are empty', (
       tester,
     ) async {
