@@ -821,7 +821,8 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
               association.requiredArtifactExtensions.isNotEmpty) &&
           (association.artifactScope.trim().isNotEmpty ||
               association.artifactDirectory.trim().isNotEmpty) &&
-          result.success;
+          result.success &&
+          (result.artifactStatus.isEmpty || result.artifactStatus == 'exporting');
       if (waitingForOpenClawArtifacts) {
         final firstSyncAtMs =
             artifactSyncStartedAtMs ?? existingThread.lastArtifactSyncAtMs;
