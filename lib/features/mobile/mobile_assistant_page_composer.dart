@@ -232,6 +232,17 @@ class MobileAssistantComposer extends StatelessWidget {
                                 );
                               },
                             ),
+                            MobileAssistantActionChip(
+                              key: const Key(
+                                'mobile-assistant-attachment-button',
+                              ),
+                              icon: CupertinoIcons.paperclip,
+                              label: appText('添加附件', 'Attachments'),
+                              onTap: () {
+                                Navigator.pop(sheetContext);
+                                onPickAttachments();
+                              },
+                            ),
                           ],
                         ),
                         const SizedBox(height: 18),
@@ -386,17 +397,8 @@ class MobileAssistantComposer extends StatelessWidget {
                               border: InputBorder.none,
                               enabledBorder: InputBorder.none,
                               focusedBorder: InputBorder.none,
-                              prefixIcon: IconButton(
-                                icon: const Icon(CupertinoIcons.paperclip),
-                                color: palette.textSecondary,
-                                padding: EdgeInsets.zero,
-                                onPressed: onPickAttachments,
-                              ),
-                              prefixIconConstraints: const BoxConstraints(
-                                minWidth: 44,
-                                minHeight: 44,
-                              ),
                               contentPadding: const EdgeInsets.only(
+                                left: 16,
                                 right: 16,
                                 top: 16,
                                 bottom: 16,
