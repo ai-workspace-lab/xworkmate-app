@@ -366,7 +366,7 @@ class _MobileAssistantDetailPageState extends State<MobileAssistantDetailPage> {
   }
 }
 
-class _MobileTaskWorkspaceReference extends StatelessWidget {
+class _MobileTaskWorkspaceReference extends StatefulWidget {
   const _MobileTaskWorkspaceReference({
     required this.workspaceReference,
     required this.onCopy,
@@ -376,9 +376,55 @@ class _MobileTaskWorkspaceReference extends StatelessWidget {
   final VoidCallback onCopy;
 
   @override
+  State<_MobileTaskWorkspaceReference> createState() =>
+      _MobileTaskWorkspaceReferenceState();
+}
+
+class _MobileTaskWorkspaceReferenceState
+    extends State<_MobileTaskWorkspaceReference> {
+  bool _expanded = false;
+
+  @override
   Widget build(BuildContext context) {
     final palette = context.palette;
     final theme = Theme.of(context);
+    
+    if (!_expanded) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(22, 0, 22, 10),
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: InkWell(
+            onTap: () => setState(() => _expanded = true),
+            borderRadius: BorderRadius.circular(12),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: palette.chromeSurface.withValues(alpha: 0.72),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: palette.chromeStroke),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.info_outline_rounded, size: 14, color: palette.textSecondary),
+                    const SizedBox(width: 6),
+                    Text(
+                      appText('查看任务ID', 'View Task ID'),
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: palette.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(22, 0, 22, 10),
       child: DecoratedBox(
@@ -395,9 +441,9 @@ class _MobileTaskWorkspaceReference extends StatelessWidget {
               const SizedBox(width: 7),
               Expanded(
                 child: Tooltip(
-                  message: workspaceReference,
+                  message: widget.workspaceReference,
                   child: Text(
-                    workspaceReference,
+                    widget.workspaceReference,
                     key: const Key('mobile-assistant-task-workspace-ref'),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -410,14 +456,14 @@ class _MobileTaskWorkspaceReference extends StatelessWidget {
               ),
               IconButton(
                 key: const Key('mobile-assistant-copy-task-workspace-ref'),
-                tooltip: appText('复制任务路径', 'Copy task path'),
+                tooltip: appText('复制任务ID', 'Copy task ID'),
                 visualDensity: VisualDensity.compact,
                 constraints: const BoxConstraints.tightFor(
                   width: 32,
                   height: 32,
                 ),
                 padding: EdgeInsets.zero,
-                onPressed: onCopy,
+                onPressed: widget.onCopy,
                 icon: const Icon(Icons.content_copy_rounded, size: 16),
               ),
             ],
