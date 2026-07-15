@@ -516,6 +516,9 @@ class SettingsController extends ChangeNotifier {
       await subscription.cancel();
     }
     settingsWatchSubscriptionsInternal.clear();
+    if (Platform.isIOS || Platform.isAndroid) {
+      return;
+    }
     final file = await storeInternal.resolvedSettingsFile();
     final directory = await storeInternal.resolvedSettingsWatchDirectory();
     void scheduleReload() {
@@ -535,7 +538,8 @@ class SettingsController extends ChangeNotifier {
             }),
           );
         }
-      } catch (e, stackTrace) { debugPrint('Error: $e\n$stackTrace');
+      } catch (e, stackTrace) {
+        debugPrint('Error: $e\n$stackTrace');
         // Best effort only. If file watching fails, directory watching may still work.
       }
     }
@@ -549,7 +553,8 @@ class SettingsController extends ChangeNotifier {
             scheduleReload();
           }),
         );
-      } catch (e, stackTrace) { debugPrint('Error: $e\n$stackTrace');
+      } catch (e, stackTrace) {
+        debugPrint('Error: $e\n$stackTrace');
         // Best effort only. Missing watch support should not block runtime.
       }
     }
