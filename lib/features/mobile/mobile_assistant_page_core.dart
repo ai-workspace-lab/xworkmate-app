@@ -256,8 +256,6 @@ class _MobileAssistantDetailPageState extends State<MobileAssistantDetailPage> {
                             messages: messages,
                             scrollController: conversationController,
                             onConnectBridge: widget.mobileActions.connectBridge,
-                            onFocusComposer: () =>
-                                inputFocusNode.requestFocus(),
                             onSelectPluginScene: prefillPluginScenePrompt,
                           ),
                         ),
@@ -274,6 +272,11 @@ class _MobileAssistantDetailPageState extends State<MobileAssistantDetailPage> {
                           },
                           onSetExecutionTarget: setExecutionTarget,
                           onSetProvider: setProvider,
+                          onComposerStateChanged: () {
+                            if (mounted) {
+                              setState(() {});
+                            }
+                          },
                           onSend: () => unawaited(sendCurrentPrompt()),
                         ),
                       ],

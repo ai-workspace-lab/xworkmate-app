@@ -12,14 +12,14 @@ Baseline: `release/v1.1`
 
 The mobile UI keeps the current feature set and reshapes it into a ChatGPT-like iOS interaction model:
 
-- A calm conversation-first landing screen with Bridge status, task suggestions, task configuration, and a persistent composer.
+- A calm conversation-first landing screen with Bridge status, five built-in plugin scenes, and a persistent composer.
 - A full-height mobile navigation surface that exposes the same core work areas as desktop: conversation, workspace, archived tasks, AI workspace, plugins, run logs, and settings.
 - An execution-focused chat state that turns running work into a visible timeline, while preserving the existing send, Bridge, Provider, permission, thinking, abort, and settings flows.
 
 ## Interaction rules
 
 - Primary task creation remains one tap from the mobile navigation home.
-- The bottom composer stays visible above the keyboard and keeps the existing configuration sheet entry points.
+- The bottom composer stays visible above the keyboard and keeps the existing configuration sheet entry points, while the always-visible task configuration strip is collapsed into the left-side settings surface.
 - Desktop core functions are mapped to existing mobile settings tabs instead of creating new backend behavior.
 - Running tasks show progress in-thread using current message and run state; no new execution protocol is introduced.
 

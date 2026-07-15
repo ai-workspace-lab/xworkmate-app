@@ -4,7 +4,7 @@ import '../../app/app_controller.dart';
 import '../../i18n/app_language.dart';
 import '../../runtime/runtime_models.dart';
 import '../../theme/app_palette.dart';
-import '../plugins/builtin_plugin_catalog.dart';
+import 'mobile_builtin_plugin_scenes.dart';
 import '../plugins/builtin_plugin_visuals.dart';
 
 class MobileAssistantConversation extends StatelessWidget {
@@ -14,7 +14,6 @@ class MobileAssistantConversation extends StatelessWidget {
     required this.messages,
     required this.scrollController,
     required this.onConnectBridge,
-    required this.onFocusComposer,
     required this.onSelectPluginScene,
   });
 
@@ -22,7 +21,6 @@ class MobileAssistantConversation extends StatelessWidget {
   final List<GatewayChatMessage> messages;
   final ScrollController scrollController;
   final VoidCallback onConnectBridge;
-  final VoidCallback onFocusComposer;
   final ValueChanged<String> onSelectPluginScene;
 
   @override
@@ -31,7 +29,6 @@ class MobileAssistantConversation extends StatelessWidget {
       return MobileAssistantEmptyState(
         controller: controller,
         onConnectBridge: onConnectBridge,
-        onFocusComposer: onFocusComposer,
         onSelectPluginScene: onSelectPluginScene,
       );
     }
@@ -253,13 +250,11 @@ class MobileAssistantEmptyState extends StatelessWidget {
     super.key,
     required this.controller,
     required this.onConnectBridge,
-    required this.onFocusComposer,
     required this.onSelectPluginScene,
   });
 
   final AppController controller;
   final VoidCallback onConnectBridge;
-  final VoidCallback onFocusComposer;
   final ValueChanged<String> onSelectPluginScene;
 
   @override
@@ -310,15 +305,16 @@ class MobileAssistantEmptyState extends StatelessWidget {
                 LayoutBuilder(
                   builder: (context, constraints) {
                     const spacing = 10.0;
-                    final cardWidth = constraints.maxWidth >= 360
-                        ? (constraints.maxWidth - spacing) / 2
-                        : constraints.maxWidth;
+                    final columns = constraints.maxWidth >= 220 ? 2 : 1;
+                    final cardWidth =
+                        (constraints.maxWidth - (spacing * (columns - 1))) /
+                        columns;
                     return Wrap(
                       alignment: WrapAlignment.center,
                       spacing: spacing,
                       runSpacing: spacing,
                       children: [
-                        for (final scene in _pluginScenes)
+                        for (final scene in mobileBuiltinPluginScenes)
                           SizedBox(
                             width: cardWidth,
                             child: _MobilePluginSceneChip(
@@ -439,46 +435,6 @@ class _MobileBridgeHeroStatus extends StatelessWidget {
   }
 }
 
-class _MobilePluginSceneSpec {
-  const _MobilePluginSceneSpec({
-    required this.plugin,
-    required this.sceneLabel,
-    required this.prefillPrompt,
-  });
-
-  final BuiltinPluginDescriptor plugin;
-  final String sceneLabel;
-  final String prefillPrompt;
-}
-
-final List<_MobilePluginSceneSpec> _pluginScenes = <_MobilePluginSceneSpec>[
-  _MobilePluginSceneSpec(
-    plugin: BuiltinPluginCatalog.firstBatch[0],
-    sceneLabel: '整理文档',
-    prefillPrompt: '请把当前内容整理成一份可编辑文档，输出 Markdown、PDF 和 Word。',
-  ),
-  _MobilePluginSceneSpec(
-    plugin: BuiltinPluginCatalog.firstBatch[1],
-    sceneLabel: '整理表格',
-    prefillPrompt: '请把当前内容结构化为可编辑表格，输出 CSV、ODS 和 XLSX。',
-  ),
-  _MobilePluginSceneSpec(
-    plugin: BuiltinPluginCatalog.firstBatch[2],
-    sceneLabel: '制作 PPT',
-    prefillPrompt: '请把当前内容制作成一份可编辑 PPT，适合汇报展示。',
-  ),
-  _MobilePluginSceneSpec(
-    plugin: BuiltinPluginCatalog.firstBatch[3],
-    sceneLabel: '生成图片',
-    prefillPrompt: '请围绕当前主题生成一组图片，适合封面、配图和海报。',
-  ),
-  _MobilePluginSceneSpec(
-    plugin: BuiltinPluginCatalog.firstBatch[4],
-    sceneLabel: '制作视频',
-    prefillPrompt: '请把当前内容整理成分镜脚本，并生成成片视频。',
-  ),
-];
-
 class _MobilePluginSceneChip extends StatelessWidget {
   const _MobilePluginSceneChip({
     super.key,
@@ -487,7 +443,7 @@ class _MobilePluginSceneChip extends StatelessWidget {
     required this.onTap,
   });
 
-  final _MobilePluginSceneSpec scene;
+  final MobileBuiltinPluginSceneSpec scene;
   final bool connected;
   final VoidCallback onTap;
 
@@ -512,12 +468,12 @@ class _MobilePluginSceneChip extends StatelessWidget {
             boxShadow: [palette.chromeShadowAmbient],
           ),
           child: Padding(
-            padding: const EdgeInsets.all(14),
+            padding: const EdgeInsets.all(12),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                BuiltinPluginIconTile(plugin: scene.plugin, size: 30),
-                const SizedBox(width: 10),
+                BuiltinPluginIconTile(plugin: scene.plugin, size: 28),
+                const SizedBox(width: 8),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -529,6 +485,7 @@ class _MobilePluginSceneChip extends StatelessWidget {
                         style: theme.textTheme.titleSmall?.copyWith(
                           color: palette.textPrimary,
                           fontWeight: FontWeight.w800,
+                          fontSize: 14,
                         ),
                       ),
                       const SizedBox(height: 4),
@@ -538,7 +495,8 @@ class _MobilePluginSceneChip extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: palette.textSecondary,
-                          height: 1.35,
+                          height: 1.32,
+                          fontSize: 12.5,
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -547,7 +505,7 @@ class _MobilePluginSceneChip extends StatelessWidget {
                         runSpacing: 6,
                         children: [
                           for (final format in scene.plugin.outputFormats.take(
-                            3,
+                            2,
                           ))
                             _MobilePluginFormatTag(label: format.toUpperCase()),
                         ],
