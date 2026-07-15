@@ -36,27 +36,6 @@ void toggleBuiltinPluginForSession(String sessionKey, String pluginId) {
   }
 }
 
-final Map<String, List<String>> selectedBuiltinPluginIdsBySessionInternal =
-    <String, List<String>>{};
-
-List<String> selectedBuiltinPluginIdsForSession(String sessionKey) {
-  return selectedBuiltinPluginIdsBySessionInternal[sessionKey] ??
-      const <String>[];
-}
-
-void toggleBuiltinPluginForSession(String sessionKey, String pluginId) {
-  final selected = selectedBuiltinPluginIdsBySessionInternal.putIfAbsent(
-    sessionKey,
-    () => <String>[],
-  );
-  if (!selected.remove(pluginId)) {
-    selected.add(pluginId);
-  }
-  if (selected.isEmpty) {
-    selectedBuiltinPluginIdsBySessionInternal.remove(sessionKey);
-  }
-}
-
 class MobileAssistantComposer extends StatelessWidget {
   const MobileAssistantComposer({
     super.key,
