@@ -34,7 +34,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('mobile-assistant-page')), findsOneWidget);
-      expect(find.text('你想让我帮你做什么？'), findsOneWidget);
+    expect(find.text('你想先用哪个插件场景？'), findsOneWidget);
       expect(
         find.byKey(const Key('mobile-assistant-open-menu-button')),
         findsOneWidget,
@@ -93,7 +93,7 @@ void main() {
       await tester.tap(find.text('返回对话主页'));
       await tester.pumpAndSettle();
 
-      expect(find.text('你想让我帮你做什么？'), findsOneWidget);
+    expect(find.text('你想先用哪个插件场景？'), findsOneWidget);
     });
 
     testWidgets('mobile history opens quick task switcher', (tester) async {
@@ -154,6 +154,46 @@ void main() {
       expect(find.text('去配置集成'), findsOneWidget);
       expect(
         find.byKey(const Key('mobile-assistant-connect-bridge-button')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('composer add sheet keeps plugins and skills compact', (
+      tester,
+    ) async {
+      final controller = AppController(
+        environmentOverride: const <String, String>{},
+      );
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(_buildTestApp(controller: controller));
+      await tester.pumpAndSettle();
+
+      await tester.tap(
+        find.byKey(const Key('mobile-assistant-composer-add-button')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('会话配置'), findsOneWidget);
+      expect(find.text('内置插件'), findsOneWidget);
+      expect(find.text('技能选择'), findsOneWidget);
+      expect(
+        find.byKey(const Key('mobile-assistant-plugin-chip-builtin.document')),
+        findsOneWidget,
+      );
+      expect(find.text('当前没有已加载技能。'), findsOneWidget);
+
+      await tester.tap(
+        find.byKey(const Key('mobile-assistant-plugin-chip-builtin.document')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('mobile-assistant-sheet-close')));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(
+          const Key('mobile-assistant-selected-plugin-builtin.document'),
+        ),
         findsOneWidget,
       );
     });
