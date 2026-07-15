@@ -195,6 +195,30 @@ void main() {
       expect(find.text('XWorkmate'), findsOneWidget);
     });
 
+    testWidgets('mobile task header exposes task workspace and copy action', (
+      tester,
+    ) async {
+      final controller = AppController(
+        environmentOverride: const <String, String>{},
+      );
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(_buildTestApp(controller: controller));
+      await tester.pumpAndSettle();
+
+      final workspaceReference = tester.widget<Text>(
+        find.byKey(const Key('mobile-assistant-task-workspace-ref')),
+      );
+      expect(
+        workspaceReference.data,
+        matches(RegExp(r'^\$HOME/\.xworkmate/threads/draft-[A-Za-z0-9._-]+$')),
+      );
+      expect(
+        find.byKey(const Key('mobile-assistant-copy-task-workspace-ref')),
+        findsOneWidget,
+      );
+    });
+
     testWidgets('disconnected state guides to integration settings', (
       tester,
     ) async {

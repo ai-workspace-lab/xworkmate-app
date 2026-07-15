@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -252,10 +251,7 @@ class _MobileExecutionProgressCard extends StatelessWidget {
             const SizedBox(width: 12),
             Expanded(
               child: Text(
-                appText(
-                  '正在执行中...',
-                  'Executing...',
-                ),
+                appText('正在执行中...', 'Executing...'),
                 style: Theme.of(
                   context,
                 ).textTheme.bodyMedium?.copyWith(color: palette.textSecondary),
@@ -599,125 +595,6 @@ class _MobileStatusPill extends StatelessWidget {
   }
 }
 
-class _MobileExecutionTimeline extends StatelessWidget {
-  const _MobileExecutionTimeline({required this.running, required this.failed});
-
-  final bool running;
-  final bool failed;
-
-  @override
-  Widget build(BuildContext context) {
-    final steps = [
-      _TimelineStep(appText('归档任务', 'Archive task'), true),
-      _TimelineStep(appText('AI 工作空间', 'AI workspace'), running),
-      _TimelineStep(appText('运行日志', 'Run logs'), !running && !failed),
-      _TimelineStep(appText('完成', 'Complete'), !running && !failed),
-    ];
-    final palette = context.palette;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          appText('执行进度', 'Progress'),
-          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-            color: palette.textPrimary,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-        const SizedBox(height: 12),
-        for (var i = 0; i < steps.length; i++)
-          _MobileTimelineRow(
-            step: steps[i],
-            isLast: i == steps.length - 1,
-            running: running && i == 1,
-          ),
-      ],
-    );
-  }
-}
-
-class _TimelineStep {
-  const _TimelineStep(this.label, this.done);
-
-  final String label;
-  final bool done;
-}
-
-class _MobileTimelineRow extends StatelessWidget {
-  const _MobileTimelineRow({
-    required this.step,
-    required this.isLast,
-    required this.running,
-  });
-
-  final _TimelineStep step;
-  final bool isLast;
-  final bool running;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.palette;
-    final active = step.done || running;
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Column(
-          children: [
-            DecoratedBox(
-              decoration: BoxDecoration(
-                color: step.done ? palette.accent : Colors.transparent,
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: active ? palette.accent : palette.textMuted,
-                  width: 1.6,
-                ),
-              ),
-              child: SizedBox(
-                width: 22,
-                height: 22,
-                child: step.done
-                    ? const Icon(
-                        Icons.check_rounded,
-                        color: Colors.white,
-                        size: 15,
-                      )
-                    : running
-                    ? Padding(
-                        padding: const EdgeInsets.all(4),
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: palette.accent,
-                        ),
-                      )
-                    : null,
-              ),
-            ),
-            if (!isLast)
-              Container(
-                width: 1.4,
-                height: 34,
-                color: active ? palette.accent : palette.stroke,
-              ),
-          ],
-        ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: Padding(
-            padding: const EdgeInsets.only(top: 1),
-            child: Text(
-              step.label,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: active ? palette.textPrimary : palette.textSecondary,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
 class _MobileBridgeInlineStatus extends StatelessWidget {
   const _MobileBridgeInlineStatus({required this.connected});
 
@@ -768,7 +645,6 @@ class _MobileGeneratedArtifactCard extends StatelessWidget {
   const _MobileGeneratedArtifactCard({
     required this.title,
     required this.onTap,
-    super.key,
   });
 
   final String title;
@@ -790,60 +666,61 @@ class _MobileGeneratedArtifactCard extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.all(12),
           child: Row(
-          children: [
-            DecoratedBox(
-              decoration: BoxDecoration(
-                color: palette.accent,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const SizedBox(
-                width: 42,
-                height: 42,
-                child: Icon(
-                  Icons.insert_chart_outlined_rounded,
-                  color: Colors.white,
+            children: [
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  color: palette.accent,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const SizedBox(
+                  width: 42,
+                  height: 42,
+                  child: Icon(
+                    Icons.insert_chart_outlined_rounded,
+                    color: Colors.white,
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      color: palette.textPrimary,
-                      fontWeight: FontWeight.w700,
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        color: palette.textPrimary,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    appText('已生成 · 等待确认', 'Generated · awaiting review'),
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: palette.textSecondary,
+                    const SizedBox(height: 3),
+                    Text(
+                      appText('已生成 · 等待确认', 'Generated · awaiting review'),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: palette.textSecondary,
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            Icon(Icons.chevron_right_rounded, color: palette.textSecondary),
-          ],
+              Icon(Icons.chevron_right_rounded, color: palette.textSecondary),
+            ],
+          ),
         ),
-      ),
       ),
     );
   }
 }
 
 class _MobileSessionArtifacts extends StatefulWidget {
-  const _MobileSessionArtifacts({super.key, required this.controller});
+  const _MobileSessionArtifacts({required this.controller});
   final AppController controller;
 
   @override
-  State<_MobileSessionArtifacts> createState() => _MobileSessionArtifactsState();
+  State<_MobileSessionArtifacts> createState() =>
+      _MobileSessionArtifactsState();
 }
 
 class _MobileSessionArtifactsState extends State<_MobileSessionArtifacts> {
@@ -887,19 +764,24 @@ class _MobileSessionArtifactsState extends State<_MobileSessionArtifacts> {
               onTap: () async {
                 try {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(appText('正在准备文件...', 'Preparing file...'))),
+                    SnackBar(
+                      content: Text(appText('正在准备文件...', 'Preparing file...')),
+                    ),
                   );
-                  final preview = await widget.controller.loadAssistantArtifactPreview(entry);
+                  final preview = await widget.controller
+                      .loadAssistantArtifactPreview(entry);
                   if (!context.mounted) return;
                   final dir = await getTemporaryDirectory();
                   final file = File('${dir.path}/${entry.label}');
                   await file.writeAsString(preview.content);
-                  await Share.shareXFiles([XFile(file.path)], text: entry.label);
+                  await SharePlus.instance.share(
+                    ShareParams(files: [XFile(file.path)], text: entry.label),
+                  );
                 } catch (e) {
                   if (!context.mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('下载失败: $e')),
-                  );
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(SnackBar(content: Text('下载失败: $e')));
                 }
               },
             ),

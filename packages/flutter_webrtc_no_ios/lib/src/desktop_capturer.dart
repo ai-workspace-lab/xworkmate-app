@@ -32,7 +32,7 @@ abstract class DesktopCapturerSource {
   /// chromeMediaSourceId constraint when calling
   String get id;
 
-  /// A screen source will be named either Entire Screen or Screen <index>,
+  /// A screen source will be named either Entire Screen or Screen `index`,
   /// while the name of a window source will match the window title.
   String get name;
 
