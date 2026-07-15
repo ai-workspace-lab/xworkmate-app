@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 
 import '../../app/app_controller.dart';
 import '../../i18n/app_language.dart';
@@ -11,6 +12,29 @@ import 'mobile_builtin_plugin_scenes.dart';
 import '../plugins/builtin_plugin_catalog.dart';
 import '../plugins/builtin_plugin_visuals.dart';
 import 'mobile_assistant_page_sheets.dart';
+import '../assistant/assistant_attachment_payloads.dart';
+import '../assistant/assistant_page_composer_clipboard.dart';
+
+final Map<String, List<String>> selectedBuiltinPluginIdsBySessionInternal =
+    <String, List<String>>{};
+
+List<String> selectedBuiltinPluginIdsForSession(String sessionKey) {
+  return selectedBuiltinPluginIdsBySessionInternal[sessionKey] ??
+      const <String>[];
+}
+
+void toggleBuiltinPluginForSession(String sessionKey, String pluginId) {
+  final selected = selectedBuiltinPluginIdsBySessionInternal.putIfAbsent(
+    sessionKey,
+    () => <String>[],
+  );
+  if (!selected.remove(pluginId)) {
+    selected.add(pluginId);
+  }
+  if (selected.isEmpty) {
+    selectedBuiltinPluginIdsBySessionInternal.remove(sessionKey);
+  }
+}
 
 final Map<String, List<String>> selectedBuiltinPluginIdsBySessionInternal =
     <String, List<String>>{};
@@ -41,6 +65,9 @@ class MobileAssistantComposer extends StatelessWidget {
     required this.focusNode,
     required this.thinking,
     required this.bottomPadding,
+    required this.attachments,
+    required this.onPickAttachments,
+    required this.onRemoveAttachment,
     required this.onThinkingChanged,
     required this.onSetExecutionTarget,
     required this.onSetProvider,
@@ -53,6 +80,9 @@ class MobileAssistantComposer extends StatelessWidget {
   final FocusNode focusNode;
   final String thinking;
   final double bottomPadding;
+  final List<ComposerAttachmentInternal> attachments;
+  final VoidCallback onPickAttachments;
+  final ValueChanged<ComposerAttachmentInternal> onRemoveAttachment;
   final ValueChanged<String> onThinkingChanged;
   final Future<void> Function(AssistantExecutionTarget target)
   onSetExecutionTarget;
@@ -377,8 +407,17 @@ class MobileAssistantComposer extends StatelessWidget {
                               border: InputBorder.none,
                               enabledBorder: InputBorder.none,
                               focusedBorder: InputBorder.none,
+                              prefixIcon: IconButton(
+                                icon: const Icon(CupertinoIcons.paperclip),
+                                color: palette.textSecondary,
+                                padding: EdgeInsets.zero,
+                                onPressed: onPickAttachments,
+                              ),
+                              prefixIconConstraints: const BoxConstraints(
+                                minWidth: 44,
+                                minHeight: 44,
+                              ),
                               contentPadding: const EdgeInsets.only(
-                                left: 16,
                                 right: 16,
                                 top: 16,
                                 bottom: 16,
@@ -402,7 +441,8 @@ class MobileAssistantComposer extends StatelessWidget {
           if (selectedBuiltinPluginIdsForSession(
                 controller.currentSessionKey,
               ).isNotEmpty ||
-              selectedSkills.isNotEmpty) ...[
+              selectedSkills.isNotEmpty ||
+              attachments.isNotEmpty) ...[
             const SizedBox(height: 8),
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
@@ -410,6 +450,19 @@ class MobileAssistantComposer extends StatelessWidget {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  for (final attachment in attachments)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: _MobileAssistantSelectionChip(
+                        key: ValueKey<String>(
+                          'mobile-assistant-selected-attachment-${attachment.name}',
+                        ),
+                        icon: CupertinoIcons.doc,
+                        label: attachment.name,
+                        onDeleted: () => onRemoveAttachment(attachment),
+                      ),
+                    ),
+>>>>>>> fc8621d3 (feat: complete mobile attachment logic and fixes)
                   for (final pluginId in selectedBuiltinPluginIdsForSession(
                     controller.currentSessionKey,
                   ))

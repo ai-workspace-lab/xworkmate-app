@@ -34,7 +34,27 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('mobile-assistant-page')), findsOneWidget);
-    expect(find.text('你想先用哪个插件场景？'), findsOneWidget);
+      expect(find.text('你想先用哪个插件场景？'), findsOneWidget);
+      expect(
+        find.byKey(const Key('mobile-plugin-scene-builtin.document')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('mobile-plugin-scene-builtin.spreadsheet')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('mobile-plugin-scene-builtin.presentation')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('mobile-plugin-scene-builtin.image')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('mobile-plugin-scene-builtin.video')),
+        findsOneWidget,
+      );
       expect(
         find.byKey(const Key('mobile-assistant-open-menu-button')),
         findsOneWidget,
@@ -93,7 +113,43 @@ void main() {
       await tester.tap(find.text('返回对话主页'));
       await tester.pumpAndSettle();
 
-    expect(find.text('你想先用哪个插件场景？'), findsOneWidget);
+      expect(find.text('你想先用哪个插件场景？'), findsOneWidget);
+    });
+
+    testWidgets('mobile plugins tab shows the built-in plugin panel', (
+      tester,
+    ) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(430, 932);
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      final controller = AppController(
+        environmentOverride: const <String, String>{},
+      );
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light().copyWith(platform: TargetPlatform.iOS),
+          home: AppShell(controller: controller),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(
+        find.byKey(const Key('mobile-assistant-open-menu-button')),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('插件'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('内置插件'), findsOneWidget);
+      expect(find.text('文档'), findsWidgets);
+      expect(find.text('电子表格'), findsWidgets);
+      expect(find.text('PPT 演示'), findsWidgets);
+      expect(find.text('图片'), findsWidgets);
+      expect(find.text('视频'), findsWidgets);
     });
 
     testWidgets('mobile history opens quick task switcher', (tester) async {

@@ -35,10 +35,10 @@ class SettingsPluginsPanel extends StatelessWidget {
           Text(
             appText(
               '任意对话内容都可以输出为可编辑的交付物。在对话框的插件入口选择后，'
-              '模板会插入输入框并随任务执行。',
+                  '模板会插入输入框并随任务执行。',
               'Turn any conversation into editable deliverables. Pick a '
-              'plugin from the composer entry to insert its template into '
-              'the input.',
+                  'plugin from the composer entry to insert its template into '
+                  'the input.',
             ),
             style: theme.textTheme.bodyMedium?.copyWith(
               color: palette.textSecondary,
@@ -51,8 +51,7 @@ class SettingsPluginsPanel extends StatelessWidget {
               final columns = constraints.maxWidth >= 720 ? 2 : 1;
               final cardWidth = columns == 1
                   ? constraints.maxWidth
-                  : (constraints.maxWidth - spacing * (columns - 1)) /
-                        columns;
+                  : (constraints.maxWidth - spacing * (columns - 1)) / columns;
               return Wrap(
                 spacing: spacing,
                 runSpacing: spacing,
@@ -146,10 +145,7 @@ class _BuiltinPluginCard extends StatelessWidget {
                 for (final format in plugin.outputFormats)
                   _PluginTag(label: format.toUpperCase()),
                 for (final skill in plugin.requiredSkills)
-                  _PluginTag(
-                    label: skill,
-                    icon: Icons.key_rounded,
-                  ),
+                  _PluginTag(label: skill, icon: Icons.key_rounded),
               ],
             ),
             if (plugin.pipelineStepsZh.isNotEmpty) ...[
@@ -173,11 +169,7 @@ class _BuiltinPluginCard extends StatelessWidget {
 }
 
 class _PluginTag extends StatelessWidget {
-  const _PluginTag({
-    required this.label,
-    this.icon,
-    this.emphasized = false,
-  });
+  const _PluginTag({required this.label, this.icon, this.emphasized = false});
 
   final String label;
   final IconData? icon;
@@ -202,11 +194,15 @@ class _PluginTag extends StatelessWidget {
               Icon(icon, size: 12, color: color),
               const SizedBox(width: 4),
             ],
-            Text(
-              label,
-              style: theme.textTheme.labelSmall?.copyWith(
-                color: color,
-                fontWeight: FontWeight.w600,
+            Flexible(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: color,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           ],

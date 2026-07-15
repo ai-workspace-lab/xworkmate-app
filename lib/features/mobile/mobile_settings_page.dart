@@ -10,6 +10,8 @@ import '../../runtime/runtime_controllers.dart';
 import '../../runtime/runtime_models.dart';
 import '../../theme/app_palette.dart';
 import 'mobile_settings_page_widgets.dart';
+import '../settings/settings_logs_panel.dart';
+import '../settings/settings_plugins_panel.dart';
 import '../settings/settings_help_panel.dart';
 
 class MobileSettingsPage extends StatefulWidget {
@@ -277,6 +279,10 @@ class _MobileSettingsPageState extends State<MobileSettingsPage> {
                       ],
                       if (currentTab == SettingsTab.archivedTasks)
                         _ArchivedTasksSection(controller: controller)
+                      else if (currentTab == SettingsTab.plugins)
+                        const SettingsPluginsPanel()
+                      else if (currentTab == SettingsTab.logs)
+                        SettingsLogsPanel(controller: controller)
                       else if (currentTab == SettingsTab.help)
                         const SettingsHelpPanel()
                       else

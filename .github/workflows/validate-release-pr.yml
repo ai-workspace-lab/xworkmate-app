@@ -3,6 +3,7 @@ name: Validate Release PR
 # release/* 分支的发布策略门禁：仅接受 hotfix/* 或 backport/* 的 PR。
 # main 只接受 feature/*、bugfix/*、cherry-pick/* 的 PR。
 # hotfix/* 不直接进 main，必须先到 release/*，再按需 cherry-pick 回 main。
+# backport/* 只能进 release/*，cherry-pick/* 只能进 main。
 # 详见 docs/project-development-standard.md
 on:
   pull_request_target:
@@ -51,6 +52,7 @@ jobs:
 
             echo "❌ Rejected."
             echo "main 仅接受 feature/*、bugfix/*、cherry-pick/* 或 cherry-pick 标签的 PR。"
+            echo "如果这是 backport/*，请把 PR base 改成对应的 release/* 分支。"
             exit 1
           fi
 
@@ -69,4 +71,5 @@ jobs:
           echo "  - 来自 hotfix/* 的 PR"
           echo "  - 来自 backport/* 的 PR"
           echo "禁止从 main / bugfix/* / feature/* / cherry-pick/* 直接合并到 release/*。"
+          echo "如果这是 cherry-pick/*，请把 PR base 改成 main。"
           exit 1
