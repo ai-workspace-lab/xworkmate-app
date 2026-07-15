@@ -625,15 +625,23 @@ class _ManualBridgeCard extends StatelessWidget {
   }
 }
 
-class _ArchivedTasksSection extends StatelessWidget {
+class _ArchivedTasksSection extends StatefulWidget {
   const _ArchivedTasksSection({required this.controller});
 
   final AppController controller;
 
   @override
+  State<_ArchivedTasksSection> createState() => _ArchivedTasksSectionState();
+}
+
+class _ArchivedTasksSectionState extends State<_ArchivedTasksSection> {
+  final Set<String> _selectedKeys = {};
+
+  @override
   Widget build(BuildContext context) {
-    final sessions = controller.archivedAssistantSessions;
+    final sessions = widget.controller.archivedAssistantSessions;
     if (sessions.isEmpty) {
+      _selectedKeys.clear();
       return MobileSettingsCardInternal(
         key: const Key('mobile-settings-archived-empty-card'),
         icon: Icons.inventory_2_outlined,
@@ -642,40 +650,123 @@ class _ArchivedTasksSection extends StatelessWidget {
         children: const [],
       );
     }
+
+    _selectedKeys.retainWhere((key) => sessions.any((s) => s.key == key));
+    final allSelected = _selectedKeys.length == sessions.length;
+
     return Column(
       children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+          child: Row(
+            children: [
+              Checkbox(
+                value: allSelected,
+                onChanged: (val) {
+                  setState(() {
+                    if (val == true) {
+                      _selectedKeys.addAll(sessions.map((s) => s.key));
+                    } else {
+                      _selectedKeys.clear();
+                    }
+                  });
+                },
+              ),
+              Text(
+                appText(
+                  '共 ${sessions.length} 条归档任务',
+                  'Total ${sessions.length} archived tasks',
+                ),
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              const Spacer(),
+              if (_selectedKeys.isNotEmpty) ...[
+                TextButton.icon(
+                  onPressed: () {
+                    for (final key in _selectedKeys.toList()) {
+                      widget.controller.saveAssistantTaskArchived(key, false);
+                    }
+                    setState(() {
+                      _selectedKeys.clear();
+                    });
+                  },
+                  icon: const Icon(Icons.unarchive_outlined, size: 18),
+                  label: Text(appText('批量解除归档', 'Batch Restore')),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                  ),
+                ),
+                IconButton(
+                  onPressed: () {
+                    for (final key in _selectedKeys.toList()) {
+                      widget.controller.deleteArchivedAssistantTask(key);
+                    }
+                    setState(() {
+                      _selectedKeys.clear();
+                    });
+                  },
+                  icon: const Icon(Icons.delete_outline_rounded),
+                  color: Theme.of(context).colorScheme.error,
+                  tooltip: appText('批量彻底删除', 'Batch Delete'),
+                ),
+              ],
+            ],
+          ),
+        ),
         for (final session in sessions)
           Padding(
             padding: const EdgeInsets.only(bottom: 10),
-            child: MobileSettingsCardInternal(
-              icon: Icons.inventory_2_outlined,
-              title: session.label.trim().isEmpty
-                  ? appText('未命名任务', 'Untitled Task')
-                  : session.label.trim(),
-              subtitle: session.lastMessagePreview?.trim() ?? '',
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: FilledButton.tonalIcon(
-                        onPressed: () => controller.saveAssistantTaskArchived(
-                          session.key,
-                          false,
-                        ),
-                        icon: const Icon(Icons.unarchive_outlined),
-                        label: Text(appText('恢复', 'Restore')),
+                Padding(
+                  padding: const EdgeInsets.only(top: 16),
+                  child: Checkbox(
+                    value: _selectedKeys.contains(session.key),
+                    onChanged: (val) {
+                      setState(() {
+                        if (val == true) {
+                          _selectedKeys.add(session.key);
+                        } else {
+                          _selectedKeys.remove(session.key);
+                        }
+                      });
+                    },
+                  ),
+                ),
+                Expanded(
+                  child: MobileSettingsCardInternal(
+                    icon: Icons.inventory_2_outlined,
+                    title: session.label.trim().isEmpty
+                        ? appText('未命名任务', 'Untitled Task')
+                        : session.label.trim(),
+                    subtitle: session.lastMessagePreview?.trim() ?? '',
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: FilledButton.tonalIcon(
+                              onPressed: () => widget.controller.saveAssistantTaskArchived(
+                                session.key,
+                                false,
+                              ),
+                              icon: const Icon(Icons.unarchive_outlined),
+                              label: Text(appText('恢复', 'Restore')),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: TextButton.icon(
+                              onPressed: () =>
+                                  widget.controller.deleteArchivedAssistantTask(session.key),
+                              icon: const Icon(Icons.delete_outline_rounded),
+                              label: Text(appText('删除', 'Delete')),
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: TextButton.icon(
-                        onPressed: () =>
-                            controller.deleteArchivedAssistantTask(session.key),
-                        icon: const Icon(Icons.delete_outline_rounded),
-                        label: Text(appText('删除', 'Delete')),
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ],
             ),
