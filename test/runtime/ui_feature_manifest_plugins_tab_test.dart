@@ -11,15 +11,17 @@ void main() {
       return UiFeatureManifest.fromYamlString(raw);
     }
 
-    test('desktop debug exposes the plugins settings tab and composer entry',
-        () {
-      final desktop = loadManifest().forPlatform(
-        UiFeaturePlatform.desktop,
-        buildMode: UiFeatureBuildMode.debug,
-      );
-      expect(desktop.availableSettingsTabs, contains(SettingsTab.plugins));
-      expect(desktop.supportsBuiltinPlugins, isTrue);
-    });
+    test(
+      'desktop debug exposes the plugins settings tab and composer entry',
+      () {
+        final desktop = loadManifest().forPlatform(
+          UiFeaturePlatform.desktop,
+          buildMode: UiFeatureBuildMode.debug,
+        );
+        expect(desktop.availableSettingsTabs, contains(SettingsTab.plugins));
+        expect(desktop.supportsBuiltinPlugins, isTrue);
+      },
+    );
 
     test('desktop release exposes batch 1 by default (stable tier)', () {
       final desktop = loadManifest().forPlatform(
@@ -30,12 +32,16 @@ void main() {
       expect(desktop.supportsBuiltinPlugins, isTrue);
     });
 
-    test('mobile and web stay untouched in batch 1', () {
+    test('mobile exposes batch 1 and web stays untouched', () {
       final manifest = loadManifest();
-      for (final platform in <UiFeaturePlatform>[
+      final mobile = manifest.forPlatform(
         UiFeaturePlatform.mobile,
-        UiFeaturePlatform.web,
-      ]) {
+        buildMode: UiFeatureBuildMode.debug,
+      );
+      expect(mobile.availableSettingsTabs, contains(SettingsTab.plugins));
+      expect(mobile.supportsBuiltinPlugins, isTrue);
+
+      for (final platform in <UiFeaturePlatform>[UiFeaturePlatform.web]) {
         final access = manifest.forPlatform(
           platform,
           buildMode: UiFeatureBuildMode.debug,
