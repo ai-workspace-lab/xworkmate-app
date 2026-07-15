@@ -7,7 +7,31 @@ import '../../i18n/app_language.dart';
 import '../../runtime/runtime_models.dart';
 import '../../theme/app_palette.dart';
 import '../../theme/app_theme.dart';
+import 'mobile_builtin_plugin_scenes.dart';
+import '../plugins/builtin_plugin_catalog.dart';
+import '../plugins/builtin_plugin_visuals.dart';
 import 'mobile_assistant_page_sheets.dart';
+
+final Map<String, List<String>> selectedBuiltinPluginIdsBySessionInternal =
+    <String, List<String>>{};
+
+List<String> selectedBuiltinPluginIdsForSession(String sessionKey) {
+  return selectedBuiltinPluginIdsBySessionInternal[sessionKey] ??
+      const <String>[];
+}
+
+void toggleBuiltinPluginForSession(String sessionKey, String pluginId) {
+  final selected = selectedBuiltinPluginIdsBySessionInternal.putIfAbsent(
+    sessionKey,
+    () => <String>[],
+  );
+  if (!selected.remove(pluginId)) {
+    selected.add(pluginId);
+  }
+  if (selected.isEmpty) {
+    selectedBuiltinPluginIdsBySessionInternal.remove(sessionKey);
+  }
+}
 
 class MobileAssistantComposer extends StatelessWidget {
   const MobileAssistantComposer({
@@ -20,6 +44,7 @@ class MobileAssistantComposer extends StatelessWidget {
     required this.onThinkingChanged,
     required this.onSetExecutionTarget,
     required this.onSetProvider,
+    required this.onComposerStateChanged,
     required this.onSend,
   });
 
@@ -32,6 +57,7 @@ class MobileAssistantComposer extends StatelessWidget {
   final Future<void> Function(AssistantExecutionTarget target)
   onSetExecutionTarget;
   final Future<void> Function(SingleAgentProvider provider) onSetProvider;
+  final VoidCallback onComposerStateChanged;
   final VoidCallback onSend;
 
   @override
@@ -46,96 +72,236 @@ class MobileAssistantComposer extends StatelessWidget {
         : provider.label;
     final hasPendingRun =
         controller.hasAssistantPendingRun || controller.activeRunId != null;
+    final selectedSkillKeys = controller
+        .assistantSelectedSkillKeysForSession(controller.currentSessionKey)
+        .toSet();
+    final selectedSkills = controller.skills
+        .where((skill) => selectedSkillKeys.contains(skill.skillKey))
+        .toList(growable: false);
 
     void showConfigurationMenu() {
+      final selectedPluginIds = List<String>.from(
+        selectedBuiltinPluginIdsForSession(controller.currentSessionKey),
+      );
+      final selectedSkillKeySet = Set<String>.from(selectedSkillKeys);
       showModalBottomSheet(
         context: context,
+        isScrollControlled: true,
+        showDragHandle: true,
         backgroundColor: palette.surfacePrimary,
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
         ),
         builder: (sheetContext) {
-          return SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    appText('会话配置', 'Configuration'),
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: palette.textPrimary,
+          return StatefulBuilder(
+            builder: (sheetContext, setSheetState) {
+              void togglePlugin(String pluginId) {
+                toggleBuiltinPluginForSession(
+                  controller.currentSessionKey,
+                  pluginId,
+                );
+                onComposerStateChanged();
+                setSheetState(() {
+                  if (!selectedPluginIds.remove(pluginId)) {
+                    selectedPluginIds.add(pluginId);
+                  }
+                });
+              }
+
+              void toggleSkill(String skillKey) {
+                unawaited(
+                  controller.toggleAssistantSkillForSession(
+                    controller.currentSessionKey,
+                    skillKey,
+                  ),
+                );
+                onComposerStateChanged();
+                setSheetState(() {
+                  if (!selectedSkillKeySet.remove(skillKey)) {
+                    selectedSkillKeySet.add(skillKey);
+                  }
+                });
+              }
+
+              return SafeArea(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxHeight: MediaQuery.of(sheetContext).size.height * 0.84,
+                  ),
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                appText('会话配置', 'Configuration'),
+                                style: Theme.of(sheetContext)
+                                    .textTheme
+                                    .titleMedium
+                                    ?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                      color: palette.textPrimary,
+                                    ),
+                              ),
+                            ),
+                            IconButton(
+                              key: const Key('mobile-assistant-sheet-close'),
+                              onPressed: () => Navigator.pop(sheetContext),
+                              icon: const Icon(Icons.close_rounded),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 14),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 10,
+                          children: [
+                            MobileAssistantActionChip(
+                              key: const Key('mobile-assistant-target-button'),
+                              icon: target.isGateway
+                                  ? Icons.cloud_queue_rounded
+                                  : Icons.smart_toy_outlined,
+                              label: target.compactLabel,
+                              onTap: () {
+                                Navigator.pop(sheetContext);
+                                showMobileAssistantTargetSheet(
+                                  context,
+                                  controller: controller,
+                                  onSelected: onSetExecutionTarget,
+                                );
+                              },
+                            ),
+                            MobileAssistantActionChip(
+                              key: const Key(
+                                'mobile-assistant-provider-button',
+                              ),
+                              icon: Icons.hub_outlined,
+                              label: providerLabel,
+                              onTap: () {
+                                Navigator.pop(sheetContext);
+                                showMobileAssistantProviderSheet(
+                                  context,
+                                  controller: controller,
+                                  target: target,
+                                  selectedProvider: provider,
+                                  onSelected: onSetProvider,
+                                );
+                              },
+                            ),
+                            MobileAssistantActionChip(
+                              key: const Key(
+                                'mobile-assistant-permission-button',
+                              ),
+                              icon: mobilePermissionIcon(
+                                controller.assistantPermissionLevel,
+                              ),
+                              label: controller.assistantPermissionLevel.label,
+                              onTap: () {
+                                Navigator.pop(sheetContext);
+                                showMobileAssistantPermissionSheet(
+                                  context,
+                                  controller: controller,
+                                );
+                              },
+                            ),
+                            MobileAssistantActionChip(
+                              key: const Key(
+                                'mobile-assistant-thinking-button',
+                              ),
+                              icon: Icons.psychology_alt_outlined,
+                              label: mobileThinkingLabel(thinking),
+                              onTap: () {
+                                Navigator.pop(sheetContext);
+                                showMobileAssistantThinkingSheet(
+                                  context,
+                                  value: thinking,
+                                  onSelected: onThinkingChanged,
+                                );
+                              },
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 18),
+                        _MobileAssistantSheetSection(
+                          title: appText('内置插件', 'Built-in plugins'),
+                          subtitle: appText(
+                            '点选即可叠加到当前会话。',
+                            'Tap to keep a plugin active for this session.',
+                          ),
+                          child: Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              for (final scene in mobileBuiltinPluginScenes)
+                                FilterChip(
+                                  key: ValueKey(
+                                    'mobile-assistant-plugin-chip-${scene.plugin.id}',
+                                  ),
+                                  avatar: BuiltinPluginIconTile(
+                                    plugin: scene.plugin,
+                                    size: 20,
+                                  ),
+                                  label: Text(scene.sceneLabel),
+                                  selected: selectedPluginIds.contains(
+                                    scene.plugin.id,
+                                  ),
+                                  onSelected: (_) =>
+                                      togglePlugin(scene.plugin.id),
+                                ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 18),
+                        _MobileAssistantSheetSection(
+                          title: appText('技能选择', 'Skills'),
+                          subtitle: appText(
+                            '和桌面端保持同一套会话技能选择。',
+                            'Keeps the same session skill selections as desktop.',
+                          ),
+                          child: controller.skills.isEmpty
+                              ? Text(
+                                  appText(
+                                    '当前没有已加载技能。',
+                                    'No skills are loaded yet.',
+                                  ),
+                                  style: Theme.of(sheetContext)
+                                      .textTheme
+                                      .bodyMedium
+                                      ?.copyWith(color: palette.textSecondary),
+                                )
+                              : Wrap(
+                                  spacing: 8,
+                                  runSpacing: 8,
+                                  children: [
+                                    for (final skill in controller.skills)
+                                      FilterChip(
+                                        key: ValueKey(
+                                          'mobile-assistant-skill-chip-${skill.skillKey}',
+                                        ),
+                                        avatar: const Icon(
+                                          Icons.key_rounded,
+                                          size: 16,
+                                        ),
+                                        label: Text(skill.name),
+                                        selected: selectedSkillKeySet.contains(
+                                          skill.skillKey,
+                                        ),
+                                        onSelected: (_) =>
+                                            toggleSkill(skill.skillKey),
+                                      ),
+                                  ],
+                                ),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 12,
-                    children: [
-                      MobileAssistantActionChip(
-                        key: const Key('mobile-assistant-target-button'),
-                        icon: target.isGateway
-                            ? Icons.cloud_queue_rounded
-                            : Icons.smart_toy_outlined,
-                        label: target.compactLabel,
-                        onTap: () {
-                          Navigator.pop(sheetContext);
-                          showMobileAssistantTargetSheet(
-                            context,
-                            controller: controller,
-                            onSelected: onSetExecutionTarget,
-                          );
-                        },
-                      ),
-                      MobileAssistantActionChip(
-                        key: const Key('mobile-assistant-provider-button'),
-                        icon: Icons.hub_outlined,
-                        label: providerLabel,
-                        onTap: () {
-                          Navigator.pop(sheetContext);
-                          showMobileAssistantProviderSheet(
-                            context,
-                            controller: controller,
-                            target: target,
-                            selectedProvider: provider,
-                            onSelected: onSetProvider,
-                          );
-                        },
-                      ),
-                      MobileAssistantActionChip(
-                        key: const Key('mobile-assistant-permission-button'),
-                        icon: mobilePermissionIcon(
-                          controller.assistantPermissionLevel,
-                        ),
-                        label: controller.assistantPermissionLevel.label,
-                        onTap: () {
-                          Navigator.pop(sheetContext);
-                          showMobileAssistantPermissionSheet(
-                            context,
-                            controller: controller,
-                          );
-                        },
-                      ),
-                      MobileAssistantActionChip(
-                        key: const Key('mobile-assistant-thinking-button'),
-                        icon: Icons.psychology_alt_outlined,
-                        label: mobileThinkingLabel(thinking),
-                        onTap: () {
-                          Navigator.pop(sheetContext);
-                          showMobileAssistantThinkingSheet(
-                            context,
-                            value: thinking,
-                            onSelected: onThinkingChanged,
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
+                ),
+              );
+            },
           );
         },
       );
@@ -152,70 +318,6 @@ class MobileAssistantComposer extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (hasPendingRun)
-            Align(
-              alignment: Alignment.centerRight,
-              child: Padding(
-                padding: const EdgeInsets.only(bottom: 8.0),
-                child: IconButton.filledTonal(
-                  key: const Key('mobile-assistant-stop-button'),
-                  onPressed: () => unawaited(controller.abortRun()),
-                  icon: const Icon(Icons.stop_rounded),
-                  tooltip: appText('停止运行', 'Stop Run'),
-                ),
-              ),
-            ),
-          InkWell(
-            borderRadius: BorderRadius.circular(12),
-            onTap: showConfigurationMenu,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: palette.surfacePrimary.withValues(alpha: 0.74),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: palette.accent.withValues(alpha: 0.5),
-                ),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 12,
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.tune_rounded, color: palette.accent, size: 24),
-                    const SizedBox(width: 12),
-                    Text(
-                      appText('任务配置', 'Task settings'),
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: palette.accent,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const Spacer(),
-                    Flexible(
-                      child: Text(
-                        [
-                          target.compactLabel,
-                          if (!provider.isUnspecified) provider.label,
-                          mobileThinkingLabel(thinking),
-                        ].join(' · '),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.right,
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: palette.textSecondary,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Icon(Icons.chevron_right_rounded, color: palette.textMuted),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
@@ -277,7 +379,7 @@ class MobileAssistantComposer extends StatelessWidget {
                               focusedBorder: InputBorder.none,
                               contentPadding: const EdgeInsets.only(
                                 left: 16,
-                                right: 8,
+                                right: 16,
                                 top: 16,
                                 bottom: 16,
                               ),
@@ -285,44 +387,207 @@ class MobileAssistantComposer extends StatelessWidget {
                           ),
                         ),
                       ),
-                      Padding(
-                        padding: const EdgeInsets.only(right: 12, bottom: 12),
-                        child: Icon(
-                          Icons.mic_none,
-                          color: palette.textSecondary,
-                          size: 26,
-                        ),
-                      ),
                     ],
                   ),
                 ),
               ),
-              Padding(
-                padding: const EdgeInsets.only(left: 10, bottom: 4),
-                child: Container(
-                  width: 54,
-                  height: 54,
-                  decoration: BoxDecoration(
-                    color: palette.accent,
-                    shape: BoxShape.circle,
-                    boxShadow: [palette.chromeShadowLift],
-                  ),
-                  child: IconButton(
-                    key: const Key('mobile-assistant-send-button'),
-                    padding: EdgeInsets.zero,
-                    icon: const Icon(
-                      Icons.arrow_upward_rounded,
-                      color: Colors.white,
-                      size: 28,
-                    ),
-                    onPressed: onSend,
-                  ),
-                ),
+              const SizedBox(width: 10),
+              _MobileAssistantPrimaryActionButton(
+                isBusy: hasPendingRun,
+                onSend: onSend,
+                onStop: () => unawaited(controller.abortRun()),
               ),
             ],
           ),
+          if (selectedBuiltinPluginIdsForSession(
+                controller.currentSessionKey,
+              ).isNotEmpty ||
+              selectedSkills.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (final pluginId in selectedBuiltinPluginIdsForSession(
+                    controller.currentSessionKey,
+                  ))
+                    if (BuiltinPluginCatalog.byId(pluginId) case final plugin?)
+                      Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: _MobileAssistantSelectionChip(
+                          key: ValueKey<String>(
+                            'mobile-assistant-selected-plugin-$pluginId',
+                          ),
+                          iconWidget: BuiltinPluginIconTile(
+                            plugin: plugin,
+                            size: 18,
+                          ),
+                          label: plugin.name,
+                          onDeleted: () {
+                            toggleBuiltinPluginForSession(
+                              controller.currentSessionKey,
+                              pluginId,
+                            );
+                            onComposerStateChanged();
+                          },
+                        ),
+                      ),
+                  for (final skill in selectedSkills)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: _MobileAssistantSelectionChip(
+                        key: ValueKey<String>(
+                          'mobile-assistant-selected-skill-${skill.skillKey}',
+                        ),
+                        icon: Icons.key_rounded,
+                        label: skill.name,
+                        onDeleted: () {
+                          unawaited(
+                            controller.toggleAssistantSkillForSession(
+                              controller.currentSessionKey,
+                              skill.skillKey,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
         ],
       ),
+    );
+  }
+}
+
+class _MobileAssistantPrimaryActionButton extends StatelessWidget {
+  const _MobileAssistantPrimaryActionButton({
+    required this.isBusy,
+    required this.onSend,
+    required this.onStop,
+  });
+
+  final bool isBusy;
+  final VoidCallback onSend;
+  final VoidCallback onStop;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final backgroundColor = isBusy
+        ? palette.surfaceSecondary
+        : const Color(0xFF0058BD);
+    final foregroundColor = isBusy ? palette.textPrimary : Colors.white;
+    return SizedBox(
+      width: 58,
+      height: 58,
+      child: IconButton(
+        key: ValueKey<String>(
+          isBusy
+              ? 'mobile-assistant-stop-button'
+              : 'mobile-assistant-send-button',
+        ),
+        tooltip: isBusy
+            ? appText('停止运行', 'Stop run')
+            : appText('提交任务', 'Submit task'),
+        onPressed: isBusy ? onStop : onSend,
+        style: IconButton.styleFrom(
+          backgroundColor: backgroundColor,
+          foregroundColor: foregroundColor,
+          side: BorderSide(
+            color: isBusy
+                ? palette.strokeSoft
+                : Colors.white.withValues(alpha: 0.22),
+            width: 1.1,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(isBusy ? 18 : 999),
+          ),
+          minimumSize: const Size(58, 58),
+        ),
+        icon: Icon(
+          isBusy ? Icons.stop_rounded : Icons.arrow_upward_rounded,
+          size: isBusy ? 26 : 30,
+        ),
+      ),
+    );
+  }
+}
+
+class _MobileAssistantSelectionChip extends StatelessWidget {
+  const _MobileAssistantSelectionChip({
+    super.key,
+    this.icon,
+    this.iconWidget,
+    required this.label,
+    required this.onDeleted,
+  }) : assert(icon != null || iconWidget != null);
+
+  final IconData? icon;
+  final Widget? iconWidget;
+  final String label;
+  final VoidCallback onDeleted;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    return InputChip(
+      avatar: iconWidget ?? Icon(icon, size: 18, color: palette.textSecondary),
+      label: Text(label),
+      onDeleted: onDeleted,
+      deleteIcon: const Icon(Icons.close_rounded, size: 16),
+      deleteIconColor: palette.textMuted,
+      backgroundColor: palette.surfacePrimary,
+      side: BorderSide(color: palette.strokeSoft),
+      labelStyle: Theme.of(context).textTheme.labelLarge?.copyWith(
+        color: palette.textPrimary,
+        fontWeight: FontWeight.w600,
+      ),
+      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      visualDensity: VisualDensity.compact,
+      padding: const EdgeInsets.symmetric(horizontal: 2),
+    );
+  }
+}
+
+class _MobileAssistantSheetSection extends StatelessWidget {
+  const _MobileAssistantSheetSection({
+    required this.title,
+    required this.subtitle,
+    required this.child,
+  });
+
+  final String title;
+  final String subtitle;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+            color: palette.textPrimary,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          subtitle,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: palette.textSecondary,
+            height: 1.35,
+          ),
+        ),
+        const SizedBox(height: 10),
+        child,
+      ],
     );
   }
 }
