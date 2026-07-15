@@ -4,6 +4,8 @@ import '../../app/app_controller.dart';
 import '../../i18n/app_language.dart';
 import '../../runtime/runtime_models.dart';
 import '../../theme/app_palette.dart';
+import '../plugins/builtin_plugin_catalog.dart';
+import '../plugins/builtin_plugin_visuals.dart';
 
 class MobileAssistantConversation extends StatelessWidget {
   const MobileAssistantConversation({
@@ -13,6 +15,7 @@ class MobileAssistantConversation extends StatelessWidget {
     required this.scrollController,
     required this.onConnectBridge,
     required this.onFocusComposer,
+    required this.onSelectPluginScene,
   });
 
   final AppController controller;
@@ -20,6 +23,7 @@ class MobileAssistantConversation extends StatelessWidget {
   final ScrollController scrollController;
   final VoidCallback onConnectBridge;
   final VoidCallback onFocusComposer;
+  final ValueChanged<String> onSelectPluginScene;
 
   @override
   Widget build(BuildContext context) {
@@ -28,6 +32,7 @@ class MobileAssistantConversation extends StatelessWidget {
         controller: controller,
         onConnectBridge: onConnectBridge,
         onFocusComposer: onFocusComposer,
+        onSelectPluginScene: onSelectPluginScene,
       );
     }
 
@@ -249,11 +254,13 @@ class MobileAssistantEmptyState extends StatelessWidget {
     required this.controller,
     required this.onConnectBridge,
     required this.onFocusComposer,
+    required this.onSelectPluginScene,
   });
 
   final AppController controller;
   final VoidCallback onConnectBridge;
   final VoidCallback onFocusComposer;
+  final ValueChanged<String> onSelectPluginScene;
 
   @override
   Widget build(BuildContext context) {
@@ -273,11 +280,11 @@ class MobileAssistantEmptyState extends StatelessWidget {
                   connected: connection.connected,
                   detail: connection.connected
                       ? appText('在线 · 随时为你执行任务', 'Online · ready to run')
-                      : connection.detailLabel,
+                      : appText('先去配置集成连接', 'Configure integration first'),
                 ),
-                const SizedBox(height: 36),
+                const SizedBox(height: 30),
                 Text(
-                  appText('你想让我帮你做什么？', 'What would you like me to do?'),
+                  appText('你想先用哪个插件场景？', 'Which plugin scene do you want?'),
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                     color: palette.textPrimary,
@@ -289,8 +296,8 @@ class MobileAssistantEmptyState extends StatelessWidget {
                 Text(
                   connection.connected
                       ? appText(
-                          '告诉我你的目标，我来拆解并执行',
-                          'Tell me your goal and I will break it down.',
+                          '点一下场景卡，我会把对应任务填进输入框。',
+                          'Tap a scene card and I will prefill the task prompt.',
                         )
                       : connection.detailLabel,
                   textAlign: TextAlign.center,
@@ -299,33 +306,39 @@ class MobileAssistantEmptyState extends StatelessWidget {
                     height: 1.45,
                   ),
                 ),
-                const SizedBox(height: 28),
-                Wrap(
-                  alignment: WrapAlignment.center,
-                  spacing: 10,
-                  runSpacing: 10,
-                  children: [
-                    _MobileSuggestionChip(
-                      icon: Icons.search_rounded,
-                      label: appText('调研分析', 'Research'),
-                      onTap: onFocusComposer,
-                    ),
-                    _MobileSuggestionChip(
-                      icon: Icons.bar_chart_rounded,
-                      label: appText('数据处理', 'Data'),
-                      onTap: onFocusComposer,
-                    ),
-                    _MobileSuggestionChip(
-                      icon: Icons.code_rounded,
-                      label: appText('开发任务', 'Code'),
-                      onTap: onFocusComposer,
-                    ),
-                    _MobileSuggestionChip(
-                      icon: Icons.description_outlined,
-                      label: appText('文档生成', 'Docs'),
-                      onTap: onFocusComposer,
-                    ),
-                  ],
+                const SizedBox(height: 26),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    const spacing = 10.0;
+                    final cardWidth = constraints.maxWidth >= 360
+                        ? (constraints.maxWidth - spacing) / 2
+                        : constraints.maxWidth;
+                    return Wrap(
+                      alignment: WrapAlignment.center,
+                      spacing: spacing,
+                      runSpacing: spacing,
+                      children: [
+                        for (final scene in _pluginScenes)
+                          SizedBox(
+                            width: cardWidth,
+                            child: _MobilePluginSceneChip(
+                              key: ValueKey(
+                                'mobile-plugin-scene-${scene.plugin.id}',
+                              ),
+                              scene: scene,
+                              connected: connection.connected,
+                              onTap: () {
+                                if (!connection.connected) {
+                                  onConnectBridge();
+                                  return;
+                                }
+                                onSelectPluginScene(scene.prefillPrompt);
+                              },
+                            ),
+                          ),
+                      ],
+                    );
+                  },
                 ),
                 if (!connection.connected) ...[
                   const SizedBox(height: 28),
@@ -400,7 +413,7 @@ class _MobileBridgeHeroStatus extends StatelessWidget {
             children: [
               Text(
                 connected
-                    ? appText('Bridge 已连接', 'Bridge Connected')
+                    ? appText('AI Workspace 已连接', 'AI Workspace Connected')
                     : appText('先配置集成连接', 'Configure Integration First'),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -426,44 +439,151 @@ class _MobileBridgeHeroStatus extends StatelessWidget {
   }
 }
 
-class _MobileSuggestionChip extends StatelessWidget {
-  const _MobileSuggestionChip({
-    required this.icon,
-    required this.label,
+class _MobilePluginSceneSpec {
+  const _MobilePluginSceneSpec({
+    required this.plugin,
+    required this.sceneLabel,
+    required this.prefillPrompt,
+  });
+
+  final BuiltinPluginDescriptor plugin;
+  final String sceneLabel;
+  final String prefillPrompt;
+}
+
+final List<_MobilePluginSceneSpec> _pluginScenes = <_MobilePluginSceneSpec>[
+  _MobilePluginSceneSpec(
+    plugin: BuiltinPluginCatalog.firstBatch[0],
+    sceneLabel: '整理文档',
+    prefillPrompt: '请把当前内容整理成一份可编辑文档，输出 Markdown、PDF 和 Word。',
+  ),
+  _MobilePluginSceneSpec(
+    plugin: BuiltinPluginCatalog.firstBatch[1],
+    sceneLabel: '整理表格',
+    prefillPrompt: '请把当前内容结构化为可编辑表格，输出 CSV、ODS 和 XLSX。',
+  ),
+  _MobilePluginSceneSpec(
+    plugin: BuiltinPluginCatalog.firstBatch[2],
+    sceneLabel: '制作 PPT',
+    prefillPrompt: '请把当前内容制作成一份可编辑 PPT，适合汇报展示。',
+  ),
+  _MobilePluginSceneSpec(
+    plugin: BuiltinPluginCatalog.firstBatch[3],
+    sceneLabel: '生成图片',
+    prefillPrompt: '请围绕当前主题生成一组图片，适合封面、配图和海报。',
+  ),
+  _MobilePluginSceneSpec(
+    plugin: BuiltinPluginCatalog.firstBatch[4],
+    sceneLabel: '制作视频',
+    prefillPrompt: '请把当前内容整理成分镜脚本，并生成成片视频。',
+  ),
+];
+
+class _MobilePluginSceneChip extends StatelessWidget {
+  const _MobilePluginSceneChip({
+    super.key,
+    required this.scene,
+    required this.connected,
     required this.onTap,
   });
 
-  final IconData icon;
-  final String label;
+  final _MobilePluginSceneSpec scene;
+  final bool connected;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
-    return InkWell(
-      borderRadius: BorderRadius.circular(22),
-      onTap: onTap,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: palette.surfacePrimary.withValues(alpha: 0.82),
-          borderRadius: BorderRadius.circular(22),
-          border: Border.all(color: palette.strokeSoft),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, color: palette.accent, size: 22),
-              const SizedBox(width: 8),
-              Text(
-                label,
-                style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  color: palette.textPrimary,
-                  fontWeight: FontWeight.w700,
+    final theme = Theme.of(context);
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(20),
+        onTap: onTap,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: palette.surfacePrimary.withValues(alpha: 0.92),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: connected
+                  ? palette.accent.withValues(alpha: 0.34)
+                  : palette.strokeSoft,
+            ),
+            boxShadow: [palette.chromeShadowAmbient],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                BuiltinPluginIconTile(plugin: scene.plugin, size: 30),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        scene.sceneLabel,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          color: palette.textPrimary,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        scene.plugin.description,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: palette.textSecondary,
+                          height: 1.35,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: [
+                          for (final format in scene.plugin.outputFormats.take(
+                            3,
+                          ))
+                            _MobilePluginFormatTag(label: format.toUpperCase()),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MobilePluginFormatTag extends StatelessWidget {
+  const _MobilePluginFormatTag({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: palette.surfaceSecondary,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        child: Text(
+          label,
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+            color: palette.textSecondary,
+            fontWeight: FontWeight.w700,
           ),
         ),
       ),
@@ -644,8 +764,14 @@ class _MobileBridgeInlineStatus extends StatelessWidget {
             const SizedBox(width: 6),
             Text(
               connected
-                  ? appText('在线 · Bridge 连接正常', 'Online · Bridge healthy')
-                  : appText('Bridge 需要检查', 'Bridge needs attention'),
+                  ? appText(
+                      '在线 · AI Workspace 连接正常',
+                      'Online · AI Workspace healthy',
+                    )
+                  : appText(
+                      'AI Workspace 需要检查',
+                      'AI Workspace needs attention',
+                    ),
               style: Theme.of(
                 context,
               ).textTheme.bodyMedium?.copyWith(color: palette.textSecondary),

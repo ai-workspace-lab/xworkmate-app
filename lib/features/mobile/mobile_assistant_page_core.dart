@@ -153,6 +153,14 @@ class _MobileAssistantDetailPageState extends State<MobileAssistantDetailPage> {
     setState(() {});
   }
 
+  void prefillPluginScenePrompt(String prompt) {
+    HapticFeedback.selectionClick();
+    inputController.text = prompt;
+    inputController.selection = TextSelection.collapsed(offset: prompt.length);
+    inputFocusNode.requestFocus();
+    setState(() {});
+  }
+
   Future<void> showSessionSwitcher() async {
     await showModalBottomSheet<void>(
       context: context,
@@ -250,6 +258,7 @@ class _MobileAssistantDetailPageState extends State<MobileAssistantDetailPage> {
                             onConnectBridge: widget.mobileActions.connectBridge,
                             onFocusComposer: () =>
                                 inputFocusNode.requestFocus(),
+                            onSelectPluginScene: prefillPluginScenePrompt,
                           ),
                         ),
                         MobileAssistantComposer(
@@ -549,7 +558,7 @@ class MobileAssistantStatusBanner extends StatelessWidget {
     );
     final hasProvider = !provider.isUnspecified;
     final title = connection.connected
-        ? appText('Bridge 已连接', 'Bridge Connected')
+        ? appText('AI Workspace 已连接', 'AI Workspace Connected')
         : appText('先配置集成连接', 'Configure Integration First');
     final detail = connection.connected
         ? [
@@ -558,9 +567,9 @@ class MobileAssistantStatusBanner extends StatelessWidget {
               provider.label
             else
               appText('Provider 未就绪', 'Provider unavailable'),
-            connection.detailLabel,
+            appText('已准备好执行', 'Ready to run'),
           ].where((item) => item.trim().isNotEmpty).join(' · ')
-        : connection.detailLabel;
+        : appText('先去配置集成连接', 'Configure integration first');
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(10, 10, 10, 8),

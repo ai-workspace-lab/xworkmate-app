@@ -152,70 +152,6 @@ class MobileAssistantComposer extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          if (hasPendingRun)
-            Align(
-              alignment: Alignment.centerRight,
-              child: Padding(
-                padding: const EdgeInsets.only(bottom: 8.0),
-                child: IconButton.filledTonal(
-                  key: const Key('mobile-assistant-stop-button'),
-                  onPressed: () => unawaited(controller.abortRun()),
-                  icon: const Icon(Icons.stop_rounded),
-                  tooltip: appText('停止运行', 'Stop Run'),
-                ),
-              ),
-            ),
-          InkWell(
-            borderRadius: BorderRadius.circular(12),
-            onTap: showConfigurationMenu,
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: palette.surfacePrimary.withValues(alpha: 0.74),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: palette.accent.withValues(alpha: 0.5),
-                ),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 12,
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.tune_rounded, color: palette.accent, size: 24),
-                    const SizedBox(width: 12),
-                    Text(
-                      appText('任务配置', 'Task settings'),
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: palette.accent,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const Spacer(),
-                    Flexible(
-                      child: Text(
-                        [
-                          target.compactLabel,
-                          if (!provider.isUnspecified) provider.label,
-                          mobileThinkingLabel(thinking),
-                        ].join(' · '),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.right,
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: palette.textSecondary,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Icon(Icons.chevron_right_rounded, color: palette.textMuted),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
@@ -277,20 +213,12 @@ class MobileAssistantComposer extends StatelessWidget {
                               focusedBorder: InputBorder.none,
                               contentPadding: const EdgeInsets.only(
                                 left: 16,
-                                right: 8,
+                                right: 16,
                                 top: 16,
                                 bottom: 16,
                               ),
                             ),
                           ),
-                        ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.only(right: 12, bottom: 12),
-                        child: Icon(
-                          Icons.mic_none,
-                          color: palette.textSecondary,
-                          size: 26,
                         ),
                       ),
                     ],
@@ -299,29 +227,87 @@ class MobileAssistantComposer extends StatelessWidget {
               ),
               Padding(
                 padding: const EdgeInsets.only(left: 10, bottom: 4),
-                child: Container(
-                  width: 54,
-                  height: 54,
-                  decoration: BoxDecoration(
-                    color: palette.accent,
-                    shape: BoxShape.circle,
-                    boxShadow: [palette.chromeShadowLift],
-                  ),
-                  child: IconButton(
-                    key: const Key('mobile-assistant-send-button'),
-                    padding: EdgeInsets.zero,
-                    icon: const Icon(
-                      Icons.arrow_upward_rounded,
-                      color: Colors.white,
-                      size: 28,
-                    ),
-                    onPressed: onSend,
-                  ),
-                ),
+                child: hasPendingRun
+                    ? _MobileAssistantStopRunButton(
+                        onPressed: () => unawaited(controller.abortRun()),
+                      )
+                    : _MobileAssistantSendButton(onPressed: onSend),
               ),
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// The composer has one primary control. During an active run it becomes the
+/// existing run-status action, avoiding a second floating stop control.
+class _MobileAssistantStopRunButton extends StatelessWidget {
+  const _MobileAssistantStopRunButton({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    return SizedBox(
+      width: 58,
+      height: 58,
+      child: IconButton.filledTonal(
+        key: const Key('mobile-assistant-stop-button'),
+        tooltip: appText('停止运行', 'Stop run'),
+        onPressed: onPressed,
+        style: IconButton.styleFrom(
+          backgroundColor: palette.surfaceSecondary,
+          foregroundColor: palette.textPrimary,
+          side: BorderSide(color: palette.strokeSoft),
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.all(Radius.circular(18)),
+          ),
+        ),
+        icon: const Icon(Icons.stop_rounded, size: 26),
+      ),
+    );
+  }
+}
+
+class _MobileAssistantSendButton extends StatelessWidget {
+  const _MobileAssistantSendButton({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 58,
+      height: 58,
+      decoration: BoxDecoration(
+        color: const Color(0xFF0058BD),
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: Colors.white.withValues(alpha: 0.22),
+          width: 1.1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0058BD).withValues(alpha: 0.46),
+            blurRadius: 26,
+            offset: const Offset(0, 12),
+            spreadRadius: -10,
+          ),
+        ],
+      ),
+      child: IconButton(
+        key: const Key('mobile-assistant-send-button'),
+        padding: EdgeInsets.zero,
+        tooltip: appText('提交任务', 'Submit task'),
+        icon: const Icon(
+          Icons.arrow_upward_rounded,
+          color: Colors.white,
+          size: 30,
+        ),
+        onPressed: onPressed,
       ),
     );
   }

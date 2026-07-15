@@ -220,12 +220,148 @@ class _MobileAssistantListPageState extends State<MobileAssistantListPage> {
                                         ),
                                   ),
                                   trailing: index < 3
-                                      ? Icon(
-                                          CupertinoIcons.pin_fill,
-                                          color: palette.accent,
-                                          size: 18,
+                                      ? Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(
+                                              CupertinoIcons.pin_fill,
+                                              color: palette.accent,
+                                              size: 18,
+                                            ),
+                                            const SizedBox(width: 4),
+                                            PopupMenuButton<String>(
+                                              key: ValueKey(
+                                                'mobile-task-menu-$sessionKey',
+                                              ),
+                                              icon: Icon(
+                                                CupertinoIcons.ellipsis,
+                                                color: palette.textMuted,
+                                                size: 18,
+                                              ),
+                                              onSelected: (value) async {
+                                                switch (value) {
+                                                  case 'rename':
+                                                    await _renameTask(
+                                                      sessionKey,
+                                                      title,
+                                                    );
+                                                    break;
+                                                  case 'archive':
+                                                    await widget.controller
+                                                        .saveAssistantTaskArchived(
+                                                          sessionKey,
+                                                          true,
+                                                        );
+                                                    break;
+                                                }
+                                              },
+                                              itemBuilder: (context) => [
+                                                PopupMenuItem<String>(
+                                                  value: 'rename',
+                                                  child: Row(
+                                                    children: [
+                                                      const Icon(
+                                                        CupertinoIcons.pencil,
+                                                        size: 18,
+                                                      ),
+                                                      const SizedBox(width: 8),
+                                                      Text(
+                                                        appText(
+                                                          '重命名任务',
+                                                          'Rename task',
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                                PopupMenuItem<String>(
+                                                  value: 'archive',
+                                                  child: Row(
+                                                    children: [
+                                                      const Icon(
+                                                        CupertinoIcons
+                                                            .archivebox,
+                                                        size: 18,
+                                                      ),
+                                                      const SizedBox(width: 8),
+                                                      Text(
+                                                        appText(
+                                                          '归档任务',
+                                                          'Archive task',
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ],
                                         )
-                                      : null,
+                                      : PopupMenuButton<String>(
+                                          key: ValueKey(
+                                            'mobile-task-menu-$sessionKey',
+                                          ),
+                                          icon: Icon(
+                                            CupertinoIcons.ellipsis,
+                                            color: palette.textMuted,
+                                            size: 18,
+                                          ),
+                                          onSelected: (value) async {
+                                            switch (value) {
+                                              case 'rename':
+                                                await _renameTask(
+                                                  sessionKey,
+                                                  title,
+                                                );
+                                                break;
+                                              case 'archive':
+                                                await widget.controller
+                                                    .saveAssistantTaskArchived(
+                                                      sessionKey,
+                                                      true,
+                                                    );
+                                                break;
+                                            }
+                                          },
+                                          itemBuilder: (context) => [
+                                            PopupMenuItem<String>(
+                                              value: 'rename',
+                                              child: Row(
+                                                children: [
+                                                  const Icon(
+                                                    CupertinoIcons.pencil,
+                                                    size: 18,
+                                                  ),
+                                                  const SizedBox(width: 8),
+                                                  Text(
+                                                    appText(
+                                                      '重命名任务',
+                                                      'Rename task',
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            PopupMenuItem<String>(
+                                              value: 'archive',
+                                              child: Row(
+                                                children: [
+                                                  const Icon(
+                                                    CupertinoIcons.archivebox,
+                                                    size: 18,
+                                                  ),
+                                                  const SizedBox(width: 8),
+                                                  Text(
+                                                    appText(
+                                                      '归档任务',
+                                                      'Archive task',
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ],
+                                        ),
                                   onTap: () => widget.onSelectTask(sessionKey),
                                 ),
                               );
@@ -275,6 +411,50 @@ class _MobileAssistantListPageState extends State<MobileAssistantListPage> {
         );
       },
     );
+  }
+
+  Future<void> _renameTask(String sessionKey, String currentTitle) async {
+    final input = TextEditingController(text: currentTitle);
+    final result = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          title: Text(appText('重命名任务', 'Rename task')),
+          content: TextField(
+            key: const Key('mobile-task-rename-input'),
+            controller: input,
+            autofocus: true,
+            decoration: InputDecoration(
+              labelText: appText('任务名称', 'Task name'),
+              hintText: appText(
+                '留空后恢复默认名称',
+                'Leave empty to restore the default title',
+              ),
+            ),
+            onSubmitted: (value) => Navigator.of(dialogContext).pop(value),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: Text(appText('取消', 'Cancel')),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(input.text),
+              child: Text(appText('保存', 'Save')),
+            ),
+          ],
+        );
+      },
+    );
+    input.dispose();
+    if (!mounted || result == null) {
+      return;
+    }
+    final normalized = result.trim();
+    await widget.controller.saveAssistantTaskTitle(sessionKey, normalized);
+    if (mounted) {
+      setState(() {});
+    }
   }
 }
 

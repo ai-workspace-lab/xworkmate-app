@@ -55,10 +55,10 @@ mobile:
       description: Mobile does not expose desktop runtime controls
       ui_surface: assistant_page
     builtin_plugins:
-      enabled: false
-      release_tier: beta
-      build_modes: []
-      description: Mobile built-in plugin composer entry (batch 1 lands desktop-first)
+      enabled: true
+      release_tier: stable
+      build_modes: [debug, profile, release]
+      description: Mobile built-in plugin composer entry (batch 1)
       ui_surface: assistant_page
   settings:
     gateway:
@@ -80,10 +80,10 @@ mobile:
       description: Mobile WebRTC Remote Desktop view
       ui_surface: settings_page
     plugins:
-      enabled: false
-      release_tier: beta
-      build_modes: []
-      description: Mobile built-in plugins management tab (batch 1 lands desktop-first)
+      enabled: true
+      release_tier: stable
+      build_modes: [debug, profile, release]
+      description: Mobile built-in plugins management tab (batch 1)
       ui_surface: settings_page
     logs:
       enabled: true
