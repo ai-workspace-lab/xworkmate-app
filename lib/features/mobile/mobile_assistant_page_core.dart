@@ -82,19 +82,7 @@ class _MobileAssistantDetailPageState extends State<MobileAssistantDetailPage> {
     if (!uiFeatures.supportsFileAttachments) {
       return;
     }
-    final files = await openFiles(
-      acceptedTypeGroups: const [
-        XTypeGroup(
-          label: 'Images',
-          extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp'],
-        ),
-        XTypeGroup(label: 'Logs', extensions: ['log', 'txt', 'json', 'csv']),
-        XTypeGroup(
-          label: 'Files',
-          extensions: ['md', 'pdf', 'yaml', 'yml', 'zip'],
-        ),
-      ],
-    );
+    final files = await openFiles();
     if (!mounted || files.isEmpty) {
       return;
     }

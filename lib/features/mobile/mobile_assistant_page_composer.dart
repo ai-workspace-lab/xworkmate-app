@@ -275,46 +275,75 @@ class MobileAssistantComposer extends StatelessWidget {
                             ],
                           ),
                         ),
-                        const SizedBox(height: 18),
-                        _MobileAssistantSheetSection(
-                          title: appText('技能选择', 'Skills'),
-                          subtitle: appText(
-                            '和桌面端保持同一套会话技能选择。',
-                            'Keeps the same session skill selections as desktop.',
-                          ),
-                          child: controller.skills.isEmpty
-                              ? Text(
-                                  appText(
-                                    '当前没有已加载技能。',
-                                    'No skills are loaded yet.',
-                                  ),
-                                  style: Theme.of(sheetContext)
-                                      .textTheme
-                                      .bodyMedium
-                                      ?.copyWith(color: palette.textSecondary),
-                                )
-                              : Wrap(
-                                  spacing: 8,
-                                  runSpacing: 8,
-                                  children: [
-                                    for (final skill in controller.skills)
-                                      FilterChip(
-                                        key: ValueKey(
-                                          'mobile-assistant-skill-chip-${skill.skillKey}',
-                                        ),
-                                        avatar: const Icon(
-                                          Icons.key_rounded,
-                                          size: 16,
-                                        ),
-                                        label: Text(skill.name),
-                                        selected: selectedSkillKeySet.contains(
-                                          skill.skillKey,
-                                        ),
-                                        onSelected: (_) =>
-                                            toggleSkill(skill.skillKey),
+                        AnimatedBuilder(
+                          animation: controller,
+                          builder: (context, _) {
+                            if (controller.skills.isEmpty) {
+                              return Column(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const SizedBox(height: 18),
+                                  _MobileAssistantSheetSection(
+                                    title: appText('技能选择', 'Skills'),
+                                    subtitle: appText(
+                                      '和桌面端保持同一套会话技能选择。',
+                                      'Keeps the same session skill selections as desktop.',
+                                    ),
+                                    child: Text(
+                                      appText(
+                                        '当前没有已加载技能。',
+                                        'No skills are loaded yet.',
                                       ),
-                                  ],
+                                      style: Theme.of(sheetContext)
+                                          .textTheme
+                                          .bodyMedium
+                                          ?.copyWith(
+                                            color: palette.textSecondary,
+                                          ),
+                                    ),
+                                  ),
+                                ],
+                              );
+                            }
+                            return Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const SizedBox(height: 18),
+                                _MobileAssistantSheetSection(
+                                  title: appText('技能选择', 'Skills'),
+                                  subtitle: appText(
+                                    '和桌面端保持同一套会话技能选择。',
+                                    'Keeps the same session skill selections as desktop.',
+                                  ),
+                                  child: Wrap(
+                                    spacing: 8,
+                                    runSpacing: 8,
+                                    children: [
+                                      for (final skill in controller.skills)
+                                        FilterChip(
+                                          key: ValueKey(
+                                            'mobile-assistant-skill-chip-${skill.skillKey}',
+                                          ),
+                                          avatar: const Icon(
+                                            Icons.key_rounded,
+                                            size: 16,
+                                          ),
+                                          label: Text(skill.name),
+                                          selected:
+                                              selectedSkillKeySet.contains(
+                                            skill.skillKey,
+                                          ),
+                                          onSelected: (_) =>
+                                              toggleSkill(skill.skillKey),
+                                        ),
+                                    ],
+                                  ),
                                 ),
+                              ],
+                            );
+                          },
                         ),
                       ],
                     ),
