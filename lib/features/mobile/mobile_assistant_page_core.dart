@@ -425,48 +425,55 @@ class _MobileTaskWorkspaceReferenceState
       );
     }
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(22, 0, 22, 10),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: palette.chromeSurface.withValues(alpha: 0.72),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: palette.chromeStroke),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 7, 6, 7),
-          child: Row(
-            children: [
-              Icon(Icons.tag_rounded, size: 15, color: palette.textSecondary),
-              const SizedBox(width: 7),
-              Expanded(
-                child: Tooltip(
-                  message: widget.workspaceReference,
-                  child: Text(
-                    widget.workspaceReference,
-                    key: const Key('mobile-assistant-task-workspace-ref'),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.labelMedium?.copyWith(
-                      color: palette.textSecondary,
-                      fontFeatures: const [FontFeature.tabularFigures()],
+    return GestureDetector(
+      onHorizontalDragEnd: (details) {
+        if (details.primaryVelocity != null && details.primaryVelocity! < 0) {
+          setState(() => _expanded = false);
+        }
+      },
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(22, 0, 22, 10),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: palette.chromeSurface.withValues(alpha: 0.72),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: palette.chromeStroke),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 7, 6, 7),
+            child: Row(
+              children: [
+                Icon(Icons.tag_rounded, size: 15, color: palette.textSecondary),
+                const SizedBox(width: 7),
+                Expanded(
+                  child: Tooltip(
+                    message: widget.workspaceReference,
+                    child: Text(
+                      widget.workspaceReference,
+                      key: const Key('mobile-assistant-task-workspace-ref'),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: palette.textSecondary,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
                     ),
                   ),
                 ),
-              ),
-              IconButton(
-                key: const Key('mobile-assistant-copy-task-workspace-ref'),
-                tooltip: appText('复制任务ID', 'Copy task ID'),
-                visualDensity: VisualDensity.compact,
-                constraints: const BoxConstraints.tightFor(
-                  width: 32,
-                  height: 32,
+                IconButton(
+                  key: const Key('mobile-assistant-copy-task-workspace-ref'),
+                  tooltip: appText('复制任务ID', 'Copy task ID'),
+                  visualDensity: VisualDensity.compact,
+                  constraints: const BoxConstraints.tightFor(
+                    width: 32,
+                    height: 32,
+                  ),
+                  padding: EdgeInsets.zero,
+                  onPressed: widget.onCopy,
+                  icon: const Icon(Icons.content_copy_rounded, size: 16),
                 ),
-                padding: EdgeInsets.zero,
-                onPressed: widget.onCopy,
-                icon: const Icon(Icons.content_copy_rounded, size: 16),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
