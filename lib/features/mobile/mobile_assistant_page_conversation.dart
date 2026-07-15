@@ -749,6 +749,55 @@ class _MobileSessionArtifactsState extends State<_MobileSessionArtifacts> {
 
   @override
   Widget build(BuildContext context) {
+    final status = widget.controller.assistantArtifactSyncStatusForSession(
+      widget.controller.currentSessionKey,
+    );
+    if (status == 'no-artifacts') {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 16.0),
+        child: Text(
+          appText('未生成任何产物', 'No artifacts generated'),
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            color: Theme.of(context).colorScheme.outline,
+          ),
+          textAlign: TextAlign.center,
+        ),
+      );
+    }
+    if (status == 'syncing') {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 16.0),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              appText('正在准备产物...', 'Preparing artifacts...'),
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).colorScheme.outline,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    if (status == 'failed') {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 16.0),
+        child: Text(
+          appText('产物准备失败，请重试', 'Failed to prepare artifacts. Please retry.'),
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            color: Theme.of(context).colorScheme.error,
+          ),
+          textAlign: TextAlign.center,
+        ),
+      );
+    }
     if (_snapshot == null || _snapshot!.fileEntries.isEmpty) {
       return const SizedBox.shrink();
     }
