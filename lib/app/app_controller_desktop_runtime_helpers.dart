@@ -821,7 +821,8 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
               association.requiredArtifactExtensions.isNotEmpty) &&
           (association.artifactScope.trim().isNotEmpty ||
               association.artifactDirectory.trim().isNotEmpty) &&
-          result.success;
+          result.success &&
+          (result.artifactStatus.isEmpty || result.artifactStatus == 'exporting');
       if (waitingForOpenClawArtifacts) {
         final firstSyncAtMs =
             artifactSyncStartedAtMs ?? existingThread.lastArtifactSyncAtMs;
@@ -1194,10 +1195,18 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
       return const _ArtifactBytesResult.skipped();
     }
     var uri = Uri.tryParse(rawDownloadUrl);
-    if (uri == null || (uri.scheme != 'http' && uri.scheme != 'https')) {
+    if (uri == null) {
       return const _ArtifactBytesResult.skipped();
     }
     final bridgeEndpoint = resolveBridgeAcpEndpointInternal();
+    if (uri.scheme.isEmpty && uri.host.isEmpty && bridgeEndpoint != null) {
+      // Resolve relative URLs against the bridge endpoint.
+      // This handles cases where the backend returns a path like "/artifacts/openclaw/download?path=...&sig=..."
+      uri = bridgeEndpoint.resolveUri(uri);
+    }
+    if (uri.scheme != 'http' && uri.scheme != 'https') {
+      return const _ArtifactBytesResult.skipped();
+    }
     final bridgeHost = bridgeEndpoint?.host.trim().toLowerCase() ?? '';
     var downloadHost = uri.host.trim().toLowerCase();
     final isLoopback =
