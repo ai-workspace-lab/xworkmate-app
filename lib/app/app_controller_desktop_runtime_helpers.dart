@@ -1639,7 +1639,9 @@ Future<List<String>> _workspaceArtifactPathsModifiedSinceInternal(
   for (final file in files) {
     try {
       final stat = await file.stat();
-      if (stat.modified.millisecondsSinceEpoch.toDouble() <= thresholdMs) {
+      // Files written in the run's first millisecond are current artifacts,
+      // not stale workspace content.
+      if (stat.modified.millisecondsSinceEpoch.toDouble() < thresholdMs) {
         continue;
       }
       final resolvedRelativePath =
