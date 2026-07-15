@@ -12,7 +12,6 @@ import 'mobile_builtin_plugin_scenes.dart';
 import '../plugins/builtin_plugin_catalog.dart';
 import '../plugins/builtin_plugin_visuals.dart';
 import 'mobile_assistant_page_sheets.dart';
-import '../assistant/assistant_attachment_payloads.dart';
 import '../assistant/assistant_page_composer_clipboard.dart';
 
 final Map<String, List<String>> selectedBuiltinPluginIdsBySessionInternal =
@@ -331,10 +330,8 @@ class MobileAssistantComposer extends StatelessWidget {
                                             size: 16,
                                           ),
                                           label: Text(skill.name),
-                                          selected:
-                                              selectedSkillKeySet.contains(
-                                            skill.skillKey,
-                                          ),
+                                          selected: selectedSkillKeySet
+                                              .contains(skill.skillKey),
                                           onSelected: (_) =>
                                               toggleSkill(skill.skillKey),
                                         ),

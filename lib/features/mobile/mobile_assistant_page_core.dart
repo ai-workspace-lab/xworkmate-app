@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:file_selector/file_selector.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -101,7 +100,7 @@ class _MobileAssistantDetailPageState extends State<MobileAssistantDetailPage> {
       inputFocusNode.requestFocus();
       return;
     }
-    
+
     final submittedAttachments = List<ComposerAttachmentInternal>.from(
       _attachments,
       growable: false,
@@ -111,11 +110,13 @@ class _MobileAssistantDetailPageState extends State<MobileAssistantDetailPage> {
       _attachments = [];
     });
     HapticFeedback.lightImpact();
-    
+
     try {
-      final attachmentPayloads = await buildAssistantAttachmentPayloadsInternal(submittedAttachments);
+      final attachmentPayloads = await buildAssistantAttachmentPayloadsInternal(
+        submittedAttachments,
+      );
       await widget.controller.sendChatMessage(
-        text, 
+        text,
         thinking: thinking,
         attachments: attachmentPayloads,
       );
@@ -226,6 +227,20 @@ class _MobileAssistantDetailPageState extends State<MobileAssistantDetailPage> {
     );
   }
 
+  Future<void> copyTaskWorkspaceReference(String workspaceReference) async {
+    final normalized = workspaceReference.trim();
+    if (normalized.isEmpty) {
+      return;
+    }
+    await Clipboard.setData(ClipboardData(text: normalized));
+    if (!mounted) {
+      return;
+    }
+    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+      SnackBar(content: Text(appText('任务路径已复制', 'Task path copied'))),
+    );
+  }
+
   void maybeScrollToBottom(List<GatewayChatMessage> messages) {
     final signature = messages.isEmpty
         ? widget.controller.currentSessionKey
@@ -263,6 +278,10 @@ class _MobileAssistantDetailPageState extends State<MobileAssistantDetailPage> {
         final title = hasPendingRun
             ? appText('执行中', 'Running')
             : appText('会话', 'Chat');
+        final sessionKey = controller.currentSessionKey.trim();
+        final taskWorkspaceReference = sessionKey.isEmpty
+            ? ''
+            : '\$HOME/.xworkmate/threads/${controller.threadWorkspaceDirectoryNameInternal(sessionKey)}';
 
         return Scaffold(
           backgroundColor: palette.canvas,
@@ -279,6 +298,13 @@ class _MobileAssistantDetailPageState extends State<MobileAssistantDetailPage> {
                     onBack: widget.onBack,
                     onOpenHistory: showSessionSwitcher,
                   ),
+                  if (taskWorkspaceReference.isNotEmpty)
+                    _MobileTaskWorkspaceReference(
+                      workspaceReference: taskWorkspaceReference,
+                      onCopy: () => unawaited(
+                        copyTaskWorkspaceReference(taskWorkspaceReference),
+                      ),
+                    ),
                   Expanded(
                     child: Column(
                       children: [
@@ -309,7 +335,8 @@ class _MobileAssistantDetailPageState extends State<MobileAssistantDetailPage> {
                           onPickAttachments: _pickAttachments,
                           onRemoveAttachment: (attachment) {
                             setState(() {
-                              _attachments = List.from(_attachments)..remove(attachment);
+                              _attachments = List.from(_attachments)
+                                ..remove(attachment);
                             });
                           },
                           onThinkingChanged: (value) {
@@ -335,6 +362,68 @@ class _MobileAssistantDetailPageState extends State<MobileAssistantDetailPage> {
           ),
         );
       },
+    );
+  }
+}
+
+class _MobileTaskWorkspaceReference extends StatelessWidget {
+  const _MobileTaskWorkspaceReference({
+    required this.workspaceReference,
+    required this.onCopy,
+  });
+
+  final String workspaceReference;
+  final VoidCallback onCopy;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(22, 0, 22, 10),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: palette.chromeSurface.withValues(alpha: 0.72),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: palette.chromeStroke),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 7, 6, 7),
+          child: Row(
+            children: [
+              Icon(Icons.tag_rounded, size: 15, color: palette.textSecondary),
+              const SizedBox(width: 7),
+              Expanded(
+                child: Tooltip(
+                  message: workspaceReference,
+                  child: Text(
+                    workspaceReference,
+                    key: const Key('mobile-assistant-task-workspace-ref'),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: palette.textSecondary,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                ),
+              ),
+              IconButton(
+                key: const Key('mobile-assistant-copy-task-workspace-ref'),
+                tooltip: appText('复制任务路径', 'Copy task path'),
+                visualDensity: VisualDensity.compact,
+                constraints: const BoxConstraints.tightFor(
+                  width: 32,
+                  height: 32,
+                ),
+                padding: EdgeInsets.zero,
+                onPressed: onCopy,
+                icon: const Icon(Icons.content_copy_rounded, size: 16),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
