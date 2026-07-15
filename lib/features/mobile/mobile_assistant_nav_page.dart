@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
 
 import '../../app/app_controller.dart';
@@ -57,11 +59,8 @@ class _MobileAssistantNavPageState extends State<MobileAssistantNavPage> {
                 controller: widget.controller,
                 onBackHome: _returnHome,
                 onSelectTask: (sessionKey) async {
-                  await widget.controller.switchSession(sessionKey);
-                  if (!mounted) {
-                    return;
-                  }
                   _returnHome();
+                  unawaited(widget.controller.switchSession(sessionKey));
                 },
               );
               break;

@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 
 import '../../app/app_controller.dart';
 import '../../i18n/app_language.dart';
@@ -11,6 +12,8 @@ import 'mobile_builtin_plugin_scenes.dart';
 import '../plugins/builtin_plugin_catalog.dart';
 import '../plugins/builtin_plugin_visuals.dart';
 import 'mobile_assistant_page_sheets.dart';
+import '../assistant/assistant_attachment_payloads.dart';
+import '../assistant/assistant_page_composer_clipboard.dart';
 
 final Map<String, List<String>> selectedBuiltinPluginIdsBySessionInternal =
     <String, List<String>>{};
@@ -41,6 +44,9 @@ class MobileAssistantComposer extends StatelessWidget {
     required this.focusNode,
     required this.thinking,
     required this.bottomPadding,
+    required this.attachments,
+    required this.onPickAttachments,
+    required this.onRemoveAttachment,
     required this.onThinkingChanged,
     required this.onSetExecutionTarget,
     required this.onSetProvider,
@@ -53,6 +59,9 @@ class MobileAssistantComposer extends StatelessWidget {
   final FocusNode focusNode;
   final String thinking;
   final double bottomPadding;
+  final List<ComposerAttachmentInternal> attachments;
+  final VoidCallback onPickAttachments;
+  final ValueChanged<ComposerAttachmentInternal> onRemoveAttachment;
   final ValueChanged<String> onThinkingChanged;
   final Future<void> Function(AssistantExecutionTarget target)
   onSetExecutionTarget;
@@ -223,6 +232,17 @@ class MobileAssistantComposer extends StatelessWidget {
                                 );
                               },
                             ),
+                            MobileAssistantActionChip(
+                              key: const Key(
+                                'mobile-assistant-attachment-button',
+                              ),
+                              icon: CupertinoIcons.paperclip,
+                              label: appText('添加附件', 'Attachments'),
+                              onTap: () {
+                                Navigator.pop(sheetContext);
+                                onPickAttachments();
+                              },
+                            ),
                           ],
                         ),
                         const SizedBox(height: 18),
@@ -255,46 +275,75 @@ class MobileAssistantComposer extends StatelessWidget {
                             ],
                           ),
                         ),
-                        const SizedBox(height: 18),
-                        _MobileAssistantSheetSection(
-                          title: appText('技能选择', 'Skills'),
-                          subtitle: appText(
-                            '和桌面端保持同一套会话技能选择。',
-                            'Keeps the same session skill selections as desktop.',
-                          ),
-                          child: controller.skills.isEmpty
-                              ? Text(
-                                  appText(
-                                    '当前没有已加载技能。',
-                                    'No skills are loaded yet.',
-                                  ),
-                                  style: Theme.of(sheetContext)
-                                      .textTheme
-                                      .bodyMedium
-                                      ?.copyWith(color: palette.textSecondary),
-                                )
-                              : Wrap(
-                                  spacing: 8,
-                                  runSpacing: 8,
-                                  children: [
-                                    for (final skill in controller.skills)
-                                      FilterChip(
-                                        key: ValueKey(
-                                          'mobile-assistant-skill-chip-${skill.skillKey}',
-                                        ),
-                                        avatar: const Icon(
-                                          Icons.key_rounded,
-                                          size: 16,
-                                        ),
-                                        label: Text(skill.name),
-                                        selected: selectedSkillKeySet.contains(
-                                          skill.skillKey,
-                                        ),
-                                        onSelected: (_) =>
-                                            toggleSkill(skill.skillKey),
+                        AnimatedBuilder(
+                          animation: controller,
+                          builder: (context, _) {
+                            if (controller.skills.isEmpty) {
+                              return Column(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const SizedBox(height: 18),
+                                  _MobileAssistantSheetSection(
+                                    title: appText('技能选择', 'Skills'),
+                                    subtitle: appText(
+                                      '和桌面端保持同一套会话技能选择。',
+                                      'Keeps the same session skill selections as desktop.',
+                                    ),
+                                    child: Text(
+                                      appText(
+                                        '当前没有已加载技能。',
+                                        'No skills are loaded yet.',
                                       ),
-                                  ],
+                                      style: Theme.of(sheetContext)
+                                          .textTheme
+                                          .bodyMedium
+                                          ?.copyWith(
+                                            color: palette.textSecondary,
+                                          ),
+                                    ),
+                                  ),
+                                ],
+                              );
+                            }
+                            return Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const SizedBox(height: 18),
+                                _MobileAssistantSheetSection(
+                                  title: appText('技能选择', 'Skills'),
+                                  subtitle: appText(
+                                    '和桌面端保持同一套会话技能选择。',
+                                    'Keeps the same session skill selections as desktop.',
+                                  ),
+                                  child: Wrap(
+                                    spacing: 8,
+                                    runSpacing: 8,
+                                    children: [
+                                      for (final skill in controller.skills)
+                                        FilterChip(
+                                          key: ValueKey(
+                                            'mobile-assistant-skill-chip-${skill.skillKey}',
+                                          ),
+                                          avatar: const Icon(
+                                            Icons.key_rounded,
+                                            size: 16,
+                                          ),
+                                          label: Text(skill.name),
+                                          selected:
+                                              selectedSkillKeySet.contains(
+                                            skill.skillKey,
+                                          ),
+                                          onSelected: (_) =>
+                                              toggleSkill(skill.skillKey),
+                                        ),
+                                    ],
+                                  ),
                                 ),
+                              ],
+                            );
+                          },
                         ),
                       ],
                     ),
@@ -402,7 +451,8 @@ class MobileAssistantComposer extends StatelessWidget {
           if (selectedBuiltinPluginIdsForSession(
                 controller.currentSessionKey,
               ).isNotEmpty ||
-              selectedSkills.isNotEmpty) ...[
+              selectedSkills.isNotEmpty ||
+              attachments.isNotEmpty) ...[
             const SizedBox(height: 8),
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
@@ -410,6 +460,18 @@ class MobileAssistantComposer extends StatelessWidget {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  for (final attachment in attachments)
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: _MobileAssistantSelectionChip(
+                        key: ValueKey<String>(
+                          'mobile-assistant-selected-attachment-${attachment.name}',
+                        ),
+                        icon: CupertinoIcons.doc,
+                        label: attachment.name,
+                        onDeleted: () => onRemoveAttachment(attachment),
+                      ),
+                    ),
                   for (final pluginId in selectedBuiltinPluginIdsForSession(
                     controller.currentSessionKey,
                   ))

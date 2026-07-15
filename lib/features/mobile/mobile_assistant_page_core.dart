@@ -1,9 +1,13 @@
 import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:file_selector/file_selector.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../assistant/assistant_attachment_payloads.dart';
+import '../assistant/assistant_page_composer_clipboard.dart';
 import '../../app/app_controller.dart';
 import '../../app/app_controller_desktop_thread_binding.dart';
 import '../../app/ui_feature_manifest.dart';
@@ -42,6 +46,8 @@ class _MobileAssistantDetailPageState extends State<MobileAssistantDetailPage> {
   String thinking = 'medium';
   String lastScrollSignature = '';
 
+  List<ComposerAttachmentInternal> _attachments = [];
+
   @override
   void initState() {
     super.initState();
@@ -69,16 +75,50 @@ class _MobileAssistantDetailPageState extends State<MobileAssistantDetailPage> {
     super.dispose();
   }
 
+  Future<void> _pickAttachments() async {
+    final uiFeatures = widget.controller.featuresFor(
+      resolveUiFeaturePlatformFromContext(context),
+    );
+    if (!uiFeatures.supportsFileAttachments) {
+      return;
+    }
+    final files = await openFiles();
+    if (!mounted || files.isEmpty) {
+      return;
+    }
+
+    setState(() {
+      _attachments = [
+        ..._attachments,
+        ...files.map(ComposerAttachmentInternal.fromXFile),
+      ];
+    });
+  }
+
   Future<void> sendCurrentPrompt() async {
     final text = inputController.text.trim();
-    if (text.isEmpty) {
+    if (text.isEmpty && _attachments.isEmpty) {
       inputFocusNode.requestFocus();
       return;
     }
+    
+    final submittedAttachments = List<ComposerAttachmentInternal>.from(
+      _attachments,
+      growable: false,
+    );
     inputController.clear();
+    setState(() {
+      _attachments = [];
+    });
     HapticFeedback.lightImpact();
+    
     try {
-      await widget.controller.sendChatMessage(text, thinking: thinking);
+      final attachmentPayloads = await buildAssistantAttachmentPayloadsInternal(submittedAttachments);
+      await widget.controller.sendChatMessage(
+        text, 
+        thinking: thinking,
+        attachments: attachmentPayloads,
+      );
     } catch (error) {
       if (!mounted) {
         return;
@@ -265,6 +305,13 @@ class _MobileAssistantDetailPageState extends State<MobileAssistantDetailPage> {
                           focusNode: inputFocusNode,
                           thinking: thinking,
                           bottomPadding: bottomPadding,
+                          attachments: _attachments,
+                          onPickAttachments: _pickAttachments,
+                          onRemoveAttachment: (attachment) {
+                            setState(() {
+                              _attachments = List.from(_attachments)..remove(attachment);
+                            });
+                          },
                           onThinkingChanged: (value) {
                             setState(() {
                               thinking = value;

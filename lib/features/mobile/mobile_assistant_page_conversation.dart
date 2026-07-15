@@ -1,9 +1,15 @@
+import 'dart:io';
+
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../app/app_controller.dart';
 import '../../i18n/app_language.dart';
 import '../../runtime/runtime_models.dart';
 import '../../theme/app_palette.dart';
+import '../../widgets/assistant_task_progress_bar.dart';
 import 'mobile_builtin_plugin_scenes.dart';
 import '../plugins/builtin_plugin_visuals.dart';
 
@@ -58,7 +64,10 @@ class MobileAssistantConversation extends StatelessWidget {
           return _MobileUserMessageBubble(message: message);
         }
 
-        return _MobileAssistantMessageCard(message: message);
+        return _MobileAssistantMessageCard(
+          message: message,
+          controller: controller,
+        );
       },
     );
   }
@@ -111,9 +120,13 @@ class _MobileUserMessageBubble extends StatelessWidget {
 }
 
 class _MobileAssistantMessageCard extends StatelessWidget {
-  const _MobileAssistantMessageCard({required this.message});
+  const _MobileAssistantMessageCard({
+    required this.message,
+    required this.controller,
+  });
 
   final GatewayChatMessage message;
+  final AppController controller;
 
   @override
   Widget build(BuildContext context) {
@@ -184,14 +197,52 @@ class _MobileAssistantMessageCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 18),
-              _MobileExecutionTimeline(
-                running: message.pending,
-                failed: message.error,
-              ),
-              const SizedBox(height: 18),
+              if (message.pending || message.error) ...[
+                AssistantTaskProgressBar(
+                  state: AssistantTaskProgressState(
+                    phase: message.error
+                        ? AssistantTaskProgressPhase.interrupted
+                        : AssistantTaskProgressPhase.running,
+                    label: message.error
+                        ? appText('任务中断', 'Task interrupted')
+                        : appText('正在运行...', 'Running...'),
+                  ),
+                  onStop: message.pending ? () => controller.abortRun() : null,
+                ),
+                const SizedBox(height: 18),
+              ],
               _MobileBridgeInlineStatus(connected: !message.error),
               const SizedBox(height: 18),
-              _MobileGeneratedArtifactCard(),
+              _MobileGeneratedArtifactCard(
+                onTap: () async {
+                  try {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text(appText('正在准备文件...', 'Preparing file...'))),
+                    );
+                    final snapshot = await controller.loadAssistantArtifactSnapshot();
+                    if (!context.mounted) return;
+                    if (snapshot.fileEntries.isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text(appText('暂无可用结果', 'No results available'))),
+                      );
+                      return;
+                    }
+                    final entry = snapshot.fileEntries.first;
+                    final preview = await controller.loadAssistantArtifactPreview(entry);
+                    
+                    final dir = await getTemporaryDirectory();
+                    final file = File('${dir.path}/${entry.label}');
+                    await file.writeAsString(preview.content);
+                    
+                    await Share.shareXFiles([XFile(file.path)], text: entry.label);
+                  } catch (e) {
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('下载失败: $e')),
+                    );
+                  }
+                },
+              ),
               const SizedBox(height: 12),
               _MobileLogButton(),
             ],
@@ -742,18 +793,26 @@ class _MobileBridgeInlineStatus extends StatelessWidget {
 }
 
 class _MobileGeneratedArtifactCard extends StatelessWidget {
+  const _MobileGeneratedArtifactCard({this.onTap});
+
+  final VoidCallback? onTap;
+
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: palette.surfacePrimary,
+    return Material(
+      color: palette.surfacePrimary,
+      borderRadius: BorderRadius.circular(12),
+      shape: RoundedRectangleBorder(
+        side: BorderSide(color: palette.strokeSoft),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: palette.strokeSoft),
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
           children: [
             DecoratedBox(
               decoration: BoxDecoration(
@@ -796,6 +855,7 @@ class _MobileGeneratedArtifactCard extends StatelessWidget {
             Icon(Icons.chevron_right_rounded, color: palette.textSecondary),
           ],
         ),
+      ),
       ),
     );
   }
