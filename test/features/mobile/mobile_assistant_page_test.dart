@@ -34,7 +34,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('mobile-assistant-page')), findsOneWidget);
-      expect(find.text('你想让我帮你做什么？'), findsOneWidget);
+    expect(find.text('你想先用哪个插件场景？'), findsOneWidget);
       expect(
         find.byKey(const Key('mobile-assistant-open-menu-button')),
         findsOneWidget,
@@ -93,7 +93,7 @@ void main() {
       await tester.tap(find.text('返回对话主页'));
       await tester.pumpAndSettle();
 
-      expect(find.text('你想让我帮你做什么？'), findsOneWidget);
+    expect(find.text('你想先用哪个插件场景？'), findsOneWidget);
     });
 
     testWidgets('mobile history opens quick task switcher', (tester) async {
