@@ -462,7 +462,6 @@ class MobileAssistantComposer extends StatelessWidget {
                         onDeleted: () => onRemoveAttachment(attachment),
                       ),
                     ),
->>>>>>> fc8621d3 (feat: complete mobile attachment logic and fixes)
                   for (final pluginId in selectedBuiltinPluginIdsForSession(
                     controller.currentSessionKey,
                   ))
