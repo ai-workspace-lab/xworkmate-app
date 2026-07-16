@@ -206,6 +206,9 @@ void main() {
       await tester.pumpWidget(_buildTestApp(controller: controller));
       await tester.pumpAndSettle();
 
+      await tester.tap(find.text('查看任务ID'));
+      await tester.pumpAndSettle();
+
       final workspaceReference = tester.widget<Text>(
         find.byKey(const Key('mobile-assistant-task-workspace-ref')),
       );
