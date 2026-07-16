@@ -365,6 +365,7 @@ class MobileAssistantComposer extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
+            clipBehavior: Clip.antiAlias,
             decoration: BoxDecoration(
               color: palette.surfacePrimary,
               borderRadius: BorderRadius.circular(24),
