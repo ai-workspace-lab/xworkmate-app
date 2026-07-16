@@ -260,12 +260,11 @@ itemBuilder: (context, index) {
 
 | 类型 | URL | 用户名 | 密码 |
 |------|-----|--------|------|
-| Apple 审核专用只读账号 | https://accounts.svc.plus | `review@svc.plus` | `Review123!` |
+| Apple 审核专用只读账号 | https://accounts.svc.plus | `review@svc.plus` | （已从文档移除；该口令曾入库，需按规范第 9 节轮换，轮换后存放于密钥管理处） |
 
 ---
 
 ## iOS 设备信息
 
-- **设备 UDID**: `00008140-000E75903EF2801C`
-- **部署命令**: `flutter run -d 00008140-000E75903EF2801C --release`
-- **Team ID**: `N3G9T67W78`
+- **设备 UDID / Team ID**: 已从文档移除，见维护者本地记录
+- **部署命令**: `flutter run -d <device-udid> --release`
