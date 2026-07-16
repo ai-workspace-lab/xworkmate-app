@@ -2,8 +2,10 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:file_selector/file_selector.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../assistant/assistant_attachment_payloads.dart';
 import '../assistant/assistant_page_composer_clipboard.dart';
@@ -81,7 +83,47 @@ class _MobileAssistantDetailPageState extends State<MobileAssistantDetailPage> {
     if (!uiFeatures.supportsFileAttachments) {
       return;
     }
-    final files = await openFiles();
+
+    final action = await showCupertinoModalPopup<String>(
+      context: context,
+      builder: (BuildContext context) => CupertinoActionSheet(
+        title: Text(appText('选择附件类型', 'Select Attachment Type')),
+        actions: <CupertinoActionSheetAction>[
+          CupertinoActionSheetAction(
+            onPressed: () {
+              Navigator.pop(context, 'photo');
+            },
+            child: Text(appText('照片和视频', 'Photos and Videos')),
+          ),
+          CupertinoActionSheetAction(
+            onPressed: () {
+              Navigator.pop(context, 'file');
+            },
+            child: Text(appText('浏览文件', 'Browse Files')),
+          ),
+        ],
+        cancelButton: CupertinoActionSheetAction(
+          isDefaultAction: true,
+          onPressed: () {
+            Navigator.pop(context);
+          },
+          child: Text(appText('取消', 'Cancel')),
+        ),
+      ),
+    );
+
+    if (action == null) {
+      return;
+    }
+
+    List<XFile> files = [];
+    if (action == 'photo') {
+      final picker = ImagePicker();
+      files = await picker.pickMultiImage();
+    } else if (action == 'file') {
+      files = await openFiles();
+    }
+
     if (!mounted || files.isEmpty) {
       return;
     }
