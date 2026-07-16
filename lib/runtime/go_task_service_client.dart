@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:crypto/crypto.dart' as crypto;
 
@@ -328,7 +327,6 @@ class GoTaskServiceRequest {
       'routing': resolvedRouting.toJson(),
       if (routingHint.trim().isNotEmpty) 'routingHint': routingHint.trim(),
       'requestedExecutionTarget': normalizedTarget.promptValue,
-      if (Platform.isIOS || Platform.isAndroid) 'requiresArtifactExport': true,
       if (_usesGatewaySessionMode(acpMode)) ...<String, dynamic>{
         'executionTarget': normalizedTarget.promptValue,
         'appThreadKey': threadId,

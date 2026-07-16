@@ -783,8 +783,9 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
       existingThread.selectedSkillKeys,
     );
     final artifacts = result.artifacts;
-    final isMobile = Platform.isIOS || Platform.isAndroid;
-    if (isMobile && result.artifactStatus.isNotEmpty) {
+    // A populated manifest is authoritative. OpenClaw can retain an earlier
+    // export status while returning the completed task's signed artifact URLs.
+    if (artifacts.isEmpty && result.artifactStatus.isNotEmpty) {
       final status = result.artifactStatus;
       if (status == 'none') {
         upsertTaskThreadInternal(
@@ -822,7 +823,8 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
           (association.artifactScope.trim().isNotEmpty ||
               association.artifactDirectory.trim().isNotEmpty) &&
           result.success &&
-          (result.artifactStatus.isEmpty || result.artifactStatus == 'exporting');
+          (result.artifactStatus.isEmpty ||
+              result.artifactStatus == 'exporting');
       if (waitingForOpenClawArtifacts) {
         final firstSyncAtMs =
             artifactSyncStartedAtMs ?? existingThread.lastArtifactSyncAtMs;
