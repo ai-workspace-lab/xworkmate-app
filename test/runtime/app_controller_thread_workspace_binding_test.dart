@@ -879,6 +879,92 @@ void main() {
   );
 
   test(
+    'keeps signed OpenClaw artifacts when the snapshot status is none',
+    () async {
+      String observedAuthorization = '';
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() => server.close(force: true));
+      server.listen((request) async {
+        observedAuthorization =
+            request.headers.value(HttpHeaders.authorizationHeader) ?? '';
+        request.response
+          ..statusCode = HttpStatus.ok
+          ..headers.contentType = ContentType.binary
+          ..add(<int>[0x50, 0x44, 0x46]);
+        await request.response.close();
+      });
+
+      final controller = AppController(
+        environmentOverride: const <String, String>{
+          'BRIDGE_AUTH_TOKEN': 'bridge-token',
+        },
+      );
+      addTearDown(controller.dispose);
+
+      final taskWorkspace = await Directory.systemTemp.createTemp(
+        'xworkmate-artifact-status-none-',
+      );
+      addTearDown(() async {
+        if (await taskWorkspace.exists()) {
+          await taskWorkspace.delete(recursive: true);
+        }
+      });
+      const sessionKey = 'draft-artifact-status-none';
+      controller.upsertTaskThreadInternal(
+        sessionKey,
+        workspaceBinding: WorkspaceBinding(
+          workspaceId: sessionKey,
+          workspaceKind: WorkspaceKind.localFs,
+          workspacePath: taskWorkspace.path,
+          displayPath: taskWorkspace.path,
+          writable: true,
+        ),
+      );
+
+      final result = GoTaskServiceResult(
+        success: true,
+        message: 'task completed',
+        turnId: 'run-artifact-status-none',
+        raw: <String, dynamic>{
+          'artifactStatus': 'none',
+          'artifacts': <Map<String, dynamic>>[
+            <String, dynamic>{
+              'relativePath': 'exports/final.pdf',
+              'downloadUrl':
+                  'http://xworkmate-bridge.svc.plus:${server.port}/artifacts/openclaw/download'
+                  '?sessionKey=$sessionKey&runId=run-artifact-status-none&relativePath=exports%2Ffinal.pdf'
+                  '&expires=9999999999&sig=test-signature',
+              'contentType': 'application/pdf',
+              'sizeBytes': 3,
+            },
+          ],
+        },
+        errorMessage: '',
+        resolvedModel: '',
+        route: GoTaskServiceRoute.externalAcpSingle,
+      );
+
+      await HttpOverrides.runZoned(() async {
+        await controller.persistGoTaskArtifactsForSessionInternal(
+          sessionKey,
+          result,
+        );
+      }, createHttpClient: _proxiedClientFactory(server.port));
+
+      expect(
+        await File('${taskWorkspace.path}/exports/final.pdf').readAsBytes(),
+        <int>[0x50, 0x44, 0x46],
+      );
+      expect(observedAuthorization, 'Bearer bridge-token');
+      final thread = controller.requireTaskThreadForSessionInternal(sessionKey);
+      expect(thread.lastArtifactSyncStatus, 'synced');
+      expect(thread.lastTaskArtifactRelativePaths, <String>[
+        'exports/final.pdf',
+      ]);
+    },
+  );
+
+  test(
     'refreshing an empty artifact snapshot backfills OpenClaw task artifacts from the remote workspace hint',
     () async {
       late OpenClawTaskAssociation observedAssociation;
