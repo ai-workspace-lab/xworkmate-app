@@ -1664,15 +1664,22 @@ extension AppControllerDesktopThreadActions on AppController {
         kOpenClawArtifactSyncTimeoutCode) {
       return;
     }
+    // 终态后保留 association（校正为终态 status）：制品清单为空可能只是
+    // 远端 export 滞后，session/run/scope 三元组是后续 loadAssistantArtifactSnapshot
+    // 补拉的唯一凭据，清掉后该线程将永远无法再发起带 runId 的 tasks.get。
+    final retainedOpenClawAssociation = openClawAssociation == null
+        ? null
+        : (openClawAssociation.isTerminal
+              ? openClawAssociation
+              : openClawAssociation.copyWith(status: 'completed'));
     upsertTaskThreadInternal(
       sessionKey,
       lifecycleStatus: 'ready',
       lastRunAtMs: completedAtMs,
       lastResultCode: terminalResultCode,
-      openClawTaskAssociation: hasCurrentRunArtifacts && openClawAssociation != null
-          ? openClawAssociation
-          : null,
-      clearOpenClawTaskAssociation: !hasCurrentRunArtifacts,
+      openClawTaskAssociation: retainedOpenClawAssociation,
+      clearOpenClawTaskAssociation:
+          retainedOpenClawAssociation == null && !hasCurrentRunArtifacts,
       updatedAtMs: completedAtMs,
     );
   }

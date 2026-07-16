@@ -1015,8 +1015,7 @@ class OpenClawTaskAssociation {
         'artifactDirectory': artifactDirectory,
       if (gatewayProviderId.trim().isNotEmpty)
         'gatewayProviderId': gatewayProviderId,
-      if (requiresArtifactExport || Platform.isIOS || Platform.isAndroid)
-        'requiresArtifactExport': true,
+      if (requiresArtifactExport) 'requiresArtifactExport': true,
       if (expectedArtifactExtensions.isNotEmpty)
         'expectedArtifactExtensions': expectedArtifactExtensions,
       if (requiredArtifactExtensions.isNotEmpty)
