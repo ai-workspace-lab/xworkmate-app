@@ -364,86 +364,82 @@ class MobileAssistantComposer extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Padding(
-                padding: const EdgeInsets.only(right: 10, bottom: 4),
-                child: Container(
-                  width: 54,
-                  height: 54,
-                  decoration: BoxDecoration(
-                    color: palette.surfacePrimary,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: palette.strokeSoft),
-                    boxShadow: [palette.chromeShadowAmbient],
+          Container(
+            decoration: BoxDecoration(
+              color: palette.surfacePrimary,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: palette.strokeSoft),
+              boxShadow: [palette.chromeShadowAmbient],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    minHeight: 48,
+                    maxHeight: 118,
                   ),
-                  child: IconButton(
-                    key: const Key('mobile-assistant-composer-add-button'),
-                    padding: EdgeInsets.zero,
-                    icon: Icon(
-                      Icons.add_rounded,
-                      color: palette.textPrimary,
-                      size: 30,
+                  child: TextField(
+                    key: const Key('mobile-assistant-input'),
+                    controller: inputController,
+                    focusNode: focusNode,
+                    minLines: 1,
+                    maxLines: 4,
+                    textInputAction: TextInputAction.newline,
+                    decoration: InputDecoration(
+                      hintText: appText(
+                        '询问 XWorkmate...',
+                        'Ask XWorkmate...',
+                      ),
+                      hintStyle: TextStyle(color: palette.textMuted),
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      contentPadding: const EdgeInsets.only(
+                        left: 18,
+                        right: 18,
+                        top: 14,
+                        bottom: 8,
+                      ),
                     ),
-                    onPressed: showConfigurationMenu,
                   ),
                 ),
-              ),
-              Expanded(
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: palette.surfacePrimary,
-                    borderRadius: BorderRadius.circular(30),
-                    border: Border.all(color: palette.strokeSoft),
-                    boxShadow: [palette.chromeShadowAmbient],
+                Padding(
+                  padding: const EdgeInsets.only(
+                    left: 10,
+                    right: 10,
+                    bottom: 10,
+                    top: 2,
                   ),
                   child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.end,
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: [
-                      Expanded(
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(
-                            minHeight: 54,
-                            maxHeight: 118,
-                          ),
-                          child: TextField(
-                            key: const Key('mobile-assistant-input'),
-                            controller: inputController,
-                            focusNode: focusNode,
-                            minLines: 1,
-                            maxLines: 4,
-                            textInputAction: TextInputAction.newline,
-                            decoration: InputDecoration(
-                              hintText: appText(
-                                '询问 XWorkmate...',
-                                'Ask XWorkmate...',
-                              ),
-                              hintStyle: TextStyle(color: palette.textMuted),
-                              border: InputBorder.none,
-                              enabledBorder: InputBorder.none,
-                              focusedBorder: InputBorder.none,
-                              contentPadding: const EdgeInsets.only(
-                                left: 16,
-                                right: 16,
-                                top: 16,
-                                bottom: 16,
-                              ),
-                            ),
-                          ),
+                      IconButton(
+                        key: const Key('mobile-assistant-composer-add-button'),
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(
+                          minWidth: 40,
+                          minHeight: 40,
                         ),
+                        icon: Icon(
+                          Icons.add_rounded,
+                          color: palette.textPrimary,
+                          size: 28,
+                        ),
+                        onPressed: showConfigurationMenu,
+                      ),
+                      _MobileAssistantPrimaryActionButton(
+                        isBusy: hasPendingRun,
+                        onSend: onSend,
+                        onStop: () => unawaited(controller.abortRun()),
                       ),
                     ],
                   ),
                 ),
-              ),
-              const SizedBox(width: 10),
-              _MobileAssistantPrimaryActionButton(
-                isBusy: hasPendingRun,
-                onSend: onSend,
-                onStop: () => unawaited(controller.abortRun()),
-              ),
-            ],
+              ],
+            ),
           ),
           if (selectedBuiltinPluginIdsForSession(
                 controller.currentSessionKey,
@@ -538,11 +534,11 @@ class _MobileAssistantPrimaryActionButton extends StatelessWidget {
     final palette = context.palette;
     final backgroundColor = isBusy
         ? palette.surfaceSecondary
-        : const Color(0xFF0058BD);
-    final foregroundColor = isBusy ? palette.textPrimary : Colors.white;
+        : palette.accentMuted;
+    final foregroundColor = isBusy ? palette.textPrimary : palette.accent;
     return SizedBox(
-      width: 58,
-      height: 58,
+      width: 40,
+      height: 40,
       child: IconButton(
         key: ValueKey<String>(
           isBusy
@@ -559,17 +555,18 @@ class _MobileAssistantPrimaryActionButton extends StatelessWidget {
           side: BorderSide(
             color: isBusy
                 ? palette.strokeSoft
-                : Colors.white.withValues(alpha: 0.22),
+                : Colors.transparent,
             width: 1.1,
           ),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(isBusy ? 18 : 999),
+            borderRadius: BorderRadius.circular(isBusy ? 12 : 999),
           ),
-          minimumSize: const Size(58, 58),
+          minimumSize: const Size(40, 40),
+          padding: EdgeInsets.zero,
         ),
         icon: Icon(
           isBusy ? Icons.stop_rounded : Icons.arrow_upward_rounded,
-          size: isBusy ? 26 : 30,
+          size: isBusy ? 20 : 22,
         ),
       ),
     );
