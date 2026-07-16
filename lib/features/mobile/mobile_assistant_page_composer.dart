@@ -701,45 +701,6 @@ class _MobileAssistantSelectionChip extends StatelessWidget {
   }
 }
 
-class _MobileAssistantSheetSection extends StatelessWidget {
-  const _MobileAssistantSheetSection({
-    required this.title,
-    required this.subtitle,
-    required this.child,
-  });
-
-  final String title;
-  final String subtitle;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.palette;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-            color: palette.textPrimary,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          subtitle,
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: palette.textSecondary,
-            height: 1.35,
-          ),
-        ),
-        const SizedBox(height: 10),
-        child,
-      ],
-    );
-  }
-}
-
 class MobileAssistantActionChip extends StatelessWidget {
   const MobileAssistantActionChip({
     super.key,
