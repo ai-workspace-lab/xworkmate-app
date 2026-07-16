@@ -1,3 +1,5 @@
+![XWorkmate App promotional poster](./assets/product.png)
+
 # xworkmate-app
 
 Flutter-based AI workspace shell for running assistant threads with local and remote gateway task execution via ACP bridge.
