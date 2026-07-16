@@ -257,15 +257,28 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('会话配置'), findsOneWidget);
-      expect(find.text('内置插件'), findsOneWidget);
-      expect(find.text('技能选择'), findsOneWidget);
+      expect(find.byKey(const Key('mobile-assistant-tab-0')), findsOneWidget);
+      expect(find.byKey(const Key('mobile-assistant-tab-1')), findsOneWidget);
+      expect(find.byKey(const Key('mobile-assistant-tab-2')), findsOneWidget);
+      expect(find.byKey(const Key('mobile-assistant-tab-attach')), findsOneWidget);
+
+      // Switch to Plugins tab (Tab 1)
+      await tester.tap(find.byKey(const Key('mobile-assistant-tab-1')));
+      await tester.pumpAndSettle();
+
       expect(
         find.byKey(const Key('mobile-assistant-plugin-chip-builtin.document')),
         findsOneWidget,
       );
+
+      // Switch to Skills tab (Tab 2)
+      await tester.tap(find.byKey(const Key('mobile-assistant-tab-2')));
+      await tester.pumpAndSettle();
       expect(find.text('当前没有已加载技能。'), findsOneWidget);
 
+      // Go back to Plugins tab and select plugin
+      await tester.tap(find.byKey(const Key('mobile-assistant-tab-1')));
+      await tester.pumpAndSettle();
       await tester.tap(
         find.byKey(const Key('mobile-assistant-plugin-chip-builtin.document')),
       );

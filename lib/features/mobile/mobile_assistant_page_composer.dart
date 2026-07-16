@@ -101,6 +101,7 @@ class MobileAssistantComposer extends StatelessWidget {
           borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
         ),
         builder: (sheetContext) {
+          int activeTabIndex = 0;
           return StatefulBuilder(
             builder: (sheetContext, setSheetState) {
               void togglePlugin(String pluginId) {
@@ -131,6 +132,76 @@ class MobileAssistantComposer extends StatelessWidget {
                 });
               }
 
+              void refreshSkillsIfEmpty() {
+                final skillsController = controller.skillsController;
+                if (controller.skills.isNotEmpty || skillsController.loading) {
+                  return;
+                }
+                final selectedAgentId = controller.selectedAgentId.trim();
+                unawaited(
+                  skillsController.refresh(
+                    agentId: selectedAgentId.isEmpty ? null : selectedAgentId,
+                  ),
+                );
+              }
+
+              Widget buildHeaderChip({
+                required String label,
+                required bool selected,
+                required IconData icon,
+                required Key key,
+                required VoidCallback onTap,
+              }) {
+                return InkWell(
+                  key: key,
+                  onTap: onTap,
+                  borderRadius: BorderRadius.circular(16),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: selected
+                          ? palette.accentMuted
+                          : palette.surfaceSecondary,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: selected
+                            ? palette.accent
+                            : palette.strokeSoft,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          icon,
+                          size: 14,
+                          color: selected
+                              ? palette.accent
+                              : palette.textSecondary,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          label,
+                          style: TextStyle(
+                            color: selected
+                                ? palette.accent
+                                : palette.textSecondary,
+                            fontWeight: selected
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }
+
               return SafeArea(
                 child: ConstrainedBox(
                   constraints: BoxConstraints(
@@ -145,113 +216,147 @@ class MobileAssistantComposer extends StatelessWidget {
                         Row(
                           children: [
                             Expanded(
-                              child: Text(
-                                appText('会话配置', 'Configuration'),
-                                style: Theme.of(sheetContext)
-                                    .textTheme
-                                    .titleMedium
-                                    ?.copyWith(
-                                      fontWeight: FontWeight.bold,
-                                      color: palette.textPrimary,
+                              child: SingleChildScrollView(
+                                scrollDirection: Axis.horizontal,
+                                child: Row(
+                                  children: [
+                                    buildHeaderChip(
+                                      key: const Key('mobile-assistant-tab-0'),
+                                      label: appText('会话配置', 'Config'),
+                                      icon: Icons.tune_rounded,
+                                      selected: activeTabIndex == 0,
+                                      onTap: () => setSheetState(() => activeTabIndex = 0),
                                     ),
+                                    const SizedBox(width: 8),
+                                    buildHeaderChip(
+                                      key: const Key('mobile-assistant-tab-1'),
+                                      label: appText('内置插件', 'Plugins'),
+                                      icon: Icons.extension_rounded,
+                                      selected: activeTabIndex == 1,
+                                      onTap: () => setSheetState(() => activeTabIndex = 1),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    buildHeaderChip(
+                                      key: const Key('mobile-assistant-tab-2'),
+                                      label: appText('技能选择', 'Skills'),
+                                      icon: Icons.psychology_rounded,
+                                      selected: activeTabIndex == 2,
+                                      onTap: () {
+                                        refreshSkillsIfEmpty();
+                                        setSheetState(() => activeTabIndex = 2);
+                                      },
+                                    ),
+                                    const SizedBox(width: 8),
+                                    buildHeaderChip(
+                                      key: const Key('mobile-assistant-tab-attach'),
+                                      label: appText('添加附件', 'Attach'),
+                                      icon: CupertinoIcons.paperclip,
+                                      selected: false,
+                                      onTap: () {
+                                        Navigator.pop(sheetContext);
+                                        onPickAttachments();
+                                      },
+                                    ),
+                                  ],
+                                ),
                               ),
                             ),
+                            const SizedBox(width: 4),
                             IconButton(
                               key: const Key('mobile-assistant-sheet-close'),
                               onPressed: () => Navigator.pop(sheetContext),
                               icon: const Icon(Icons.close_rounded),
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 14),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 10,
-                          children: [
-                            MobileAssistantActionChip(
-                              key: const Key('mobile-assistant-target-button'),
-                              icon: target.isGateway
-                                  ? Icons.cloud_queue_rounded
-                                  : Icons.smart_toy_outlined,
-                              label: target.compactLabel,
-                              onTap: () {
-                                Navigator.pop(sheetContext);
-                                showMobileAssistantTargetSheet(
-                                  context,
-                                  controller: controller,
-                                  onSelected: onSetExecutionTarget,
-                                );
-                              },
-                            ),
-                            MobileAssistantActionChip(
-                              key: const Key(
-                                'mobile-assistant-provider-button',
+                        if (activeTabIndex == 0) ...[
+                          const SizedBox(height: 18),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 10,
+                            children: [
+                              MobileAssistantActionChip(
+                                key: const Key('mobile-assistant-target-button'),
+                                icon: target.isGateway
+                                    ? Icons.cloud_queue_rounded
+                                    : Icons.smart_toy_outlined,
+                                label: target.compactLabel,
+                                onTap: () {
+                                  Navigator.pop(sheetContext);
+                                  showMobileAssistantTargetSheet(
+                                    context,
+                                    controller: controller,
+                                    onSelected: onSetExecutionTarget,
+                                  );
+                                },
                               ),
-                              icon: Icons.hub_outlined,
-                              label: providerLabel,
-                              onTap: () {
-                                Navigator.pop(sheetContext);
-                                showMobileAssistantProviderSheet(
-                                  context,
-                                  controller: controller,
-                                  target: target,
-                                  selectedProvider: provider,
-                                  onSelected: onSetProvider,
-                                );
-                              },
-                            ),
-                            MobileAssistantActionChip(
-                              key: const Key(
-                                'mobile-assistant-permission-button',
+                              MobileAssistantActionChip(
+                                key: const Key(
+                                  'mobile-assistant-provider-button',
+                                ),
+                                icon: Icons.hub_outlined,
+                                label: providerLabel,
+                                onTap: () {
+                                  Navigator.pop(sheetContext);
+                                  showMobileAssistantProviderSheet(
+                                    context,
+                                    controller: controller,
+                                    target: target,
+                                    selectedProvider: provider,
+                                    onSelected: onSetProvider,
+                                  );
+                                },
                               ),
-                              icon: mobilePermissionIcon(
-                                controller.assistantPermissionLevel,
+                              MobileAssistantActionChip(
+                                key: const Key(
+                                  'mobile-assistant-permission-button',
+                                ),
+                                icon: mobilePermissionIcon(
+                                  controller.assistantPermissionLevel,
+                                ),
+                                label: controller.assistantPermissionLevel.label,
+                                onTap: () {
+                                  Navigator.pop(sheetContext);
+                                  showMobileAssistantPermissionSheet(
+                                    context,
+                                    controller: controller,
+                                  );
+                                },
                               ),
-                              label: controller.assistantPermissionLevel.label,
-                              onTap: () {
-                                Navigator.pop(sheetContext);
-                                showMobileAssistantPermissionSheet(
-                                  context,
-                                  controller: controller,
-                                );
-                              },
-                            ),
-                            MobileAssistantActionChip(
-                              key: const Key(
-                                'mobile-assistant-thinking-button',
+                              MobileAssistantActionChip(
+                                key: const Key(
+                                  'mobile-assistant-thinking-button',
+                                ),
+                                icon: Icons.psychology_alt_outlined,
+                                label: mobileThinkingLabel(thinking),
+                                onTap: () {
+                                  Navigator.pop(sheetContext);
+                                  showMobileAssistantThinkingSheet(
+                                    context,
+                                    value: thinking,
+                                    onSelected: onThinkingChanged,
+                                  );
+                                },
                               ),
-                              icon: Icons.psychology_alt_outlined,
-                              label: mobileThinkingLabel(thinking),
-                              onTap: () {
-                                Navigator.pop(sheetContext);
-                                showMobileAssistantThinkingSheet(
-                                  context,
-                                  value: thinking,
-                                  onSelected: onThinkingChanged,
-                                );
-                              },
-                            ),
-                            MobileAssistantActionChip(
-                              key: const Key(
-                                'mobile-assistant-attachment-button',
-                              ),
-                              icon: CupertinoIcons.paperclip,
-                              label: appText('添加附件', 'Attachments'),
-                              onTap: () {
-                                Navigator.pop(sheetContext);
-                                onPickAttachments();
-                              },
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 18),
-                        _MobileAssistantSheetSection(
-                          title: appText('内置插件', 'Built-in plugins'),
-                          subtitle: appText(
-                            '点选即可叠加到当前会话。',
-                            'Tap to keep a plugin active for this session.',
+                            ],
                           ),
-                          child: Wrap(
+                        ],
+                        if (activeTabIndex == 1) ...[
+                          const SizedBox(height: 14),
+                          Text(
+                            appText(
+                              '点选即可叠加到当前会话。',
+                              'Tap to keep a plugin active for this session.',
+                            ),
+                            style: TextStyle(
+                              color: palette.textMuted,
+                              fontSize: 13,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          Wrap(
                             spacing: 8,
                             runSpacing: 8,
                             children: [
@@ -273,75 +378,61 @@ class MobileAssistantComposer extends StatelessWidget {
                                 ),
                             ],
                           ),
-                        ),
-                        AnimatedBuilder(
-                          animation: controller,
-                          builder: (context, _) {
-                            if (controller.skills.isEmpty) {
-                              return Column(
-                                mainAxisSize: MainAxisSize.min,
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const SizedBox(height: 18),
-                                  _MobileAssistantSheetSection(
-                                    title: appText('技能选择', 'Skills'),
-                                    subtitle: appText(
-                                      '和桌面端保持同一套会话技能选择。',
-                                      'Keeps the same session skill selections as desktop.',
-                                    ),
-                                    child: Text(
-                                      appText(
-                                        '当前没有已加载技能。',
-                                        'No skills are loaded yet.',
-                                      ),
-                                      style: Theme.of(sheetContext)
-                                          .textTheme
-                                          .bodyMedium
-                                          ?.copyWith(
-                                            color: palette.textSecondary,
-                                          ),
-                                    ),
+                        ],
+                        if (activeTabIndex == 2) ...[
+                          const SizedBox(height: 14),
+                          Text(
+                            appText(
+                              '和桌面端保持同一套会话技能选择。',
+                              'Keeps the same session skill selections as desktop.',
+                            ),
+                            style: TextStyle(
+                              color: palette.textMuted,
+                              fontSize: 13,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          AnimatedBuilder(
+                            animation: controller,
+                            builder: (context, _) {
+                              if (controller.skills.isEmpty) {
+                                return Text(
+                                  appText(
+                                    '当前没有已加载技能。',
+                                    'No skills are loaded yet.',
                                   ),
+                                  style: Theme.of(sheetContext)
+                                      .textTheme
+                                      .bodyMedium
+                                      ?.copyWith(
+                                        color: palette.textSecondary,
+                                      ),
+                                );
+                              }
+                              return Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: [
+                                  for (final skill in controller.skills)
+                                    FilterChip(
+                                      key: ValueKey(
+                                        'mobile-assistant-skill-chip-${skill.skillKey}',
+                                      ),
+                                      avatar: const Icon(
+                                        Icons.key_rounded,
+                                        size: 16,
+                                      ),
+                                      label: Text(skill.name),
+                                      selected: selectedSkillKeySet
+                                          .contains(skill.skillKey),
+                                      onSelected: (_) =>
+                                          toggleSkill(skill.skillKey),
+                                    ),
                                 ],
                               );
-                            }
-                            return Column(
-                              mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const SizedBox(height: 18),
-                                _MobileAssistantSheetSection(
-                                  title: appText('技能选择', 'Skills'),
-                                  subtitle: appText(
-                                    '和桌面端保持同一套会话技能选择。',
-                                    'Keeps the same session skill selections as desktop.',
-                                  ),
-                                  child: Wrap(
-                                    spacing: 8,
-                                    runSpacing: 8,
-                                    children: [
-                                      for (final skill in controller.skills)
-                                        FilterChip(
-                                          key: ValueKey(
-                                            'mobile-assistant-skill-chip-${skill.skillKey}',
-                                          ),
-                                          avatar: const Icon(
-                                            Icons.key_rounded,
-                                            size: 16,
-                                          ),
-                                          label: Text(skill.name),
-                                          selected: selectedSkillKeySet
-                                              .contains(skill.skillKey),
-                                          onSelected: (_) =>
-                                              toggleSkill(skill.skillKey),
-                                        ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            );
-                          },
-                        ),
+                            },
+                          ),
+                        ],
                       ],
                     ),
                   ),
