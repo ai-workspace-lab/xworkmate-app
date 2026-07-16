@@ -221,6 +221,17 @@ class MobileAssistantComposer extends StatelessWidget {
                                 child: Row(
                                   children: [
                                     buildHeaderChip(
+                                      key: const Key('mobile-assistant-tab-attach'),
+                                      label: appText('添加附件', 'Attach'),
+                                      icon: CupertinoIcons.paperclip,
+                                      selected: false,
+                                      onTap: () {
+                                        Navigator.pop(sheetContext);
+                                        onPickAttachments();
+                                      },
+                                    ),
+                                    const SizedBox(width: 8),
+                                    buildHeaderChip(
                                       key: const Key('mobile-assistant-tab-0'),
                                       label: appText('会话配置', 'Config'),
                                       icon: Icons.tune_rounded,
@@ -244,17 +255,6 @@ class MobileAssistantComposer extends StatelessWidget {
                                       onTap: () {
                                         refreshSkillsIfEmpty();
                                         setSheetState(() => activeTabIndex = 2);
-                                      },
-                                    ),
-                                    const SizedBox(width: 8),
-                                    buildHeaderChip(
-                                      key: const Key('mobile-assistant-tab-attach'),
-                                      label: appText('添加附件', 'Attach'),
-                                      icon: CupertinoIcons.paperclip,
-                                      selected: false,
-                                      onTap: () {
-                                        Navigator.pop(sheetContext);
-                                        onPickAttachments();
                                       },
                                     ),
                                   ],
