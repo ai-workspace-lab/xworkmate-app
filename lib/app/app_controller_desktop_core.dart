@@ -295,6 +295,10 @@ class AppController extends ChangeNotifier {
   StreamSubscription<GatewayPushEvent>? runtimeEventsSubscriptionInternal;
   bool disposedInternal = false;
   String resolvedUserHomeDirectoryInternal = resolveUserHomeDirectory();
+  // 移动端线程工作区基准目录（应用 Documents 目录）。iOS 进程没有 HOME
+  // 环境变量，基于 env 的 home 解析在真机上得到空串；该字段由
+  // initializeInternal 在恢复线程之前经 path_provider 异步解析。
+  String mobileWorkspaceBaseDirectoryInternal = '';
   Map<String, String>? environmentOverrideInternal;
   SettingsSnapshot lastObservedSettingsSnapshotInternal =
       SettingsSnapshot.defaults();

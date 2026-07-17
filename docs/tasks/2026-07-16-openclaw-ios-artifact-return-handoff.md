@@ -80,6 +80,44 @@ skill 合同型任务（association 自带 `requiresArtifactExport` / `requiredA
 
 验证：`assistant_execution_target_test.dart` + `app_controller_thread_workspace_binding_test.dart` 共 109 用例通过；全仓 `flutter analyze` 零告警。（`records workspace files produced during an empty-artifact task run` 存在文件 mtime 竞态的存量 flake，与本修复无关。）
 
+## 4.1 第四轮：真机在线联调定位到最终根因（2026-07-17）
+
+前三轮修复(§3/§4)落地后,新任务在 iOS 上仍无制品卡片。通过「服务器侧直接调用
+`xworkmate.tasks.get` + 真机 profile 模式实时日志」两端夹逼,得到决定性证据链：
+
+1. **服务端链路当场验证健康**：对现场 run 直接调用 tasks.get,返回
+   `status=completed + artifactCount=1 + 签名 downloadUrl`,文件确实在
+   `tasks/<session>/<run>/` scope 内。断点 100% 在客户端。
+2. **真机日志揭示第一层**：`[artifact-sync] bail: workspaceKind=remoteFs
+   workspacePath=/owners/...`——iOS 上所有线程的 workspace 绑定都是
+   remoteFs 兜底,而制品同步第一道守卫要求 localFs,**同步从未发起过**。
+3. **真机日志揭示第二层（最终根因）**：`[thread-binding] localPath bail:
+   empty base (home="")`——**iOS 应用进程没有 HOME 环境变量**,
+   `resolveUserHomeDirectory()` 得到空串,`localThreadWorkspacePathInternal`
+   永远返回空,绑定构建永远走 remoteFs 兜底分支。`a88ffb2` 只修了
+   bootstrap 的 workspace root,线程绑定这条路径从未在 iOS 上工作过。
+
+### 最终修复（三处,含桌面兼容设计）
+
+| 文件 | 修改 | 桌面端影响 |
+|---|---|---|
+| `app_controller_desktop_core.dart` + `app_controller_desktop_settings_runtime.dart` | 新增 `mobileWorkspaceBaseDirectoryInternal`,`initializeInternal` 在**恢复线程之前**经 path_provider 解析应用 Documents 目录(仅 iOS/Android 且无 environmentOverride 时) | 无——桌面不进入该分支 |
+| `app_controller_desktop_thread_binding.dart` | `threadWorkspaceHomeBaseInternal()`：移动端用 Documents 基准,桌面端保持 `$HOME`;显示路径移动端为 `$DOCUMENTS/.xworkmate/threads/<dir>` | 桌面路径与显示完全不变 |
+| `app_controller_desktop_thread_storage.dart` | 线程恢复时迁移：`remoteFs + /owners/ 兜底路径 + app-owned` 且本地路径可用 → 迁回 localFs 并重建目录 | 桌面同样受益：历史上绑定失败的线程自愈;正常 localFs 线程不满足迁移条件,不受影响 |
+
+配套：`mobile_assistant_page_core.dart` 的任务路径展示改用
+`localThreadWorkspaceDisplayPathInternal()`(此前硬编码 `$HOME/...`,与真实
+写入位置不符)。新增 host 可跑的迁移回归测试
+`startup migrates owner-scoped remoteFs threads back to a local workspace`。
+
+### 桌面兼容结论
+
+- 桌面端(macOS/Windows/Linux)路径推导、显示、绑定行为**逐字节不变**
+  (仅 `Platform.isIOS/isAndroid` 分支变化,host 全量测试 110 用例通过)。
+- 迁移逻辑跨端生效但条件严格(owner-scoped remoteFs 兜底 + 本地可用),
+  桌面只会修复历史坏绑定,不会触碰正常线程。
+- `environmentOverride` 语义保留：测试注入的环境不受 path_provider 影响。
+
 ## 5. 服务端遗留项（尚未闭环）
 
 1. **插件部署断裂**：`openclaw-multi-session-plugins` 统一流水线的 publish 阶段自 06-28 建立以来从未成功（发布所需的 npm 凭据在 CI 密钥源中缺失；npm 上仅有 2026-05-07 的 `0.1.8`）。`5c34a5f`（识别 completed 终态）已合入 main 但从未部署。需补齐发布凭据后 `workflow_dispatch` 重新发布部署。
