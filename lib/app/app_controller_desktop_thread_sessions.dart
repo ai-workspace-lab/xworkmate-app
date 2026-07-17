@@ -414,8 +414,16 @@ extension AppControllerDesktopThreadSessions on AppController {
 
   bool _shouldRefreshRemoteArtifactSnapshotInternal(TaskThread thread) {
     final syncStatus = thread.lastArtifactSyncStatus?.trim().toLowerCase();
-    if (syncStatus == 'partial' ||
-        syncStatus == 'syncing' ||
+    if (syncStatus == 'partial') {
+      // partial 是稳定终态（清单里有文件已消失/被跳过），移动端 3s 一次的
+      // snapshot 轮询若每轮都全量重同步，会对同一清单反复打下载请求。
+      // 冷却期内直接使用本地快照，到期后再重查远端。
+      final lastSyncAtMs = thread.lastArtifactSyncAtMs ?? 0;
+      final nowMs = DateTime.now().millisecondsSinceEpoch.toDouble();
+      return nowMs - lastSyncAtMs >=
+          kOpenClawPartialArtifactRefreshCooldownInternal.inMilliseconds;
+    }
+    if (syncStatus == 'syncing' ||
         syncStatus == 'running' ||
         syncStatus == 'queued') {
       return true;
