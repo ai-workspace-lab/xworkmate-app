@@ -122,6 +122,63 @@ void main() {
   });
 
   test(
+    'startup migrates owner-scoped remoteFs threads back to a local workspace',
+    () async {
+      final storeRoot = await Directory.systemTemp.createTemp(
+        'xworkmate-remote-binding-migrate-',
+      );
+      addTearDown(() async {
+        if (await storeRoot.exists()) {
+          await storeRoot.delete(recursive: true);
+        }
+      });
+      final homeRoot = '${storeRoot.path}/home';
+      await Directory(homeRoot).create(recursive: true);
+      final store = _RecordingSecureConfigStore(rootPath: storeRoot.path);
+      await store.initialize();
+      const sessionKey = 'unit-fixture-migrate-a';
+      await store.saveTaskThreads(<TaskThread>[
+        TaskThread(
+          threadId: sessionKey,
+          title: 'Remote-bound task',
+          workspaceBinding: const WorkspaceBinding(
+            workspaceId: sessionKey,
+            workspaceKind: WorkspaceKind.remoteFs,
+            workspacePath: '/owners/local/user/device-a/threads/$sessionKey',
+            displayPath: '/owners/local/user/device-a/threads/$sessionKey',
+            writable: true,
+          ),
+          executionBinding: const ExecutionBinding(
+            executionMode: ThreadExecutionMode.gateway,
+            executorId: 'openclaw',
+            providerId: 'openclaw',
+            endpointId: '',
+          ),
+        ),
+      ]);
+
+      final controller = AppController(
+        store: store,
+        environmentOverride: <String, String>{'HOME': homeRoot},
+      );
+      addTearDown(controller.dispose);
+      await _waitForControllerInitialization(controller);
+
+      final thread = controller.taskThreadForSessionInternal(sessionKey);
+      expect(thread, isNotNull);
+      expect(thread!.workspaceBinding.workspaceKind, WorkspaceKind.localFs);
+      expect(
+        thread.workspaceBinding.workspacePath,
+        '$homeRoot/.xworkmate/threads/$sessionKey',
+      );
+      expect(
+        Directory(thread.workspaceBinding.workspacePath).existsSync(),
+        isTrue,
+      );
+    },
+  );
+
+  test(
     'empty environment override keeps thread workspaces out of real HOME',
     () async {
       final realHome = Platform.environment['HOME']?.trim() ?? '';
