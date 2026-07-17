@@ -4,6 +4,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
 import 'app_metadata.dart';
 import 'app_capabilities.dart';
 import 'app_store_policy.dart';
@@ -395,6 +396,17 @@ extension AppControllerDesktopSettingsRuntime on AppController {
           : resolveUserHomeDirectoryFromControllerEnvironmentInternal(
               environmentOverrideInternal,
             );
+      if ((Platform.isIOS || Platform.isAndroid) &&
+          environmentOverrideInternal == null) {
+        // iOS 进程没有 HOME 环境变量；线程工作区必须落在应用 Documents 下。
+        // 必须在 restoreAssistantThreadsInternal 之前完成，绑定迁移才有基准。
+        try {
+          mobileWorkspaceBaseDirectoryInternal =
+              (await getApplicationDocumentsDirectory()).path;
+        } catch (error) {
+          debugPrint('Resolve mobile documents directory failed: $error');
+        }
+      }
       await settingsControllerInternal.initialize();
       final loadedAppUiState = await storeInternal.loadAppUiState();
       final sanitizedAppUiState = sanitizeAppUiStateInternal(loadedAppUiState);
