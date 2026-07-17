@@ -323,7 +323,7 @@ class _MobileAssistantDetailPageState extends State<MobileAssistantDetailPage> {
         final sessionKey = controller.currentSessionKey.trim();
         final taskWorkspaceReference = sessionKey.isEmpty
             ? ''
-            : '\$HOME/.xworkmate/threads/${controller.threadWorkspaceDirectoryNameInternal(sessionKey)}';
+            : controller.localThreadWorkspaceDisplayPathInternal(sessionKey);
 
         return Scaffold(
           backgroundColor: palette.canvas,

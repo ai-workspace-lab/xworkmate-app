@@ -35,6 +35,7 @@ import 'app_controller_desktop_gateway.dart';
 import 'app_controller_desktop_settings.dart';
 import 'app_controller_desktop_thread_sessions.dart';
 import 'app_controller_desktop_thread_actions.dart';
+import 'app_controller_desktop_thread_binding.dart';
 import 'app_controller_desktop_workspace_execution.dart';
 import 'app_controller_desktop_settings_runtime.dart';
 import 'app_controller_desktop_skill_permissions.dart';
@@ -620,7 +621,7 @@ extension AppControllerDesktopThreadStorage on AppController {
         recordProviderId,
         executionTarget: normalizedExecutionTarget,
       );
-      final workspaceBinding = record.workspaceBinding.copyWith(
+      var workspaceBinding = record.workspaceBinding.copyWith(
         workspaceId: sessionKey,
         displayPath: record.workspaceKind == WorkspaceKind.localFs
             ? record.workspacePath.trim()
@@ -628,6 +629,27 @@ extension AppControllerDesktopThreadStorage on AppController {
                   ? record.workspacePath.trim()
                   : record.displayPath.trim()),
       );
+      // 迁移：owner-scoped remoteFs 只是「本地工作区不可用」时的兜底绑定
+      // （历史上 iOS 以 $HOME 建线程目录失败即落入此分支）。一旦本地路径
+      // 恢复可用，必须迁回 localFs，否则制品同步永远跳过该线程。
+      if (record.workspaceKind == WorkspaceKind.remoteFs &&
+          isOwnerScopedRemoteWorkspacePathInternal(record.workspacePath) &&
+          isAppOwnedAssistantSessionKeyInternal(sessionKey)) {
+        final migratedLocalPath = localThreadWorkspacePathInternal(sessionKey);
+        debugPrint(
+          '[thread-migrate] $sessionKey remoteFs->localFs '
+          'candidate="$migratedLocalPath"',
+        );
+        if (migratedLocalPath.isNotEmpty) {
+          workspaceBinding = WorkspaceBinding(
+            workspaceId: sessionKey,
+            workspaceKind: WorkspaceKind.localFs,
+            workspacePath: migratedLocalPath,
+            displayPath: migratedLocalPath,
+            writable: record.workspaceBinding.writable,
+          );
+        }
+      }
       final normalizedRecord = record.copyWith(
         threadId: sessionKey,
         title: record.title.trim(),

@@ -88,6 +88,24 @@ extension AppControllerDesktopThreadBinding on AppController {
     return normalizedPath.endsWith(normalizedSuffix);
   }
 
+  /// 线程工作区的可写基准目录。
+  ///
+  /// iOS 应用进程没有 HOME 环境变量（2026-07-17 真机联调确认 home 解析为
+  /// 空串），基于 env 的路径推导必然失败，绑定随之回退 remoteFs，制品同步
+  /// 的 localFs 守卫会永远跳过该线程。移动端改用 initializeInternal 经
+  /// path_provider 解析的应用 Documents 目录；桌面端保持 `$HOME` 不变。
+  String threadWorkspaceHomeBaseInternal() {
+    if (Platform.isIOS || Platform.isAndroid) {
+      final base = mobileWorkspaceBaseDirectoryInternal.trim();
+      return base.isEmpty ? '' : trimTrailingPathSeparatorInternal(base);
+    }
+    final homeDirectory = resolvedUserHomeDirectoryInternal.trim();
+    if (homeDirectory.isEmpty) {
+      return '';
+    }
+    return trimTrailingPathSeparatorInternal(homeDirectory);
+  }
+
   String localThreadWorkspacePathInternal(String sessionKey) {
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey,
@@ -95,20 +113,25 @@ extension AppControllerDesktopThreadBinding on AppController {
     if (!isAppOwnedAssistantSessionKeyInternal(normalizedSessionKey)) {
       return '';
     }
-    final homeDirectory = resolvedUserHomeDirectoryInternal.trim();
-    if (homeDirectory.isEmpty) {
+    final baseDirectory = threadWorkspaceHomeBaseInternal();
+    if (baseDirectory.isEmpty) {
+      debugPrint(
+        '[thread-binding] localPath bail: empty base '
+        '(home="$resolvedUserHomeDirectoryInternal")',
+      );
       return '';
     }
     final threadWorkspace =
-        '${trimTrailingPathSeparatorInternal(homeDirectory)}/.xworkmate/threads/${threadWorkspaceDirectoryNameInternal(normalizedSessionKey)}';
-    return ensureLocalWorkspaceDirectoryInternal(threadWorkspace)
-        ? threadWorkspace
-        : '';
+        '$baseDirectory/.xworkmate/threads/${threadWorkspaceDirectoryNameInternal(normalizedSessionKey)}';
+    final ensured = ensureLocalWorkspaceDirectoryInternal(threadWorkspace);
+    if (!ensured) {
+      debugPrint('[thread-binding] localPath mkdir failed: $threadWorkspace');
+    }
+    return ensured ? threadWorkspace : '';
   }
 
   String localThreadWorkspaceDisplayPathInternal(String sessionKey) {
-    final homeDirectory = resolvedUserHomeDirectoryInternal.trim();
-    if (homeDirectory.isEmpty) {
+    if (threadWorkspaceHomeBaseInternal().isEmpty) {
       return '';
     }
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
@@ -117,7 +140,10 @@ extension AppControllerDesktopThreadBinding on AppController {
     if (!isAppOwnedAssistantSessionKeyInternal(normalizedSessionKey)) {
       return '';
     }
-    return '\$HOME/.xworkmate/threads/${threadWorkspaceDirectoryNameInternal(normalizedSessionKey)}';
+    final displayBase = Platform.isIOS || Platform.isAndroid
+        ? '\$DOCUMENTS'
+        : '\$HOME';
+    return '$displayBase/.xworkmate/threads/${threadWorkspaceDirectoryNameInternal(normalizedSessionKey)}';
   }
 
   String remoteThreadWorkspacePathInternal(

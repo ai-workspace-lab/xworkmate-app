@@ -1238,14 +1238,27 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
       sameBridgeHost = downloadHost == bridgeHost;
     }
     if (!sameBridgeHost) {
+      debugPrint(
+        '[artifact-download] skip cross-host: url=$downloadHost '
+        'bridge=$bridgeHost path=${uri.path}',
+      );
       return const _ArtifactBytesResult.skipped();
     }
     final authorization =
         await resolveBridgeArtifactAuthorizationHeaderInternal(uri);
     if (authorization == null || authorization.trim().isEmpty) {
+      debugPrint('[artifact-download] fail: no bridge authorization header');
       return const _ArtifactBytesResult.failed();
     }
-    return _downloadBridgeArtifactBytesInternal(uri, authorization);
+    final downloadResult = await _downloadBridgeArtifactBytesInternal(
+      uri,
+      authorization,
+    );
+    debugPrint(
+      '[artifact-download] ${uri.path} '
+      'failed=${downloadResult.failed} bytes=${downloadResult.bytes?.length}',
+    );
+    return downloadResult;
   }
 
   Future<_ArtifactBytesResult> _downloadBridgeArtifactBytesInternal(
