@@ -489,25 +489,44 @@ class MobileAssistantComposer extends StatelessWidget {
                   ),
                   const SizedBox(width: 4),
                   Expanded(
-                    child: TextField(
-                      key: const Key('mobile-assistant-input'),
-                      controller: inputController,
-                      focusNode: focusNode,
-                      minLines: 1,
-                      maxLines: 1,
-                      textInputAction: TextInputAction.send,
-                      onSubmitted: (_) => onSend(),
-                      decoration: InputDecoration(
-                        hintText: appText(
-                          '询问 XWorkmate...',
-                          'Ask XWorkmate...',
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        TextField(
+                          key: const Key('mobile-assistant-input'),
+                          controller: inputController,
+                          focusNode: focusNode,
+                          minLines: 1,
+                          maxLines: 1,
+                          textInputAction: TextInputAction.send,
+                          onSubmitted: (_) => onSend(),
+                          decoration: const InputDecoration(
+                            hintText: '',
+                            border: InputBorder.none,
+                            enabledBorder: InputBorder.none,
+                            focusedBorder: InputBorder.none,
+                            contentPadding: EdgeInsets.zero,
+                          ),
                         ),
-                        hintStyle: TextStyle(color: palette.textMuted),
-                        border: InputBorder.none,
-                        enabledBorder: InputBorder.none,
-                        focusedBorder: InputBorder.none,
-                        contentPadding: EdgeInsets.zero,
-                      ),
+                        IgnorePointer(
+                          child: ValueListenableBuilder<TextEditingValue>(
+                            valueListenable: inputController,
+                            builder: (context, value, _) {
+                              if (value.text.isNotEmpty) {
+                                return const SizedBox.shrink();
+                              }
+                              return Text(
+                                appText(
+                                  '询问 XWorkmate...',
+                                  'Ask XWorkmate...',
+                                ),
+                                textAlign: TextAlign.center,
+                                style: TextStyle(color: palette.textMuted),
+                              );
+                            },
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                   const SizedBox(width: 8),
