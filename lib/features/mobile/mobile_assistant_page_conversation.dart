@@ -289,13 +289,6 @@ class MobileAssistantEmptyState extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                _MobileBridgeHeroStatus(
-                  connected: connection.connected,
-                  detail: connection.connected
-                      ? appText('在线 · 随时为你执行任务', 'Online · ready to run')
-                      : appText('先去配置集成连接', 'Configure integration first'),
-                ),
-                const SizedBox(height: 30),
                 Text(
                   appText('你想先用哪个插件场景？', 'Which plugin scene do you want?'),
                   textAlign: TextAlign.center,
@@ -365,87 +358,6 @@ class MobileAssistantEmptyState extends StatelessWidget {
           ),
         );
       },
-    );
-  }
-}
-
-class _MobileBridgeHeroStatus extends StatelessWidget {
-  const _MobileBridgeHeroStatus({
-    required this.connected,
-    required this.detail,
-  });
-
-  final bool connected;
-  final String detail;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.palette;
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Stack(
-          clipBehavior: Clip.none,
-          children: [
-            DecoratedBox(
-              decoration: BoxDecoration(
-                color: palette.surfacePrimary,
-                shape: BoxShape.circle,
-                border: Border.all(color: palette.accent, width: 1.4),
-              ),
-              child: SizedBox(
-                width: 56,
-                height: 56,
-                child: Icon(
-                  connected ? Icons.hub_outlined : Icons.link_off_rounded,
-                  color: connected ? palette.accent : palette.warning,
-                  size: 30,
-                ),
-              ),
-            ),
-            Positioned(
-              right: 2,
-              bottom: 2,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: connected ? palette.success : palette.warning,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: palette.canvas, width: 3),
-                ),
-                child: const SizedBox(width: 17, height: 17),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(width: 14),
-        Flexible(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                connected
-                    ? appText('AI Workspace 已连接', 'AI Workspace Connected')
-                    : appText('先配置集成连接', 'Configure Integration First'),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: palette.textPrimary,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 3),
-              Text(
-                detail,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(
-                  context,
-                ).textTheme.bodyMedium?.copyWith(color: palette.textSecondary),
-              ),
-            ],
-          ),
-        ),
-      ],
     );
   }
 }

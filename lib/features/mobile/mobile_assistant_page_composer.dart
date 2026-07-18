@@ -473,20 +473,19 @@ class MobileAssistantComposer extends StatelessWidget {
               height: 64,
               child: Row(
                 children: [
-                  IconButton(
+                  CircleAvatar(
                     key: const Key('mobile-assistant-composer-add-button'),
-                    tooltip: appText('添加附件与配置', 'Attachments and settings'),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(
-                      minWidth: 44,
-                      minHeight: 44,
+                    radius: 20,
+                    backgroundColor: palette.surfaceSecondary,
+                    child: IconButton(
+                      padding: EdgeInsets.zero,
+                      icon: Icon(
+                        Icons.add,
+                        color: palette.textPrimary,
+                        size: 24,
+                      ),
+                      onPressed: showConfigurationMenu,
                     ),
-                    icon: Icon(
-                      CupertinoIcons.paperclip,
-                      color: palette.textPrimary,
-                      size: 24,
-                    ),
-                    onPressed: showConfigurationMenu,
                   ),
                   const SizedBox(width: 4),
                   Expanded(
