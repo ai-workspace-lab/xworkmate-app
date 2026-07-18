@@ -50,6 +50,11 @@ const int kOpenClawArtifactSyncMaxAttempts = 45;
 const Duration kOpenClawArtifactSyncMaxDuration = Duration(seconds: 90);
 const String kOpenClawArtifactSyncTimeoutCode =
     'OPENCLAW_ARTIFACT_SYNC_TIMEOUT';
+// partial 终态下 snapshot 轮询触发远端重同步的最小间隔，
+// 防止移动端 3s 轮询对同一份含缺失文件的清单反复全量下载。
+const Duration kOpenClawPartialArtifactRefreshCooldownInternal = Duration(
+  seconds: 30,
+);
 
 // running 轮询（OpenClaw run handle）兜底截止（T3）：
 // 当 gateway 始终回 running（例如 bridge↔gateway socket 抖动后 run 态丢失）时，防止客户端无限轮询、
@@ -1233,24 +1238,30 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
       sameBridgeHost = downloadHost == bridgeHost;
     }
     if (!sameBridgeHost) {
+      debugPrint(
+        '[artifact-download] skip cross-host: url=$downloadHost '
+        'bridge=$bridgeHost path=${uri.path}',
+      );
       return const _ArtifactBytesResult.skipped();
     }
     final authorization =
         await resolveBridgeArtifactAuthorizationHeaderInternal(uri);
     if (authorization == null || authorization.trim().isEmpty) {
+      debugPrint('[artifact-download] fail: no bridge authorization header');
       return const _ArtifactBytesResult.failed();
     }
-    final bytes = await _downloadBridgeArtifactBytesInternal(
+    final downloadResult = await _downloadBridgeArtifactBytesInternal(
       uri,
       authorization,
     );
-    if (bytes == null) {
-      return const _ArtifactBytesResult.failed();
-    }
-    return _ArtifactBytesResult.bytes(bytes);
+    debugPrint(
+      '[artifact-download] ${uri.path} '
+      'failed=${downloadResult.failed} bytes=${downloadResult.bytes?.length}',
+    );
+    return downloadResult;
   }
 
-  Future<List<int>?> _downloadBridgeArtifactBytesInternal(
+  Future<_ArtifactBytesResult> _downloadBridgeArtifactBytesInternal(
     Uri uri,
     String authorization,
   ) async {
@@ -1262,6 +1273,12 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
         authorization,
         rangeStart: bytes.length,
       );
+      if (result.gone) {
+        // 远端明确回答文件不存在（stale manifest：文件在 export 之后被清理，
+        // 或 Bridge 终态缓存回放旧清单）。重试不可能成功，按跳过处理，
+        // 避免每轮同步对同一文件打满重试预算。
+        return const _ArtifactBytesResult.skipped();
+      }
       if (result.reset) {
         bytes = <int>[];
       }
@@ -1269,14 +1286,14 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
         bytes.addAll(result.bytes);
       }
       if (result.completed) {
-        return bytes;
+        return _ArtifactBytesResult.bytes(bytes);
       }
       if (attempt < maxAttempts) {
         final delayMs = math.min(2000, 250 * (1 << (attempt - 1)));
         await Future<void>.delayed(Duration(milliseconds: delayMs));
       }
     }
-    return null;
+    return const _ArtifactBytesResult.failed();
   }
 
   Future<_ArtifactDownloadAttemptResult>
@@ -1300,6 +1317,9 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
         reset = rangeStart > 0;
       } else if (response.statusCode == HttpStatus.partialContent) {
         reset = false;
+      } else if (response.statusCode == HttpStatus.notFound ||
+          response.statusCode == HttpStatus.gone) {
+        return const _ArtifactDownloadAttemptResult.gone();
       } else {
         return const _ArtifactDownloadAttemptResult.retry();
       }
@@ -2141,14 +2161,19 @@ class _ArtifactDownloadAttemptResult {
     required this.bytes,
     required this.completed,
     required this.reset,
+    this.gone = false,
   });
 
   const _ArtifactDownloadAttemptResult.retry()
     : this(bytes: const <int>[], completed: false, reset: false);
 
+  const _ArtifactDownloadAttemptResult.gone()
+    : this(bytes: const <int>[], completed: false, reset: false, gone: true);
+
   final List<int> bytes;
   final bool completed;
   final bool reset;
+  final bool gone;
 }
 
 List<int> _decodeArtifactContentInternal(GoTaskServiceArtifact artifact) {
