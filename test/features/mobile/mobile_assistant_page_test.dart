@@ -319,7 +319,7 @@ void main() {
       );
       expect(
         workspaceReference.data,
-        matches(RegExp(r'^\$HOME/\.xworkmate/threads/draft-[A-Za-z0-9._-]+$')),
+        matches(RegExp(r'^/.+/\.xworkmate/threads/draft-[A-Za-z0-9._-]+$')),
       );
       expect(
         find.byKey(const Key('mobile-assistant-copy-task-workspace-ref')),

@@ -522,6 +522,21 @@ extension AppControllerDesktopThreadSessions on AppController {
     );
   }
 
+  String assistantArtifactWorkspacePathForEntry(
+    AssistantArtifactEntry entry, {
+    String? sessionKey,
+  }) {
+    final resolvedSessionKey = normalizedAssistantSessionKeyInternal(
+      sessionKey ?? currentSessionKey,
+    );
+    return DesktopThreadArtifactService.workspacePathForEntryInternal(
+      entry,
+      fallbackWorkspacePath: assistantWorkspacePathForSession(
+        resolvedSessionKey,
+      ),
+    );
+  }
+
   String get assistantConversationOwnerLabel {
     return activeAgentName;
   }

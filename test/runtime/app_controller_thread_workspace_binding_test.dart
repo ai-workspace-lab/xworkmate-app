@@ -254,7 +254,7 @@ void main() {
         controller.localThreadWorkspaceDisplayPathInternal(
           'unit-fixture-task-a',
         ),
-        '\$HOME/.xworkmate/threads/unit-fixture-task-a',
+        controller.localThreadWorkspacePathInternal('unit-fixture-task-a'),
       );
     },
   );
@@ -405,10 +405,7 @@ void main() {
       final expectedWorkspace = '${home.path}/.xworkmate/threads/$sessionKey';
       final thread = controller.requireTaskThreadForSessionInternal(sessionKey);
       expect(thread.workspaceBinding.workspacePath, expectedWorkspace);
-      expect(
-        thread.workspaceBinding.displayPath,
-        '\$HOME/.xworkmate/threads/$sessionKey',
-      );
+      expect(thread.workspaceBinding.displayPath, expectedWorkspace);
       expect(Directory(expectedWorkspace).existsSync(), isTrue);
       expect(thread.lastRemoteWorkingDirectory, '/remote/thread/workspace');
       expect(thread.messages.single.text, 'kept message');

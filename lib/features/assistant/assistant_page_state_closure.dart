@@ -393,7 +393,10 @@ extension AssistantPageStateClosureInternal on AssistantPageStateInternal {
                   },
                   onOpenEntryLocation: (entry) async {
                     final workspacePath = controller
-                        .assistantWorkspacePathForSession(activeSessionKey)
+                        .assistantArtifactWorkspacePathForEntry(
+                          entry,
+                          sessionKey: activeSessionKey,
+                        )
                         .trim();
                     if (workspacePath.isEmpty) {
                       return;
