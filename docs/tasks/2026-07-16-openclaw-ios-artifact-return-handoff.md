@@ -19,6 +19,7 @@
 | 第三轮 | 07-16 | 定位 iOS 专属回归：移动端无条件强制 `requiresArtifactExport`，把 Bridge 终态语义扭成「永远等 export」（§3.1）。修复：去除强制标志 + 终态保留 association | **PR #148 已合并 main、PR #150 已合并 release/v1.1** |
 | 第四轮 | 07-17 | 真机在线联调（服务器直调 tasks.get + profile 实时日志）定位最终根因：**iOS 进程无 HOME 环境变量**，线程工作区绑定永远回退 remoteFs，制品同步的 localFs 守卫从未通过（§4.1）。修复：Documents 目录基准 + 旧绑定迁移 | **PR #153 已合并 main、PR #154 已合并 release/v1.1** |
 | 延伸（第五轮） | 07-18 | 客户端链路闭环后，控制台暴露服务端边界问题：最终回复 `MEDIA:` 引用全局媒体缓存，Control UI 拒绝读取（`Outside allowed folders`）。Bridge 终态补偿 `2e5c5b6` 已部署；根治需 OpenClaw 发送前载荷改写 hook | 另立 case 跟进：[openclaw-task-scoped-media-artifacts](../cases/openclaw-task-scoped-media-artifacts.md) |
+| 第六轮 | 07-18 | iOS 退出重启后本地会话丢失：`threads.json` 加载对单条无效记录（legacy `auto` 执行模式 / 不完整 workspaceBinding / 损坏数据）一票否决——`TaskThread.fromJson` 抛错被整表 try 捕获后按空表处理，后续任何保存把空表写回即永久丢失；`SkippedTaskThreadRecord` 启动告警机制此前从未接线。修复：逐条容错加载 + 接线启动告警 + 恢复前备份原件 `threads.json.invalid-<ts>.bak` | 本分支 `251ee01`，PR → main 待开 |
 
 ### 0.2 PR 全景
 
@@ -41,6 +42,7 @@
 - [ ] 轮换测试账号 `review@svc.plus` 口令（历史提交含明文，最紧急）。
 - [ ] 服务端遗留项（§5，07-18 更新）：确认插件 npm 发布凭据闭环；评估 Bridge 终态缓存失效策略；跟进 OpenClaw 发送前改写 hook 根治项（另立 case）。
 - [ ] CI 基建（非阻塞、可选）：补 Mac App Distribution 证书修 `Build macos dmg`；`validate-release-pr.yml` 每次 push 的 0 秒 startup failure（已另派任务卡片）。
+- [ ] 会话存储演进（第六轮结论）：暂不引入 SQLite——跨五端新增原生依赖与迁移成本大于当前单写者模型的收益；下一步优先「分线程文件」（`StoreLayout.taskFileForSessionKey` 已预留）消除整表重写放大，消息规模继续增长后再评估 sqflite 单表（threadId, json, updatedAtMs）方案。
 
 ### 0.4 忽略项（经确认）
 
