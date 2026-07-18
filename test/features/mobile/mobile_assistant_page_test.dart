@@ -42,7 +42,7 @@ void main() {
         ),
         findsOneWidget,
       );
-      expect(find.text('你想先用哪个插件场景？'), findsOneWidget);
+      expect(find.text('你想先用哪个内置插件？'), findsOneWidget);
       expect(
         find.byKey(const Key('mobile-plugin-scene-carousel')),
         findsOneWidget,
@@ -55,7 +55,7 @@ void main() {
         findsOneWidget,
       );
       final firstCard = find.byKey(
-        const Key('mobile-plugin-scene-builtin.document'),
+        const Key('mobile-plugin-shortcut-builtin.document'),
       );
       final startingOffset = tester.getTopLeft(firstCard).dx;
       await tester.drag(
@@ -83,23 +83,23 @@ void main() {
         findsOneWidget,
       );
       expect(
-        find.byKey(const Key('mobile-plugin-scene-builtin.document')),
+        find.byKey(const Key('mobile-plugin-shortcut-builtin.document')),
         findsOneWidget,
       );
       expect(
-        find.byKey(const Key('mobile-plugin-scene-builtin.spreadsheet')),
+        find.byKey(const Key('mobile-plugin-shortcut-builtin.spreadsheet')),
         findsOneWidget,
       );
       expect(
-        find.byKey(const Key('mobile-plugin-scene-builtin.presentation')),
+        find.byKey(const Key('mobile-plugin-shortcut-builtin.presentation')),
         findsOneWidget,
       );
       expect(
-        find.byKey(const Key('mobile-plugin-scene-builtin.image')),
+        find.byKey(const Key('mobile-plugin-shortcut-builtin.image')),
         findsOneWidget,
       );
       expect(
-        find.byKey(const Key('mobile-plugin-scene-builtin.video')),
+        find.byKey(const Key('mobile-plugin-shortcut-builtin.video')),
         findsOneWidget,
       );
       expect(
@@ -160,7 +160,7 @@ void main() {
       await tester.tap(find.text('返回对话主页'));
       await tester.pumpAndSettle();
 
-      expect(find.text('你想先用哪个插件场景？'), findsOneWidget);
+      expect(find.text('你想先用哪个内置插件？'), findsOneWidget);
     });
 
     testWidgets('mobile plugins tab shows the built-in plugin panel', (
@@ -197,6 +197,64 @@ void main() {
       expect(find.text('PPT 演示'), findsWidgets);
       expect(find.text('图片'), findsWidgets);
       expect(find.text('视频'), findsWidgets);
+    });
+
+    testWidgets('home plugin shortcuts reuse the session plugin selection', (
+      tester,
+    ) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 844);
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      selectedBuiltinPluginIdsBySessionInternal.clear();
+      addTearDown(selectedBuiltinPluginIdsBySessionInternal.clear);
+
+      final controller = AppController(
+        environmentOverride: const <String, String>{},
+      );
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(_buildTestApp(controller: controller));
+      await tester.pumpAndSettle();
+
+      final shortcut = find.byKey(
+        const Key('mobile-plugin-shortcut-builtin.document'),
+      );
+      final shortcutChip = find.descendant(
+        of: shortcut,
+        matching: find.byType(FilterChip),
+      );
+      expect(shortcut, findsOneWidget);
+      expect(tester.widget<FilterChip>(shortcutChip).selected, isFalse);
+
+      await tester.tap(shortcut);
+      await tester.pumpAndSettle();
+
+      expect(tester.widget<FilterChip>(shortcutChip).selected, isTrue);
+      expect(
+        find.byKey(
+          const Key('mobile-assistant-selected-plugin-builtin.document'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        tester
+            .widget<TextField>(find.byKey(const Key('mobile-assistant-input')))
+            .controller
+            ?.text,
+        isEmpty,
+      );
+
+      await tester.tap(shortcut);
+      await tester.pumpAndSettle();
+
+      expect(tester.widget<FilterChip>(shortcutChip).selected, isFalse);
+      expect(
+        find.byKey(
+          const Key('mobile-assistant-selected-plugin-builtin.document'),
+        ),
+        findsNothing,
+      );
     });
 
     testWidgets('mobile history opens quick task switcher', (tester) async {

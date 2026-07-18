@@ -235,11 +235,12 @@ class _MobileAssistantDetailPageState extends State<MobileAssistantDetailPage> {
     setState(() {});
   }
 
-  void prefillPluginScenePrompt(String prompt) {
+  void toggleBuiltinPluginShortcut(String pluginId) {
     HapticFeedback.selectionClick();
-    inputController.text = prompt;
-    inputController.selection = TextSelection.collapsed(offset: prompt.length);
-    inputFocusNode.requestFocus();
+    toggleBuiltinPluginForSession(
+      widget.controller.currentSessionKey,
+      pluginId,
+    );
     setState(() {});
   }
 
@@ -354,7 +355,11 @@ class _MobileAssistantDetailPageState extends State<MobileAssistantDetailPage> {
                             messages: messages,
                             scrollController: conversationController,
                             onConnectBridge: widget.mobileActions.connectBridge,
-                            onSelectPluginScene: prefillPluginScenePrompt,
+                            selectedBuiltinPluginIds:
+                                selectedBuiltinPluginIdsForSession(
+                                  controller.currentSessionKey,
+                                ).toSet(),
+                            onToggleBuiltinPlugin: toggleBuiltinPluginShortcut,
                           ),
                         ),
                         MobileAssistantComposer(

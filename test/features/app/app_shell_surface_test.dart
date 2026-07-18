@@ -30,7 +30,7 @@ void main() {
 
       expect(find.byKey(const Key('mobile-assistant-page')), findsOneWidget);
       expect(find.byKey(const Key('mobile-settings-page')), findsNothing);
-      expect(find.text('你想先用哪个插件场景？'), findsOneWidget);
+      expect(find.text('你想先用哪个内置插件？'), findsOneWidget);
 
       await tester.tap(
         find.byKey(const Key('mobile-assistant-open-menu-button')),
