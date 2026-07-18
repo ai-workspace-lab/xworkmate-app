@@ -34,6 +34,7 @@
 - 成功终态即使制品清单为空，也必须保留 association（校正为终态 status），使 `loadAssistantArtifactSnapshot` 保有补拉能力。
 - 非空 manifest 是权威：不被旧 `artifactStatus` 提前截断（`141ece2` 语义）。
 - skill 合同型任务（association 自带 `requiresArtifactExport` / `requiredArtifactExtensions`）保持等待/轮询直至清单满足或超时。
+- **本地会话恢复逐条容错**：`threads.json` 中单条无效记录（legacy `auto` 执行模式、不完整绑定、损坏数据）只跳过该条并触发启动告警，不允许清空整表；部分恢复前必须备份原件（`threads.json.invalid-<ts>.bak`）。
 
 ## 自动化落点
 
@@ -42,6 +43,7 @@
 | `xworkmate-app` | `test/runtime/app_controller_thread_workspace_binding_test.dart` | `startup migrates owner-scoped remoteFs threads back to a local workspace`：remoteFs 兜底绑定在本地可用时迁回 localFs 并重建目录 |
 | `xworkmate-app` | `test/runtime/assistant_execution_target_test.dart` | `toTaskGetParams()` 的字段契约：session mapping 键、artifactScope/Directory 透传；不含平台强制字段 |
 | `xworkmate-app` | `test/runtime/app_controller_thread_workspace_binding_test.dart` | 制品下载/鉴权/scope/超时/校验失败、空清单收尾与 `lastArtifactSyncStatus` 状态机 |
+| `xworkmate-app` | `test/runtime/settings_store_test.dart` | `threads.json` 逐条容错加载：legacy auto / 不完整绑定 / 损坏条目跳过并记录原因、恢复前备份原件、干净加载清除告警 |
 
 ## 真机验收清单
 
