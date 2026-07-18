@@ -36,6 +36,38 @@ void main() {
       expect(find.byKey(const Key('mobile-assistant-page')), findsOneWidget);
       expect(find.text('你想先用哪个插件场景？'), findsOneWidget);
       expect(
+        find.byKey(const Key('mobile-plugin-scene-carousel')),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('mobile-plugin-scene-carousel')),
+          matching: find.byType(SingleChildScrollView),
+        ),
+        findsOneWidget,
+      );
+      final firstCard = find.byKey(
+        const Key('mobile-plugin-scene-builtin.document'),
+      );
+      final startingOffset = tester.getTopLeft(firstCard).dx;
+      await tester.drag(
+        find.byKey(const Key('mobile-plugin-scene-carousel')),
+        const Offset(-160, 0),
+      );
+      await tester.pumpAndSettle();
+      expect(tester.getTopLeft(firstCard).dx, lessThan(startingOffset));
+      final carouselRect = tester.getRect(
+        find.byKey(const Key('mobile-plugin-scene-carousel')),
+      );
+      final input = tester.widget<TextField>(
+        find.byKey(const Key('mobile-assistant-input')),
+      );
+      final inputRect = tester.getRect(
+        find.byKey(const Key('mobile-assistant-input')),
+      );
+      expect(input.maxLines, 1);
+      expect(inputRect.top - carouselRect.bottom, lessThan(48));
+      expect(
         find.byKey(const Key('mobile-plugin-scene-builtin.document')),
         findsOneWidget,
       );
@@ -260,7 +292,10 @@ void main() {
       expect(find.byKey(const Key('mobile-assistant-tab-0')), findsOneWidget);
       expect(find.byKey(const Key('mobile-assistant-tab-1')), findsOneWidget);
       expect(find.byKey(const Key('mobile-assistant-tab-2')), findsOneWidget);
-      expect(find.byKey(const Key('mobile-assistant-tab-attach')), findsOneWidget);
+      expect(
+        find.byKey(const Key('mobile-assistant-tab-attach')),
+        findsOneWidget,
+      );
 
       // Switch to Plugins tab (Tab 1)
       await tester.tap(find.byKey(const Key('mobile-assistant-tab-1')));
