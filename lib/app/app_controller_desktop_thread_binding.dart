@@ -140,10 +140,10 @@ extension AppControllerDesktopThreadBinding on AppController {
     if (!isAppOwnedAssistantSessionKeyInternal(normalizedSessionKey)) {
       return '';
     }
-    final displayBase = Platform.isIOS || Platform.isAndroid
-        ? '\$DOCUMENTS'
-        : '\$HOME';
-    return '$displayBase/.xworkmate/threads/${threadWorkspaceDirectoryNameInternal(normalizedSessionKey)}';
+    if (Platform.isIOS || Platform.isAndroid) {
+      return '\$DOCUMENTS/.xworkmate/threads/${threadWorkspaceDirectoryNameInternal(normalizedSessionKey)}';
+    }
+    return localThreadWorkspacePathInternal(normalizedSessionKey);
   }
 
   String remoteThreadWorkspacePathInternal(

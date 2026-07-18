@@ -392,19 +392,12 @@ extension AssistantPageStateClosureInternal on AssistantPageStateInternal {
                     }
                   },
                   onOpenEntryLocation: (entry) async {
-                    // The snapshot entry is scoped to the session that produced
-                    // it. Prefer its workspace binding so a stale controller
-                    // session cache cannot reveal a different thread directory.
-                    final entryWorkspacePath = entry.workspacePath.trim();
-                    final workspacePath =
-                        entryWorkspacePath.isNotEmpty &&
-                            !entryWorkspacePath.startsWith('/owners/')
-                        ? entryWorkspacePath
-                        : controller
-                              .assistantWorkspacePathForSession(
-                                activeSessionKey,
-                              )
-                              .trim();
+                    final workspacePath = controller
+                        .assistantArtifactWorkspacePathForEntry(
+                          entry,
+                          sessionKey: activeSessionKey,
+                        )
+                        .trim();
                     if (workspacePath.isEmpty) {
                       return;
                     }

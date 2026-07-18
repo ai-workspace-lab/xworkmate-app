@@ -118,7 +118,11 @@ class DesktopThreadArtifactService {
         message: 'Remote agent artifacts are not directly readable on desktop.',
       );
     }
-    final root = Directory(workspacePath.trim());
+    final resolvedWorkspacePath = workspacePathForEntryInternal(
+      entry,
+      fallbackWorkspacePath: workspacePath,
+    );
+    final root = Directory(resolvedWorkspacePath);
     if (!await root.exists()) {
       return const AssistantArtifactPreview.empty(
         message:
@@ -145,7 +149,7 @@ class DesktopThreadArtifactService {
       );
     }
     final targetPath = resolveAbsolutePathInternal(
-      workspacePath,
+      resolvedWorkspacePath,
       entryRelativePath,
     );
     final file = File(targetPath);
@@ -155,7 +159,10 @@ class DesktopThreadArtifactService {
             'The selected file is no longer available: ${entry.relativePath}',
       );
     }
-    final resolvedRelativePath = relativePathInternal(workspacePath, file.path);
+    final resolvedRelativePath = relativePathInternal(
+      resolvedWorkspacePath,
+      file.path,
+    );
     if (resolvedRelativePath == null ||
         resolvedRelativePath != entryRelativePath) {
       return const AssistantArtifactPreview.empty(
@@ -205,7 +212,10 @@ class DesktopThreadArtifactService {
     if (workspaceKind != WorkspaceRefKind.localPath) {
       return null;
     }
-    final normalizedWorkspacePath = workspacePath.trim();
+    final normalizedWorkspacePath = workspacePathForEntryInternal(
+      entry,
+      fallbackWorkspacePath: workspacePath,
+    );
     final root = Directory(normalizedWorkspacePath);
     if (normalizedWorkspacePath.isEmpty || !await root.exists()) {
       return null;
@@ -240,6 +250,23 @@ class DesktopThreadArtifactService {
       return null;
     }
     return file;
+  }
+
+  static String workspacePathForEntryInternal(
+    AssistantArtifactEntry entry, {
+    required String fallbackWorkspacePath,
+  }) {
+    final entryWorkspacePath = entry.workspacePath.trim();
+    final isAbsolute =
+        entryWorkspacePath.startsWith('/') ||
+        entryWorkspacePath.startsWith(r'\') ||
+        entryWorkspacePath.contains(r':\');
+    if (entryWorkspacePath.isNotEmpty &&
+        isAbsolute &&
+        !entryWorkspacePath.startsWith('/owners/')) {
+      return entryWorkspacePath;
+    }
+    return fallbackWorkspacePath.trim();
   }
 
   Future<List<File>> collectFilesInternal(Directory root) async {

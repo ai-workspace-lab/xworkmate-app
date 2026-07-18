@@ -252,4 +252,51 @@ void main() {
       });
     },
   );
+
+  test(
+    'artifact access follows the workspace recorded by the task entry',
+    () async {
+      final currentWorkspace = await Directory.systemTemp.createTemp(
+        'xworkmate-current-artifact-workspace-',
+      );
+      final staleWorkspace = await Directory.systemTemp.createTemp(
+        'xworkmate-stale-artifact-workspace-',
+      );
+      addTearDown(() async {
+        await currentWorkspace.delete(recursive: true);
+        await staleWorkspace.delete(recursive: true);
+      });
+      await File(
+        '${currentWorkspace.path}/report.md',
+      ).writeAsString('# Current');
+      await File('${staleWorkspace.path}/report.md').writeAsString('# Stale');
+      final entry = AssistantArtifactEntry(
+        id: '${currentWorkspace.path}::report.md',
+        label: 'report.md',
+        relativePath: 'report.md',
+        kind: AssistantArtifactEntryKind.file,
+        mimeType: 'text/markdown',
+        previewable: true,
+        workspacePath: currentWorkspace.path,
+      );
+      final service = DesktopThreadArtifactService();
+
+      final preview = await service.loadPreview(
+        entry: entry,
+        workspacePath: staleWorkspace.path,
+        workspaceKind: WorkspaceRefKind.localPath,
+        artifactRelativePaths: const <String>['report.md'],
+      );
+      final sharedFile = await service.loadFile(
+        entry: entry,
+        workspacePath: staleWorkspace.path,
+        workspaceKind: WorkspaceRefKind.localPath,
+        artifactRelativePaths: const <String>['report.md'],
+      );
+
+      expect(preview.content, contains('Current'));
+      expect(preview.content, isNot(contains('Stale')));
+      expect(sharedFile?.path, '${currentWorkspace.path}/report.md');
+    },
+  );
 }
