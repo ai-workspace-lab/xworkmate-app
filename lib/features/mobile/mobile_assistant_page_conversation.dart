@@ -1,8 +1,6 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../app/app_controller.dart';
@@ -615,14 +613,17 @@ class _MobileSessionArtifactsState extends State<_MobileSessionArtifacts> {
                       content: Text(appText('正在准备文件...', 'Preparing file...')),
                     ),
                   );
-                  final preview = await widget.controller
-                      .loadAssistantArtifactPreview(entry);
+                  final artifactFile = await widget.controller
+                      .resolveAssistantArtifactFile(entry);
+                  if (artifactFile == null) {
+                    throw StateError('Artifact file is unavailable');
+                  }
                   if (!context.mounted) return;
-                  final dir = await getTemporaryDirectory();
-                  final file = File('${dir.path}/${entry.label}');
-                  await file.writeAsString(preview.content);
                   await SharePlus.instance.share(
-                    ShareParams(files: [XFile(file.path)], text: entry.label),
+                    ShareParams(
+                      files: [XFile(artifactFile.path)],
+                      text: entry.label,
+                    ),
                   );
                 } catch (e) {
                   if (!context.mounted) return;

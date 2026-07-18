@@ -355,10 +355,18 @@ extension AppControllerDesktopThreadSessions on AppController {
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey,
     );
-    return taskThreadForSessionInternal(
-          normalizedSessionKey,
-        )?.workspaceBinding.displayPath.trim() ??
-        '';
+    final binding = taskThreadForSessionInternal(
+      normalizedSessionKey,
+    )?.workspaceBinding;
+    if (binding == null) {
+      return '';
+    }
+    if (!Platform.isIOS &&
+        !Platform.isAndroid &&
+        binding.workspaceKind == WorkspaceKind.localFs) {
+      return binding.workspacePath.trim();
+    }
+    return binding.displayPath.trim();
   }
 
   double? assistantArtifactSyncAtMsForSession(String sessionKey) {
@@ -497,6 +505,38 @@ extension AppControllerDesktopThreadSessions on AppController {
     );
     final thread = taskThreadForSessionInternal(resolvedSessionKey);
     return threadArtifactServiceInternal.loadPreview(
+      entry: entry,
+      workspacePath: assistantWorkspacePathForSession(resolvedSessionKey),
+      workspaceKind: assistantWorkspaceKindForSession(resolvedSessionKey),
+      artifactRelativePaths:
+          thread?.lastTaskArtifactRelativePaths ?? const <String>[],
+    );
+  }
+
+  String assistantArtifactWorkspacePathForEntry(
+    AssistantArtifactEntry entry, {
+    String? sessionKey,
+  }) {
+    final resolvedSessionKey = normalizedAssistantSessionKeyInternal(
+      sessionKey ?? currentSessionKey,
+    );
+    return DesktopThreadArtifactService.workspacePathForEntryInternal(
+      entry,
+      fallbackWorkspacePath: assistantWorkspacePathForSession(
+        resolvedSessionKey,
+      ),
+    );
+  }
+
+  Future<File?> resolveAssistantArtifactFile(
+    AssistantArtifactEntry entry, {
+    String? sessionKey,
+  }) {
+    final resolvedSessionKey = normalizedAssistantSessionKeyInternal(
+      sessionKey ?? currentSessionKey,
+    );
+    final thread = taskThreadForSessionInternal(resolvedSessionKey);
+    return threadArtifactServiceInternal.resolveLocalArtifactFile(
       entry: entry,
       workspacePath: assistantWorkspacePathForSession(resolvedSessionKey),
       workspaceKind: assistantWorkspaceKindForSession(resolvedSessionKey),

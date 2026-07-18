@@ -118,7 +118,11 @@ class DesktopThreadArtifactService {
         message: 'Remote agent artifacts are not directly readable on desktop.',
       );
     }
-    final root = Directory(workspacePath.trim());
+    final resolvedWorkspacePath = workspacePathForEntryInternal(
+      entry,
+      fallbackWorkspacePath: workspacePath,
+    );
+    final root = Directory(resolvedWorkspacePath);
     if (!await root.exists()) {
       return const AssistantArtifactPreview.empty(
         message:
@@ -135,15 +139,17 @@ class DesktopThreadArtifactService {
     final taskArtifactPaths = normalizeTaskArtifactPathsInternal(
       artifactRelativePaths,
     );
-    final isAllowed = taskArtifactPaths.any((path) =>
-        entryRelativePath == path || entryRelativePath.startsWith('$path/'));
+    final isAllowed = taskArtifactPaths.any(
+      (path) =>
+          entryRelativePath == path || entryRelativePath.startsWith('$path/'),
+    );
     if (taskArtifactPaths.isEmpty || !isAllowed) {
       return const AssistantArtifactPreview.empty(
         message: 'The selected file is not part of the current task artifacts.',
       );
     }
     final targetPath = resolveAbsolutePathInternal(
-      workspacePath,
+      resolvedWorkspacePath,
       entryRelativePath,
     );
     final file = File(targetPath);
@@ -153,7 +159,10 @@ class DesktopThreadArtifactService {
             'The selected file is no longer available: ${entry.relativePath}',
       );
     }
-    final resolvedRelativePath = relativePathInternal(workspacePath, file.path);
+    final resolvedRelativePath = relativePathInternal(
+      resolvedWorkspacePath,
+      file.path,
+    );
     if (resolvedRelativePath == null ||
         resolvedRelativePath != entryRelativePath) {
       return const AssistantArtifactPreview.empty(
@@ -192,6 +201,60 @@ class DesktopThreadArtifactService {
     );
   }
 
+  static String workspacePathForEntryInternal(
+    AssistantArtifactEntry entry, {
+    required String fallbackWorkspacePath,
+  }) {
+    final entryWorkspacePath = entry.workspacePath.trim();
+    final isAbsolute =
+        entryWorkspacePath.startsWith('/') ||
+        entryWorkspacePath.startsWith(r'\') ||
+        entryWorkspacePath.contains(r':\');
+    if (entryWorkspacePath.isNotEmpty &&
+        isAbsolute &&
+        !entryWorkspacePath.startsWith('/owners/')) {
+      return entryWorkspacePath;
+    }
+    return fallbackWorkspacePath.trim();
+  }
+
+  Future<File?> resolveLocalArtifactFile({
+    required AssistantArtifactEntry entry,
+    required String workspacePath,
+    required WorkspaceRefKind workspaceKind,
+    List<String> artifactRelativePaths = const <String>[],
+  }) async {
+    if (workspaceKind != WorkspaceRefKind.localPath) {
+      return null;
+    }
+    final resolvedWorkspacePath = workspacePathForEntryInternal(
+      entry,
+      fallbackWorkspacePath: workspacePath,
+    );
+    final entryRelativePath = normalizeArtifactPathInternal(entry.relativePath);
+    final taskArtifactPaths = normalizeTaskArtifactPathsInternal(
+      artifactRelativePaths,
+    );
+    final isAllowed = taskArtifactPaths.any(
+      (path) =>
+          entryRelativePath == path || entryRelativePath.startsWith('$path/'),
+    );
+    if (entryRelativePath.isEmpty || taskArtifactPaths.isEmpty || !isAllowed) {
+      return null;
+    }
+    final file = File(
+      resolveAbsolutePathInternal(resolvedWorkspacePath, entryRelativePath),
+    );
+    if (!await file.exists()) {
+      return null;
+    }
+    final resolvedRelativePath = relativePathInternal(
+      resolvedWorkspacePath,
+      file.path,
+    );
+    return resolvedRelativePath == entryRelativePath ? file : null;
+  }
+
   Future<List<File>> collectFilesInternal(Directory root) async {
     final files = <File>[];
     try {
@@ -224,7 +287,10 @@ class DesktopThreadArtifactService {
     for (final relativePath in artifactRelativePaths) {
       final absolutePath = resolveAbsolutePathInternal(root.path, relativePath);
       try {
-        final type = await FileSystemEntity.type(absolutePath, followLinks: true);
+        final type = await FileSystemEntity.type(
+          absolutePath,
+          followLinks: true,
+        );
         if (type == FileSystemEntityType.file) {
           final target = File(absolutePath);
           final resolvedRelativePath = relativePathInternal(
@@ -391,9 +457,12 @@ class DesktopThreadArtifactService {
         if (relativePath == null || relativePath.isEmpty) {
           continue;
         }
-        final isAllowed = allowedPaths.isEmpty ||
-            allowedPaths.any((path) =>
-                relativePath == path || relativePath.startsWith('$path/'));
+        final isAllowed =
+            allowedPaths.isEmpty ||
+            allowedPaths.any(
+              (path) =>
+                  relativePath == path || relativePath.startsWith('$path/'),
+            );
         if (!isAllowed) {
           continue;
         }
