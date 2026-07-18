@@ -17,7 +17,6 @@ import '../../i18n/app_language.dart';
 import '../../models/app_models.dart';
 import '../../runtime/runtime_models.dart';
 import '../../theme/app_palette.dart';
-import '../../theme/app_theme.dart';
 import 'mobile_assistant_page_composer.dart';
 import 'mobile_assistant_page_conversation.dart';
 
@@ -315,12 +314,8 @@ class _MobileAssistantDetailPageState extends State<MobileAssistantDetailPage> {
         final bottomInset = mediaQuery.viewInsets.bottom;
         final bottomPadding = math.max(mediaQuery.viewPadding.bottom, 10.0);
         final palette = context.palette;
-        final hasPendingRun =
-            controller.hasAssistantPendingRun || controller.activeRunId != null;
-        final title = hasPendingRun
-            ? appText('执行中', 'Running')
-            : appText('会话', 'Chat');
         final sessionKey = controller.currentSessionKey.trim();
+        final connection = controller.currentAssistantConnectionState;
         final taskWorkspaceReference = sessionKey.isEmpty
             ? ''
             : controller.localThreadWorkspaceDisplayPathInternal(sessionKey);
@@ -336,7 +331,10 @@ class _MobileAssistantDetailPageState extends State<MobileAssistantDetailPage> {
               child: Column(
                 children: [
                   _MobileAssistantTopBar(
-                    title: title,
+                    connected: connection.connected,
+                    detail: connection.connected
+                        ? appText('在线 · 随时为你执行任务', 'Online · ready to run')
+                        : appText('先去配置集成连接', 'Configure integration first'),
                     onBack: widget.onBack,
                     onOpenHistory: showSessionSwitcher,
                   ),
@@ -350,14 +348,6 @@ class _MobileAssistantDetailPageState extends State<MobileAssistantDetailPage> {
                   Expanded(
                     child: Column(
                       children: [
-                        if (!controller
-                                .currentAssistantConnectionState
-                                .connected &&
-                            messages.isNotEmpty)
-                          MobileAssistantStatusBanner(
-                            controller: controller,
-                            onConnectBridge: widget.mobileActions.connectBridge,
-                          ),
                         Expanded(
                           child: MobileAssistantConversation(
                             controller: controller,
@@ -430,7 +420,7 @@ class _MobileTaskWorkspaceReferenceState
   Widget build(BuildContext context) {
     final palette = context.palette;
     final theme = Theme.of(context);
-    
+
     if (!_expanded) {
       return Padding(
         padding: const EdgeInsets.fromLTRB(22, 0, 22, 10),
@@ -446,11 +436,18 @@ class _MobileTaskWorkspaceReferenceState
                 border: Border.all(color: palette.chromeStroke),
               ),
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 6,
+                ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.info_outline_rounded, size: 14, color: palette.textSecondary),
+                    Icon(
+                      Icons.info_outline_rounded,
+                      size: 14,
+                      color: palette.textSecondary,
+                    ),
                     const SizedBox(width: 6),
                     Text(
                       appText('查看任务ID', 'View Task ID'),
@@ -525,18 +522,19 @@ class _MobileTaskWorkspaceReferenceState
 
 class _MobileAssistantTopBar extends StatelessWidget {
   const _MobileAssistantTopBar({
-    required this.title,
+    required this.connected,
+    required this.detail,
     required this.onBack,
     required this.onOpenHistory,
   });
 
-  final String title;
+  final bool connected;
+  final String detail;
   final VoidCallback onBack;
   final VoidCallback onOpenHistory;
 
   @override
   Widget build(BuildContext context) {
-    final palette = context.palette;
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 18),
       child: Row(
@@ -548,22 +546,11 @@ class _MobileAssistantTopBar extends StatelessWidget {
             onTap: onBack,
           ),
           Expanded(
-            child: Center(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 8,
-                ),
-                child: Text(
-                  title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    color: palette.textPrimary,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 0,
-                  ),
-                ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              child: MobileBridgeHeroStatus(
+                connected: connected,
+                detail: detail,
               ),
             ),
           ),
@@ -771,105 +758,84 @@ class _MobileSessionSwitcherSheet extends StatelessWidget {
   }
 }
 
-class MobileAssistantStatusBanner extends StatelessWidget {
-  const MobileAssistantStatusBanner({
+class MobileBridgeHeroStatus extends StatelessWidget {
+  const MobileBridgeHeroStatus({
     super.key,
-    required this.controller,
-    required this.onConnectBridge,
+    required this.connected,
+    required this.detail,
   });
 
-  final AppController controller;
-  final VoidCallback onConnectBridge;
+  final bool connected;
+  final String detail;
 
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
-    final theme = Theme.of(context);
-    final connection = controller.currentAssistantConnectionState;
-    final target = controller.currentAssistantExecutionTarget;
-    final provider = controller.assistantProviderForSession(
-      controller.currentSessionKey,
-    );
-    final hasProvider = !provider.isUnspecified;
-    final title = connection.connected
-        ? appText('AI Workspace 已连接', 'AI Workspace Connected')
-        : appText('先配置集成连接', 'Configure Integration First');
-    final detail = connection.connected
-        ? [
-            target.compactLabel,
-            if (hasProvider)
-              provider.label
-            else
-              appText('Provider 未就绪', 'Provider unavailable'),
-            appText('已准备好执行', 'Ready to run'),
-          ].where((item) => item.trim().isNotEmpty).join(' · ')
-        : appText('先去配置集成连接', 'Configure integration first');
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(10, 10, 10, 8),
-      child: DecoratedBox(
-        key: const Key('mobile-assistant-status-banner'),
-        decoration: BoxDecoration(
-          color: connection.connected
-              ? palette.accentMuted
-              : palette.surfacePrimary,
-          borderRadius: BorderRadius.circular(AppRadius.card),
-          border: Border.all(
-            color: connection.connected
-                ? palette.accent.withValues(alpha: 0.18)
-                : palette.strokeSoft,
-          ),
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Stack(
+          clipBehavior: Clip.none,
+          children: [
+            DecoratedBox(
+              decoration: BoxDecoration(
+                color: palette.surfacePrimary,
+                shape: BoxShape.circle,
+                border: Border.all(color: palette.accent, width: 1.4),
+              ),
+              child: SizedBox(
+                width: 56,
+                height: 56,
+                child: Icon(
+                  connected ? Icons.hub_outlined : Icons.link_off_rounded,
+                  color: connected ? palette.accent : palette.warning,
+                  size: 30,
+                ),
+              ),
+            ),
+            Positioned(
+              right: 2,
+              bottom: 2,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: connected ? palette.success : palette.warning,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: palette.canvas, width: 3),
+                ),
+                child: const SizedBox(width: 17, height: 17),
+              ),
+            ),
+          ],
         ),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
+        const SizedBox(width: 14),
+        Flexible(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(
-                connection.connected
-                    ? Icons.verified_outlined
-                    : Icons.link_off_rounded,
-                color: connection.connected ? palette.accent : palette.warning,
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        color: palette.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      detail,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: palette.textSecondary,
-                      ),
-                    ),
-                  ],
+              Text(
+                connected
+                    ? appText('AI Workspace 已连接', 'AI Workspace Connected')
+                    : appText('先配置集成连接', 'Configure Integration First'),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: palette.textPrimary,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
-              if (!connection.connected) ...[
-                const SizedBox(width: 10),
-                FilledButton(
-                  key: const Key('mobile-assistant-connect-bridge-button'),
-                  onPressed: onConnectBridge,
-                  style: FilledButton.styleFrom(
-                    minimumSize: const Size(92, 38),
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                  ),
-                  child: Text(appText('去配置集成', 'Configure')),
-                ),
-              ],
+              const SizedBox(height: 3),
+              Text(
+                detail,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(color: palette.textSecondary),
+              ),
             ],
           ),
         ),
-      ),
+      ],
     );
   }
 }

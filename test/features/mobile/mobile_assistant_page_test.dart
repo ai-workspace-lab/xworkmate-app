@@ -34,6 +34,14 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('mobile-assistant-page')), findsOneWidget);
+      expect(
+        find.text(
+          controller.currentAssistantConnectionState.connected
+              ? 'AI Workspace 已连接'
+              : '先配置集成连接',
+        ),
+        findsOneWidget,
+      );
       expect(find.text('你想先用哪个插件场景？'), findsOneWidget);
       expect(
         find.byKey(const Key('mobile-plugin-scene-carousel')),
@@ -67,6 +75,13 @@ void main() {
       );
       expect(input.maxLines, 1);
       expect(inputRect.top - carouselRect.bottom, lessThan(48));
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('mobile-assistant-composer-add-button')),
+          matching: find.byIcon(Icons.add),
+        ),
+        findsOneWidget,
+      );
       expect(
         find.byKey(const Key('mobile-plugin-scene-builtin.document')),
         findsOneWidget,
