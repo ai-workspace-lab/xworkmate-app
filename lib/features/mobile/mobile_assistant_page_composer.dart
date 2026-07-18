@@ -8,7 +8,7 @@ import '../../i18n/app_language.dart';
 import '../../runtime/runtime_models.dart';
 import '../../theme/app_palette.dart';
 import '../../theme/app_theme.dart';
-import 'mobile_builtin_plugin_scenes.dart';
+import 'mobile_builtin_plugin_choice_chip.dart';
 import '../plugins/builtin_plugin_catalog.dart';
 import '../plugins/builtin_plugin_visuals.dart';
 import 'mobile_assistant_page_sheets.dart';
@@ -367,21 +367,17 @@ class MobileAssistantComposer extends StatelessWidget {
                             spacing: 8,
                             runSpacing: 8,
                             children: [
-                              for (final scene in mobileBuiltinPluginScenes)
-                                FilterChip(
+                              for (final plugin
+                                  in BuiltinPluginCatalog.firstBatch)
+                                MobileBuiltinPluginChoiceChip(
                                   key: ValueKey(
-                                    'mobile-assistant-plugin-chip-${scene.plugin.id}',
+                                    'mobile-assistant-plugin-chip-${plugin.id}',
                                   ),
-                                  avatar: BuiltinPluginIconTile(
-                                    plugin: scene.plugin,
-                                    size: 20,
-                                  ),
-                                  label: Text(scene.sceneLabel),
+                                  plugin: plugin,
                                   selected: selectedPluginIds.contains(
-                                    scene.plugin.id,
+                                    plugin.id,
                                   ),
-                                  onSelected: (_) =>
-                                      togglePlugin(scene.plugin.id),
+                                  onSelected: (_) => togglePlugin(plugin.id),
                                 ),
                             ],
                           ),
@@ -473,42 +469,60 @@ class MobileAssistantComposer extends StatelessWidget {
               height: 64,
               child: Row(
                 children: [
-                  IconButton(
+                  CircleAvatar(
                     key: const Key('mobile-assistant-composer-add-button'),
-                    tooltip: appText('添加附件与配置', 'Attachments and settings'),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(
-                      minWidth: 44,
-                      minHeight: 44,
+                    radius: 20,
+                    backgroundColor: palette.surfaceSecondary,
+                    child: IconButton(
+                      padding: EdgeInsets.zero,
+                      icon: Icon(
+                        Icons.add,
+                        color: palette.textPrimary,
+                        size: 24,
+                      ),
+                      onPressed: showConfigurationMenu,
                     ),
-                    icon: Icon(
-                      CupertinoIcons.paperclip,
-                      color: palette.textPrimary,
-                      size: 24,
-                    ),
-                    onPressed: showConfigurationMenu,
                   ),
                   const SizedBox(width: 4),
                   Expanded(
-                    child: TextField(
-                      key: const Key('mobile-assistant-input'),
-                      controller: inputController,
-                      focusNode: focusNode,
-                      minLines: 1,
-                      maxLines: 1,
-                      textInputAction: TextInputAction.send,
-                      onSubmitted: (_) => onSend(),
-                      decoration: InputDecoration(
-                        hintText: appText(
-                          '询问 XWorkmate...',
-                          'Ask XWorkmate...',
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        TextField(
+                          key: const Key('mobile-assistant-input'),
+                          controller: inputController,
+                          focusNode: focusNode,
+                          minLines: 1,
+                          maxLines: 1,
+                          textInputAction: TextInputAction.send,
+                          onSubmitted: (_) => onSend(),
+                          decoration: const InputDecoration(
+                            hintText: '',
+                            border: InputBorder.none,
+                            enabledBorder: InputBorder.none,
+                            focusedBorder: InputBorder.none,
+                            contentPadding: EdgeInsets.zero,
+                          ),
                         ),
-                        hintStyle: TextStyle(color: palette.textMuted),
-                        border: InputBorder.none,
-                        enabledBorder: InputBorder.none,
-                        focusedBorder: InputBorder.none,
-                        contentPadding: EdgeInsets.zero,
-                      ),
+                        IgnorePointer(
+                          child: ValueListenableBuilder<TextEditingValue>(
+                            valueListenable: inputController,
+                            builder: (context, value, _) {
+                              if (value.text.isNotEmpty) {
+                                return const SizedBox.shrink();
+                              }
+                              return Text(
+                                appText(
+                                  '询问 XWorkmate...',
+                                  'Ask XWorkmate...',
+                                ),
+                                textAlign: TextAlign.center,
+                                style: TextStyle(color: palette.textMuted),
+                              );
+                            },
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                   const SizedBox(width: 8),
