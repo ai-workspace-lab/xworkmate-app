@@ -141,4 +141,115 @@ void main() {
       expect(preview.content, isEmpty);
     },
   );
+
+  test('loadFile returns the original binary artifact bytes', () async {
+    final workspace = await Directory.systemTemp.createTemp(
+      'xworkmate-artifact-file-',
+    );
+    addTearDown(() async {
+      if (await workspace.exists()) {
+        await workspace.delete(recursive: true);
+      }
+    });
+    final image = File('${workspace.path}/poster.png');
+    await image.writeAsBytes(<int>[0, 255, 16, 32]);
+    const entry = AssistantArtifactEntry(
+      id: 'poster.png',
+      label: 'poster.png',
+      relativePath: 'poster.png',
+      kind: AssistantArtifactEntryKind.file,
+      mimeType: 'image/png',
+      previewable: false,
+      workspacePath: '',
+    );
+
+    final resolved = await DesktopThreadArtifactService().loadFile(
+      entry: entry,
+      workspacePath: workspace.path,
+      workspaceKind: WorkspaceRefKind.localPath,
+      artifactRelativePaths: const <String>['poster.png'],
+    );
+
+    expect(resolved, isNotNull);
+    expect(await resolved!.readAsBytes(), <int>[0, 255, 16, 32]);
+  });
+
+  test('loadFile rejects files outside the current task artifacts', () async {
+    final workspace = await Directory.systemTemp.createTemp(
+      'xworkmate-artifact-file-boundary-',
+    );
+    addTearDown(() async {
+      if (await workspace.exists()) {
+        await workspace.delete(recursive: true);
+      }
+    });
+    await File('${workspace.path}/historical.mp4').writeAsBytes(<int>[1, 2]);
+    const entry = AssistantArtifactEntry(
+      id: 'historical.mp4',
+      label: 'historical.mp4',
+      relativePath: 'historical.mp4',
+      kind: AssistantArtifactEntryKind.file,
+      mimeType: 'video/mp4',
+      previewable: false,
+      workspacePath: '',
+    );
+
+    final resolved = await DesktopThreadArtifactService().loadFile(
+      entry: entry,
+      workspacePath: workspace.path,
+      workspaceKind: WorkspaceRefKind.localPath,
+      artifactRelativePaths: const <String>[],
+    );
+
+    expect(resolved, isNull);
+  });
+
+  test(
+    'loadSnapshot identifies common document and media artifact types',
+    () async {
+      final workspace = await Directory.systemTemp.createTemp(
+        'xworkmate-artifact-mime-',
+      );
+      addTearDown(() async {
+        if (await workspace.exists()) {
+          await workspace.delete(recursive: true);
+        }
+      });
+      const paths = <String>[
+        'deck.pptx',
+        'sheet.xlsx',
+        'document.docx',
+        'audio.m4a',
+        'video.mp4',
+        'archive.zip',
+        'vector.svg',
+      ];
+      for (final path in paths) {
+        await File('${workspace.path}/$path').writeAsBytes(<int>[1]);
+      }
+
+      final snapshot = await DesktopThreadArtifactService().loadSnapshot(
+        workspacePath: workspace.path,
+        workspaceKind: WorkspaceRefKind.localPath,
+        artifactRelativePaths: paths,
+      );
+      final mimeTypes = <String, String>{
+        for (final entry in snapshot.fileEntries)
+          entry.relativePath: entry.mimeType,
+      };
+
+      expect(mimeTypes, <String, String>{
+        'deck.pptx':
+            'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        'sheet.xlsx':
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'document.docx':
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'audio.m4a': 'audio/mp4',
+        'video.mp4': 'video/mp4',
+        'archive.zip': 'application/zip',
+        'vector.svg': 'image/svg+xml',
+      });
+    },
+  );
 }

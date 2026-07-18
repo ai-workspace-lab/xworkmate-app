@@ -8,7 +8,7 @@ import '../../i18n/app_language.dart';
 import '../../runtime/runtime_models.dart';
 import '../../theme/app_palette.dart';
 import '../../theme/app_theme.dart';
-import 'mobile_builtin_plugin_scenes.dart';
+import 'mobile_builtin_plugin_choice_chip.dart';
 import '../plugins/builtin_plugin_catalog.dart';
 import '../plugins/builtin_plugin_visuals.dart';
 import 'mobile_assistant_page_sheets.dart';
@@ -168,9 +168,7 @@ class MobileAssistantComposer extends StatelessWidget {
                           : palette.surfaceSecondary,
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(
-                        color: selected
-                            ? palette.accent
-                            : palette.strokeSoft,
+                        color: selected ? palette.accent : palette.strokeSoft,
                       ),
                     ),
                     child: Row(
@@ -221,7 +219,9 @@ class MobileAssistantComposer extends StatelessWidget {
                                 child: Row(
                                   children: [
                                     buildHeaderChip(
-                                      key: const Key('mobile-assistant-tab-attach'),
+                                      key: const Key(
+                                        'mobile-assistant-tab-attach',
+                                      ),
                                       label: appText('添加附件', 'Attach'),
                                       icon: CupertinoIcons.paperclip,
                                       selected: false,
@@ -236,7 +236,9 @@ class MobileAssistantComposer extends StatelessWidget {
                                       label: appText('会话配置', 'Config'),
                                       icon: Icons.tune_rounded,
                                       selected: activeTabIndex == 0,
-                                      onTap: () => setSheetState(() => activeTabIndex = 0),
+                                      onTap: () => setSheetState(
+                                        () => activeTabIndex = 0,
+                                      ),
                                     ),
                                     const SizedBox(width: 8),
                                     buildHeaderChip(
@@ -244,7 +246,9 @@ class MobileAssistantComposer extends StatelessWidget {
                                       label: appText('内置插件', 'Plugins'),
                                       icon: Icons.extension_rounded,
                                       selected: activeTabIndex == 1,
-                                      onTap: () => setSheetState(() => activeTabIndex = 1),
+                                      onTap: () => setSheetState(
+                                        () => activeTabIndex = 1,
+                                      ),
                                     ),
                                     const SizedBox(width: 8),
                                     buildHeaderChip(
@@ -278,7 +282,9 @@ class MobileAssistantComposer extends StatelessWidget {
                             runSpacing: 10,
                             children: [
                               MobileAssistantActionChip(
-                                key: const Key('mobile-assistant-target-button'),
+                                key: const Key(
+                                  'mobile-assistant-target-button',
+                                ),
                                 icon: target.isGateway
                                     ? Icons.cloud_queue_rounded
                                     : Icons.smart_toy_outlined,
@@ -316,7 +322,8 @@ class MobileAssistantComposer extends StatelessWidget {
                                 icon: mobilePermissionIcon(
                                   controller.assistantPermissionLevel,
                                 ),
-                                label: controller.assistantPermissionLevel.label,
+                                label:
+                                    controller.assistantPermissionLevel.label,
                                 onTap: () {
                                   Navigator.pop(sheetContext);
                                   showMobileAssistantPermissionSheet(
@@ -360,21 +367,17 @@ class MobileAssistantComposer extends StatelessWidget {
                             spacing: 8,
                             runSpacing: 8,
                             children: [
-                              for (final scene in mobileBuiltinPluginScenes)
-                                FilterChip(
+                              for (final plugin
+                                  in BuiltinPluginCatalog.firstBatch)
+                                MobileBuiltinPluginChoiceChip(
                                   key: ValueKey(
-                                    'mobile-assistant-plugin-chip-${scene.plugin.id}',
+                                    'mobile-assistant-plugin-chip-${plugin.id}',
                                   ),
-                                  avatar: BuiltinPluginIconTile(
-                                    plugin: scene.plugin,
-                                    size: 20,
-                                  ),
-                                  label: Text(scene.sceneLabel),
+                                  plugin: plugin,
                                   selected: selectedPluginIds.contains(
-                                    scene.plugin.id,
+                                    plugin.id,
                                   ),
-                                  onSelected: (_) =>
-                                      togglePlugin(scene.plugin.id),
+                                  onSelected: (_) => togglePlugin(plugin.id),
                                 ),
                             ],
                           ),
@@ -404,9 +407,7 @@ class MobileAssistantComposer extends StatelessWidget {
                                   style: Theme.of(sheetContext)
                                       .textTheme
                                       .bodyMedium
-                                      ?.copyWith(
-                                        color: palette.textSecondary,
-                                      ),
+                                      ?.copyWith(color: palette.textSecondary),
                                 );
                               }
                               return Wrap(
@@ -423,8 +424,9 @@ class MobileAssistantComposer extends StatelessWidget {
                                         size: 16,
                                       ),
                                       label: Text(skill.name),
-                                      selected: selectedSkillKeySet
-                                          .contains(skill.skillKey),
+                                      selected: selectedSkillKeySet.contains(
+                                        skill.skillKey,
+                                      ),
                                       onSelected: (_) =>
                                           toggleSkill(skill.skillKey),
                                     ),
@@ -463,74 +465,74 @@ class MobileAssistantComposer extends StatelessWidget {
               border: Border.all(color: palette.strokeSoft),
               boxShadow: [palette.chromeShadowAmbient],
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                ConstrainedBox(
-                  constraints: const BoxConstraints(
-                    minHeight: 48,
-                    maxHeight: 118,
-                  ),
-                  child: TextField(
-                    key: const Key('mobile-assistant-input'),
-                    controller: inputController,
-                    focusNode: focusNode,
-                    minLines: 1,
-                    maxLines: 4,
-                    textInputAction: TextInputAction.newline,
-                    decoration: InputDecoration(
-                      hintText: appText(
-                        '询问 XWorkmate...',
-                        'Ask XWorkmate...',
+            child: SizedBox(
+              height: 64,
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    key: const Key('mobile-assistant-composer-add-button'),
+                    radius: 20,
+                    backgroundColor: palette.surfaceSecondary,
+                    child: IconButton(
+                      padding: EdgeInsets.zero,
+                      icon: Icon(
+                        Icons.add,
+                        color: palette.textPrimary,
+                        size: 24,
                       ),
-                      hintStyle: TextStyle(color: palette.textMuted),
-                      border: InputBorder.none,
-                      enabledBorder: InputBorder.none,
-                      focusedBorder: InputBorder.none,
-                      contentPadding: const EdgeInsets.only(
-                        left: 18,
-                        right: 18,
-                        top: 14,
-                        bottom: 8,
-                      ),
+                      onPressed: showConfigurationMenu,
                     ),
                   ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.only(
-                    left: 10,
-                    right: 10,
-                    bottom: 10,
-                    top: 2,
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      IconButton(
-                        key: const Key('mobile-assistant-composer-add-button'),
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(
-                          minWidth: 40,
-                          minHeight: 40,
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        TextField(
+                          key: const Key('mobile-assistant-input'),
+                          controller: inputController,
+                          focusNode: focusNode,
+                          minLines: 1,
+                          maxLines: 1,
+                          textInputAction: TextInputAction.send,
+                          onSubmitted: (_) => onSend(),
+                          decoration: const InputDecoration(
+                            hintText: '',
+                            border: InputBorder.none,
+                            enabledBorder: InputBorder.none,
+                            focusedBorder: InputBorder.none,
+                            contentPadding: EdgeInsets.zero,
+                          ),
                         ),
-                        icon: Icon(
-                          Icons.add_rounded,
-                          color: palette.textPrimary,
-                          size: 28,
+                        IgnorePointer(
+                          child: ValueListenableBuilder<TextEditingValue>(
+                            valueListenable: inputController,
+                            builder: (context, value, _) {
+                              if (value.text.isNotEmpty) {
+                                return const SizedBox.shrink();
+                              }
+                              return Text(
+                                appText(
+                                  '询问 XWorkmate...',
+                                  'Ask XWorkmate...',
+                                ),
+                                textAlign: TextAlign.center,
+                                style: TextStyle(color: palette.textMuted),
+                              );
+                            },
+                          ),
                         ),
-                        onPressed: showConfigurationMenu,
-                      ),
-                      _MobileAssistantPrimaryActionButton(
-                        isBusy: hasPendingRun,
-                        onSend: onSend,
-                        onStop: () => unawaited(controller.abortRun()),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                  const SizedBox(width: 8),
+                  _MobileAssistantPrimaryActionButton(
+                    isBusy: hasPendingRun,
+                    onSend: onSend,
+                    onStop: () => unawaited(controller.abortRun()),
+                  ),
+                ],
+              ),
             ),
           ),
           if (selectedBuiltinPluginIdsForSession(
@@ -645,9 +647,7 @@ class _MobileAssistantPrimaryActionButton extends StatelessWidget {
           backgroundColor: backgroundColor,
           foregroundColor: foregroundColor,
           side: BorderSide(
-            color: isBusy
-                ? palette.strokeSoft
-                : Colors.transparent,
+            color: isBusy ? palette.strokeSoft : Colors.transparent,
             width: 1.1,
           ),
           shape: RoundedRectangleBorder(

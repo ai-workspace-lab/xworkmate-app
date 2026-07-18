@@ -1,8 +1,6 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../app/app_controller.dart';
@@ -11,8 +9,8 @@ import '../../runtime/runtime_models.dart';
 import '../../runtime/assistant_artifacts.dart';
 import '../../theme/app_palette.dart';
 import '../../widgets/assistant_task_progress_bar.dart';
-import 'mobile_builtin_plugin_scenes.dart';
-import '../plugins/builtin_plugin_visuals.dart';
+import '../plugins/builtin_plugin_catalog.dart';
+import 'mobile_builtin_plugin_choice_chip.dart';
 
 class MobileAssistantConversation extends StatelessWidget {
   const MobileAssistantConversation({
@@ -21,14 +19,16 @@ class MobileAssistantConversation extends StatelessWidget {
     required this.messages,
     required this.scrollController,
     required this.onConnectBridge,
-    required this.onSelectPluginScene,
+    required this.selectedBuiltinPluginIds,
+    required this.onToggleBuiltinPlugin,
   });
 
   final AppController controller;
   final List<GatewayChatMessage> messages;
   final ScrollController scrollController;
   final VoidCallback onConnectBridge;
-  final ValueChanged<String> onSelectPluginScene;
+  final Set<String> selectedBuiltinPluginIds;
+  final ValueChanged<String> onToggleBuiltinPlugin;
 
   @override
   Widget build(BuildContext context) {
@@ -36,7 +36,8 @@ class MobileAssistantConversation extends StatelessWidget {
       return MobileAssistantEmptyState(
         controller: controller,
         onConnectBridge: onConnectBridge,
-        onSelectPluginScene: onSelectPluginScene,
+        selectedBuiltinPluginIds: selectedBuiltinPluginIds,
+        onToggleBuiltinPlugin: onToggleBuiltinPlugin,
       );
     }
 
@@ -269,12 +270,14 @@ class MobileAssistantEmptyState extends StatelessWidget {
     super.key,
     required this.controller,
     required this.onConnectBridge,
-    required this.onSelectPluginScene,
+    required this.selectedBuiltinPluginIds,
+    required this.onToggleBuiltinPlugin,
   });
 
   final AppController controller;
   final VoidCallback onConnectBridge;
-  final ValueChanged<String> onSelectPluginScene;
+  final Set<String> selectedBuiltinPluginIds;
+  final ValueChanged<String> onToggleBuiltinPlugin;
 
   @override
   Widget build(BuildContext context) {
@@ -284,21 +287,14 @@ class MobileAssistantEmptyState extends StatelessWidget {
       builder: (context, constraints) {
         return SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(22, 18, 22, 18),
+          padding: const EdgeInsets.fromLTRB(22, 18, 22, 0),
           child: ConstrainedBox(
             constraints: BoxConstraints(minHeight: constraints.maxHeight - 36),
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                _MobileBridgeHeroStatus(
-                  connected: connection.connected,
-                  detail: connection.connected
-                      ? appText('在线 · 随时为你执行任务', 'Online · ready to run')
-                      : appText('先去配置集成连接', 'Configure integration first'),
-                ),
-                const SizedBox(height: 30),
                 Text(
-                  appText('你想先用哪个插件场景？', 'Which plugin scene do you want?'),
+                  appText('你想先用哪个内置插件？', 'Which built-in plugin do you want?'),
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                     color: palette.textPrimary,
@@ -310,8 +306,8 @@ class MobileAssistantEmptyState extends StatelessWidget {
                 Text(
                   connection.connected
                       ? appText(
-                          '点一下场景卡，我会把对应任务填进输入框。',
-                          'Tap a scene card and I will prefill the task prompt.',
+                          '点选即可将插件用于当前会话。',
+                          'Tap to use a plugin in this session.',
                         )
                       : connection.detailLabel,
                   textAlign: TextAlign.center,
@@ -320,43 +316,8 @@ class MobileAssistantEmptyState extends StatelessWidget {
                     height: 1.45,
                   ),
                 ),
-                const SizedBox(height: 26),
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    const spacing = 10.0;
-                    final columns = constraints.maxWidth >= 220 ? 2 : 1;
-                    final cardWidth =
-                        (constraints.maxWidth - (spacing * (columns - 1))) /
-                        columns;
-                    return Wrap(
-                      alignment: WrapAlignment.center,
-                      spacing: spacing,
-                      runSpacing: spacing,
-                      children: [
-                        for (final scene in mobileBuiltinPluginScenes)
-                          SizedBox(
-                            width: cardWidth,
-                            child: _MobilePluginSceneChip(
-                              key: ValueKey(
-                                'mobile-plugin-scene-${scene.plugin.id}',
-                              ),
-                              scene: scene,
-                              connected: connection.connected,
-                              onTap: () {
-                                if (!connection.connected) {
-                                  onConnectBridge();
-                                  return;
-                                }
-                                onSelectPluginScene(scene.prefillPrompt);
-                              },
-                            ),
-                          ),
-                      ],
-                    );
-                  },
-                ),
                 if (!connection.connected) ...[
-                  const SizedBox(height: 28),
+                  const SizedBox(height: 20),
                   FilledButton.icon(
                     key: const Key('mobile-assistant-connect-bridge-button'),
                     onPressed: onConnectBridge,
@@ -364,206 +325,41 @@ class MobileAssistantEmptyState extends StatelessWidget {
                     label: Text(appText('去配置集成', 'Configure integration')),
                   ),
                 ],
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _MobileBridgeHeroStatus extends StatelessWidget {
-  const _MobileBridgeHeroStatus({
-    required this.connected,
-    required this.detail,
-  });
-
-  final bool connected;
-  final String detail;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.palette;
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Stack(
-          clipBehavior: Clip.none,
-          children: [
-            DecoratedBox(
-              decoration: BoxDecoration(
-                color: palette.surfacePrimary,
-                shape: BoxShape.circle,
-                border: Border.all(color: palette.accent, width: 1.4),
-              ),
-              child: SizedBox(
-                width: 56,
-                height: 56,
-                child: Icon(
-                  connected ? Icons.hub_outlined : Icons.link_off_rounded,
-                  color: connected ? palette.accent : palette.warning,
-                  size: 30,
-                ),
-              ),
-            ),
-            Positioned(
-              right: 2,
-              bottom: 2,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: connected ? palette.success : palette.warning,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: palette.canvas, width: 3),
-                ),
-                child: const SizedBox(width: 17, height: 17),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(width: 14),
-        Flexible(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                connected
-                    ? appText('AI Workspace 已连接', 'AI Workspace Connected')
-                    : appText('先配置集成连接', 'Configure Integration First'),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: palette.textPrimary,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 3),
-              Text(
-                detail,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(
-                  context,
-                ).textTheme.bodyMedium?.copyWith(color: palette.textSecondary),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _MobilePluginSceneChip extends StatelessWidget {
-  const _MobilePluginSceneChip({
-    super.key,
-    required this.scene,
-    required this.connected,
-    required this.onTap,
-  });
-
-  final MobileBuiltinPluginSceneSpec scene;
-  final bool connected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.palette;
-    final theme = Theme.of(context);
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(20),
-        onTap: onTap,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: palette.surfacePrimary.withValues(alpha: 0.92),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: connected
-                  ? palette.accent.withValues(alpha: 0.34)
-                  : palette.strokeSoft,
-            ),
-            boxShadow: [palette.chromeShadowAmbient],
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                BuiltinPluginIconTile(plugin: scene.plugin, size: 28),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        scene.sceneLabel,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          color: palette.textPrimary,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 14,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        scene.plugin.description,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: palette.textSecondary,
-                          height: 1.32,
-                          fontSize: 12.5,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 6,
-                        children: [
-                          for (final format in scene.plugin.outputFormats.take(
-                            2,
-                          ))
-                            _MobilePluginFormatTag(label: format.toUpperCase()),
+                const SizedBox(height: 26),
+                SizedBox(
+                  key: const Key('mobile-plugin-scene-carousel'),
+                  height: 68,
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    physics: const BouncingScrollPhysics(),
+                    padding: const EdgeInsets.symmetric(horizontal: 2),
+                    child: Row(
+                      children: [
+                        for (final plugin
+                            in BuiltinPluginCatalog.firstBatch) ...[
+                          MobileBuiltinPluginChoiceChip(
+                            key: ValueKey(
+                              'mobile-plugin-shortcut-${plugin.id}',
+                            ),
+                            plugin: plugin,
+                            selected: selectedBuiltinPluginIds.contains(
+                              plugin.id,
+                            ),
+                            large: true,
+                            onSelected: (_) => onToggleBuiltinPlugin(plugin.id),
+                          ),
+                          if (plugin != BuiltinPluginCatalog.firstBatch.last)
+                            const SizedBox(width: 10),
                         ],
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ],
             ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _MobilePluginFormatTag extends StatelessWidget {
-  const _MobilePluginFormatTag({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.palette;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: palette.surfaceSecondary,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        child: Text(
-          label,
-          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-            color: palette.textSecondary,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
@@ -641,8 +437,9 @@ class _MobileBridgeInlineStatus extends StatelessWidget {
   }
 }
 
-class _MobileGeneratedArtifactCard extends StatelessWidget {
-  const _MobileGeneratedArtifactCard({
+class MobileGeneratedArtifactCardInternal extends StatelessWidget {
+  const MobileGeneratedArtifactCardInternal({
+    super.key,
     required this.title,
     required this.onTap,
   });
@@ -655,7 +452,6 @@ class _MobileGeneratedArtifactCard extends StatelessWidget {
     final palette = context.palette;
     return Material(
       color: palette.surfacePrimary,
-      borderRadius: BorderRadius.circular(12),
       shape: RoundedRectangleBorder(
         side: BorderSide(color: palette.strokeSoft),
         borderRadius: BorderRadius.circular(12),
@@ -808,7 +604,10 @@ class _MobileSessionArtifactsState extends State<_MobileSessionArtifacts> {
         for (final entry in _snapshot!.fileEntries)
           Padding(
             padding: const EdgeInsets.only(bottom: 12),
-            child: _MobileGeneratedArtifactCard(
+            child: MobileGeneratedArtifactCardInternal(
+              key: ValueKey<String>(
+                'mobile-generated-artifact-${entry.relativePath}',
+              ),
               title: entry.label,
               onTap: () async {
                 try {
@@ -817,14 +616,27 @@ class _MobileSessionArtifactsState extends State<_MobileSessionArtifacts> {
                       content: Text(appText('正在准备文件...', 'Preparing file...')),
                     ),
                   );
-                  final preview = await widget.controller
-                      .loadAssistantArtifactPreview(entry);
+                  final file = await widget.controller
+                      .loadAssistantArtifactFile(entry);
                   if (!context.mounted) return;
-                  final dir = await getTemporaryDirectory();
-                  final file = File('${dir.path}/${entry.label}');
-                  await file.writeAsString(preview.content);
+                  if (file == null) {
+                    throw StateError('Artifact file is unavailable');
+                  }
+                  final shareBox = context.findRenderObject() as RenderBox?;
                   await SharePlus.instance.share(
-                    ShareParams(files: [XFile(file.path)], text: entry.label),
+                    ShareParams(
+                      files: <XFile>[
+                        XFile(
+                          file.path,
+                          name: entry.label,
+                          mimeType: entry.mimeType,
+                        ),
+                      ],
+                      text: entry.label,
+                      sharePositionOrigin: shareBox == null
+                          ? null
+                          : shareBox.localToGlobal(Offset.zero) & shareBox.size,
+                    ),
                   );
                 } catch (e) {
                   if (!context.mounted) return;

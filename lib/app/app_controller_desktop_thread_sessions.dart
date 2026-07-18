@@ -505,6 +505,23 @@ extension AppControllerDesktopThreadSessions on AppController {
     );
   }
 
+  Future<File?> loadAssistantArtifactFile(
+    AssistantArtifactEntry entry, {
+    String? sessionKey,
+  }) {
+    final resolvedSessionKey = normalizedAssistantSessionKeyInternal(
+      sessionKey ?? currentSessionKey,
+    );
+    final thread = taskThreadForSessionInternal(resolvedSessionKey);
+    return threadArtifactServiceInternal.loadFile(
+      entry: entry,
+      workspacePath: assistantWorkspacePathForSession(resolvedSessionKey),
+      workspaceKind: assistantWorkspaceKindForSession(resolvedSessionKey),
+      artifactRelativePaths:
+          thread?.lastTaskArtifactRelativePaths ?? const <String>[],
+    );
+  }
+
   String get assistantConversationOwnerLabel {
     return activeAgentName;
   }

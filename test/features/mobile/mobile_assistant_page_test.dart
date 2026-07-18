@@ -34,25 +34,72 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('mobile-assistant-page')), findsOneWidget);
-      expect(find.text('你想先用哪个插件场景？'), findsOneWidget);
       expect(
-        find.byKey(const Key('mobile-plugin-scene-builtin.document')),
+        find.text(
+          controller.currentAssistantConnectionState.connected
+              ? 'AI Workspace 已连接'
+              : '先配置集成连接',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('你想先用哪个内置插件？'), findsOneWidget);
+      expect(
+        find.byKey(const Key('mobile-plugin-scene-carousel')),
         findsOneWidget,
       );
       expect(
-        find.byKey(const Key('mobile-plugin-scene-builtin.spreadsheet')),
+        find.descendant(
+          of: find.byKey(const Key('mobile-plugin-scene-carousel')),
+          matching: find.byType(SingleChildScrollView),
+        ),
+        findsOneWidget,
+      );
+      final firstCard = find.byKey(
+        const Key('mobile-plugin-shortcut-builtin.document'),
+      );
+      final startingOffset = tester.getTopLeft(firstCard).dx;
+      await tester.drag(
+        find.byKey(const Key('mobile-plugin-scene-carousel')),
+        const Offset(-160, 0),
+      );
+      await tester.pumpAndSettle();
+      expect(tester.getTopLeft(firstCard).dx, lessThan(startingOffset));
+      final carouselRect = tester.getRect(
+        find.byKey(const Key('mobile-plugin-scene-carousel')),
+      );
+      final input = tester.widget<TextField>(
+        find.byKey(const Key('mobile-assistant-input')),
+      );
+      final inputRect = tester.getRect(
+        find.byKey(const Key('mobile-assistant-input')),
+      );
+      expect(input.maxLines, 1);
+      expect(inputRect.top - carouselRect.bottom, lessThan(48));
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('mobile-assistant-composer-add-button')),
+          matching: find.byIcon(Icons.add),
+        ),
         findsOneWidget,
       );
       expect(
-        find.byKey(const Key('mobile-plugin-scene-builtin.presentation')),
+        find.byKey(const Key('mobile-plugin-shortcut-builtin.document')),
         findsOneWidget,
       );
       expect(
-        find.byKey(const Key('mobile-plugin-scene-builtin.image')),
+        find.byKey(const Key('mobile-plugin-shortcut-builtin.spreadsheet')),
         findsOneWidget,
       );
       expect(
-        find.byKey(const Key('mobile-plugin-scene-builtin.video')),
+        find.byKey(const Key('mobile-plugin-shortcut-builtin.presentation')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('mobile-plugin-shortcut-builtin.image')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('mobile-plugin-shortcut-builtin.video')),
         findsOneWidget,
       );
       expect(
@@ -113,7 +160,7 @@ void main() {
       await tester.tap(find.text('返回对话主页'));
       await tester.pumpAndSettle();
 
-      expect(find.text('你想先用哪个插件场景？'), findsOneWidget);
+      expect(find.text('你想先用哪个内置插件？'), findsOneWidget);
     });
 
     testWidgets('mobile plugins tab shows the built-in plugin panel', (
@@ -150,6 +197,64 @@ void main() {
       expect(find.text('PPT 演示'), findsWidgets);
       expect(find.text('图片'), findsWidgets);
       expect(find.text('视频'), findsWidgets);
+    });
+
+    testWidgets('home plugin shortcuts reuse the session plugin selection', (
+      tester,
+    ) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 844);
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+      selectedBuiltinPluginIdsBySessionInternal.clear();
+      addTearDown(selectedBuiltinPluginIdsBySessionInternal.clear);
+
+      final controller = AppController(
+        environmentOverride: const <String, String>{},
+      );
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(_buildTestApp(controller: controller));
+      await tester.pumpAndSettle();
+
+      final shortcut = find.byKey(
+        const Key('mobile-plugin-shortcut-builtin.document'),
+      );
+      final shortcutChip = find.descendant(
+        of: shortcut,
+        matching: find.byType(FilterChip),
+      );
+      expect(shortcut, findsOneWidget);
+      expect(tester.widget<FilterChip>(shortcutChip).selected, isFalse);
+
+      await tester.tap(shortcut);
+      await tester.pumpAndSettle();
+
+      expect(tester.widget<FilterChip>(shortcutChip).selected, isTrue);
+      expect(
+        find.byKey(
+          const Key('mobile-assistant-selected-plugin-builtin.document'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        tester
+            .widget<TextField>(find.byKey(const Key('mobile-assistant-input')))
+            .controller
+            ?.text,
+        isEmpty,
+      );
+
+      await tester.tap(shortcut);
+      await tester.pumpAndSettle();
+
+      expect(tester.widget<FilterChip>(shortcutChip).selected, isFalse);
+      expect(
+        find.byKey(
+          const Key('mobile-assistant-selected-plugin-builtin.document'),
+        ),
+        findsNothing,
+      );
     });
 
     testWidgets('mobile history opens quick task switcher', (tester) async {
@@ -260,7 +365,10 @@ void main() {
       expect(find.byKey(const Key('mobile-assistant-tab-0')), findsOneWidget);
       expect(find.byKey(const Key('mobile-assistant-tab-1')), findsOneWidget);
       expect(find.byKey(const Key('mobile-assistant-tab-2')), findsOneWidget);
-      expect(find.byKey(const Key('mobile-assistant-tab-attach')), findsOneWidget);
+      expect(
+        find.byKey(const Key('mobile-assistant-tab-attach')),
+        findsOneWidget,
+      );
 
       // Switch to Plugins tab (Tab 1)
       await tester.tap(find.byKey(const Key('mobile-assistant-tab-1')));
@@ -452,6 +560,34 @@ void main() {
       expect(sendRect.bottom, lessThanOrEqualTo(844));
       expect(sendRect.width, greaterThanOrEqualTo(32));
       expect(sendRect.height, greaterThanOrEqualTo(32));
+    });
+
+    testWidgets('generated artifact card exposes the file action', (
+      tester,
+    ) async {
+      var tapped = false;
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light().copyWith(platform: TargetPlatform.iOS),
+          home: Scaffold(
+            body: MobileGeneratedArtifactCardInternal(
+              key: const Key('mobile-generated-artifact-test-card'),
+              title: 'poster.png',
+              onTap: () => tapped = true,
+            ),
+          ),
+        ),
+      );
+
+      expect(
+        find.byKey(const Key('mobile-generated-artifact-test-card')),
+        findsOneWidget,
+      );
+      expect(find.text('poster.png'), findsOneWidget);
+      await tester.tap(
+        find.byKey(const Key('mobile-generated-artifact-test-card')),
+      );
+      expect(tapped, isTrue);
     });
   });
 }
