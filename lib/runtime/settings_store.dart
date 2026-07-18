@@ -92,20 +92,83 @@ class SettingsStore {
   }
 
   Future<List<TaskThread>> loadTaskThreads() async {
+    _lastSkippedInvalidTaskThreadRecords.clear();
+    File? file;
     try {
       final layout = await _layoutResolver.resolve();
-      final file = File('${layout.tasksDirectory.path}/threads.json');
+      file = File('${layout.tasksDirectory.path}/threads.json');
       if (await file.exists()) {
         final content = await file.readAsString();
         final decoded = jsonDecode(content);
         if (decoded is List) {
-          return decoded.map((e) => TaskThread.fromJson(e)).toList();
+          // One bad record must never wipe the whole list: a legacy or
+          // corrupted entry used to throw out of the shared try and the caller
+          // then treated every persisted session as gone — the next save made
+          // that loss permanent. Decode per record and keep the valid rest.
+          final threads = <TaskThread>[];
+          for (final entry in decoded) {
+            if (entry is! Map) {
+              _recordSkippedTaskThread('unknown', const FormatException('not-a-map'));
+              continue;
+            }
+            final map = entry.cast<String, dynamic>();
+            try {
+              threads.add(TaskThread.fromJson(map));
+            } catch (error) {
+              _recordSkippedTaskThread(
+                map['threadId']?.toString().trim().isNotEmpty == true
+                    ? map['threadId'].toString().trim()
+                    : 'unknown',
+                error,
+              );
+            }
+          }
+          if (_lastSkippedInvalidTaskThreadRecords.isNotEmpty) {
+            await _backupUnreadableTaskThreads(file);
+          }
+          return threads;
         }
       }
     } catch (e) {
       _tasksWriteFailure = _wrapFailure('loadTaskThreads', PersistentStoreScope.tasks, e);
+      if (file != null) {
+        await _backupUnreadableTaskThreads(file);
+      }
     }
     return const [];
+  }
+
+  void _recordSkippedTaskThread(String threadId, Object error) {
+    // Reason mapping keys off the throw sites in TaskThread: the legacy
+    // "auto" execution mode raises FormatException("... no longer supported")
+    // and an incomplete workspace binding raises StateError mentioning
+    // workspaceBinding. Anything else counts as invalid persisted data.
+    final message = error.toString();
+    final SkippedTaskThreadReason reason;
+    if (message.contains('no longer supported')) {
+      reason = SkippedTaskThreadReason.removedAutoExecutionMode;
+    } else if (message.contains('workspaceBinding')) {
+      reason = SkippedTaskThreadReason.incompleteWorkspaceBinding;
+    } else {
+      reason = SkippedTaskThreadReason.invalidPersistedThreadData;
+    }
+    _lastSkippedInvalidTaskThreadRecords.add(
+      SkippedTaskThreadRecord(threadId: threadId, reason: reason),
+    );
+  }
+
+  Future<void> _backupUnreadableTaskThreads(File file) async {
+    // Keep the original bytes recoverable before any later save rewrites
+    // threads.json with only the surviving subset.
+    try {
+      if (!await file.exists()) {
+        return;
+      }
+      final stamp = DateTime.now().millisecondsSinceEpoch;
+      await file.copy('${file.path}.invalid-$stamp.bak');
+    } catch (e, stackTrace) {
+      debugPrint('Task thread backup failed: $e\n$stackTrace');
+    }
   }
 
   Future<void> saveTaskThreads(List<TaskThread> threads) async {
