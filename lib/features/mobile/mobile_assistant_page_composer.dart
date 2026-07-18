@@ -8,7 +8,7 @@ import '../../i18n/app_language.dart';
 import '../../runtime/runtime_models.dart';
 import '../../theme/app_palette.dart';
 import '../../theme/app_theme.dart';
-import 'mobile_builtin_plugin_scenes.dart';
+import 'mobile_builtin_plugin_choice_chip.dart';
 import '../plugins/builtin_plugin_catalog.dart';
 import '../plugins/builtin_plugin_visuals.dart';
 import 'mobile_assistant_page_sheets.dart';
@@ -367,21 +367,17 @@ class MobileAssistantComposer extends StatelessWidget {
                             spacing: 8,
                             runSpacing: 8,
                             children: [
-                              for (final scene in mobileBuiltinPluginScenes)
-                                FilterChip(
+                              for (final plugin
+                                  in BuiltinPluginCatalog.firstBatch)
+                                MobileBuiltinPluginChoiceChip(
                                   key: ValueKey(
-                                    'mobile-assistant-plugin-chip-${scene.plugin.id}',
+                                    'mobile-assistant-plugin-chip-${plugin.id}',
                                   ),
-                                  avatar: BuiltinPluginIconTile(
-                                    plugin: scene.plugin,
-                                    size: 20,
-                                  ),
-                                  label: Text(scene.sceneLabel),
+                                  plugin: plugin,
                                   selected: selectedPluginIds.contains(
-                                    scene.plugin.id,
+                                    plugin.id,
                                   ),
-                                  onSelected: (_) =>
-                                      togglePlugin(scene.plugin.id),
+                                  onSelected: (_) => togglePlugin(plugin.id),
                                 ),
                             ],
                           ),

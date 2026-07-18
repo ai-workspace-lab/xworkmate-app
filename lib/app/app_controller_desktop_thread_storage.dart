@@ -287,6 +287,10 @@ extension AppControllerDesktopThreadStorage on AppController {
     await taskThreadRepositoryInternal.flush();
   }
 
+  Future<void> persistAssistantHistory() async {
+    await flushAssistantThreadPersistenceInternal();
+  }
+
   void clearPendingToolCallsForGatewaySessionInternal(
     String sessionKey, {
     bool hasError = false,

@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'package:path_provider/path_provider.dart';
+
 import 'runtime_models.dart';
 
 class RuntimeBootstrapConfig {
@@ -19,7 +21,7 @@ class RuntimeBootstrapConfig {
     String? workspacePathHint,
     String? cliPathHint,
   }) async {
-    final workspaceRoot = _resolveWorkspaceRoot(workspacePathHint);
+    final workspaceRoot = await _resolveWorkspaceRoot(workspacePathHint);
     final openClawRoot = _resolveOpenClawRoot(
       workspaceRoot,
       cliPathHint: cliPathHint,
@@ -215,7 +217,21 @@ Map<String, String> _loadEnvFile({
   return const <String, String>{};
 }
 
-Directory? _resolveWorkspaceRoot(String? workspacePathHint) {
+Future<Directory?> _resolveWorkspaceRoot(String? workspacePathHint) async {
+  final isMobile = Platform.isIOS || Platform.isAndroid;
+  if (isMobile) {
+    try {
+      final docDir = await getApplicationDocumentsDirectory();
+      final root = Directory('${docDir.path}/xworkmate/workspace');
+      if (!await root.exists()) {
+        await root.create(recursive: true);
+      }
+      return root;
+    } catch (error) {
+      return null;
+    }
+  }
+
   final candidates = <Directory>{
     ..._pathCandidates(workspacePathHint),
     Directory.current,
