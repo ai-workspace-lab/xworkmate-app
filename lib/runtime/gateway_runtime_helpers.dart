@@ -755,9 +755,53 @@ String extractMessageText(Map<String, dynamic> message) {
     final nestedContent = map['content'];
     if (nestedContent is String && nestedContent.trim().isNotEmpty) {
       parts.add(nestedContent.trim());
+      continue;
+    }
+    final attachmentLabel = _historyAttachmentLabel(map);
+    if (attachmentLabel != null) {
+      parts.add(attachmentLabel);
     }
   }
   return parts.join('\n').trim();
+}
+
+String? _historyAttachmentLabel(Map<String, dynamic> part) {
+  final type = stringValue(part['type'])?.trim().toLowerCase() ?? '';
+  final mimeType =
+      stringValue(part['mimeType'])?.trim().toLowerCase() ??
+      stringValue(part['mime_type'])?.trim().toLowerCase() ??
+      '';
+  final isAttachment =
+      type == 'file' ||
+      type == 'image' ||
+      type == 'image_url' ||
+      type == 'attachment' ||
+      mimeType.startsWith('image/') ||
+      mimeType == 'application/octet-stream';
+  if (!isAttachment) {
+    return null;
+  }
+  final source = asMap(part['source']);
+  final imageUrl = asMap(part['image_url']);
+  final name =
+      <String?>[
+            stringValue(part['fileName']),
+            stringValue(part['filename']),
+            stringValue(part['name']),
+            stringValue(part['path']),
+            stringValue(source['fileName']),
+            stringValue(source['filename']),
+            stringValue(source['path']),
+            stringValue(imageUrl['name']),
+          ]
+          .whereType<String>()
+          .map((value) => value.trim())
+          .firstWhere((value) => value.isNotEmpty, orElse: () => '');
+  final marker =
+      type == 'image' || type == 'image_url' || mimeType.startsWith('image/')
+      ? '🖼'
+      : '📎';
+  return name.isEmpty ? marker : '$marker $name';
 }
 
 String randomIdInternal() {

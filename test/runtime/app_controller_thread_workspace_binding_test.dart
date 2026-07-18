@@ -82,6 +82,59 @@ void main() {
     },
   );
 
+  test('assistant history survives an iOS-style background flush', () async {
+    final storeRoot = await Directory.systemTemp.createTemp(
+      'xworkmate-history-flush-store-',
+    );
+    addTearDown(() async {
+      if (await storeRoot.exists()) {
+        await storeRoot.delete(recursive: true);
+      }
+    });
+    final store = _RecordingSecureConfigStore(rootPath: storeRoot.path);
+    await store.initialize();
+    const sessionKey = 'draft:persisted-mobile-history';
+
+    final firstController = AppController(
+      store: store,
+      environmentOverride: const <String, String>{},
+    );
+    await _waitForControllerInitialization(firstController);
+    firstController.initializeAssistantThreadContext(
+      sessionKey,
+      title: '保留的历史任务',
+    );
+    firstController.appendAssistantThreadMessageInternal(
+      sessionKey,
+      const GatewayChatMessage(
+        id: 'history-message',
+        role: 'user',
+        text: '生成一张海报',
+        timestampMs: 1,
+        toolCallId: null,
+        toolName: null,
+        stopReason: null,
+        pending: false,
+        error: false,
+      ),
+    );
+    await firstController.persistAssistantHistory();
+    firstController.dispose();
+
+    final restoredController = AppController(
+      store: store,
+      environmentOverride: const <String, String>{},
+    );
+    addTearDown(restoredController.dispose);
+    await _waitForControllerInitialization(restoredController);
+
+    final restored = restoredController.requireTaskThreadForSessionInternal(
+      sessionKey,
+    );
+    expect(restored.title, '保留的历史任务');
+    expect(restored.messages.single.text, '生成一张海报');
+  });
+
   test('source tree does not contain known real draft test fixtures', () async {
     final blocked = <String>[
       _pollutedUnitSessionKey(),

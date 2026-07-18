@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -19,7 +21,8 @@ class XWorkmateApp extends StatefulWidget {
   State<XWorkmateApp> createState() => _XWorkmateAppState();
 }
 
-class _XWorkmateAppState extends State<XWorkmateApp> {
+class _XWorkmateAppState extends State<XWorkmateApp>
+    with WidgetsBindingObserver {
   static const MethodChannel _appLifecycleChannel = MethodChannel(
     'plus.svc.xworkmate/app_lifecycle',
   );
@@ -32,6 +35,7 @@ class _XWorkmateAppState extends State<XWorkmateApp> {
     super.initState();
     _themeSurface = resolveAppThemeSurface();
     _controller = AppController(uiFeatureManifest: widget.featureManifest);
+    WidgetsBinding.instance.addObserver(this);
     if (_supportsDesktopLifecycleChannel) {
       _appLifecycleChannel.setMethodCallHandler(_handleAppLifecycleCall);
     }
@@ -39,11 +43,22 @@ class _XWorkmateAppState extends State<XWorkmateApp> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     if (_supportsDesktopLifecycleChannel) {
       _appLifecycleChannel.setMethodCallHandler(null);
     }
     _controller.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached ||
+        state == AppLifecycleState.hidden) {
+      unawaited(_controller.persistAssistantHistory());
+    }
   }
 
   bool get _supportsDesktopLifecycleChannel {
