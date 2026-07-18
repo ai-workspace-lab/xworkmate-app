@@ -12,7 +12,6 @@ import '../../runtime/assistant_artifacts.dart';
 import '../../theme/app_palette.dart';
 import '../../widgets/assistant_task_progress_bar.dart';
 import 'mobile_builtin_plugin_scenes.dart';
-import '../plugins/builtin_plugin_visuals.dart';
 
 class MobileAssistantConversation extends StatelessWidget {
   const MobileAssistantConversation({
@@ -284,19 +283,12 @@ class MobileAssistantEmptyState extends StatelessWidget {
       builder: (context, constraints) {
         return SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.fromLTRB(22, 18, 22, 18),
+          padding: const EdgeInsets.fromLTRB(22, 18, 22, 0),
           child: ConstrainedBox(
             constraints: BoxConstraints(minHeight: constraints.maxHeight - 36),
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                _MobileBridgeHeroStatus(
-                  connected: connection.connected,
-                  detail: connection.connected
-                      ? appText('在线 · 随时为你执行任务', 'Online · ready to run')
-                      : appText('先去配置集成连接', 'Configure integration first'),
-                ),
-                const SizedBox(height: 30),
                 Text(
                   appText('你想先用哪个插件场景？', 'Which plugin scene do you want?'),
                   textAlign: TextAlign.center,
@@ -320,43 +312,8 @@ class MobileAssistantEmptyState extends StatelessWidget {
                     height: 1.45,
                   ),
                 ),
-                const SizedBox(height: 26),
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    const spacing = 10.0;
-                    final columns = constraints.maxWidth >= 220 ? 2 : 1;
-                    final cardWidth =
-                        (constraints.maxWidth - (spacing * (columns - 1))) /
-                        columns;
-                    return Wrap(
-                      alignment: WrapAlignment.center,
-                      spacing: spacing,
-                      runSpacing: spacing,
-                      children: [
-                        for (final scene in mobileBuiltinPluginScenes)
-                          SizedBox(
-                            width: cardWidth,
-                            child: _MobilePluginSceneChip(
-                              key: ValueKey(
-                                'mobile-plugin-scene-${scene.plugin.id}',
-                              ),
-                              scene: scene,
-                              connected: connection.connected,
-                              onTap: () {
-                                if (!connection.connected) {
-                                  onConnectBridge();
-                                  return;
-                                }
-                                onSelectPluginScene(scene.prefillPrompt);
-                              },
-                            ),
-                          ),
-                      ],
-                    );
-                  },
-                ),
                 if (!connection.connected) ...[
-                  const SizedBox(height: 28),
+                  const SizedBox(height: 20),
                   FilledButton.icon(
                     key: const Key('mobile-assistant-connect-bridge-button'),
                     onPressed: onConnectBridge,
@@ -364,92 +321,43 @@ class MobileAssistantEmptyState extends StatelessWidget {
                     label: Text(appText('去配置集成', 'Configure integration')),
                   ),
                 ],
+                const SizedBox(height: 26),
+                SizedBox(
+                  key: const Key('mobile-plugin-scene-carousel'),
+                  height: 68,
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    physics: const BouncingScrollPhysics(),
+                    padding: const EdgeInsets.symmetric(horizontal: 2),
+                    child: Row(
+                      children: [
+                        for (final scene in mobileBuiltinPluginScenes) ...[
+                          _MobilePluginSceneChip(
+                            key: ValueKey(
+                              'mobile-plugin-scene-${scene.plugin.id}',
+                            ),
+                            scene: scene,
+                            connected: connection.connected,
+                            onTap: () {
+                              if (!connection.connected) {
+                                onConnectBridge();
+                                return;
+                              }
+                              onSelectPluginScene(scene.prefillPrompt);
+                            },
+                          ),
+                          if (scene != mobileBuiltinPluginScenes.last)
+                            const SizedBox(width: 10),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
         );
       },
-    );
-  }
-}
-
-class _MobileBridgeHeroStatus extends StatelessWidget {
-  const _MobileBridgeHeroStatus({
-    required this.connected,
-    required this.detail,
-  });
-
-  final bool connected;
-  final String detail;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.palette;
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Stack(
-          clipBehavior: Clip.none,
-          children: [
-            DecoratedBox(
-              decoration: BoxDecoration(
-                color: palette.surfacePrimary,
-                shape: BoxShape.circle,
-                border: Border.all(color: palette.accent, width: 1.4),
-              ),
-              child: SizedBox(
-                width: 56,
-                height: 56,
-                child: Icon(
-                  connected ? Icons.hub_outlined : Icons.link_off_rounded,
-                  color: connected ? palette.accent : palette.warning,
-                  size: 30,
-                ),
-              ),
-            ),
-            Positioned(
-              right: 2,
-              bottom: 2,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: connected ? palette.success : palette.warning,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: palette.canvas, width: 3),
-                ),
-                child: const SizedBox(width: 17, height: 17),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(width: 14),
-        Flexible(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                connected
-                    ? appText('AI Workspace 已连接', 'AI Workspace Connected')
-                    : appText('先配置集成连接', 'Configure Integration First'),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: palette.textPrimary,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              const SizedBox(height: 3),
-              Text(
-                detail,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(
-                  context,
-                ).textTheme.bodyMedium?.copyWith(color: palette.textSecondary),
-              ),
-            ],
-          ),
-        ),
-      ],
     );
   }
 }
@@ -473,94 +381,34 @@ class _MobilePluginSceneChip extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(34),
         onTap: onTap,
         child: DecoratedBox(
           decoration: BoxDecoration(
-            color: palette.surfacePrimary.withValues(alpha: 0.92),
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: connected
-                  ? palette.accent.withValues(alpha: 0.34)
-                  : palette.strokeSoft,
-            ),
-            boxShadow: [palette.chromeShadowAmbient],
+            color: palette.surfaceSecondary,
+            borderRadius: BorderRadius.circular(34),
           ),
           child: Padding(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
             child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                BuiltinPluginIconTile(plugin: scene.plugin, size: 28),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        scene.sceneLabel,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          color: palette.textPrimary,
-                          fontWeight: FontWeight.w800,
-                          fontSize: 14,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        scene.plugin.description,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: palette.textSecondary,
-                          height: 1.32,
-                          fontSize: 12.5,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 6,
-                        children: [
-                          for (final format in scene.plugin.outputFormats.take(
-                            2,
-                          ))
-                            _MobilePluginFormatTag(label: format.toUpperCase()),
-                        ],
-                      ),
-                    ],
+                Icon(
+                  scene.plugin.icon,
+                  size: 25,
+                  color: connected ? palette.textSecondary : palette.textMuted,
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  scene.sceneLabel,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    color: palette.textPrimary,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0,
                   ),
                 ),
               ],
             ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _MobilePluginFormatTag extends StatelessWidget {
-  const _MobilePluginFormatTag({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.palette;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: palette.surfaceSecondary,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        child: Text(
-          label,
-          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-            color: palette.textSecondary,
-            fontWeight: FontWeight.w700,
           ),
         ),
       ),
