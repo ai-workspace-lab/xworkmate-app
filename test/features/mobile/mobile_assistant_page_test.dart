@@ -561,6 +561,34 @@ void main() {
       expect(sendRect.width, greaterThanOrEqualTo(32));
       expect(sendRect.height, greaterThanOrEqualTo(32));
     });
+
+    testWidgets('generated artifact card exposes the file action', (
+      tester,
+    ) async {
+      var tapped = false;
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light().copyWith(platform: TargetPlatform.iOS),
+          home: Scaffold(
+            body: MobileGeneratedArtifactCardInternal(
+              key: const Key('mobile-generated-artifact-test-card'),
+              title: 'poster.png',
+              onTap: () => tapped = true,
+            ),
+          ),
+        ),
+      );
+
+      expect(
+        find.byKey(const Key('mobile-generated-artifact-test-card')),
+        findsOneWidget,
+      );
+      expect(find.text('poster.png'), findsOneWidget);
+      await tester.tap(
+        find.byKey(const Key('mobile-generated-artifact-test-card')),
+      );
+      expect(tapped, isTrue);
+    });
   });
 }
 

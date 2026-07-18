@@ -1,8 +1,6 @@
 import 'dart:async';
-import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../app/app_controller.dart';
@@ -439,8 +437,9 @@ class _MobileBridgeInlineStatus extends StatelessWidget {
   }
 }
 
-class _MobileGeneratedArtifactCard extends StatelessWidget {
-  const _MobileGeneratedArtifactCard({
+class MobileGeneratedArtifactCardInternal extends StatelessWidget {
+  const MobileGeneratedArtifactCardInternal({
+    super.key,
     required this.title,
     required this.onTap,
   });
@@ -453,7 +452,6 @@ class _MobileGeneratedArtifactCard extends StatelessWidget {
     final palette = context.palette;
     return Material(
       color: palette.surfacePrimary,
-      borderRadius: BorderRadius.circular(12),
       shape: RoundedRectangleBorder(
         side: BorderSide(color: palette.strokeSoft),
         borderRadius: BorderRadius.circular(12),
@@ -606,7 +604,10 @@ class _MobileSessionArtifactsState extends State<_MobileSessionArtifacts> {
         for (final entry in _snapshot!.fileEntries)
           Padding(
             padding: const EdgeInsets.only(bottom: 12),
-            child: _MobileGeneratedArtifactCard(
+            child: MobileGeneratedArtifactCardInternal(
+              key: ValueKey<String>(
+                'mobile-generated-artifact-${entry.relativePath}',
+              ),
               title: entry.label,
               onTap: () async {
                 try {
@@ -615,14 +616,27 @@ class _MobileSessionArtifactsState extends State<_MobileSessionArtifacts> {
                       content: Text(appText('正在准备文件...', 'Preparing file...')),
                     ),
                   );
-                  final preview = await widget.controller
-                      .loadAssistantArtifactPreview(entry);
+                  final file = await widget.controller
+                      .loadAssistantArtifactFile(entry);
                   if (!context.mounted) return;
-                  final dir = await getTemporaryDirectory();
-                  final file = File('${dir.path}/${entry.label}');
-                  await file.writeAsString(preview.content);
+                  if (file == null) {
+                    throw StateError('Artifact file is unavailable');
+                  }
+                  final shareBox = context.findRenderObject() as RenderBox?;
                   await SharePlus.instance.share(
-                    ShareParams(files: [XFile(file.path)], text: entry.label),
+                    ShareParams(
+                      files: <XFile>[
+                        XFile(
+                          file.path,
+                          name: entry.label,
+                          mimeType: entry.mimeType,
+                        ),
+                      ],
+                      text: entry.label,
+                      sharePositionOrigin: shareBox == null
+                          ? null
+                          : shareBox.localToGlobal(Offset.zero) & shareBox.size,
+                    ),
                   );
                 } catch (e) {
                   if (!context.mounted) return;

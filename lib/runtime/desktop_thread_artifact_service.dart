@@ -135,8 +135,10 @@ class DesktopThreadArtifactService {
     final taskArtifactPaths = normalizeTaskArtifactPathsInternal(
       artifactRelativePaths,
     );
-    final isAllowed = taskArtifactPaths.any((path) =>
-        entryRelativePath == path || entryRelativePath.startsWith('$path/'));
+    final isAllowed = taskArtifactPaths.any(
+      (path) =>
+          entryRelativePath == path || entryRelativePath.startsWith('$path/'),
+    );
     if (taskArtifactPaths.isEmpty || !isAllowed) {
       return const AssistantArtifactPreview.empty(
         message: 'The selected file is not part of the current task artifacts.',
@@ -192,6 +194,54 @@ class DesktopThreadArtifactService {
     );
   }
 
+  /// Resolves a current-task artifact to a local file without reading it as
+  /// text. Mobile and desktop share/export flows use this for binary media.
+  Future<File?> loadFile({
+    required AssistantArtifactEntry entry,
+    required String workspacePath,
+    required WorkspaceRefKind workspaceKind,
+    List<String> artifactRelativePaths = const <String>[],
+  }) async {
+    if (workspaceKind != WorkspaceRefKind.localPath) {
+      return null;
+    }
+    final normalizedWorkspacePath = workspacePath.trim();
+    final root = Directory(normalizedWorkspacePath);
+    if (normalizedWorkspacePath.isEmpty || !await root.exists()) {
+      return null;
+    }
+    final entryRelativePath = normalizeArtifactPathInternal(entry.relativePath);
+    if (entryRelativePath.isEmpty) {
+      return null;
+    }
+    final taskArtifactPaths = normalizeTaskArtifactPathsInternal(
+      artifactRelativePaths,
+    );
+    final isAllowed = taskArtifactPaths.any(
+      (path) =>
+          entryRelativePath == path || entryRelativePath.startsWith('$path/'),
+    );
+    if (!isAllowed) {
+      return null;
+    }
+    final targetPath = resolveAbsolutePathInternal(
+      normalizedWorkspacePath,
+      entryRelativePath,
+    );
+    final file = File(targetPath);
+    if (!await file.exists()) {
+      return null;
+    }
+    final resolvedRelativePath = relativePathInternal(
+      normalizedWorkspacePath,
+      file.path,
+    );
+    if (resolvedRelativePath != entryRelativePath) {
+      return null;
+    }
+    return file;
+  }
+
   Future<List<File>> collectFilesInternal(Directory root) async {
     final files = <File>[];
     try {
@@ -224,7 +274,10 @@ class DesktopThreadArtifactService {
     for (final relativePath in artifactRelativePaths) {
       final absolutePath = resolveAbsolutePathInternal(root.path, relativePath);
       try {
-        final type = await FileSystemEntity.type(absolutePath, followLinks: true);
+        final type = await FileSystemEntity.type(
+          absolutePath,
+          followLinks: true,
+        );
         if (type == FileSystemEntityType.file) {
           final target = File(absolutePath);
           final resolvedRelativePath = relativePathInternal(
@@ -391,9 +444,12 @@ class DesktopThreadArtifactService {
         if (relativePath == null || relativePath.isEmpty) {
           continue;
         }
-        final isAllowed = allowedPaths.isEmpty ||
-            allowedPaths.any((path) =>
-                relativePath == path || relativePath.startsWith('$path/'));
+        final isAllowed =
+            allowedPaths.isEmpty ||
+            allowedPaths.any(
+              (path) =>
+                  relativePath == path || relativePath.startsWith('$path/'),
+            );
         if (!isAllowed) {
           continue;
         }
@@ -566,7 +622,25 @@ class DesktopThreadArtifactService {
       'jpg' || 'jpeg' => 'image/jpeg',
       'gif' => 'image/gif',
       'webp' => 'image/webp',
+      'svg' => 'image/svg+xml',
       'pdf' => 'application/pdf',
+      'doc' => 'application/msword',
+      'docx' =>
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'xls' => 'application/vnd.ms-excel',
+      'xlsx' =>
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'ppt' => 'application/vnd.ms-powerpoint',
+      'pptx' =>
+        'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      'mp3' => 'audio/mpeg',
+      'm4a' => 'audio/mp4',
+      'wav' => 'audio/wav',
+      'aac' => 'audio/aac',
+      'mp4' => 'video/mp4',
+      'mov' => 'video/quicktime',
+      'webm' => 'video/webm',
+      'zip' => 'application/zip',
       'dart' => 'text/x-dart',
       'js' => 'text/javascript',
       'ts' => 'text/typescript',
