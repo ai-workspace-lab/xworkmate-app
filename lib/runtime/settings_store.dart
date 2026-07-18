@@ -112,7 +112,7 @@ class SettingsStore {
     try {
       final layout = await _layoutResolver.resolve();
       final file = File('${layout.tasksDirectory.path}/threads.json');
-      await file.writeAsString(jsonEncode(threads), flush: true);
+      await atomicWriteString(file, jsonEncode(threads));
       _tasksWriteFailure = null;
     } catch (e) {
       _tasksWriteFailure = _wrapFailure('saveTaskThreads', PersistentStoreScope.tasks, e);
