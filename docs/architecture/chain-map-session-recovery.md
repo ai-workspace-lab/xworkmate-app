@@ -28,6 +28,38 @@ Key files:
   lib/runtime/external_code_agent_acp_desktop_transport.dart
 ```
 
+### S1a: App update / reinstall on iOS (container UUID moved)
+
+iOS assigns the app data container a new UUID on every update or reinstall.
+`threads.json` itself moves with the container, but each persisted
+`workspaceBinding.workspacePath` is an absolute path that still names the old
+container root, so every managed `localFs` binding goes stale at once.
+
+```
+App starts (new container UUID)
+  └─ restoreAssistantThreadsInternal(records)
+     └─ For each record with workspaceKind=localFs, app-owned sessionKey,
+        and a managed-shape path (…/.xworkmate/threads/<name>):
+        └─ localThreadWorkspacePathInternal(sessionKey)  → canonical path
+           under the CURRENT base (iOS: app Documents; desktop: $HOME)
+           ├─ differs from stored path → rebase binding to canonical
+           │   (workspacePath + displayPath), count the migration
+           └─ equal → keep as-is
+  └─ rebased count > 0 → saveTaskThreads(all records) once, so the next
+     launch (and any on-disk inspection) no longer sees old-container paths
+```
+
+Non-managed custom `localFs` paths are never touched — only the managed
+layout is derivable from the sessionKey. Active sessions would also self-heal
+via `ensureDesktopTaskThreadBindingInternal` on activation; the restore-time
+rebase exists for historical threads that are never activated but whose
+paths are still read directly (artifact sync guards, workspace reveal).
+
+Key files:
+  lib/app/app_controller_desktop_thread_storage.dart (restoreAssistantThreadsInternal)
+  lib/app/app_controller_desktop_thread_binding.dart (isManagedLocalThreadWorkspacePathInternal, localThreadWorkspacePathInternal)
+  lib/app/app_controller_desktop_settings_runtime.dart (persist-once after rebase)
+
 ### S2: Bridge restart (all sessions lost)
 
 ```
