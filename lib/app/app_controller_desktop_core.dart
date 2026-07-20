@@ -638,7 +638,10 @@ createDefaultSecureConfigStoreForControllerEnvironmentInternal(
   String resolvedUserHomeDirectory, {
   required Map<String, String>? environmentOverride,
 }) {
-  if (environmentOverride == null || resolvedUserHomeDirectory.trim().isEmpty) {
+  if (Platform.isIOS ||
+      Platform.isAndroid ||
+      environmentOverride == null ||
+      resolvedUserHomeDirectory.trim().isEmpty) {
     return SecureConfigStore();
   }
   final supportRoot =
