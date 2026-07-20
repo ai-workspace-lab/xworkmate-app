@@ -126,8 +126,6 @@ class SecretStore {
            ),
        _secureStorageOverride = secureStorage;
 
-  static const String legacyLocalStateKey = 'xworkmate.local_state.key';
-
   static const String _gatewayDeviceIdKey = 'xworkmate.gateway.device.id';
   static const String _gatewayDevicePublicKeyKey =
       'xworkmate.gateway.device.public_key';
@@ -182,19 +180,9 @@ class SecretStore {
           final prefs = await SharedPreferences.getInstance();
           final boundUuid = prefs.getString('keychain_bound_uuid');
           if (boundUuid == null) {
-            bool isUpgrade = false;
-            if (_layout != null) {
-              final secretDir = _layout!.secretDirectory;
-              if (await secretDir.exists()) {
-                final files = await secretDir.list().toList();
-                if (files.isNotEmpty) {
-                  isUpgrade = true;
-                }
-              }
-            }
-            if (!isUpgrade) {
-              await keychain.deleteAll();
-            }
+            // UserDefaults 随卸载清空而 Keychain 不随:UUID 缺失即视为
+            // 全新安装或重装,清残留凭据,落实「重装即登出」。
+            await keychain.deleteAll();
             await prefs.setString('keychain_bound_uuid', const Uuid().v4());
           }
           _secureStorage = keychain;
@@ -505,15 +493,6 @@ class SecretStore {
     required String role,
   }) => _deleteSecure(_deviceTokenKey(deviceId, role));
 
-  Future<List<int>?> loadLegacyLocalStateKeyBytes() async {
-    final encoded = await _readSecure(legacyLocalStateKey);
-    final trimmed = encoded?.trim() ?? '';
-    if (trimmed.isEmpty) {
-      return null;
-    }
-    return _base64UrlDecode(trimmed);
-  }
-
   Future<void> dispose() async {
     _memorySecure.clear();
     _secureStorage = null;
@@ -707,12 +686,6 @@ class SecretStore {
 
   static String _gatewayPasswordKeyForProfile(int profileIndex) =>
       'xworkmate.gateway.profile.$profileIndex.password';
-
-  static List<int> _base64UrlDecode(String value) {
-    final normalized = value.replaceAll('-', '+').replaceAll('_', '/');
-    final padded = normalized + '=' * ((4 - normalized.length % 4) % 4);
-    return base64.decode(padded);
-  }
 
   PersistentWriteFailure _buildWriteFailure(String operation, Object error) {
     return PersistentWriteFailure(
