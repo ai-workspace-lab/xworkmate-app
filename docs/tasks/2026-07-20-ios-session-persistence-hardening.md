@@ -40,7 +40,7 @@
 ## 2. 遗留与跟进
 
 1. **真机验收未做**(设备离线):重装登出、升级迁移、路径重基、备份排除四条链路需过一遍,清单见 [manual cases](../cases/ios-session-persistence-manual-cases.md)。#170 的 RunnerTests XCTest 同样待设备补跑(`build-for-testing` 已编译通过)。
-2. **负载敏感 flaky 测试**:`app_controller_thread_workspace_binding_test.dart` › "records workspace files produced during an empty-artifact task run"——测试把旧文件写入与 `startedAtMs` 只隔几毫秒,机器忙时 mtime 过滤窗口吞掉间隔,全量跑必现、空载单跑 3/3 过,**与本工作流各 PR 无关**(main 基线同样复现)。已立独立跟进任务:修测试(旧文件 mtime 显式回拨)或收窄实现容差。
+2. **负载敏感 flaky 测试**:`app_controller_thread_workspace_binding_test.dart` › "records workspace files produced during an empty-artifact task run"——测试把旧文件写入与 `startedAtMs` 只隔几毫秒,机器忙时 mtime 过滤窗口吞掉间隔,全量跑必现、空载单跑 3/3 过,**与本工作流各 PR 无关**(main 基线同样复现)。根因与修复方案已完整记录:[2026-07-20 mtime 过滤 flaky 分析](2026-07-20-artifact-mtime-filter-flaky-test-analysis.md)(结论:修测试,不修实现;代码改动尚未落地)。
 3. **`make ios-pods` 目标失效**:工程已迁 SPM,`ios/` 下无 Podfile,`ios-pods` / `ios-pods-check` / 依赖它们的 `build-ios-release-no-codesign` / `verify-ios-release` 本地全部跑不通,待修 Makefile。
 4. 隐私清单 `NSPrivacyCollectedDataTypes` 目前为空,而 App 登录会向 svc.plus 传账号邮箱;App Store Connect 的 nutrition labels 与 manifest 是否对齐,上架前需人工核对。
 

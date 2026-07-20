@@ -119,7 +119,7 @@ iOS 客户端曾在 `artifactStatus` 为 `none/exporting/failed` 时先于检查
 
 skill 合同型任务（association 自带 `requiresArtifactExport` / `requiredArtifactExtensions`）行为不变。UI 未改动。
 
-验证：`assistant_execution_target_test.dart` + `app_controller_thread_workspace_binding_test.dart` 共 109 用例通过；全仓 `flutter analyze` 零告警。（`records workspace files produced during an empty-artifact task run` 存在文件 mtime 竞态的存量 flake，与本修复无关。）
+验证：`assistant_execution_target_test.dart` + `app_controller_thread_workspace_binding_test.dart` 共 109 用例通过；全仓 `flutter analyze` 零告警。（`records workspace files produced during an empty-artifact task run` 存在文件 mtime 竞态的存量 flake，与本修复无关；根因见 [2026-07-20 mtime 过滤 flaky 分析](2026-07-20-artifact-mtime-filter-flaky-test-analysis.md)。）
 
 ## 4.1 第四轮：真机在线联调定位到最终根因（2026-07-17，PR #153/#154，已合并）
 

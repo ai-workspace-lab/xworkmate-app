@@ -36,6 +36,58 @@ P2(容量演进)已在接口层预留,触发条件见架构文档。
 (iCloud key-value store、CloudKit、其他云存储)实现 provider 并注册
 即可参与平台解析,`SettingsStore` 与上层零改动。
 
+## 0.1 起因分析:立项前的现状评估
+
+本节是 D1 的证据附录,记录立项时(P1 重构前)对现状的完整评估。**评估对象是当时 `lib/runtime/settings_store.dart` 上一次未提交的改动**(#181 之后、P1 之前;引入"任务会话搬家"回捞逻辑但从未合并),该版本已被本次 P1 重构整体替换,下述文件:行号引用的是评估当时的文件版本,不适用于现状——现状见 [secure-local-persistence-architecture.md](../architecture/secure-local-persistence-architecture.md)。
+
+### 现状对比(#177 之后、P1 之前)
+
+| 维度 | macOS Desktop | iOS(#177 后、P1 前) |
+|---|---|---|
+| 真值源 | `~/Library/Application Support/xworkmate/tasks/` 分会话文件 + index.json | SharedPreferences(UserDefaults 单 plist) |
+| 写粒度 | 逐会话原子写,O(dirty) | 逐键 setString,但 OS 层是整 plist 重序列化 |
+| 坏数据容错 | 先 `.invalid-<ts>.bak` 字节备份,再隔离删除 | 直接 `prefs.remove(k)`,无备份 |
+| 抗后台被杀 | 进程内写,依赖原子写兜底 | cfprefsd 进程外落盘,天然更强 |
+| 路径漂移 | 无此问题 | 免疫(弃用沙盒文件的根因,P0-1) |
+| 卸载语义 | 数据保留 | 沙盒+prefs 清空、Keychain 残留 → "重装即登出" |
+
+### Keychain 智能探针评估(#181,已合并;P1 中已删除)
+
+`secret_store.dart` 原实现:`keychain_bound_uuid` 缺失时,探测旧 `secrets/`
+目录非空 → 判定为升级、免除 `deleteAll()`。
+
+方向正确但是**启发式而非版本化迁移**,有明确 cohort 缺口:#172~#177
+之间的中间版本(secret 已入 Keychain、哨兵是沙盒 `.keychain-bound`
+文件)升级到当时版本时,prefs 无 UUID 且 `secrets/` 目录为空 →
+仍会误触发 `deleteAll()` 登出。P1 按 D1 决策整体删除该探针,恢复无
+例外的"重装即登出",消灭这个缺口而非修补它。
+
+### "任务会话搬家"回捞逻辑的三个实质缺陷(未提交 diff,已废弃)
+
+1. **双写实际上没有写磁盘**:diff 意图让 iOS 同时写 prefs 和沙盒文件,
+   但 `_saveTaskThreadsMobile` 结尾把共享的 dedup 缓存
+   `_lastWrittenThreadJsonByThreadId` 更新为本轮期望值(原
+   `settings_store.dart:657-660`),紧接着磁盘路径的 diff 用同一缓存
+   判断(原 `398-401`)——全部命中"未变化"而跳过,index 的
+   `listEquals` 同理。磁盘侧永远是 no-op,双写只是幻觉。
+2. **已删数据会"复活"**:外层回退(原 `136-150`)以
+   `mobileThreads.isEmpty` 触发磁盘回捞,但"prefs 为空"与"用户合法
+   地删光了所有会话"不可区分。迁移从不退役磁盘源,`clearAssistantLocalState`
+   移动端也只清 prefs(原 `440-451`)不碰沙盒。组合结果:用户删除
+   全部会话或执行"诊断→清理本地配置"后,下次启动旧沙盒数据整批
+   复活并回写 prefs。
+3. **legacy 迁移的破坏性对账 + 崩溃窗口**:
+   `_migrateLegacyThreadsFileIfNeeded` 会删除不在 legacy 清单里的
+   分会话文件(原 `213-219`),而 legacy 文件退役 rename 放在最后一步
+   (原 `234`)。若迁移完成后、rename 前进程被杀:用户新建会话写入
+   分会话文件;下次启动 legacy 文件仍在 → 重新迁移 →
+   用户的新会话文件被当作"多余文件"删掉,真实数据丢失。
+
+三个缺陷共同指向同一个结构性问题:**"合并两个存储介质"这件事本身
+不该由分散在各方法里的启发式判断承担**——这正是 D1(不向后兼容,
+消灭合并面)与 D3(provider 抽象,新介质只能新增不能合并)的直接
+动因。
+
 ## 1. 交付内容
 
 | 项 | 内容 |

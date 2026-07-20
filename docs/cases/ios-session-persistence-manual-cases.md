@@ -52,6 +52,26 @@
 
 **预期**:含大制品的工作区不计入备份体积(`Documents/.xworkmate` 已排除);会话历史仍随备份——iCloud 恢复到新机后,历史在、制品缺、制品可从任务详情重新拉取。
 
+## C8(自动化)制品 mtime 过滤竞态 flaky 测试
+
+不是真机手工用例,记录在此是因为它与本文件覆盖的同一能力树
+(任务线程 / 制品持久化)共享代码路径,且已被反复标注为"存量 flake"
+却从未展开根因——归档到这里避免下次又被当成新问题重新排查。
+
+1. 单跑 `flutter test test/runtime/app_controller_thread_workspace_binding_test.dart --plain-name "records workspace files produced during an empty-artifact task run"`:空载 3/3 通过。
+2. 后台起负载(如 `flutter build ios --release &`)后跑整个测试文件:必现失败,期望产物列表混入 run 开始前写入的 `old-task-report.md`。
+
+**预期(当前实际,未修复)**:失败断言形如
+`['prompts/DELIVERY.md', 'renders/identity-security-evolution.mp4']`
+变成三元素列表,多出 `old-task-report.md`。根因是测试自身把"写旧文件"
+与"取 `startedAtMs`"这两步时序压得太近,高负载下二者落入同一毫秒,
+被生产代码"同毫秒含入"的边界语义判为当前产物——不是生产代码缺陷。
+完整分析与待落地修复方案见
+[2026-07-20 mtime 过滤 flaky 分析](../tasks/2026-07-20-artifact-mtime-filter-flaky-test-analysis.md)。
+`"assistant history survives an iOS-style background flush"` 外在
+表现相同但根因不同(`_waitForControllerInitialization` 的 5 秒硬
+deadline),不要用同一个修复方案套用。
+
 ## 已知限制
 
 - C2 的「写入进行中被杀」窗口内,最后一条消息可能回退到上一状态——原子写保证不损坏,不保证不丢最后一笔。
