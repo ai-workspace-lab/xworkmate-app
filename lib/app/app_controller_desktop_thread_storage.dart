@@ -596,9 +596,11 @@ extension AppControllerDesktopThreadStorage on AppController {
     return target.promptValue;
   }
 
-  void restoreAssistantThreadsInternal(List<TaskThread> records) {
+  /// 返回工作区路径被重定位的记录数，调用方据此决定是否立刻落盘。
+  int restoreAssistantThreadsInternal(List<TaskThread> records) {
     taskThreadRepositoryInternal.clear();
     assistantThreadMessagesInternal.clear();
+    var rebasedThreadWorkspaceCount = 0;
     for (final record in records) {
       final sessionKey = normalizedAssistantSessionKeyInternal(
         record.sessionKey,
@@ -654,6 +656,38 @@ extension AppControllerDesktopThreadStorage on AppController {
           );
         }
       }
+      // 迁移：iOS 容器 UUID 随每次升级/重装变化，持久化下来的 localFs 绝对
+      // 路径会指向已不存在的旧容器。托管线程工作区完全可由 sessionKey 推导，
+      // 因此只要存量路径仍是托管形态（…/.xworkmate/threads/<name>）而基准
+      // 已漂移，就重定位到当前基准。非托管形态的自定义路径不属于容器产物，
+      // 保持原样。激活中的会话另有 ensureDesktopTaskThreadBindingInternal
+      // 自愈，这里补齐的是从不被 ensure 的历史线程（制品同步直接读记录）。
+      if (workspaceBinding.workspaceKind == WorkspaceKind.localFs &&
+          isAppOwnedAssistantSessionKeyInternal(sessionKey) &&
+          isManagedLocalThreadWorkspacePathInternal(
+            workspaceBinding.workspacePath,
+            sessionKey,
+          )) {
+        final canonicalLocalPath = localThreadWorkspacePathInternal(sessionKey);
+        if (canonicalLocalPath.isNotEmpty &&
+            canonicalLocalPath !=
+                trimTrailingPathSeparatorInternal(
+                  workspaceBinding.workspacePath.trim(),
+                )) {
+          debugPrint(
+            '[thread-migrate] $sessionKey localFs rebase '
+            '"${workspaceBinding.workspacePath}" -> "$canonicalLocalPath"',
+          );
+          workspaceBinding = WorkspaceBinding(
+            workspaceId: sessionKey,
+            workspaceKind: WorkspaceKind.localFs,
+            workspacePath: canonicalLocalPath,
+            displayPath: canonicalLocalPath,
+            writable: workspaceBinding.writable,
+          );
+          rebasedThreadWorkspaceCount += 1;
+        }
+      }
       final normalizedRecord = record.copyWith(
         threadId: sessionKey,
         title: record.title.trim(),
@@ -696,5 +730,6 @@ extension AppControllerDesktopThreadStorage on AppController {
             List<GatewayChatMessage>.from(normalizedRecord.messages);
       }
     }
+    return rebasedThreadWorkspaceCount;
   }
 }

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import 'file_store_support.dart';
 import 'runtime_models.dart';
@@ -12,6 +13,8 @@ abstract class SecureStorageClient {
   Future<void> write({required String key, required String value});
 
   Future<void> delete({required String key});
+
+  Future<void> deleteAll();
 }
 
 class FileSecureStorageClient implements SecureStorageClient {
@@ -46,6 +49,22 @@ class FileSecureStorageClient implements SecureStorageClient {
     await atomicWriteString(file, '$value\n', ownerOnly: true);
   }
 
+  @override
+  Future<void> deleteAll() async {
+    final directory = await _directoryResolver();
+    if (directory == null || !await directory.exists()) {
+      return;
+    }
+    final files = directory
+        .listSync()
+        .whereType<File>()
+        .where((file) => file.path.endsWith('.secret'))
+        .toList();
+    for (final file in files) {
+      await deleteIfExists(file);
+    }
+  }
+
   Future<File?> _fileForKey(String key) async {
     final directory = await _directoryResolver();
     if (directory == null) {
@@ -57,6 +76,77 @@ class FileSecureStorageClient implements SecureStorageClient {
     await ensureOwnerOnlyDirectory(directory);
     return File('${directory.path}/${encodeStableFileKey(key)}.secret');
   }
+}
+
+/// iOS 密钥落 Keychain(AGENTS.md「持久化密钥必须用安全存储」)。
+/// first_unlock_this_device:设备首次解锁后可读(后台任务需要),
+/// 且不进 iCloud Keychain 同步、不随备份迁移到其他设备。
+class KeychainSecureStorageClient implements SecureStorageClient {
+  KeychainSecureStorageClient()
+    : _storage = const FlutterSecureStorage(
+        iOptions: IOSOptions(
+          accessibility: KeychainAccessibility.first_unlock_this_device,
+        ),
+      );
+
+  final FlutterSecureStorage _storage;
+
+  @override
+  Future<String?> read({required String key}) => _storage.read(key: key);
+
+  @override
+  Future<void> write({required String key, required String value}) =>
+      _storage.write(key: key, value: value);
+
+  @override
+  Future<void> delete({required String key}) => _storage.delete(key: key);
+
+  @override
+  Future<void> deleteAll() => _storage.deleteAll();
+}
+
+/// 重装即登出的落地点。Keychain 跨卸载重装保留,而沙盒文件不保留——
+/// 以 [secretDirectory] 里的哨兵文件作为「本容器已绑定 Keychain」的凭据:
+///
+/// 1. 哨兵不在(全新安装或卸载重装)→ 先清空 Keychain 里的残留;
+/// 2. 目录里还有 .secret 文件(旧版本升级)→ 逐个迁入 Keychain 后删除,
+///    迁移单向、不留双读路径;
+/// 3. 写哨兵,此后每次启动只做第 2 步的空扫。
+///
+/// 顺序不可交换:清残留必须先于迁移写入,否则迁入的值会被一并清掉。
+Future<void> bindKeychainSecretStorage({
+  required SecureStorageClient keychain,
+  required Directory secretDirectory,
+}) async {
+  final marker = File('${secretDirectory.path}/.keychain-bound');
+  if (!await marker.exists()) {
+    await keychain.deleteAll();
+  }
+  if (await secretDirectory.exists()) {
+    final files = secretDirectory
+        .listSync()
+        .whereType<File>()
+        .where((file) => file.path.endsWith('.secret'))
+        .toList();
+    for (final file in files) {
+      final name = file.uri.pathSegments.last;
+      final key = decodeStableFileKey(
+        name.substring(0, name.length - '.secret'.length),
+      );
+      if (key == null) {
+        debugPrint('Skipping undecodable secret file: ${file.path}');
+        continue;
+      }
+      final value = (await file.readAsString()).trim();
+      if (value.isNotEmpty) {
+        await keychain.write(key: key, value: value);
+      }
+      await deleteIfExists(file);
+    }
+  } else {
+    await secretDirectory.create(recursive: true);
+  }
+  await atomicWriteString(marker, 'bound\n', ownerOnly: true);
 }
 
 class SecretStore {
@@ -126,6 +216,21 @@ class SecretStore {
     }
     try {
       _layout = await _layoutResolver.resolve();
+      if (!kIsWeb && Platform.isIOS) {
+        try {
+          final keychain = KeychainSecureStorageClient();
+          await bindKeychainSecretStorage(
+            keychain: keychain,
+            secretDirectory: _layout!.secretDirectory,
+          );
+          _secureStorage = keychain;
+          return;
+        } catch (error) {
+          // Keychain 不可用时退回文件存储:可用性优先,且文件路径就是
+          // 迁移前的现状,不构成新的信任边界。
+          debugPrint('Keychain binding failed, using file storage: $error');
+        }
+      }
       _secureStorage = FileSecureStorageClient(
         () async => _layout?.secretDirectory,
       );
