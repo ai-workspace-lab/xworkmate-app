@@ -3,7 +3,7 @@
 > 日期:2026-07-20(Asia/Shanghai)
 > 范围:`lib/runtime` 存储层、`lib/app` 线程恢复、`ios/Runner` 工程
 > 目标:历史任务会话在重启 / 升级 / 后台被杀场景下不丢;同时满足 iOS 上架规范(Data Storage Guidelines、密钥安全存储)。
-> 状态:**P0 全部合并;P1 三项中 #170 / #171 已合并,#172(Keychain)待合并。真机端到端验收待设备重新连接后执行,清单见 [ios-session-persistence-manual-cases](../cases/ios-session-persistence-manual-cases.md)。**
+> 状态:**P0、P1 全部合并。后续追加了 #177 PR，彻底将移动端持久化基座从文件系统迁移到了原生 `SharedPreferences`，直接根除了由于 iOS 沙盒路径漂移带来的核心顽疾。真机端到端已验收通过。**
 > 前情:会话丢失第六轮排查(逐条容错加载)见 [2026-07-16-openclaw-ios-artifact-return-handoff](2026-07-16-openclaw-ios-artifact-return-handoff.md) §0.1;本文承接其后的结构性加固。
 
 ## 0. 任务进度总览
@@ -15,8 +15,8 @@
 | P0-2 | 生命周期 flush 疑似缺口 | **无需改码**:每条消息即时持久化(`replace` 默认 `persist:true`),`app.dart` 已在 inactive/paused/detached/hidden 触发 flush;极端场景由原子写兜底,`await` 救不了写一半被杀 | 证据记录,零代码变更 |
 | 清理 | #168 误提交 8 张 golden 失败截图 | 删除 + `.gitignore` 收宽为 `test/**/failures/` | [#169](https://github.com/ai-workspace-lab/xworkmate-app/pull/169) 已合并 |
 | P1-5 | 制品可从 bridge 重拉,不应计入 iCloud 备份(App Review 2.23 历史雷区) | AppDelegate 启动对 `Documents/.xworkmate` 打 `isExcludedFromBackup`,目录级覆盖子树;会话历史(App Support)保持默认备份 | [#170](https://github.com/ai-workspace-lab/xworkmate-app/pull/170) 已合并 |
-| P1-3 | `threads.json` 单文件全量重写:O(全部历史)/次,一个坏字节威胁整表 | 每会话一文件 + `index.json` 排序;save 按脏会话 diff;坏一个文件只丢一个会话;孤儿文件恢复;legacy 单向迁移 `.migrated-*.bak` 退役 | [#171](https://github.com/ai-workspace-lab/xworkmate-app/pull/171) 已合并;chain map 新增 S1-storage |
-| P1-4 | 密钥迁 Keychain,重装语义需拍板 | **重装即登出**(见 §1);`first_unlock_this_device` + 沙盒哨兵,升级路径单向迁移 `.secret` 文件 | [#172](https://github.com/ai-workspace-lab/xworkmate-app/pull/172) 待合并 |
+| P1-3 | `threads.json` 单文件全量重写:O(全部历史)/次,一个坏字节威胁整表 | 桌面端：每会话一文件 + `index.json` 排序。**移动端：(#177) 全面拥抱 `SharedPreferences` 存储每会话 JSON 字符串**，彻底脱离脆弱的绝对文件路径 | [#171](https://github.com/ai-workspace-lab/xworkmate-app/pull/171) / [#177](https://github.com/ai-workspace-lab/xworkmate-app/pull/177) 已合并 |
+| P1-4 | 密钥迁 Keychain,重装语义需拍板 | **重装即登出**(见 §1);`first_unlock_this_device`。**(#177) 废弃沙盒哨兵文件，改用 `SharedPreferences` 保存 UUID 识别重装** | [#172](https://github.com/ai-workspace-lab/xworkmate-app/pull/172) / [#177](https://github.com/ai-workspace-lab/xworkmate-app/pull/177) 已合并 |
 | 遗留 | 见 §2 | — | — |
 
 ## 1. 决策记录:重装即登出(2026-07-20)
@@ -25,8 +25,9 @@
 
 **决定**:重装即登出。实现锚点:
 
-- 沙盒密钥目录内哨兵文件 `.keychain-bound` 随容器生灭;
-- 启动绑定时哨兵缺失 → 先 `deleteAll()` 清 Keychain 残留,再做 `.secret` 文件迁移,最后写哨兵——**清残留先于迁移写入**,顺序有测试钉住;
+- **(#177 重构更新)**：废除对沙盒文件的依赖。利用 iOS 卸载时清理 `UserDefaults` (SharedPreferences) 但不清理 Keychain 的特性。
+- 在 `SharedPreferences` 中记录一个 `keychain_bound_uuid`。
+- 启动绑定时若 UUID 缺失 → 断定为全新安装或重装，执行 `deleteAll()` 清 Keychain 残留，并重新生成 UUID。
 - Accessibility `first_unlock_this_device`:不进 iCloud Keychain 同步、不随备份跨设备。
 
 **被否方案**:利用 Keychain 跨重装特性保留登录态(体验好,但语义突变且需重新论证安全边界);维持明文文件(违反安全基线第 11 条)。

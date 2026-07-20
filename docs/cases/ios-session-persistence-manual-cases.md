@@ -1,7 +1,7 @@
 # iOS 会话持久化手工回归用例
 
 > 关联:[2026-07-20 持久化加固记录](../tasks/2026-07-20-ios-session-persistence-hardening.md)
-> 覆盖 PR:#168(路径重定位)、#170(备份排除)、#171(每会话文件)、#172(Keychain + 重装即登出)
+> 覆盖 PR:#168(路径重定位)、#170(备份排除)、#171(每会话文件)、#172(Keychain + 重装即登出)、#177(SharedPreferences重构原生存储)
 > 前置:真机(iOS 15.6+),已登录 svc.plus 账号,至少两个历史任务会话(其中一个含制品),其中至少一个会话自安装后从未再次打开过。
 
 ## C1 冷重启保留
@@ -21,23 +21,16 @@
 ## C3 升级(容器迁移)保留 + 路径重基
 
 1. 用 `flutter install`(先卸载)以外的方式覆盖安装新 build(Xcode 直接 Run 到真机,或 TestFlight 升级)。
-2. 打开 App,不点进任何会话,先拉取沙盒验证:
+2. 打开 App,不点进任何会话。由于移动端已全部迁移至 `SharedPreferences` 原生存储(#177)，不再依赖脆弱的文件沙盒路径，无需再从沙盒拉取文件验证。
 
-```bash
-xcrun devicectl device copy from --device <UDID> \
-  --domain-type appDataContainer --domain-identifier plus.svc.xworkmate \
-  --source Library/Application\ Support/xworkmate/tasks --destination /tmp/xw-tasks
-cat /tmp/xw-tasks/index.json
-```
-
-**预期**:每会话 `<base64url>.json` 文件与 `index.json` 存在(#171);任一会话文件里 `workspacePath` 指向**当前**容器 UUID,不残留旧容器路径(#168);从未打开过的历史会话同样已重基。
+**预期**:历史会话列表完整存在。由于存储方案变为 `UserDefaults`，会话数据已经对沙盒文件路径变化免疫；任一老会话打开加载正常。
 
 ## C4 每会话文件坏损隔离
 
-1. 在 C3 拉取的目录里任选一个会话文件,记下 threadId。
-2. 用 `devicectl device copy to` 把该文件覆盖为非法 JSON,重启 App。
+1. (受限于 iOS UserDefaults 沙盒调试不便，可通过 Desktop 端模拟文件破坏测试)
+2. 构造一个包含非法 JSON 字符串的非法 `xworkmate.tasks.thread.<id>` 数据。
 
-**预期**:仅该会话从列表消失,其余会话完好;启动出现跳过告警;沙盒里出现 `*.invalid-<ts>.bak` 备份,坏文件被移除(下次启动不再重复告警)。
+**预期**:仅该非法 JSON 的会话从列表消失,其余会话完好;该受损数据会被移除清理。
 
 ## C5 重装即登出(#172)
 
@@ -46,12 +39,12 @@ cat /tmp/xw-tasks/index.json
 
 **预期**:处于**未登录**状态,设置页显示登录表单;不出现自动恢复的账号会话;助手页为断开态(无残留 bridge token 发起的请求)。
 
-## C6 升级密钥迁移(#172)
+## C6 升级密钥迁移及哨兵移除(#172, #177)
 
-1. 装一个 #172 之前的 build 并登录(产生 `secrets/*.secret` 文件)。
-2. 覆盖升级到含 #172 的 build(不卸载),打开。
+1. 装一个旧版本 build 并登录(产生 `secrets/*.secret` 或旧版 `.keychain-bound` 文件)。
+2. 覆盖升级到含 #177 的 build(不卸载),打开。
 
-**预期**:登录态保留、功能正常;拉取沙盒确认 `secrets/` 下不再有 `*.secret` 文件,只有 `.keychain-bound` 哨兵。
+**预期**:登录态保留、功能正常;原有的本地文件迁移死代码已被清理。由于迁移至 `SharedPreferences` 保存的 UUID，无需任何本地 `.keychain-bound` 文件即可实现重装识别。
 
 ## C7 备份排除(#170)
 
