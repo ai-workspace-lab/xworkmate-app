@@ -232,6 +232,143 @@ void main() {
   );
 
   test(
+    'stale managed localFs workspace path is rebased to the current base',
+    () async {
+      final storeRoot = await Directory.systemTemp.createTemp(
+        'xworkmate-thread-rebase-',
+      );
+      addTearDown(() async {
+        if (await storeRoot.exists()) {
+          await storeRoot.delete(recursive: true);
+        }
+      });
+      final homeRoot = '${storeRoot.path}/home';
+      await Directory(homeRoot).create(recursive: true);
+      final store = _RecordingSecureConfigStore(rootPath: storeRoot.path);
+      await store.initialize();
+      // 两条线程：activeKey 会被会话恢复激活（激活路径本就经由
+      // ensureDesktopTaskThreadBindingInternal 自愈），inactiveKey 只被
+      // restore 加载，是重定位真正要覆盖的对象——制品同步等消费方直接读
+      // 记录里的路径，从不 ensure。
+      const inactiveKey = 'unit-fixture-rebase-a';
+      const activeKey = 'unit-fixture-rebase-b';
+      // 模拟 iOS 升级/重装后残留的旧容器 UUID 绝对路径：托管形态不变，
+      // 但基准目录已经不存在。
+      const staleBase =
+          '/var/mobile/Containers/Data/Application/00000000-DEAD-BEEF-0000-000000000000/Documents';
+      await store.saveTaskThreads(<TaskThread>[
+        _persistedThread(
+          sessionKey: inactiveKey,
+          title: 'Stale container task (inactive)',
+          workspacePath: '$staleBase/.xworkmate/threads/$inactiveKey',
+        ),
+        _persistedThread(
+          sessionKey: activeKey,
+          title: 'Stale container task (active)',
+          workspacePath: '$staleBase/.xworkmate/threads/$activeKey',
+        ),
+      ]);
+      await store.saveAppUiState(
+        AppUiState.defaults().copyWith(assistantLastSessionKey: activeKey),
+      );
+
+      final controller = AppController(
+        store: store,
+        environmentOverride: <String, String>{'HOME': homeRoot},
+      );
+      addTearDown(controller.dispose);
+      await _waitForControllerInitialization(controller);
+
+      for (final sessionKey in const <String>[inactiveKey, activeKey]) {
+        final expectedPath = '$homeRoot/.xworkmate/threads/$sessionKey';
+        final thread = controller.taskThreadForSessionInternal(sessionKey);
+        expect(thread, isNotNull, reason: sessionKey);
+        expect(
+          thread!.workspaceBinding.workspaceKind,
+          WorkspaceKind.localFs,
+          reason: sessionKey,
+        );
+        expect(
+          thread.workspaceBinding.workspacePath,
+          expectedPath,
+          reason: sessionKey,
+        );
+        expect(
+          thread.workspaceBinding.displayPath,
+          expectedPath,
+          reason: sessionKey,
+        );
+        expect(
+          Directory(expectedPath).existsSync(),
+          isTrue,
+          reason: sessionKey,
+        );
+      }
+      // 迁移必须落盘：下次启动的 threads.json 不应再携带旧容器路径。
+      final persisted = await store.loadTaskThreads();
+      expect(persisted, hasLength(2));
+      for (final record in persisted) {
+        expect(
+          record.workspaceBinding.workspacePath,
+          '$homeRoot/.xworkmate/threads/${record.threadId}',
+          reason: record.threadId,
+        );
+      }
+    },
+  );
+
+  test(
+    'custom localFs workspace path outside the managed layout is preserved',
+    () async {
+      final storeRoot = await Directory.systemTemp.createTemp(
+        'xworkmate-thread-custom-path-',
+      );
+      addTearDown(() async {
+        if (await storeRoot.exists()) {
+          await storeRoot.delete(recursive: true);
+        }
+      });
+      final homeRoot = '${storeRoot.path}/home';
+      await Directory(homeRoot).create(recursive: true);
+      final customPath = '${storeRoot.path}/custom-workspace';
+      await Directory(customPath).create(recursive: true);
+      final store = _RecordingSecureConfigStore(rootPath: storeRoot.path);
+      await store.initialize();
+      // 自定义路径线程保持非激活：激活路径本就会重建规范绑定，restore 阶段
+      // 的重定位守卫才是这里要验证的对象。
+      const customKey = 'unit-fixture-custom-path-a';
+      const activeKey = 'unit-fixture-custom-path-b';
+      await store.saveTaskThreads(<TaskThread>[
+        _persistedThread(
+          sessionKey: customKey,
+          title: 'Custom workspace task',
+          workspacePath: customPath,
+        ),
+        _persistedThread(
+          sessionKey: activeKey,
+          title: 'Managed workspace task',
+          workspacePath: '$homeRoot/.xworkmate/threads/$activeKey',
+        ),
+      ]);
+      await store.saveAppUiState(
+        AppUiState.defaults().copyWith(assistantLastSessionKey: activeKey),
+      );
+
+      final controller = AppController(
+        store: store,
+        environmentOverride: <String, String>{'HOME': homeRoot},
+      );
+      addTearDown(controller.dispose);
+      await _waitForControllerInitialization(controller);
+
+      final thread = controller.taskThreadForSessionInternal(customKey);
+      expect(thread, isNotNull);
+      // 非托管形态的路径不是容器产物，restore 重定位不得触碰它。
+      expect(thread!.workspaceBinding.workspacePath, customPath);
+    },
+  );
+
+  test(
     'empty environment override keeps thread workspaces out of real HOME',
     () async {
       final realHome = Platform.environment['HOME']?.trim() ?? '';
