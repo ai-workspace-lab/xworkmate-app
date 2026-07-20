@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'dart:async';
 import 'dart:convert';
@@ -65,6 +66,14 @@ class SettingsStore {
 
   Future<SettingsSnapshot> loadSnapshot() async {
     try {
+      if (!kIsWeb && (Platform.isIOS || Platform.isAndroid)) {
+        final prefs = await SharedPreferences.getInstance();
+        final content = prefs.getString('xworkmate.settings.yaml');
+        if (content != null) {
+          return SettingsSnapshot.fromJsonString(content);
+        }
+        return SettingsSnapshot.defaults();
+      }
       final layout = await _layoutResolver.resolve();
       final file = File('${layout.configDirectory.path}/settings.yaml');
       if (await file.exists()) {
@@ -83,6 +92,12 @@ class SettingsStore {
 
   Future<void> saveSnapshot(SettingsSnapshot snapshot) async {
     try {
+      if (!kIsWeb && (Platform.isIOS || Platform.isAndroid)) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('xworkmate.settings.yaml', snapshot.toJsonString());
+        _settingsWriteFailure = null;
+        return;
+      }
       final layout = await _layoutResolver.resolve();
       final file = File('${layout.configDirectory.path}/settings.yaml');
       await file.writeAsString(snapshot.toJsonString(), flush: true);
@@ -114,30 +129,10 @@ class SettingsStore {
   Future<List<TaskThread>> loadTaskThreads() async {
     _lastSkippedInvalidTaskThreadRecords.clear();
     try {
-      final layout = await _layoutResolver.resolve();
-      final legacyFile = File(
-        '${layout.tasksDirectory.path}/$_legacyThreadsFileName',
-      );
-      if (await legacyFile.exists()) {
-        final failureBeforeLegacyLoad = _tasksWriteFailure;
-        final threads = await _loadLegacyTaskThreads(legacyFile);
-        final legacyLoadFailure =
-            identical(_tasksWriteFailure, failureBeforeLegacyLoad)
-            ? null
-            : _tasksWriteFailure;
-        // 单向迁移:legacy 是当前状态的权威快照,重写为每会话文件后把
-        // 原件改名退役,双格式到此为止。原字节留在 .migrated-*.bak 里。
-        await legacyFile.rename(
-          '${legacyFile.path}.migrated-${DateTime.now().millisecondsSinceEpoch}.bak',
-        );
-        _lastWrittenThreadJsonByThreadId.clear();
-        _threadCachePrimed = false;
-        await saveTaskThreads(threads);
-        // 迁移写盘成功会把 _tasksWriteFailure 清空;若 legacy 本身已损坏,
-        // 那个失败仍然要报给上层(它意味着真实的数据丢失)。
-        _tasksWriteFailure = legacyLoadFailure ?? _tasksWriteFailure;
-        return threads;
+      if (!kIsWeb && (Platform.isIOS || Platform.isAndroid)) {
+        return await _loadPerSessionTaskThreadsMobile();
       }
+      final layout = await _layoutResolver.resolve();
       return await _loadPerSessionTaskThreads(layout);
     } catch (e) {
       _tasksWriteFailure = _wrapFailure(
@@ -145,58 +140,6 @@ class SettingsStore {
         PersistentStoreScope.tasks,
         e,
       );
-    }
-    return const [];
-  }
-
-  Future<List<TaskThread>> _loadLegacyTaskThreads(File file) async {
-    try {
-      final content = await file.readAsString();
-      final decoded = jsonDecode(content);
-      if (decoded is List) {
-        // One bad record must never wipe the whole list: a legacy or
-        // corrupted entry used to throw out of the shared try and the caller
-        // then treated every persisted session as gone — the next save made
-        // that loss permanent. Decode per record and keep the valid rest.
-        final threads = <TaskThread>[];
-        for (final entry in decoded) {
-          if (entry is! Map) {
-            _recordSkippedTaskThread(
-              'unknown',
-              const FormatException('not-a-map'),
-            );
-            continue;
-          }
-          final map = entry.cast<String, dynamic>();
-          try {
-            threads.add(TaskThread.fromJson(map));
-          } catch (error) {
-            _recordSkippedTaskThread(
-              map['threadId']?.toString().trim().isNotEmpty == true
-                  ? map['threadId'].toString().trim()
-                  : 'unknown',
-              error,
-            );
-          }
-        }
-        if (_lastSkippedInvalidTaskThreadRecords.isNotEmpty) {
-          await _backupUnreadableTaskThreads(file);
-        }
-        return threads;
-      }
-      _tasksWriteFailure = _wrapFailure(
-        'loadTaskThreads',
-        PersistentStoreScope.tasks,
-        const FormatException('threads.json is not a JSON list'),
-      );
-      await _backupUnreadableTaskThreads(file);
-    } catch (e) {
-      _tasksWriteFailure = _wrapFailure(
-        'loadTaskThreads',
-        PersistentStoreScope.tasks,
-        e,
-      );
-      await _backupUnreadableTaskThreads(file);
     }
     return const [];
   }
@@ -329,17 +272,11 @@ class SettingsStore {
 
   Future<void> saveTaskThreads(List<TaskThread> threads) async {
     try {
-      final layout = await _layoutResolver.resolve();
-      final legacyFile = File(
-        '${layout.tasksDirectory.path}/$_legacyThreadsFileName',
-      );
-      if (await legacyFile.exists()) {
-        // save 先于 load 发生时(全新实例直接保存),同样把 legacy 退役,
-        // 否则下次 load 会用旧快照覆盖这里写出的新状态。
-        await legacyFile.rename(
-          '${legacyFile.path}.migrated-${DateTime.now().millisecondsSinceEpoch}.bak',
-        );
+      if (!kIsWeb && (Platform.isIOS || Platform.isAndroid)) {
+        await _saveTaskThreadsMobile(threads);
+        return;
       }
+      final layout = await _layoutResolver.resolve();
       if (!_threadCachePrimed) {
         // 冷缓存只需要文件名集合就能做删除对账;内容未知记 null,
         // 本轮全部重写一遍。
@@ -404,10 +341,20 @@ class SettingsStore {
 
   Future<void> clearAssistantLocalState() async {
     try {
+      if (!kIsWeb && (Platform.isIOS || Platform.isAndroid)) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.remove('xworkmate.settings.yaml');
+        await prefs.remove('xworkmate.tasks.index');
+        final keys = prefs.getKeys().where((k) => k.startsWith('xworkmate.tasks.thread.')).toList();
+        for (final k in keys) {
+           await prefs.remove(k);
+        }
+        _lastWrittenThreadJsonByThreadId.clear();
+        _lastWrittenThreadIndex = const <String>[];
+        _threadCachePrimed = true;
+        return;
+      }
       final layout = await _layoutResolver.resolve();
-      await deleteIfExists(
-        File('${layout.tasksDirectory.path}/$_legacyThreadsFileName'),
-      );
       await deleteIfExists(layout.taskIndexFile);
       final payloadFiles = layout.tasksDirectory
           .listSync()
@@ -431,6 +378,17 @@ class SettingsStore {
 
   Future<List<SecretAuditEntry>> loadAuditTrail() async {
     try {
+      if (!kIsWeb && (Platform.isIOS || Platform.isAndroid)) {
+        final prefs = await SharedPreferences.getInstance();
+        final content = prefs.getString('xworkmate.audit.json');
+        if (content != null) {
+          final decoded = jsonDecode(content);
+          if (decoded is List) {
+            return decoded.map((e) => SecretAuditEntry.fromJson(e)).toList();
+          }
+        }
+        return const [];
+      }
       final layout = await _layoutResolver.resolve();
       final file = File('${layout.configDirectory.path}/audit.json');
       if (await file.exists()) {
@@ -454,6 +412,12 @@ class SettingsStore {
       if (items.length > 40) {
         items.removeRange(40, items.length);
       }
+      if (!kIsWeb && (Platform.isIOS || Platform.isAndroid)) {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('xworkmate.audit.json', jsonEncode(items));
+        _auditWriteFailure = null;
+        return;
+      }
       final layout = await _layoutResolver.resolve();
       final file = File('${layout.configDirectory.path}/audit.json');
       await file.writeAsString(jsonEncode(items), flush: true);
@@ -465,6 +429,117 @@ class SettingsStore {
         e,
       );
     }
+  }
+
+
+  Future<List<TaskThread>> _loadPerSessionTaskThreadsMobile() async {
+    final prefs = await SharedPreferences.getInstance();
+    final rawIndex = prefs.getString('xworkmate.tasks.index');
+    List<String> indexIds = const [];
+    if (rawIndex != null) {
+      try {
+        final decoded = jsonDecode(rawIndex);
+        if (decoded is Map && decoded['threadIds'] is List) {
+          indexIds = (decoded['threadIds'] as List)
+              .map((item) => item.toString())
+              .toList(growable: false);
+        }
+      } catch (e) {}
+    }
+
+    final keys = prefs.getKeys().where((k) => k.startsWith('xworkmate.tasks.thread.')).toList();
+    final byId = <String, TaskThread>{};
+    for (final k in keys) {
+      String threadId = k.substring('xworkmate.tasks.thread.'.length);
+      try {
+        final raw = prefs.getString(k);
+        if (raw != null) {
+          final decoded = jsonDecode(raw);
+          if (decoded is Map) {
+            final map = decoded.cast<String, dynamic>();
+            final persistedId = map['threadId']?.toString().trim() ?? '';
+            if (persistedId.isNotEmpty) {
+              threadId = persistedId;
+            }
+            byId[threadId] = TaskThread.fromJson(map);
+          }
+        }
+      } catch (error) {
+        _recordSkippedTaskThread(threadId, error);
+        await prefs.remove(k);
+      }
+    }
+
+    final ordered = <TaskThread>[];
+    for (final threadId in indexIds) {
+      final thread = byId.remove(threadId);
+      if (thread != null) {
+        ordered.add(thread);
+      }
+    }
+    final orphanIds = byId.keys.toList()..sort();
+    ordered.addAll(orphanIds.map((threadId) => byId[threadId]!));
+
+    _lastWrittenThreadJsonByThreadId
+      ..clear()
+      ..addEntries(
+        ordered.map(
+          (thread) =>
+              MapEntry<String, String?>(thread.threadId, jsonEncode(thread)),
+        ),
+      );
+    _lastWrittenThreadIndex = ordered
+        .map((thread) => thread.threadId)
+        .toList(growable: false);
+    _threadCachePrimed = true;
+    return ordered;
+  }
+
+  Future<void> _saveTaskThreadsMobile(List<TaskThread> threads) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!_threadCachePrimed) {
+      _lastWrittenThreadJsonByThreadId.clear();
+      final keys = prefs.getKeys().where((k) => k.startsWith('xworkmate.tasks.thread.')).toList();
+      for (final k in keys) {
+        final threadId = k.substring('xworkmate.tasks.thread.'.length);
+        _lastWrittenThreadJsonByThreadId[threadId] = null;
+      }
+      _threadCachePrimed = true;
+    }
+
+    final desiredJsonByThreadId = <String, String>{
+      for (final thread in threads) thread.threadId: jsonEncode(thread),
+    };
+
+    for (final entry in desiredJsonByThreadId.entries) {
+      if (_lastWrittenThreadJsonByThreadId[entry.key] == entry.value) {
+        continue;
+      }
+      await prefs.setString('xworkmate.tasks.thread.${entry.key}', entry.value);
+    }
+
+    final removedThreadIds = _lastWrittenThreadJsonByThreadId.keys
+        .where((threadId) => !desiredJsonByThreadId.containsKey(threadId))
+        .toList(growable: false);
+    for (final threadId in removedThreadIds) {
+      await prefs.remove('xworkmate.tasks.thread.$threadId');
+    }
+
+    final nextIndex = threads
+        .map((thread) => thread.threadId)
+        .toList(growable: false);
+    if (!listEquals(nextIndex, _lastWrittenThreadIndex)) {
+      await prefs.setString(
+        'xworkmate.tasks.index',
+        jsonEncode(<String, dynamic>{'version': 1, 'threadIds': nextIndex}),
+      );
+    }
+
+    _lastWrittenThreadJsonByThreadId
+      ..clear()
+      ..addAll(desiredJsonByThreadId);
+    _lastWrittenThreadIndex = nextIndex;
+    _tasksWriteFailure = null;
   }
 
   PersistentWriteFailure _wrapFailure(
