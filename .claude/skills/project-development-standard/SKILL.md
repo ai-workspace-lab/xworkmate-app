@@ -27,7 +27,9 @@ This skill is the operational digest; when in doubt, read the full document.
 
 Disallowed: `release/*`→`main`, `main`→`release/*` wholesale merges, `feature/*`→`release/*`, `hotfix/*`→`main`, `backport/*`→`main`, `cherry-pick/*`→`release/*`.
 
-Before opening a PR, verify: source branch prefix matches the target branch per the table above. The `Validate Release PR` workflow enforces this; do not fight it.
+Use the prefix spelled out above — the gate matches it literally. Common abbreviations (`feat/`, `fix/`, `chore/`, `docs/`) are **not** accepted and there is no alias for them; `feat/` in particular reads as correct and is not. Into `main` only `feature/`, `bugfix/`, `cherry-pick/` (or a `cherry-pick` label) pass; into `release/*` only `hotfix/`, `backport/`.
+
+Check the prefix yourself before pushing, at the moment you create the branch. `Validate Release PR` is the backstop, not the check — a misconfigured or skipped workflow run will let a wrong branch name through to merge, and renaming after the PR is open costs more than getting it right up front.
 
 ## Opening a PR — required content
 
@@ -57,12 +59,28 @@ Public-repo hygiene: this repository is public. PR bodies, commit messages, and 
 - Cut `release/vMAJOR.MINOR` from a reviewed, stable `main` commit; after the cut it accepts only `hotfix/*` and intentional `backport/*`.
 - Tags are SemVer `vMAJOR.MINOR.PATCH` (pre-releases: `-alpha.N` / `-beta.N` / `-rc.N`), annotated, created deliberately at a release point — never as a side effect of branch synchronization.
 - Every published artifact must trace to exactly one release tag; each release records version, date, changelog, and any breaking/migration/security notes.
+- When a line reaches end of support, mark it EOL in the release notes and protect it read-only. Keep the branch — it is history and reproducibility, not clutter to delete.
 
 ## Backport vs cherry-pick (direction cheat)
 
 - Fix born on `main`, needed on a release line → `backport/*` → PR into `release/*`.
 - Fix born on `release/*`, needed on trunk → `cherry-pick/*` → PR into `main`.
 - One fix (or one tightly related fix set) per branch.
+
+## Ownership and protected branches
+
+Applies to `main` and every supported `release/*` line: no direct pushes, required status checks, at least one approval, no force pushes.
+
+- `.github/CODEOWNERS` must exist before ownership review is made required, and must list real maintainers — never placeholder accounts. Cover at minimum `.github/`, `ios/`, `macos/`, `android/`, security-sensitive runtime code, and release scripts.
+- Changes to CI, release policy, native entitlements, or security boundaries need review from the responsible maintainer in addition to the author. Authoring the change does not qualify you to approve it.
+
+## Secret prevention (before anything leaks)
+
+- Keep GitHub secret scanning and push protection enabled where the repository supports them.
+- Run a scanner such as Gitleaks in CI, and get it passing reliably before making it a required check.
+- Review false positives individually and narrow the rule. Do not add a broad bypass — a blanket ignore turns the next real hit into silence.
+
+This is prevention only. Once a secret is actually exposed, no scanner helps and the flow below takes over.
 
 ## Committed secret — emergency flow
 
