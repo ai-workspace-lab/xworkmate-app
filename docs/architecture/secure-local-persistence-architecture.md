@@ -1,96 +1,21 @@
 # Secure Local Persistence Architecture
 
+> 2026-07-20 更新:随 `TaskThreadStore` 结构收敛重写(P1)。旧版描述的
+> `config-store.sqlite3`、durable mirror 文件与 sealed-state 恢复链路
+> 均已从代码中移除,本文只记录当前真实基线。历史方案见 git 历史。
+
 ## 目标
 
-本文记录 `XWorkmate.svc.plus` 当前桌面端本地持久化实现的真实基线，并明确区分：
+本文记录 `XWorkmate.svc.plus` 本地持久化的真实基线,并明确:
 
-- 当前正在使用的持久化路径
-- 仅用于旧版本恢复的 legacy sealed-state 路径
+- 桌面端与移动端各自的真值源与文件/键布局
 - secret 与 recoverable local state 的边界
+- 存储后端的扩展方式(provider 插件位)与容量演进(P2)预留
 
-如果后续重新引入 sealed local state，这份文档必须和 `SettingsStore` 写路径、测试断言一起更新。
+如果写路径发生变化,本文必须和 `SettingsStore` / `TaskThreadStore`
+实现、测试断言一起更新。
 
-## 当前实现基线（v0.6.1）
-
-### 1) macOS 标准持久化目录
-
-默认目录按 Apple 常规结构落在：
-
-- `~/Library/Application Support/plus.svc.xworkmate/xworkmate`
-
-当前活跃文件与目录：
-
-- `config-store.sqlite3`
-  - `SettingsStore` 主库
-- `settings-snapshot.json`
-  - `SettingsSnapshot` 的 durable mirror
-- `assistant-threads.json`
-  - `AssistantThreadRecord` 列表的 durable mirror
-- `gateway-auth/secure-storage/*`
-  - `SecretStore` 的文件型 secure-storage fallback
-
-### 2) 首次安装初始化
-
-- `SettingsStore.initialize()` 会初始化并打开 `config-store.sqlite3`
-- `SecretStore.initialize()` 会初始化 `gateway-auth` 与 `secure-storage` 目录结构
-- 因此首次安装后，不需要等用户手工保存一次，目录与主存储文件就会被准备好
-
-### 3) 升级与重启行为
-
-- 应用升级 / 系统更新重启不会改写既有持久化目录
-- 用户主动执行“设置 -> 诊断 -> 清理任务线程与本地配置”时，清理的是本地 settings / thread 状态
-- 清理流程不会删除已保存 secrets（Gateway token / password、AI Gateway API key、Vault token、device token 等）
-
-### 4) 路径解析失败策略（默认）
-
-- 默认策略仍然是 `fail-fast`
-- 当 `SettingsStore` 无法解析或打开耐久数据库路径时，直接抛错
-- 只有显式开启 `allowInMemoryFallback` 时才允许内存数据库回退
-
-### 5) 当前最重要的实现结论
-
-- 长期 secret 继续通过 `SecretStore` 持久化，主路径是 `FlutterSecureStorage`
-- `SettingsSnapshot` 与 `AssistantThreadRecord` 当前写入的是明文 JSON 字符串
-  - 会写入 `config-store.sqlite3`
-  - 也会写入 `settings-snapshot.json` / `assistant-threads.json`
-- `assistant-state-backup.json`、`sealedState`、`xworkmate.local_state.key` 现在不是当前主写路径
-  - 它们只保留在旧版本恢复 / 迁移兼容逻辑里
-
-## Trust Boundary
-
-当前需要区分 3 类状态：
-
-### 1. 高敏感 secret
-
-- Gateway shared token
-- Gateway password
-- AI Gateway API key
-- Vault token
-- device token / device identity 私钥材料
-
-### 2. 可恢复的本地应用状态
-
-- `SettingsSnapshot`
-- `AssistantThreadRecord` 列表
-- assistant custom task titles
-- archived task keys
-- last session key
-- 本地审计 trail
-
-### 3. Legacy sealed-state 恢复输入
-
-- 旧版 `assistant-state-backup.json`
-- 旧版 `xworkmate.sealed.local-state.v1` payload
-- `local-state-key.txt`
-- secure storage 里的 `xworkmate.local_state.key`
-
-边界规则：
-
-- 第 1 类状态走 `SecretStore`
-- 第 2 类状态当前走 `SettingsStore`，属于 recoverable app state，不是 secret store
-- 第 3 类状态只用于 recovery / migration，不是当前版本的常规写入目标
-
-## 当前架构图
+## 分层结构(P1 收敛后)
 
 ```mermaid
 flowchart TD
@@ -102,170 +27,123 @@ flowchart TD
   E --> F["SecretStore"]
   E --> G["SettingsStore"]
 
-  F --> H["FlutterSecureStorage"]
-  F --> I["gateway-auth/secure-storage/*<br/>file fallback"]
+  F --> H["FlutterSecureStorage<br/>(iOS: Keychain, first_unlock_this_device)"]
+  F --> I["secrets/*.secret<br/>桌面文件 fallback"]
 
-  G --> J["config-store.sqlite3"]
-  G --> K["settings-snapshot.json"]
-  G --> L["assistant-threads.json"]
-
-  M["Legacy sealed-state sources"] --> N["legacy recovery / migration"]
-  N --> G
+  G --> J["TaskThreadStoreRegistry"]
+  J --> K["FileTaskThreadStore<br/>(桌面: tasks/&lt;key&gt;.json + index.json)"]
+  J --> L["PrefsTaskThreadStore<br/>(移动: SharedPreferences)"]
+  J -.预留.-> M["未来 provider<br/>(iCloud KV / 云同步)"]
 ```
 
-说明：
+- `SettingsStore` 不再包含任务线程的平台分支;它通过
+  `TaskThreadStoreRegistry.resolveForPlatform()` 拿到当前平台的
+  `TaskThreadStore` 实现,只面向接口读写。
+- 新的存储后端(例如 iCloud key-value store、CloudKit、其他云同步)
+  实现 `TaskThreadStoreProvider` 并注册进 registry 即可接入,
+  `SettingsStore` 与上层不感知。
+- 设置快照与审计 trail 仍由 `SettingsStore` 直接按平台落盘
+  (移动 prefs / 桌面文件),后续如需同样收敛可复用相同 provider 模式。
 
-- 当前活跃写路径是 `SecretStore` + `SettingsStore`
-- legacy sealed-state 只参与读旧数据并迁移到当前 store，不参与当前常规写入
+## 当前真值源
 
-## 存储分层
+### 桌面(macOS / Linux / Windows)
 
-### 1. 当前 secret 存储
+根目录:macOS 为 `~/Library/Application Support/xworkmate`,其余平台
+按惯例解析(见 `file_store_support.dart`)。
 
-用途：
+- `config/settings.yaml` — `SettingsSnapshot`
+- `config/audit.json` — secret 操作审计(最多 40 条)
+- `tasks/index.json` — `{ "version": 1, "threadIds": [有序] }`
+- `tasks/<base64url(threadId)>.json` — 每会话一个 `TaskThread`
+- `tasks/*.invalid-<ts>.bak` — 损坏记录的原字节隔离备份(只写不读)
+- `secrets/*.secret` — `SecretStore` 的文件型 secure-storage fallback
 
-- 保存 Gateway token / password
-- 保存 AI Gateway API key
-- 保存 Vault token
-- 保存 device identity / device token
+写入语义(`FileTaskThreadStore`):
 
-实现要点：
+- save 按上次写入缓存做 diff,只重写脏会话(O(dirty) 非 O(history)),
+  index 仅在成员或顺序变化时重写;全部经 `atomicWriteString`。
+- 坏一个文件只丢一个会话:原字节备份为 `.invalid-<ts>.bak`、上报
+  skip 记录、把源文件移出工作集,避免每次启动重复失败。
+- index 与会话文件之间被杀留下的孤儿文件,load 时按 threadId 排序
+  追加恢复,不丢弃。
 
-- 主路径是 `FlutterSecureStorage`
-- 当 secure storage 不可用时，`SecretStore` 会尝试提升到文件型 fallback
-- 文件型 fallback 位于 `gateway-auth/secure-storage/*`
+### 移动(iOS / Android)
 
-### 2. 当前本地状态持久化
+真值源是 `SharedPreferences`(iOS `UserDefaults` / Android 等价物),
+`PrefsTaskThreadStore`:
 
-当前覆盖对象：
+- `xworkmate.tasks.index` — 与桌面同构的有序索引 JSON
+- `xworkmate.tasks.thread.<threadId>` — 每会话一个 JSON 字符串
+- `xworkmate.tasks.invalid.<threadId>-<ts>` — 损坏值的原文备份(只写不读)
+- `xworkmate.storage.schemaVersion` — 未来 schema 迁移的锚点(当前 = 1,
+  只打标不迁移)
+- `xworkmate.settings.yaml` / `xworkmate.audit.json` — 设置快照与审计
 
-- `xworkmate.settings.snapshot`
-- `xworkmate.assistant.threads`
-- `xworkmate.secrets.audit`
+选型依据(iOS):
 
-实现要点：
+- 值由系统守护进程(cfprefsd)落盘,App 被杀不影响已写入的值 —
+  比进程内文件写更抗「后台被杀」。
+- 免疫容器 UUID 漂移(升级/重装后绝对路径悬空的历史根因)。
+- 卸载即清空 UserDefaults 而 Keychain 残留,与 `keychain_bound_uuid`
+  绑定检查组合出「重装即登出」语义。
+- 会话历史随 iCloud 设备备份;制品工作区 `Documents/.xworkmate`
+  已被 `isExcludedFromBackup` 排除(App Review 2.23)。
 
-- `SettingsSnapshot` 通过 `toJsonString()` 写入
-- `AssistantThreadRecord` 列表通过 `jsonEncode(...)` 写入
-- 当前写路径没有 AES-GCM seal / unseal
-- durable mirror 文件内容当前也是明文 JSON，不是 sealed envelope
+**没有回退与迁移**:移动端不读沙盒文件,也不迁移任何旧布局
+(2026-07-20 决策:不向后兼容,旧版沙盒数据视为不存在)。
+「prefs 为空」就是合法的空状态,不触发任何数据回捞——这从结构上
+杜绝了「删除全部会话/清理本地状态后旧数据复活」一类缺陷。
 
-### 3. Durable mirror files
+## Trust Boundary
 
-当前保留两类 durable mirror：
+### 1. 高敏感 secret(走 `SecretStore`)
 
-- `settings-snapshot.json`
-- `assistant-threads.json`
+Gateway token/password、AI Gateway API key、Vault token、
+device token / device identity 私钥材料。
 
-语义：
+- iOS 主路径 Keychain(`first_unlock_this_device`,不进 iCloud
+  Keychain 同步);桌面为 secure storage,不可用时降级文件 fallback。
+- 启动时 `keychain_bound_uuid` 缺失 → 判定全新安装或重装 →
+  `deleteAll()` 清残留凭据后重新绑定(重装即登出)。
 
-- 作为 SQLite 的文件镜像 / fallback 来源
-- 也是测试里会直接读取和断言的当前持久化内容
+### 2. 可恢复的本地应用状态(走 `SettingsStore` / `TaskThreadStore`)
 
-### 4. Legacy sealed-state recovery path
-
-旧版 sealed local state 兼容仍然保留，但仅用于 recovery：
-
-- 识别旧版 `xworkmate.sealed.local-state.v1`
-- 读取旧版 `assistant-state-backup.json` 里的 `sealedState`
-- 通过 legacy local state key 解密旧 payload
-- 成功恢复后重写到当前 `SettingsStore`
-
-这条路径的目标是兼容旧数据，不代表当前版本仍在主动写 sealed local state。
-
-## 当前写入流程
-
-### SettingsSnapshot
-
-1. `SettingsController` 或 `AppController` 生成新的 `SettingsSnapshot`
-2. `SecureConfigStore.saveSettingsSnapshot()`
-3. `SettingsStore.saveSettingsSnapshot()`
-4. `snapshot.toJsonString()`
-5. 写入 SQLite
-6. 同步写入 `settings-snapshot.json`
-
-### Assistant Threads
-
-1. `AppController` 更新线程记录
-2. 更新被串行排入 `_assistantThreadPersistQueue`
-3. `SecureConfigStore.saveAssistantThreadRecords()`
-4. `jsonEncode(records.map(...))`
-5. 写入 SQLite
-6. 同步写入 `assistant-threads.json`
-
-这么做的目标是避免异步写晚到覆盖较新的线程快照；当前目标不是加密封装。
-
-## 当前读取与恢复流程
-
-恢复顺序：
-
-1. 初始化 SQLite
-2. 优先读取 SQLite entry
-3. SQLite 读不到时，再读 durable mirror 文件
-4. 如果当前 state 不可读，再尝试 legacy recovery
-5. 若发现旧 sealed-state 但缺少 key，则产生 locked recovery report
-
-补充说明：
-
-- `SharedPreferences` 只作为旧数据迁移兼容来源，不是当前桌面端的主状态真值源
-- Web 端有独立的 `WebStore`，不适用这里的桌面持久化链路
-
-## Legacy backup / sealedState 的当前语义
-
-当前代码里：
-
-- `assistant-state-backup.json` 只在 legacy recovery 时读取
-- `sealedState` 只在旧版 backup 或旧版 durable value 解密时出现
-- `xworkmate.local_state.key` 只通过 legacy loader 参与旧数据恢复
-
-因此这三者现在应该被理解为：
-
-- 兼容旧版本
-- 避免升级后直接丢历史
-- 不属于当前日常写入架构
+`SettingsSnapshot`、`TaskThread` 列表(含会话消息)、审计 trail。
+明文 JSON,属 recoverable app state,不是 secret store。
 
 ## Clear 行为
 
-`clearAssistantLocalState()` 当前会清理：
+`clearAssistantLocalState()`:
 
-- `SettingsSnapshot`
-- `AssistantThreadRecord` 列表
-- `settings-snapshot.json`
-- `assistant-threads.json`
-- 旧版 `assistant-state-backup.json`（如果存在）
+- 任务线程:`TaskThreadStore.clear()` — 桌面删 index 与全部会话文件;
+  移动删所有 `xworkmate.tasks.*` 键(含 invalid 备份)。
+- 设置快照:移动删 prefs 键;桌面删 `config/settings.yaml`。
+- 不触碰任何 secret(Gateway token/password、API key、device token)。
 
-不会误删：
+## P2 预留:容量演进
 
-- Gateway token / password
-- AI Gateway API key
-- Vault token
-- device token / device identity
+`SharedPreferences` 是单 plist:全量驻内存、每次修改整体重序列化,
+而消息历史无界增长。P1 已把演进面收敛为「新增一个 provider」:
+
+- 触发条件:先对 plist 实际尺寸埋点;超过约 1–2 MB 或启动加载可感知
+  变慢时启动 P2。
+- 方向:线程元数据 + index 留 prefs;消息体按会话拆分(App Support
+  原子写文件,相对路径寻址),或引入 sqflite/drift(WAL)作为新
+  provider。两者都不需要改动 `SettingsStore` 之上的任何代码。
 
 ## Debug / Test 策略
 
-为了让测试稳定运行，当前保留可注入的 secure storage client：
-
-- `SecureStorageClient`
-- `FlutterSecureStorageClient`
-- `FileSecureStorageClient`
-- `MemorySecureStorageClient`
-
-策略：
-
-- release：优先真实 `FlutterSecureStorage`
-- debug / test：允许注入式或文件型 secure storage
-- `allowInMemoryFallback` 只在显式场景下允许内存数据库回退
+- `SettingsStore` 支持注入 `TaskThreadStore` / registry,存储实现可以
+  脱离平台分支被直接单测(见 `test/runtime/task_thread_store_test.dart`)。
+- `SecretStore` 保留可注入的 secure storage client
+  (`Memory` / `File` / `Keychain`)。
 
 ## 当前文档结论
 
-当前桌面端本地持久化不是 sealed local state 架构，而是：
-
-- secrets 走 secure storage / file fallback
-- recoverable local app state 走 SQLite + plain JSON durable mirrors
-- legacy sealed-state 只用于恢复旧数据
-
-如果后续要把本地状态重新升级为 sealed payload，必须同步更新：
-
-- `SettingsStore` 写路径
-- 文档中的架构图与存储分层
-- 相关测试断言
+- secrets 走 `SecretStore`(Keychain / 文件 fallback)。
+- 任务线程走 `TaskThreadStore` provider:桌面文件布局、移动
+  SharedPreferences,二者行为契约一致(索引排序、孤儿恢复、
+  逐条容错 + 隔离备份、O(dirty) 写)。
+- 不存在 SQLite、durable mirror、sealed-state 或任何 legacy
+  迁移/回退路径;旧数据不被读取。

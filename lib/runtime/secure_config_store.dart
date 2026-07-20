@@ -154,7 +154,7 @@ class SecureConfigStore {
 
   PersistentWriteFailures get persistentWriteFailures =>
       PersistentWriteFailures(
-        settings: _settingsStore.auditWriteFailure,
+        settings: _settingsStore.settingsWriteFailure,
         tasks: _settingsStore.tasksWriteFailure,
         secrets: _secretStore.secretsWriteFailure,
         audit: _settingsStore.auditWriteFailure,

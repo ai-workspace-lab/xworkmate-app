@@ -32,6 +32,11 @@
 
 **被否方案**:利用 Keychain 跨重装特性保留登录态(体验好,但语义突变且需重新论证安全边界);维持明文文件(违反安全基线第 11 条)。
 
+> **后续(同日)**:P1 结构收敛已完成——任务线程持久化收敛为
+> `TaskThreadStore` provider,并按「不向后兼容」决策删除全部 legacy
+> 迁移/回退(含 #181 的升级探针与沙盒回捞)。见
+> [2026-07-20 P1 结构收敛](2026-07-20-ios-task-persistence-p1-refactor.md)。
+
 ## 2. 遗留与跟进
 
 1. **真机验收未做**(设备离线):重装登出、升级迁移、路径重基、备份排除四条链路需过一遍,清单见 [manual cases](../cases/ios-session-persistence-manual-cases.md)。#170 的 RunnerTests XCTest 同样待设备补跑(`build-for-testing` 已编译通过)。

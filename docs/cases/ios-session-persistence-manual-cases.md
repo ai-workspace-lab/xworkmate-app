@@ -1,7 +1,7 @@
 # iOS 会话持久化手工回归用例
 
-> 关联:[2026-07-20 持久化加固记录](../tasks/2026-07-20-ios-session-persistence-hardening.md)
-> 覆盖 PR:#168(路径重定位)、#170(备份排除)、#171(每会话文件)、#172(Keychain + 重装即登出)、#177(SharedPreferences重构原生存储)
+> 关联:[2026-07-20 持久化加固记录](../tasks/2026-07-20-ios-session-persistence-hardening.md)、[2026-07-20 P1 结构收敛](../tasks/2026-07-20-ios-task-persistence-p1-refactor.md)
+> 覆盖 PR:#168(路径重定位)、#170(备份排除)、#171(每会话文件)、#172(Keychain + 重装即登出)、#177(SharedPreferences重构原生存储)、P1 收敛(TaskThreadStore,不向后兼容)
 > 前置:真机(iOS 15.6+),已登录 svc.plus 账号,至少两个历史任务会话(其中一个含制品),其中至少一个会话自安装后从未再次打开过。
 
 ## C1 冷重启保留
@@ -25,12 +25,12 @@
 
 **预期**:历史会话列表完整存在。由于存储方案变为 `UserDefaults`，会话数据已经对沙盒文件路径变化免疫；任一老会话打开加载正常。
 
-## C4 每会话文件坏损隔离
+## C4 每会话记录坏损隔离
 
-1. (受限于 iOS UserDefaults 沙盒调试不便，可通过 Desktop 端模拟文件破坏测试)
-2. 构造一个包含非法 JSON 字符串的非法 `xworkmate.tasks.thread.<id>` 数据。
+1. (受限于 iOS UserDefaults 沙盒调试不便,可通过 Desktop 端模拟文件破坏,或用单测覆盖:`test/runtime/task_thread_store_test.dart`)
+2. 构造一个包含非法 JSON 字符串的 `xworkmate.tasks.thread.<id>` 值。
 
-**预期**:仅该非法 JSON 的会话从列表消失,其余会话完好;该受损数据会被移除清理。
+**预期**:仅该会话从列表消失,其余会话完好;受损原文先备份到 `xworkmate.tasks.invalid.<id>-<ts>` 键,再从工作集移除,后续启动不重复报错。
 
 ## C5 重装即登出(#172)
 
@@ -39,12 +39,12 @@
 
 **预期**:处于**未登录**状态,设置页显示登录表单;不出现自动恢复的账号会话;助手页为断开态(无残留 bridge token 发起的请求)。
 
-## C6 升级密钥迁移及哨兵移除(#172, #177)
+## C6 从 P1 之前版本覆盖升级(不向后兼容决策)
 
-1. 装一个旧版本 build 并登录(产生 `secrets/*.secret` 或旧版 `.keychain-bound` 文件)。
-2. 覆盖升级到含 #177 的 build(不卸载),打开。
+1. 装一个 P1 收敛之前的旧版本 build 并登录、产生若干会话。
+2. 覆盖升级到含 P1 收敛的 build(不卸载),打开。
 
-**预期**:登录态保留、功能正常;原有的本地文件迁移死代码已被清理。由于迁移至 `SharedPreferences` 保存的 UUID，无需任何本地 `.keychain-bound` 文件即可实现重装识别。
+**预期**:等同全新安装——旧版沙盒里的会话数据与文件型 secret 一律不读取、不迁移;`keychain_bound_uuid` 缺失会触发 Keychain 清理,需重新登录。此为 2026-07-20 的明确决策(见关联文档),不是缺陷。同版本(P1 后)之间覆盖升级,会话历史与登录态完整保留(C1/C3 语义不变)。
 
 ## C7 备份排除(#170)
 
