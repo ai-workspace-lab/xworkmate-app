@@ -334,7 +334,7 @@ class _MobileAssistantDetailPageState extends State<MobileAssistantDetailPage> {
                   _MobileAssistantTopBar(
                     connected: connection.connected,
                     detail: connection.connected
-                        ? appText('在线 · 随时为你执行任务', 'Online · ready to run')
+                        ? null
                         : appText('先去配置集成连接', 'Configure integration first'),
                     onBack: widget.onBack,
                     onOpenHistory: showSessionSwitcher,
@@ -529,14 +529,14 @@ class _MobileTaskWorkspaceReferenceState
 class _MobileAssistantTopBar extends StatelessWidget {
   const _MobileAssistantTopBar({
     required this.connected,
-    required this.detail,
+    this.detail,
     required this.onBack,
     required this.onOpenHistory,
     this.extraWidget,
   });
 
   final bool connected;
-  final String detail;
+  final String? detail;
   final VoidCallback onBack;
   final VoidCallback onOpenHistory;
   final Widget? extraWidget;
@@ -771,12 +771,12 @@ class MobileBridgeHeroStatus extends StatelessWidget {
   const MobileBridgeHeroStatus({
     super.key,
     required this.connected,
-    required this.detail,
+    this.detail,
     this.extraWidget,
   });
 
   final bool connected;
-  final String detail;
+  final String? detail;
   final Widget? extraWidget;
 
   @override
@@ -834,15 +834,17 @@ class MobileBridgeHeroStatus extends StatelessWidget {
                   fontWeight: FontWeight.w700,
                 ),
               ),
-              const SizedBox(height: 3),
-              Text(
-                detail,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(
-                  context,
-                ).textTheme.bodyMedium?.copyWith(color: palette.textSecondary),
-              ),
+              if (detail != null && detail!.isNotEmpty) ...[
+                const SizedBox(height: 3),
+                Text(
+                  detail!,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(color: palette.textSecondary),
+                ),
+              ],
               if (extraWidget != null) ...[
                 const SizedBox(height: 6),
                 extraWidget!,
