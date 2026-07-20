@@ -268,7 +268,8 @@ extension AppControllerDesktopSettingsRuntime on AppController {
       );
       try {
         await runtime.health();
-      } catch (e, stackTrace) { debugPrint('Error: $e\n$stackTrace');
+      } catch (e, stackTrace) {
+        debugPrint('Error: $e\n$stackTrace');
         // Connectivity succeeded; health is best-effort for the test path.
       }
       final endpoint =
@@ -287,14 +288,16 @@ extension AppControllerDesktopSettingsRuntime on AppController {
     } finally {
       try {
         await runtime.disconnect(clearDesiredProfile: false);
-      } catch (e, stackTrace) { debugPrint('Error: $e\n$stackTrace');
+      } catch (e, stackTrace) {
+        debugPrint('Error: $e\n$stackTrace');
         // Ignore teardown noise from temporary connectivity checks.
       }
       runtime.dispose();
       temporaryStore.dispose();
       try {
         await temporaryRoot.delete(recursive: true);
-      } catch (e, stackTrace) { debugPrint('Error: $e\n$stackTrace');
+      } catch (e, stackTrace) {
+        debugPrint('Error: $e\n$stackTrace');
         // Ignore cleanup noise for temporary connectivity checks.
       }
     }
@@ -459,10 +462,20 @@ extension AppControllerDesktopSettingsRuntime on AppController {
       }
       try {
         await settingsControllerInternal.restoreAccountSession();
-      } catch (e, stackTrace) { debugPrint('Error: $e\n$stackTrace');
+      } catch (e, stackTrace) {
+        debugPrint('Error: $e\n$stackTrace');
         // Keep initialization resilient when remote account restore fails.
       }
-      restoreAssistantThreadsInternal(sanitizedAssistantThreads);
+      final rebasedThreadWorkspaceCount = restoreAssistantThreadsInternal(
+        sanitizedAssistantThreads,
+      );
+      if (rebasedThreadWorkspaceCount > 0) {
+        // 一次性把重定位后的路径写回 threads.json，让备份文件与磁盘状态
+        // 一致；不落盘也能在下次启动自愈，但排查时会一直看到旧容器路径。
+        await storeInternal.saveTaskThreads(
+          taskThreadRepositoryInternal.values.toList(growable: false),
+        );
+      }
       if (disposedInternal) {
         return;
       }
@@ -513,7 +526,8 @@ extension AppControllerDesktopSettingsRuntime on AppController {
               startupTarget,
             ),
           );
-        } catch (e, stackTrace) { debugPrint('Error: $e\n$stackTrace');
+        } catch (e, stackTrace) {
+          debugPrint('Error: $e\n$stackTrace');
           // Keep the shell usable when auto-connect fails.
         }
       }
