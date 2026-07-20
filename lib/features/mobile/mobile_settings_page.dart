@@ -33,6 +33,7 @@ class _MobileSettingsPageState extends State<MobileSettingsPage> {
   String lastSavedAccountBaseUrl = '';
   String lastSavedAccountIdentifier = '';
   String lastSavedBridgeUrl = '';
+  bool accountSyncing = false;
 
   @override
   void initState() {
@@ -154,15 +155,50 @@ class _MobileSettingsPageState extends State<MobileSettingsPage> {
   }
 
   Future<void> syncAccount(SettingsSnapshot settings) async {
-    await persistAccountProfileSettings(
-      settings: settings,
-      isManualBridge: false,
-      refreshAfterSave: false,
-    );
-    await widget.controller.settingsController.syncAccountSettings(
-      baseUrl: accountBaseUrlController.text.trim(),
-    );
-    unawaited(refreshBridgeCapabilities());
+    if (accountSyncing) {
+      return;
+    }
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    setState(() => accountSyncing = true);
+    AccountSyncResult result;
+    try {
+      await persistAccountProfileSettings(
+        settings: settings,
+        isManualBridge: false,
+        refreshAfterSave: false,
+      );
+      result = await widget.controller.settingsController.syncAccountSettings(
+        baseUrl: accountBaseUrlController.text.trim(),
+      );
+      // Keep the button in its busy state until capabilities reflect the sync,
+      // so the card and the feedback land at the same moment.
+      await refreshBridgeCapabilities();
+    } catch (e, stackTrace) {
+      debugPrint('Error: $e\n$stackTrace');
+      result = AccountSyncResult(state: 'error', message: '$e');
+    } finally {
+      if (mounted) {
+        setState(() => accountSyncing = false);
+      }
+    }
+    if (!mounted || messenger == null) {
+      return;
+    }
+    final succeeded = result.state.trim() == 'ready';
+    final message = result.message.trim();
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          key: const Key('mobile-settings-account-sync-snackbar'),
+          behavior: SnackBarBehavior.floating,
+          content: Text(
+            succeeded
+                ? appText('同步完成：$message', 'Sync complete: $message')
+                : appText('同步失败：$message', 'Sync failed: $message'),
+          ),
+        ),
+      );
   }
 
   Future<void> verifyMfa(SettingsSnapshot settings) async {
@@ -294,6 +330,7 @@ class _MobileSettingsPageState extends State<MobileSettingsPage> {
                               controller.settingsController.accountSyncState,
                           accountBusy:
                               controller.settingsController.accountBusy,
+                          accountSyncing: accountSyncing,
                           accountStatus:
                               controller.settingsController.accountStatus,
                           accountSignedIn:
@@ -341,6 +378,7 @@ class _AccountSection extends StatelessWidget {
     required this.accountSession,
     required this.accountState,
     required this.accountBusy,
+    required this.accountSyncing,
     required this.accountStatus,
     required this.accountSignedIn,
     required this.accountMfaRequired,
@@ -362,6 +400,7 @@ class _AccountSection extends StatelessWidget {
   final AccountSessionSummary? accountSession;
   final AccountSyncState? accountState;
   final bool accountBusy;
+  final bool accountSyncing;
   final String accountStatus;
   final bool accountSignedIn;
   final bool accountMfaRequired;
@@ -435,9 +474,13 @@ class _AccountSection extends StatelessWidget {
         children: [
           MobileSettingsCardInternal(
             key: const Key('mobile-settings-account-signed-in-card'),
-            icon: Icons.cloud_done_outlined,
+            icon: accountSyncing
+                ? Icons.sync_rounded
+                : Icons.cloud_done_outlined,
             title: email.isEmpty ? appText('已登录', 'Signed In') : email,
-            subtitle: status.isEmpty
+            subtitle: accountSyncing
+                ? appText('正在同步托管 Bridge…', 'Syncing managed Bridge…')
+                : status.isEmpty
                 ? appText('svc.plus 托管 Bridge 已就绪。', 'Managed Bridge is ready.')
                 : status,
             children: [
@@ -446,22 +489,43 @@ class _AccountSection extends StatelessWidget {
                 label: appText('托管入口', 'Managed Endpoint'),
                 value: kManagedBridgeServerUrl,
               ),
+              const SizedBox(height: 8),
+              MobileSettingsMetaRowInternal(
+                key: const Key('mobile-settings-account-last-sync-row'),
+                icon: Icons.schedule_rounded,
+                label: appText('最近同步', 'Last Sync'),
+                value: accountSyncing
+                    ? appText('同步中…', 'Syncing…')
+                    : _formatLastSyncTime(accountState?.lastSyncAtMs ?? 0),
+              ),
               const SizedBox(height: 12),
               Row(
                 children: [
                   Expanded(
                     child: FilledButton.icon(
                       key: const Key('mobile-settings-account-sync-button'),
-                      onPressed: accountBusy ? null : onSync,
-                      icon: const Icon(Icons.sync_rounded),
-                      label: Text(appText('同步', 'Sync')),
+                      onPressed: accountBusy || accountSyncing ? null : onSync,
+                      icon: accountSyncing
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.sync_rounded),
+                      label: Text(
+                        accountSyncing
+                            ? appText('同步中…', 'Syncing…')
+                            : appText('同步', 'Sync'),
+                      ),
                     ),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: FilledButton.tonalIcon(
                       key: const Key('mobile-settings-account-logout-button'),
-                      onPressed: accountBusy ? null : onLogout,
+                      onPressed: accountBusy || accountSyncing
+                          ? null
+                          : onLogout,
                       icon: const Icon(Icons.logout_rounded),
                       label: Text(appText('退出', 'Sign Out')),
                     ),
@@ -746,10 +810,11 @@ class _ArchivedTasksSectionState extends State<_ArchivedTasksSection> {
                         children: [
                           Expanded(
                             child: FilledButton.tonalIcon(
-                              onPressed: () => widget.controller.saveAssistantTaskArchived(
-                                session.key,
-                                false,
-                              ),
+                              onPressed: () =>
+                                  widget.controller.saveAssistantTaskArchived(
+                                    session.key,
+                                    false,
+                                  ),
                               icon: const Icon(Icons.unarchive_outlined),
                               label: Text(appText('恢复', 'Restore')),
                             ),
@@ -757,8 +822,8 @@ class _ArchivedTasksSectionState extends State<_ArchivedTasksSection> {
                           const SizedBox(width: 10),
                           Expanded(
                             child: TextButton.icon(
-                              onPressed: () =>
-                                  widget.controller.deleteArchivedAssistantTask(session.key),
+                              onPressed: () => widget.controller
+                                  .deleteArchivedAssistantTask(session.key),
                               icon: const Icon(Icons.delete_outline_rounded),
                               label: Text(appText('删除', 'Delete')),
                             ),
@@ -774,4 +839,14 @@ class _ArchivedTasksSectionState extends State<_ArchivedTasksSection> {
       ],
     );
   }
+}
+
+String _formatLastSyncTime(int lastSyncAtMs) {
+  if (lastSyncAtMs <= 0) {
+    return appText('尚未同步', 'Not synced yet');
+  }
+  final at = DateTime.fromMillisecondsSinceEpoch(lastSyncAtMs).toLocal();
+  String two(int value) => value.toString().padLeft(2, '0');
+  return '${at.year}-${two(at.month)}-${two(at.day)} '
+      '${two(at.hour)}:${two(at.minute)}';
 }
