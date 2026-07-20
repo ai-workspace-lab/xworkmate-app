@@ -72,6 +72,13 @@ class SettingsStore {
         if (content != null) {
           return SettingsSnapshot.fromJsonString(content);
         }
+        final layout = await _layoutResolver.resolve();
+        final file = File('${layout.configDirectory.path}/settings.yaml');
+        if (await file.exists()) {
+          final legacyContent = await file.readAsString();
+          await prefs.setString('xworkmate.settings.yaml', legacyContent);
+          return SettingsSnapshot.fromJsonString(legacyContent);
+        }
         return SettingsSnapshot.defaults();
       }
       final layout = await _layoutResolver.resolve();
@@ -386,6 +393,17 @@ class SettingsStore {
           if (decoded is List) {
             return decoded.map((e) => SecretAuditEntry.fromJson(e)).toList();
           }
+        } else {
+          final layout = await _layoutResolver.resolve();
+          final file = File('${layout.configDirectory.path}/audit.json');
+          if (await file.exists()) {
+            final legacyContent = await file.readAsString();
+            final decoded = jsonDecode(legacyContent);
+            if (decoded is List) {
+              await prefs.setString('xworkmate.audit.json', legacyContent);
+              return decoded.map((e) => SecretAuditEntry.fromJson(e)).toList();
+            }
+          }
         }
         return const [];
       }
@@ -445,6 +463,20 @@ class SettingsStore {
               .toList(growable: false);
         }
       } catch (e) {}
+    } else {
+      final keys = prefs.getKeys().where((k) => k.startsWith('xworkmate.tasks.thread.')).toList();
+      if (keys.isEmpty) {
+        try {
+          final layout = await _layoutResolver.resolve();
+          final legacyThreads = await _loadPerSessionTaskThreads(layout);
+          if (legacyThreads.isNotEmpty) {
+            await _saveTaskThreadsMobile(legacyThreads);
+            return legacyThreads;
+          }
+        } catch (e) {
+          debugPrint('Legacy task migration failed: $e');
+        }
+      }
     }
 
     final keys = prefs.getKeys().where((k) => k.startsWith('xworkmate.tasks.thread.')).toList();
