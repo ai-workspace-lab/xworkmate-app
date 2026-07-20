@@ -182,7 +182,19 @@ class SecretStore {
           final prefs = await SharedPreferences.getInstance();
           final boundUuid = prefs.getString('keychain_bound_uuid');
           if (boundUuid == null) {
-            await keychain.deleteAll();
+            bool isUpgrade = false;
+            if (_layout != null) {
+              final secretDir = _layout!.secretDirectory;
+              if (await secretDir.exists()) {
+                final files = await secretDir.list().toList();
+                if (files.isNotEmpty) {
+                  isUpgrade = true;
+                }
+              }
+            }
+            if (!isUpgrade) {
+              await keychain.deleteAll();
+            }
             await prefs.setString('keychain_bound_uuid', const Uuid().v4());
           }
           _secureStorage = keychain;
