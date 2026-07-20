@@ -8,7 +8,7 @@ secrets.env
 .playwright-mcp/
 *.py
 null/
-test/golden/failures/
+test/**/failures/
 
 *.class
 *.log
