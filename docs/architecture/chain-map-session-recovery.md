@@ -28,10 +28,42 @@ Key files:
   lib/runtime/external_code_agent_acp_desktop_transport.dart
 ```
 
+### S1-storage: On-disk thread store layout (per-session files)
+
+The app-side thread store under `tasks/` is one file per session plus an
+ordering index — not a single monolithic list:
+
+```
+tasks/
+  index.json                      { "version": 1, "threadIds": [ordered] }
+  <base64url(threadId)>.json      one TaskThread per file
+  threads.json.migrated-<ts>.bak  retired legacy snapshot (never read)
+  *.invalid-<ts>.bak              pre-recovery byte backups (never read)
+```
+
+- `SettingsStore.saveTaskThreads` diffs against the last written state and
+  rewrites only dirty sessions (O(dirty), not O(history)); the index is
+  rewritten only when membership or order changes.
+- A corrupt per-session file loses exactly that session: its bytes are backed
+  up to `*.invalid-<ts>.bak`, the record is reported via
+  `lastSkippedInvalidTaskThreadRecords`, and the file is removed so the
+  failure does not repeat every launch.
+- A crash between thread-file writes and the index write leaves orphan files;
+  load appends any decodable file missing from the index (sorted by
+  threadId), so orphans are recovered, not dropped.
+- Migration is one-way: a legacy `tasks/threads.json` found at load (or save)
+  is decoded with the tolerant per-record path, rewritten into the layout
+  above, and renamed to `threads.json.migrated-<ts>.bak`. No dual-format
+  reading remains after that point.
+
+Key files:
+  lib/runtime/settings_store.dart (loadTaskThreads / saveTaskThreads)
+  lib/runtime/file_store_support.dart (StoreLayout.taskFileForSessionKey, taskIndexFile)
+
 ### S1a: App update / reinstall on iOS (container UUID moved)
 
 iOS assigns the app data container a new UUID on every update or reinstall.
-`threads.json` itself moves with the container, but each persisted
+The thread store files move with the container, but each persisted
 `workspaceBinding.workspacePath` is an absolute path that still names the old
 container root, so every managed `localFs` binding goes stale at once.
 

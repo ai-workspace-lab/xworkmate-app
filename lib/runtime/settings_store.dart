@@ -26,10 +26,7 @@ enum SkippedTaskThreadReason {
 }
 
 class SkippedTaskThreadRecord {
-  const SkippedTaskThreadRecord({
-    required this.threadId,
-    required this.reason,
-  });
+  const SkippedTaskThreadRecord({required this.threadId, required this.reason});
 
   final String threadId;
   final SkippedTaskThreadReason reason;
@@ -39,7 +36,7 @@ class SettingsStore {
   SettingsStore(this._layoutResolver);
 
   final StoreLayoutResolver _layoutResolver;
-  
+
   PersistentWriteFailure? _settingsWriteFailure;
   PersistentWriteFailure? get settingsWriteFailure => _settingsWriteFailure;
 
@@ -50,14 +47,19 @@ class SettingsStore {
   PersistentWriteFailure? get auditWriteFailure => _auditWriteFailure;
 
   final List<SkippedTaskThreadRecord> _lastSkippedInvalidTaskThreadRecords = [];
-  List<SkippedTaskThreadRecord> get lastSkippedInvalidTaskThreadRecords => List.unmodifiable(_lastSkippedInvalidTaskThreadRecords);
+  List<SkippedTaskThreadRecord> get lastSkippedInvalidTaskThreadRecords =>
+      List.unmodifiable(_lastSkippedInvalidTaskThreadRecords);
 
   Future<void> initialize() async {
     // Basic connectivity check.
     try {
       await _layoutResolver.resolve();
     } catch (e) {
-      _settingsWriteFailure = _wrapFailure('initialize', PersistentStoreScope.settings, e);
+      _settingsWriteFailure = _wrapFailure(
+        'initialize',
+        PersistentStoreScope.settings,
+        e,
+      );
     }
   }
 
@@ -70,7 +72,11 @@ class SettingsStore {
         return SettingsSnapshot.fromJsonString(content);
       }
     } catch (e) {
-       _settingsWriteFailure = _wrapFailure('loadSnapshot', PersistentStoreScope.settings, e);
+      _settingsWriteFailure = _wrapFailure(
+        'loadSnapshot',
+        PersistentStoreScope.settings,
+        e,
+      );
     }
     return SettingsSnapshot.defaults();
   }
@@ -82,7 +88,11 @@ class SettingsStore {
       await file.writeAsString(snapshot.toJsonString(), flush: true);
       _settingsWriteFailure = null;
     } catch (e) {
-      _settingsWriteFailure = _wrapFailure('saveSnapshot', PersistentStoreScope.settings, e);
+      _settingsWriteFailure = _wrapFailure(
+        'saveSnapshot',
+        PersistentStoreScope.settings,
+        e,
+      );
     }
   }
 
@@ -91,49 +101,195 @@ class SettingsStore {
     return SettingsSnapshotReloadResult(applied: true, snapshot: next);
   }
 
+  static const String _legacyThreadsFileName = 'threads.json';
+  static const String _threadIndexFileName = 'index.json';
+
+  /// 上次成功写入的每会话 JSON,按 threadId 记。null 值表示文件存在但内容
+  /// 未知(冷启动 prime 时只列了文件名),下次 save 会强制重写。
+  final Map<String, String?> _lastWrittenThreadJsonByThreadId =
+      <String, String?>{};
+  List<String> _lastWrittenThreadIndex = const <String>[];
+  bool _threadCachePrimed = false;
+
   Future<List<TaskThread>> loadTaskThreads() async {
     _lastSkippedInvalidTaskThreadRecords.clear();
-    File? file;
     try {
       final layout = await _layoutResolver.resolve();
-      file = File('${layout.tasksDirectory.path}/threads.json');
-      if (await file.exists()) {
-        final content = await file.readAsString();
-        final decoded = jsonDecode(content);
-        if (decoded is List) {
-          // One bad record must never wipe the whole list: a legacy or
-          // corrupted entry used to throw out of the shared try and the caller
-          // then treated every persisted session as gone — the next save made
-          // that loss permanent. Decode per record and keep the valid rest.
-          final threads = <TaskThread>[];
-          for (final entry in decoded) {
-            if (entry is! Map) {
-              _recordSkippedTaskThread('unknown', const FormatException('not-a-map'));
-              continue;
-            }
-            final map = entry.cast<String, dynamic>();
-            try {
-              threads.add(TaskThread.fromJson(map));
-            } catch (error) {
-              _recordSkippedTaskThread(
-                map['threadId']?.toString().trim().isNotEmpty == true
-                    ? map['threadId'].toString().trim()
-                    : 'unknown',
-                error,
-              );
-            }
-          }
-          if (_lastSkippedInvalidTaskThreadRecords.isNotEmpty) {
-            await _backupUnreadableTaskThreads(file);
-          }
-          return threads;
-        }
+      final legacyFile = File(
+        '${layout.tasksDirectory.path}/$_legacyThreadsFileName',
+      );
+      if (await legacyFile.exists()) {
+        final failureBeforeLegacyLoad = _tasksWriteFailure;
+        final threads = await _loadLegacyTaskThreads(legacyFile);
+        final legacyLoadFailure =
+            identical(_tasksWriteFailure, failureBeforeLegacyLoad)
+            ? null
+            : _tasksWriteFailure;
+        // 单向迁移:legacy 是当前状态的权威快照,重写为每会话文件后把
+        // 原件改名退役,双格式到此为止。原字节留在 .migrated-*.bak 里。
+        await legacyFile.rename(
+          '${legacyFile.path}.migrated-${DateTime.now().millisecondsSinceEpoch}.bak',
+        );
+        _lastWrittenThreadJsonByThreadId.clear();
+        _threadCachePrimed = false;
+        await saveTaskThreads(threads);
+        // 迁移写盘成功会把 _tasksWriteFailure 清空;若 legacy 本身已损坏,
+        // 那个失败仍然要报给上层(它意味着真实的数据丢失)。
+        _tasksWriteFailure = legacyLoadFailure ?? _tasksWriteFailure;
+        return threads;
       }
+      return await _loadPerSessionTaskThreads(layout);
     } catch (e) {
-      _tasksWriteFailure = _wrapFailure('loadTaskThreads', PersistentStoreScope.tasks, e);
-      if (file != null) {
-        await _backupUnreadableTaskThreads(file);
+      _tasksWriteFailure = _wrapFailure(
+        'loadTaskThreads',
+        PersistentStoreScope.tasks,
+        e,
+      );
+    }
+    return const [];
+  }
+
+  Future<List<TaskThread>> _loadLegacyTaskThreads(File file) async {
+    try {
+      final content = await file.readAsString();
+      final decoded = jsonDecode(content);
+      if (decoded is List) {
+        // One bad record must never wipe the whole list: a legacy or
+        // corrupted entry used to throw out of the shared try and the caller
+        // then treated every persisted session as gone — the next save made
+        // that loss permanent. Decode per record and keep the valid rest.
+        final threads = <TaskThread>[];
+        for (final entry in decoded) {
+          if (entry is! Map) {
+            _recordSkippedTaskThread(
+              'unknown',
+              const FormatException('not-a-map'),
+            );
+            continue;
+          }
+          final map = entry.cast<String, dynamic>();
+          try {
+            threads.add(TaskThread.fromJson(map));
+          } catch (error) {
+            _recordSkippedTaskThread(
+              map['threadId']?.toString().trim().isNotEmpty == true
+                  ? map['threadId'].toString().trim()
+                  : 'unknown',
+              error,
+            );
+          }
+        }
+        if (_lastSkippedInvalidTaskThreadRecords.isNotEmpty) {
+          await _backupUnreadableTaskThreads(file);
+        }
+        return threads;
       }
+      _tasksWriteFailure = _wrapFailure(
+        'loadTaskThreads',
+        PersistentStoreScope.tasks,
+        const FormatException('threads.json is not a JSON list'),
+      );
+      await _backupUnreadableTaskThreads(file);
+    } catch (e) {
+      _tasksWriteFailure = _wrapFailure(
+        'loadTaskThreads',
+        PersistentStoreScope.tasks,
+        e,
+      );
+      await _backupUnreadableTaskThreads(file);
+    }
+    return const [];
+  }
+
+  bool _isThreadPayloadFile(File file) {
+    final name = file.uri.pathSegments.last;
+    return name.endsWith('.json') &&
+        name != _threadIndexFileName &&
+        name != _legacyThreadsFileName &&
+        !name.contains('.invalid-') &&
+        !name.contains('.migrated-') &&
+        !name.contains('.tmp-');
+  }
+
+  Future<List<TaskThread>> _loadPerSessionTaskThreads(
+    StoreLayout layout,
+  ) async {
+    final indexIds = await _readThreadIndex(layout);
+    final byId = <String, TaskThread>{};
+    final files = layout.tasksDirectory
+        .listSync()
+        .whereType<File>()
+        .where(_isThreadPayloadFile)
+        .toList();
+    for (final file in files) {
+      String threadId =
+          decodeStableFileKey(
+            file.uri.pathSegments.last.replaceAll(RegExp(r'\.json$'), ''),
+          ) ??
+          'unknown';
+      try {
+        final decoded = jsonDecode(await file.readAsString());
+        if (decoded is! Map) {
+          throw const FormatException('not-a-map');
+        }
+        final map = decoded.cast<String, dynamic>();
+        final persistedId = map['threadId']?.toString().trim() ?? '';
+        if (persistedId.isNotEmpty) {
+          threadId = persistedId;
+        }
+        byId[threadId] = TaskThread.fromJson(map);
+      } catch (error) {
+        // 坏一个文件只丢一个会话;原字节备份后从工作集中拿掉,避免每次
+        // 启动都重复失败。
+        _recordSkippedTaskThread(threadId, error);
+        await _backupUnreadableTaskThreads(file);
+        await deleteIfExists(file);
+      }
+    }
+    final ordered = <TaskThread>[];
+    for (final threadId in indexIds) {
+      final thread = byId.remove(threadId);
+      if (thread != null) {
+        ordered.add(thread);
+      }
+    }
+    // index 写入前进程被杀会留下不在 index 里的孤儿文件;按 threadId 排序
+    // 追加,保证结果确定。
+    final orphanIds = byId.keys.toList()..sort();
+    ordered.addAll(orphanIds.map((threadId) => byId[threadId]!));
+
+    _lastWrittenThreadJsonByThreadId
+      ..clear()
+      ..addEntries(
+        ordered.map(
+          (thread) =>
+              MapEntry<String, String?>(thread.threadId, jsonEncode(thread)),
+        ),
+      );
+    _lastWrittenThreadIndex = ordered
+        .map((thread) => thread.threadId)
+        .toList(growable: false);
+    _threadCachePrimed = true;
+    return ordered;
+  }
+
+  Future<List<String>> _readThreadIndex(StoreLayout layout) async {
+    try {
+      final file = layout.taskIndexFile;
+      if (!await file.exists()) {
+        return const [];
+      }
+      final decoded = jsonDecode(await file.readAsString());
+      if (decoded is Map && decoded['threadIds'] is List) {
+        return (decoded['threadIds'] as List)
+            .map((item) => item.toString())
+            .toList(growable: false);
+      }
+    } catch (e, stackTrace) {
+      // index 只承载排序;损坏时靠目录扫描兜底,不算数据丢失。
+      debugPrint(
+        'Thread index unreadable, falling back to scan: $e\n$stackTrace',
+      );
     }
     return const [];
   }
@@ -174,20 +330,101 @@ class SettingsStore {
   Future<void> saveTaskThreads(List<TaskThread> threads) async {
     try {
       final layout = await _layoutResolver.resolve();
-      final file = File('${layout.tasksDirectory.path}/threads.json');
-      await atomicWriteString(file, jsonEncode(threads));
+      final legacyFile = File(
+        '${layout.tasksDirectory.path}/$_legacyThreadsFileName',
+      );
+      if (await legacyFile.exists()) {
+        // save 先于 load 发生时(全新实例直接保存),同样把 legacy 退役,
+        // 否则下次 load 会用旧快照覆盖这里写出的新状态。
+        await legacyFile.rename(
+          '${legacyFile.path}.migrated-${DateTime.now().millisecondsSinceEpoch}.bak',
+        );
+      }
+      if (!_threadCachePrimed) {
+        // 冷缓存只需要文件名集合就能做删除对账;内容未知记 null,
+        // 本轮全部重写一遍。
+        _lastWrittenThreadJsonByThreadId.clear();
+        final existing = layout.tasksDirectory
+            .listSync()
+            .whereType<File>()
+            .where(_isThreadPayloadFile);
+        for (final file in existing) {
+          final threadId = decodeStableFileKey(
+            file.uri.pathSegments.last.replaceAll(RegExp(r'\.json$'), ''),
+          );
+          if (threadId != null) {
+            _lastWrittenThreadJsonByThreadId[threadId] = null;
+          }
+        }
+        _threadCachePrimed = true;
+      }
+
+      final desiredJsonByThreadId = <String, String>{
+        for (final thread in threads) thread.threadId: jsonEncode(thread),
+      };
+      for (final entry in desiredJsonByThreadId.entries) {
+        if (_lastWrittenThreadJsonByThreadId[entry.key] == entry.value) {
+          continue;
+        }
+        await atomicWriteString(
+          layout.taskFileForSessionKey(entry.key),
+          entry.value,
+        );
+      }
+      final removedThreadIds = _lastWrittenThreadJsonByThreadId.keys
+          .where((threadId) => !desiredJsonByThreadId.containsKey(threadId))
+          .toList(growable: false);
+      for (final threadId in removedThreadIds) {
+        await deleteIfExists(layout.taskFileForSessionKey(threadId));
+      }
+
+      final nextIndex = threads
+          .map((thread) => thread.threadId)
+          .toList(growable: false);
+      if (!listEquals(nextIndex, _lastWrittenThreadIndex)) {
+        await atomicWriteString(
+          layout.taskIndexFile,
+          jsonEncode(<String, dynamic>{'version': 1, 'threadIds': nextIndex}),
+        );
+      }
+
+      _lastWrittenThreadJsonByThreadId
+        ..clear()
+        ..addAll(desiredJsonByThreadId);
+      _lastWrittenThreadIndex = nextIndex;
       _tasksWriteFailure = null;
     } catch (e) {
-      _tasksWriteFailure = _wrapFailure('saveTaskThreads', PersistentStoreScope.tasks, e);
+      _tasksWriteFailure = _wrapFailure(
+        'saveTaskThreads',
+        PersistentStoreScope.tasks,
+        e,
+      );
     }
   }
 
   Future<void> clearAssistantLocalState() async {
     try {
       final layout = await _layoutResolver.resolve();
-      await deleteIfExists(File('${layout.tasksDirectory.path}/threads.json'));
-      await deleteIfExists(File('${layout.configDirectory.path}/settings.yaml'));
-    } catch (e, stackTrace) { debugPrint('Error: $e\n$stackTrace');
+      await deleteIfExists(
+        File('${layout.tasksDirectory.path}/$_legacyThreadsFileName'),
+      );
+      await deleteIfExists(layout.taskIndexFile);
+      final payloadFiles = layout.tasksDirectory
+          .listSync()
+          .whereType<File>()
+          .where(_isThreadPayloadFile)
+          .toList();
+      for (final file in payloadFiles) {
+        await deleteIfExists(file);
+      }
+      _lastWrittenThreadJsonByThreadId.clear();
+      _lastWrittenThreadIndex = const <String>[];
+      _threadCachePrimed = true;
+      await deleteIfExists(
+        File('${layout.configDirectory.path}/settings.yaml'),
+      );
+    } catch (e, stackTrace) {
+      debugPrint('Error: $e\n$stackTrace');
       // Ignore errors for secondary persistence.
     }
   }
@@ -203,7 +440,8 @@ class SettingsStore {
           return decoded.map((e) => SecretAuditEntry.fromJson(e)).toList();
         }
       }
-    } catch (e, stackTrace) { debugPrint('Error: $e\n$stackTrace');
+    } catch (e, stackTrace) {
+      debugPrint('Error: $e\n$stackTrace');
       // Ignore errors for secondary persistence.
     }
     return const [];
@@ -221,11 +459,19 @@ class SettingsStore {
       await file.writeAsString(jsonEncode(items), flush: true);
       _auditWriteFailure = null;
     } catch (e) {
-      _auditWriteFailure = _wrapFailure('appendAudit', PersistentStoreScope.audit, e);
+      _auditWriteFailure = _wrapFailure(
+        'appendAudit',
+        PersistentStoreScope.audit,
+        e,
+      );
     }
   }
 
-  PersistentWriteFailure _wrapFailure(String operation, PersistentStoreScope scope, Object error) {
+  PersistentWriteFailure _wrapFailure(
+    String operation,
+    PersistentStoreScope scope,
+    Object error,
+  ) {
     return PersistentWriteFailure(
       scope: scope,
       operation: operation,

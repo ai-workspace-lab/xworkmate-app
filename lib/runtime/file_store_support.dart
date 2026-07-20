@@ -258,6 +258,19 @@ String encodeStableFileKey(String key) {
   return base64Url.encode(utf8.encode(key)).replaceAll('=', '');
 }
 
+/// [encodeStableFileKey] 的逆运算；文件名不是合法编码时返回 null。
+String? decodeStableFileKey(String encoded) {
+  if (encoded.isEmpty) {
+    return null;
+  }
+  final padding = (4 - encoded.length % 4) % 4;
+  try {
+    return utf8.decode(base64Url.decode(encoded + '=' * padding));
+  } on FormatException {
+    return null;
+  }
+}
+
 Future<void> atomicWriteString(
   File file,
   String contents, {
