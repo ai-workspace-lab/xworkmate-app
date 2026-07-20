@@ -338,14 +338,15 @@ class _MobileAssistantDetailPageState extends State<MobileAssistantDetailPage> {
                         : appText('先去配置集成连接', 'Configure integration first'),
                     onBack: widget.onBack,
                     onOpenHistory: showSessionSwitcher,
+                    extraWidget: taskWorkspaceReference.isNotEmpty
+                        ? _MobileTaskWorkspaceReference(
+                            workspaceReference: taskWorkspaceReference,
+                            onCopy: () => unawaited(
+                              copyTaskWorkspaceReference(taskWorkspaceReference),
+                            ),
+                          )
+                        : null,
                   ),
-                  if (taskWorkspaceReference.isNotEmpty)
-                    _MobileTaskWorkspaceReference(
-                      workspaceReference: taskWorkspaceReference,
-                      onCopy: () => unawaited(
-                        copyTaskWorkspaceReference(taskWorkspaceReference),
-                      ),
-                    ),
                   Expanded(
                     child: Column(
                       children: [
@@ -428,7 +429,7 @@ class _MobileTaskWorkspaceReferenceState
 
     if (!_expanded) {
       return Padding(
-        padding: const EdgeInsets.fromLTRB(22, 0, 22, 10),
+        padding: const EdgeInsets.only(top: 2),
         child: Align(
           alignment: Alignment.centerLeft,
           child: InkWell(
@@ -476,7 +477,7 @@ class _MobileTaskWorkspaceReferenceState
         }
       },
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(22, 0, 22, 10),
+        padding: const EdgeInsets.only(top: 2),
         child: DecoratedBox(
           decoration: BoxDecoration(
             color: palette.chromeSurface.withValues(alpha: 0.72),
@@ -531,12 +532,14 @@ class _MobileAssistantTopBar extends StatelessWidget {
     required this.detail,
     required this.onBack,
     required this.onOpenHistory,
+    this.extraWidget,
   });
 
   final bool connected;
   final String detail;
   final VoidCallback onBack;
   final VoidCallback onOpenHistory;
+  final Widget? extraWidget;
 
   @override
   Widget build(BuildContext context) {
@@ -556,6 +559,7 @@ class _MobileAssistantTopBar extends StatelessWidget {
               child: MobileBridgeHeroStatus(
                 connected: connected,
                 detail: detail,
+                extraWidget: extraWidget,
               ),
             ),
           ),
@@ -768,10 +772,12 @@ class MobileBridgeHeroStatus extends StatelessWidget {
     super.key,
     required this.connected,
     required this.detail,
+    this.extraWidget,
   });
 
   final bool connected;
   final String detail;
+  final Widget? extraWidget;
 
   @override
   Widget build(BuildContext context) {
@@ -837,6 +843,10 @@ class MobileBridgeHeroStatus extends StatelessWidget {
                   context,
                 ).textTheme.bodyMedium?.copyWith(color: palette.textSecondary),
               ),
+              if (extraWidget != null) ...[
+                const SizedBox(height: 6),
+                extraWidget!,
+              ]
             ],
           ),
         ),
