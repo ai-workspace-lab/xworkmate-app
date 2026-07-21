@@ -2,9 +2,9 @@ name: xworkmate
 description: "XWorkmate desktop-first AI workspace shell."
 publish_to: 'none'
 
-version: 1.1.8+3
+version: 1.1.8+4
 build-date: 2026-07-21
-build-id: 3e8e278
+build-id: 0c4a80e
 
 environment:
   sdk: ^3.11.0
