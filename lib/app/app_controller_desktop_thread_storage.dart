@@ -598,6 +598,17 @@ extension AppControllerDesktopThreadStorage on AppController {
 
   /// 返回工作区路径被重定位的记录数，调用方据此决定是否立刻落盘。
   int restoreAssistantThreadsInternal(List<TaskThread> records) {
+    // 恢复可能与「启动期间已经产生的会话」并发:移动端首帧会立刻激活
+    // (必要时新建)一个会话,用户也可能在初始化跑完前就开始输入。直接
+    // clear 会把这些记录连同用户输入一起丢掉,因此先留存、后合并——磁盘
+    // 记录优先,磁盘上没有的启动期会话原样保留。
+    final preRestoreRecords = Map<String, TaskThread>.from(
+      taskThreadRepositoryInternal.recordsView,
+    );
+    final preRestoreMessages =
+        Map<String, List<GatewayChatMessage>>.from(
+          assistantThreadMessagesInternal,
+        );
     taskThreadRepositoryInternal.clear();
     assistantThreadMessagesInternal.clear();
     var rebasedThreadWorkspaceCount = 0;
@@ -728,6 +739,17 @@ extension AppControllerDesktopThreadStorage on AppController {
       if (normalizedRecord.messages.isNotEmpty) {
         assistantThreadMessagesInternal[sessionKey] =
             List<GatewayChatMessage>.from(normalizedRecord.messages);
+      }
+    }
+    for (final entry in preRestoreRecords.entries) {
+      if (taskThreadRepositoryInternal.containsKey(entry.key)) {
+        continue;
+      }
+      taskThreadRepositoryInternal.replace(entry.value, persist: false);
+      final messages = preRestoreMessages[entry.key];
+      if (messages != null && messages.isNotEmpty) {
+        assistantThreadMessagesInternal[entry.key] =
+            List<GatewayChatMessage>.from(messages);
       }
     }
     return rebasedThreadWorkspaceCount;

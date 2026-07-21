@@ -173,6 +173,10 @@ class AppController extends ChangeNotifier {
         bridgeAgentProviderCatalogInternal.isNotEmpty ||
         bridgeGatewayProviderCatalogInternal.isNotEmpty;
 
+    // 启动恢复完成前禁止写盘:此时仓库里只有首帧临时建出的会话,落盘
+    // 会把尚未恢复的历史会话当成已删除清掉。必须在这里显式触发(而非
+    // 依赖字段初始化器),否则挂起时机取决于仓库何时被首次访问。
+    taskThreadRepositoryInternal.suspendPersistence();
     attachChildListenersInternal();
     unawaited(initializeInternal());
   }
@@ -183,6 +187,7 @@ class AppController extends ChangeNotifier {
       return;
     }
     disposedInternal = true;
+    completeAssistantThreadsRestoredInternal();
     for (final turn in openClawGatewayQueuedTurnsInternal) {
       turn.cancelled = true;
     }
@@ -289,6 +294,20 @@ class AppController extends ChangeNotifier {
   bool initializingInternal = true;
   String? bootstrapErrorInternal;
   String? startupTaskThreadWarningInternal;
+
+  /// 在 [initializeInternal] 把持久化线程灌进 repository 之后完成。
+  /// 想要「拿到完整历史再动作」的调用方(测试、后续需要精确时序的场景)
+  /// 可以 await 它;UI 不应该 await——首帧不必等初始化,持久化安全由
+  /// repository 的挂起机制保证。初始化异常与 dispose 都会兜底完成它。
+  final Completer<void> assistantThreadsRestoredInternal = Completer<void>();
+
+  void completeAssistantThreadsRestoredInternal() {
+    // 恢复已结束(成功或失败),仓库视图不再是「部分」的,可以落盘了。
+    taskThreadRepositoryInternal.resumePersistence();
+    if (!assistantThreadsRestoredInternal.isCompleted) {
+      assistantThreadsRestoredInternal.complete();
+    }
+  }
 
   Map<String, TaskThread> get assistantThreadRecordsInternal =>
       taskThreadRepositoryInternal.recordsView;

@@ -28,35 +28,49 @@ Key files:
   lib/runtime/external_code_agent_acp_desktop_transport.dart
 ```
 
-### S1-storage: On-disk thread store layout (per-session files)
+### S1-storage: Thread store layout (TaskThreadStore providers)
 
-The app-side thread store under `tasks/` is one file per session plus an
-ordering index — not a single monolithic list:
+`SettingsStore` delegates task-thread persistence to the platform's
+`TaskThreadStore` (resolved via `TaskThreadStoreRegistry`). Both backends
+share one contract: per-session records plus an ordering index — never a
+single monolithic list, and (since 2026-07-20) never any legacy-format
+reading or migration.
+
+Desktop — `FileTaskThreadStore` under `tasks/`:
 
 ```
 tasks/
   index.json                      { "version": 1, "threadIds": [ordered] }
   <base64url(threadId)>.json      one TaskThread per file
-  threads.json.migrated-<ts>.bak  retired legacy snapshot (never read)
   *.invalid-<ts>.bak              pre-recovery byte backups (never read)
 ```
 
-- `SettingsStore.saveTaskThreads` diffs against the last written state and
-  rewrites only dirty sessions (O(dirty), not O(history)); the index is
-  rewritten only when membership or order changes.
-- A corrupt per-session file loses exactly that session: its bytes are backed
-  up to `*.invalid-<ts>.bak`, the record is reported via
-  `lastSkippedInvalidTaskThreadRecords`, and the file is removed so the
-  failure does not repeat every launch.
-- A crash between thread-file writes and the index write leaves orphan files;
-  load appends any decodable file missing from the index (sorted by
-  threadId), so orphans are recovered, not dropped.
-- Migration is one-way: a legacy `tasks/threads.json` found at load (or save)
-  is decoded with the tolerant per-record path, rewritten into the layout
-  above, and renamed to `threads.json.migrated-<ts>.bak`. No dual-format
-  reading remains after that point.
+Mobile — `PrefsTaskThreadStore` in SharedPreferences (iOS UserDefaults):
+
+```
+xworkmate.tasks.index                       ordered index JSON (same shape)
+xworkmate.tasks.thread.<threadId>           one TaskThread JSON string
+xworkmate.tasks.invalid.<threadId>-<ts>     corrupt-value backups (never read)
+xworkmate.storage.schemaVersion             migration anchor (currently 1)
+```
+
+- save diffs against the last written state and rewrites only dirty sessions
+  (O(dirty), not O(history)); the index is rewritten only when membership or
+  order changes.
+- A corrupt record loses exactly that session: its original bytes are backed
+  up (file: `*.invalid-<ts>.bak`; prefs: `xworkmate.tasks.invalid.*` key),
+  the record is reported via `lastSkippedInvalidTaskThreadRecords`, and the
+  source is removed so the failure does not repeat every launch.
+- A crash between record writes and the index write leaves orphans; load
+  appends any decodable record missing from the index (sorted by threadId),
+  so orphans are recovered, not dropped.
+- No fallback across backends: an empty prefs store is a legitimate empty
+  state and never triggers reading sandbox files (prevents deleted-session
+  resurrection). Pre-2026-07-20 layouts (`tasks/threads.json`, mobile
+  sandbox files) are not read at all.
 
 Key files:
+  lib/runtime/task_thread_store.dart (FileTaskThreadStore / PrefsTaskThreadStore)
   lib/runtime/settings_store.dart (loadTaskThreads / saveTaskThreads)
   lib/runtime/file_store_support.dart (StoreLayout.taskFileForSessionKey, taskIndexFile)
 

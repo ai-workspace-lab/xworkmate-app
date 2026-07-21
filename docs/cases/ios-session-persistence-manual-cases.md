@@ -1,7 +1,7 @@
 # iOS 会话持久化手工回归用例
 
-> 关联:[2026-07-20 持久化加固记录](../tasks/2026-07-20-ios-session-persistence-hardening.md)
-> 覆盖 PR:#168(路径重定位)、#170(备份排除)、#171(每会话文件)、#172(Keychain + 重装即登出)
+> 关联:[2026-07-20 持久化加固记录](../tasks/2026-07-20-ios-session-persistence-hardening.md)、[2026-07-20 P1 结构收敛](../tasks/2026-07-20-ios-task-persistence-p1-refactor.md)、[2026-07-21 启动竞态 Dev Runbook](ios-startup-session-wipe-race-dev-runbook.md)
+> 覆盖 PR:#168(路径重定位)、#170(备份排除)、#171(每会话文件)、#172(Keychain + 重装即登出)、#177(SharedPreferences重构原生存储)、P1 收敛(TaskThreadStore,不向后兼容)、#183(启动竞态清空会话修复)
 > 前置:真机(iOS 15.6+),已登录 svc.plus 账号,至少两个历史任务会话(其中一个含制品),其中至少一个会话自安装后从未再次打开过。
 
 ## C1 冷重启保留
@@ -21,23 +21,16 @@
 ## C3 升级(容器迁移)保留 + 路径重基
 
 1. 用 `flutter install`(先卸载)以外的方式覆盖安装新 build(Xcode 直接 Run 到真机,或 TestFlight 升级)。
-2. 打开 App,不点进任何会话,先拉取沙盒验证:
+2. 打开 App,不点进任何会话。由于移动端已全部迁移至 `SharedPreferences` 原生存储(#177)，不再依赖脆弱的文件沙盒路径，无需再从沙盒拉取文件验证。
 
-```bash
-xcrun devicectl device copy from --device <UDID> \
-  --domain-type appDataContainer --domain-identifier plus.svc.xworkmate \
-  --source Library/Application\ Support/xworkmate/tasks --destination /tmp/xw-tasks
-cat /tmp/xw-tasks/index.json
-```
+**预期**:历史会话列表完整存在。由于存储方案变为 `UserDefaults`，会话数据已经对沙盒文件路径变化免疫；任一老会话打开加载正常。
 
-**预期**:每会话 `<base64url>.json` 文件与 `index.json` 存在(#171);任一会话文件里 `workspacePath` 指向**当前**容器 UUID,不残留旧容器路径(#168);从未打开过的历史会话同样已重基。
+## C4 每会话记录坏损隔离
 
-## C4 每会话文件坏损隔离
+1. (受限于 iOS UserDefaults 沙盒调试不便,可通过 Desktop 端模拟文件破坏,或用单测覆盖:`test/runtime/task_thread_store_test.dart`)
+2. 构造一个包含非法 JSON 字符串的 `xworkmate.tasks.thread.<id>` 值。
 
-1. 在 C3 拉取的目录里任选一个会话文件,记下 threadId。
-2. 用 `devicectl device copy to` 把该文件覆盖为非法 JSON,重启 App。
-
-**预期**:仅该会话从列表消失,其余会话完好;启动出现跳过告警;沙盒里出现 `*.invalid-<ts>.bak` 备份,坏文件被移除(下次启动不再重复告警)。
+**预期**:仅该会话从列表消失,其余会话完好;受损原文先备份到 `xworkmate.tasks.invalid.<id>-<ts>` 键,再从工作集移除,后续启动不重复报错。
 
 ## C5 重装即登出(#172)
 
@@ -46,18 +39,38 @@ cat /tmp/xw-tasks/index.json
 
 **预期**:处于**未登录**状态,设置页显示登录表单;不出现自动恢复的账号会话;助手页为断开态(无残留 bridge token 发起的请求)。
 
-## C6 升级密钥迁移(#172)
+## C6 从 P1 之前版本覆盖升级(不向后兼容决策)
 
-1. 装一个 #172 之前的 build 并登录(产生 `secrets/*.secret` 文件)。
-2. 覆盖升级到含 #172 的 build(不卸载),打开。
+1. 装一个 P1 收敛之前的旧版本 build 并登录、产生若干会话。
+2. 覆盖升级到含 P1 收敛的 build(不卸载),打开。
 
-**预期**:登录态保留、功能正常;拉取沙盒确认 `secrets/` 下不再有 `*.secret` 文件,只有 `.keychain-bound` 哨兵。
+**预期**:等同全新安装——旧版沙盒里的会话数据与文件型 secret 一律不读取、不迁移;`keychain_bound_uuid` 缺失会触发 Keychain 清理,需重新登录。此为 2026-07-20 的明确决策(见关联文档),不是缺陷。同版本(P1 后)之间覆盖升级,会话历史与登录态完整保留(C1/C3 语义不变)。
 
 ## C7 备份排除(#170)
 
 设置 → Apple ID → iCloud → 管理账户储存空间 → 备份 → 本机,查看 XWorkmate 条目大小;或用 Xcode Devices 窗口检查。
 
 **预期**:含大制品的工作区不计入备份体积(`Documents/.xworkmate` 已排除);会话历史仍随备份——iCloud 恢复到新机后,历史在、制品缺、制品可从任务详情重新拉取。
+
+## C8(自动化)制品 mtime 过滤竞态 flaky 测试
+
+不是真机手工用例,记录在此是因为它与本文件覆盖的同一能力树
+(任务线程 / 制品持久化)共享代码路径,且已被反复标注为"存量 flake"
+却从未展开根因——归档到这里避免下次又被当成新问题重新排查。
+
+1. 单跑 `flutter test test/runtime/app_controller_thread_workspace_binding_test.dart --plain-name "records workspace files produced during an empty-artifact task run"`:空载 3/3 通过。
+2. 后台起负载(如 `flutter build ios --release &`)后跑整个测试文件:必现失败,期望产物列表混入 run 开始前写入的 `old-task-report.md`。
+
+**预期(当前实际,未修复)**:失败断言形如
+`['prompts/DELIVERY.md', 'renders/identity-security-evolution.mp4']`
+变成三元素列表,多出 `old-task-report.md`。根因是测试自身把"写旧文件"
+与"取 `startedAtMs`"这两步时序压得太近,高负载下二者落入同一毫秒,
+被生产代码"同毫秒含入"的边界语义判为当前产物——不是生产代码缺陷。
+完整分析与待落地修复方案见
+[2026-07-20 mtime 过滤 flaky 分析](../tasks/2026-07-20-artifact-mtime-filter-flaky-test-analysis.md)。
+`"assistant history survives an iOS-style background flush"` 外在
+表现相同但根因不同(`_waitForControllerInitialization` 的 5 秒硬
+deadline),不要用同一个修复方案套用。
 
 ## 已知限制
 
