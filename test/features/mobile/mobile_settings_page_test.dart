@@ -330,7 +330,7 @@ void main() {
       );
       await tester.pump(const Duration(milliseconds: 400));
       expect(
-        find.byKey(const Key('mobile-settings-manual-bridge-card')),
+        find.byKey(const Key('mobile-settings-manual-bridge-connected-card')),
         findsOneWidget,
       );
       expect(
@@ -394,8 +394,44 @@ void main() {
         find.byKey(const Key('mobile-settings-manual-bridge-snackbar')),
         findsOneWidget,
       );
-      expect(tester.widget<FilledButton>(saveButton).onPressed, isNotNull);
-      expect(find.text('保存手动配置'), findsOneWidget);
+      // 且切换到已连接视图，不把用户留在表单上。
+      expect(
+        find.byKey(const Key('mobile-settings-manual-bridge-connected-card')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets('sign-in and manual bridge cards coexist until one connects', (
+      tester,
+    ) async {
+      final store = _MemorySecureConfigStore();
+      final controller = _NoopRefreshAppController(store: store);
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light().copyWith(platform: TargetPlatform.iOS),
+          home: MediaQuery(
+            data: const MediaQueryData(size: Size(390, 844)),
+            child: Scaffold(body: MobileSettingsPage(controller: controller)),
+          ),
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 250));
+
+      // 都未连接时两张卡片共存，用户可以任选一条路。
+      expect(
+        find.byKey(const Key('mobile-settings-account-login-card')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('mobile-settings-manual-bridge-card')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('mobile-settings-manual-bridge-connected-card')),
+        findsNothing,
+      );
     });
 
     testWidgets('manual bridge mode offers a way back to sign-in', (
@@ -461,7 +497,7 @@ void main() {
       expect(resetButton, findsOneWidget);
 
       await tester.ensureVisible(resetButton);
-      tester.widget<TextButton>(resetButton).onPressed!();
+      tester.widget<FilledButton>(resetButton).onPressed!();
       await tester.pump(mobileManualBridgeFeedbackTimeoutInternal);
       await tester.pump(const Duration(milliseconds: 400));
 

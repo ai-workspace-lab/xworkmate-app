@@ -40,6 +40,9 @@ class _MobileSettingsPageState extends State<MobileSettingsPage> {
   String lastSavedBridgeUrl = '';
   bool accountSyncing = false;
   bool manualBridgeSaving = false;
+  /// 手动 Bridge 已生效时，默认展示「已连接视图」；用户点「编辑配置」才
+  /// 回到表单。未生效时表单本来就是常驻的，这个标志不参与判断。
+  bool manualBridgeEditing = false;
 
   @override
   void initState() {
@@ -151,7 +154,13 @@ class _MobileSettingsPageState extends State<MobileSettingsPage> {
       return;
     }
     final messenger = ScaffoldMessenger.maybeOf(context);
-    setState(() => manualBridgeSaving = true);
+    setState(() {
+      manualBridgeSaving = true;
+      // 设置是同步生效的：不锁住表单的话，刚点下保存卡片就会翻成
+      // 「已连接」——那是在连通性验证完成之前就宣称连上了。保存期间
+      // 留在表单上，验证有结果再切换。
+      manualBridgeEditing = true;
+    });
     bool configured = false;
     bool timedOut = false;
     String? failure;
@@ -179,6 +188,12 @@ class _MobileSettingsPageState extends State<MobileSettingsPage> {
       if (mounted) {
         setState(() => manualBridgeSaving = false);
       }
+    }
+    if (mounted && failure == null) {
+      // 解除表单锁定，让视图回归由持久化结果自行判定：settings 里真的
+      // 生效了才会显示已连接视图，没生效则表单继续在（用户输入还在）。
+      // 不用 configured 兜底——超时时它仍是初始值 false，并不代表没保存。
+      setState(() => manualBridgeEditing = false);
     }
     if (!mounted || messenger == null) {
       return;
@@ -233,6 +248,7 @@ class _MobileSettingsPageState extends State<MobileSettingsPage> {
     bridgeUrlController.clear();
     bridgeTokenController.clear();
     lastSavedBridgeUrl = '';
+    manualBridgeEditing = false;
     try {
       // 同样共用一个总预算，避免逐段超时把最坏等待时间叠成三倍。
       await () async {
@@ -507,6 +523,11 @@ class _MobileSettingsPageState extends State<MobileSettingsPage> {
                           manualBridgeSaving: manualBridgeSaving,
                           onSaveManualBridge: () => saveManualBridge(settings),
                           onResetManualBridge: resetManualBridge,
+                          manualBridgeEditing: manualBridgeEditing,
+                          onEditManualBridge: () =>
+                              setState(() => manualBridgeEditing = true),
+                          onCancelManualBridgeEdit: () =>
+                              setState(() => manualBridgeEditing = false),
                         ),
                     ],
                   ),
@@ -544,6 +565,9 @@ class _AccountSection extends StatelessWidget {
     required this.manualBridgeSaving,
     required this.onSaveManualBridge,
     required this.onResetManualBridge,
+    required this.manualBridgeEditing,
+    required this.onEditManualBridge,
+    required this.onCancelManualBridgeEdit,
   });
 
   final SettingsSnapshot settings;
@@ -568,6 +592,9 @@ class _AccountSection extends StatelessWidget {
   final bool manualBridgeSaving;
   final Future<void> Function() onSaveManualBridge;
   final Future<void> Function() onResetManualBridge;
+  final bool manualBridgeEditing;
+  final VoidCallback onEditManualBridge;
+  final VoidCallback onCancelManualBridgeEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -690,13 +717,24 @@ class _AccountSection extends StatelessWidget {
       );
     }
     if (manualBridgeConfigured) {
+      // 与账号「已连接视图」对称：默认展示连接状态而不是编辑表单，
+      // 需要改地址/令牌时再显式进入编辑。
+      if (!manualBridgeEditing) {
+        return _ManualBridgeConnectedCard(
+          accountBusy: accountBusy,
+          manualBridgeSaving: manualBridgeSaving,
+          endpoint: settings.acpBridgeServerModeConfig.selfHosted.serverUrl,
+          onEdit: onEditManualBridge,
+          onReset: onResetManualBridge,
+        );
+      }
       return _ManualBridgeCard(
         accountBusy: accountBusy,
         bridgeUrlController: bridgeUrlController,
         bridgeTokenController: bridgeTokenController,
         manualBridgeSaving: manualBridgeSaving,
         onSaveManualBridge: onSaveManualBridge,
-        onResetManualBridge: onResetManualBridge,
+        onCancelEdit: onCancelManualBridgeEdit,
       );
     }
     return Column(
@@ -786,6 +824,77 @@ class _AccountSection extends StatelessWidget {
   }
 }
 
+/// 手动 Bridge 生效后的「已连接视图」，与账号登录成功后的卡片对称：
+/// 展示当前入口与状态，并提供「编辑配置」与「退出」两个出口——退出后
+/// svc.plus 登录与手动 Bridge 两张卡片会重新一起显示。
+class _ManualBridgeConnectedCard extends StatelessWidget {
+  const _ManualBridgeConnectedCard({
+    required this.accountBusy,
+    required this.manualBridgeSaving,
+    required this.endpoint,
+    required this.onEdit,
+    required this.onReset,
+  });
+
+  final bool accountBusy;
+  final bool manualBridgeSaving;
+  final String endpoint;
+  final VoidCallback onEdit;
+  final Future<void> Function() onReset;
+
+  @override
+  Widget build(BuildContext context) {
+    final busy = accountBusy || manualBridgeSaving;
+    return MobileSettingsCardInternal(
+      key: const Key('mobile-settings-manual-bridge-connected-card'),
+      icon: manualBridgeSaving ? Icons.sync_rounded : Icons.link_rounded,
+      title: appText('手动 Bridge 已连接', 'Manual Bridge Connected'),
+      subtitle: manualBridgeSaving
+          ? appText('正在处理…', 'Working…')
+          : appText(
+              '当前使用手动配置的 Bridge，未走 svc.plus 托管登录。',
+              'Using a manually configured Bridge instead of managed sign-in.',
+            ),
+      children: [
+        MobileSettingsMetaRowInternal(
+          key: const Key('mobile-settings-manual-bridge-endpoint-row'),
+          icon: Icons.dns_outlined,
+          label: appText('Bridge 地址', 'Bridge URL'),
+          value: endpoint.trim().isEmpty ? '—' : endpoint.trim(),
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: FilledButton.icon(
+                key: const Key('mobile-settings-manual-bridge-edit-button'),
+                onPressed: busy ? null : onEdit,
+                icon: const Icon(Icons.edit_outlined),
+                label: Text(appText('编辑配置', 'Edit Config')),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: FilledButton.tonalIcon(
+                key: const Key('mobile-settings-manual-bridge-reset-button'),
+                onPressed: busy ? null : onReset,
+                icon: manualBridgeSaving
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.logout_rounded),
+                label: Text(appText('退出', 'Exit')),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
 class _ManualBridgeCard extends StatelessWidget {
   const _ManualBridgeCard({
     required this.accountBusy,
@@ -793,7 +902,7 @@ class _ManualBridgeCard extends StatelessWidget {
     required this.bridgeTokenController,
     required this.manualBridgeSaving,
     required this.onSaveManualBridge,
-    this.onResetManualBridge,
+    this.onCancelEdit,
   });
 
   final bool accountBusy;
@@ -802,8 +911,8 @@ class _ManualBridgeCard extends StatelessWidget {
   final bool manualBridgeSaving;
   final Future<void> Function() onSaveManualBridge;
 
-  /// 仅在手动 Bridge 已生效、账号登录卡片被隐藏时提供；否则本来就能走登录。
-  final Future<void> Function()? onResetManualBridge;
+  /// 仅在「已生效后再次进入编辑」时提供；首次配置没有可取消的对象。
+  final VoidCallback? onCancelEdit;
 
   @override
   Widget build(BuildContext context) {
@@ -858,19 +967,14 @@ class _ManualBridgeCard extends StatelessWidget {
             ),
           ),
         ),
-        if (onResetManualBridge != null) ...[
+        if (onCancelEdit != null) ...[
           const SizedBox(height: 8),
           SizedBox(
             width: double.infinity,
-            child: TextButton.icon(
-              key: const Key('mobile-settings-manual-bridge-reset-button'),
-              onPressed: accountBusy || manualBridgeSaving
-                  ? null
-                  : onResetManualBridge,
-              icon: const Icon(Icons.logout_rounded, size: 18),
-              label: Text(
-                appText('清除配置并返回登录', 'Clear config and back to sign-in'),
-              ),
+            child: TextButton(
+              key: const Key('mobile-settings-manual-bridge-cancel-edit-button'),
+              onPressed: manualBridgeSaving ? null : onCancelEdit,
+              child: Text(appText('取消', 'Cancel')),
             ),
           ),
         ],
