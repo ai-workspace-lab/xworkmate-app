@@ -4,6 +4,7 @@
 > 范围:`lib/features/mobile` 首帧引导、`lib/app` 启动恢复、`lib/runtime` 存储层写对账
 > 分支:`bugfix/ios-startup-session-wipe-race`
 > 关联:[2026-07-20 持久化加固记录](2026-07-20-ios-session-persistence-hardening.md)、[2026-07-20 P1 结构收敛](2026-07-20-ios-task-persistence-p1-refactor.md)
+> Dev Runbook(诊断步骤、验收清单、回滚):[docs/cases/ios-startup-session-wipe-race-dev-runbook.md](../cases/ios-startup-session-wipe-race-dev-runbook.md)
 
 ## 0. 现象
 

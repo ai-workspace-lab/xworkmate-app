@@ -1,7 +1,7 @@
 # iOS 会话持久化手工回归用例
 
-> 关联:[2026-07-20 持久化加固记录](../tasks/2026-07-20-ios-session-persistence-hardening.md)、[2026-07-20 P1 结构收敛](../tasks/2026-07-20-ios-task-persistence-p1-refactor.md)
-> 覆盖 PR:#168(路径重定位)、#170(备份排除)、#171(每会话文件)、#172(Keychain + 重装即登出)、#177(SharedPreferences重构原生存储)、P1 收敛(TaskThreadStore,不向后兼容)
+> 关联:[2026-07-20 持久化加固记录](../tasks/2026-07-20-ios-session-persistence-hardening.md)、[2026-07-20 P1 结构收敛](../tasks/2026-07-20-ios-task-persistence-p1-refactor.md)、[2026-07-21 启动竞态 Dev Runbook](ios-startup-session-wipe-race-dev-runbook.md)
+> 覆盖 PR:#168(路径重定位)、#170(备份排除)、#171(每会话文件)、#172(Keychain + 重装即登出)、#177(SharedPreferences重构原生存储)、P1 收敛(TaskThreadStore,不向后兼容)、#183(启动竞态清空会话修复)
 > 前置:真机(iOS 15.6+),已登录 svc.plus 账号,至少两个历史任务会话(其中一个含制品),其中至少一个会话自安装后从未再次打开过。
 
 ## C1 冷重启保留
