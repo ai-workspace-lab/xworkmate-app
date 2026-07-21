@@ -30,10 +30,6 @@
 	<true/>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>XWorkmate uses your local network only when you explicitly connect to a user-configured OpenClaw Gateway on the same network.</string>
-	<key>NSCameraUsageDescription</key>
-	<string>XWorkmate uses the camera only when you explicitly scan a gateway pairing QR code.</string>
-	<key>NSMicrophoneUsageDescription</key>
-	<string>XWorkmate requires microphone access for voice interactions and WebRTC connections.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>XWorkmate requires photo library access to let you select and upload images as attachments.</string>
 	<key>UIApplicationSceneManifest</key>
