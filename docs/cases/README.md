@@ -7,6 +7,8 @@
 - [核心功能集成测试手动 Case](./core-integration-manual-cases.md)
 - [云端账号与 XWorkmate Bridge 连接手动 Case](./cloud-account-and-bridge-manual-cases.md)
 - [手动 Bridge 登录状态误判 Case](./manual-bridge-login-state/README.md)
+- [iOS 会话持久化手工回归用例](./ios-session-persistence-manual-cases.md)
+- [Dev Runbook: iOS 启动竞态清空会话](./ios-startup-session-wipe-race-dev-runbook.md)
 - [云原生 Service Mesh 网络科普视频调研场景测试用例](./service-mesh-evolution-video-scenario/README.md)
 - [OpenClaw Gateway 5 并发 E2E 回归场景](./openclaw-gateway-e2e-regression/README.md)
 - [OpenClaw 全局媒体制品与任务作用域归档 Case](./openclaw-task-scoped-media-artifacts.md)
