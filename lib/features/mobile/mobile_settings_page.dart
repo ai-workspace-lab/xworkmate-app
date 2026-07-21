@@ -156,18 +156,20 @@ class _MobileSettingsPageState extends State<MobileSettingsPage> {
     bool timedOut = false;
     String? failure;
     try {
-      configured = await persistAccountProfileSettings(
-        settings: settings,
-        isManualBridge: true,
-        deferCapabilityRefresh: true,
-      ).timeout(mobileManualBridgeFeedbackTimeoutInternal);
-      if (configured) {
-        // 必须 await：按钮要保持忙碌态直到能力刷新落地，
-        // 否则反馈会早于真实连接状态出现。
-        await refreshBridgeCapabilities().timeout(
-          mobileManualBridgeFeedbackTimeoutInternal,
+      // 整个「保存 + 刷新」共用一个超时预算：逐段各给一次超时会让最坏
+      // 等待时间翻倍，用户点一次要等两倍时长才拿到回执。
+      await () async {
+        configured = await persistAccountProfileSettings(
+          settings: settings,
+          isManualBridge: true,
+          deferCapabilityRefresh: true,
         );
-      }
+        if (configured) {
+          // 必须 await：按钮要保持忙碌态直到能力刷新落地，
+          // 否则反馈会早于真实连接状态出现。
+          await refreshBridgeCapabilities();
+        }
+      }().timeout(mobileManualBridgeFeedbackTimeoutInternal);
     } on TimeoutException {
       timedOut = true;
     } catch (e, stackTrace) {
@@ -213,6 +215,68 @@ class _MobileSettingsPageState extends State<MobileSettingsPage> {
           key: const Key('mobile-settings-manual-bridge-snackbar'),
           behavior: SnackBarBehavior.floating,
           content: Text(message),
+        ),
+      );
+  }
+
+  /// 清空手动 Bridge 配置，回到「可以走 svc.plus 登录」的状态。
+  /// 手动 Bridge 一旦配置生效，账号登录卡片就不再显示；没有这个出口的话
+  /// 用户会被困在手动模式里，既退不出也换不回托管登录。
+  Future<void> resetManualBridge() async {
+    if (manualBridgeSaving) {
+      return;
+    }
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    setState(() => manualBridgeSaving = true);
+    String? failure;
+    // 输入框先清空：即使后面的持久化卡住，UI 也已回到可重配的状态。
+    bridgeUrlController.clear();
+    bridgeTokenController.clear();
+    lastSavedBridgeUrl = '';
+    try {
+      // 同样共用一个总预算，避免逐段超时把最坏等待时间叠成三倍。
+      await () async {
+        final current = widget.controller.settings;
+        final passwordRef =
+            current.acpBridgeServerModeConfig.selfHosted.passwordRef;
+        // 先落配置重置：用户要的「退出手动模式」只取决于这一步，
+        // 把它排在密钥清理后面的话，密钥清理一卡住就整个退不出去。
+        await widget.controller.saveSettings(
+          current.copyWith(
+            acpBridgeServerModeConfig: AcpBridgeServerModeConfig.defaults(),
+          ),
+          refreshAfterSave: false,
+        );
+        if (passwordRef.trim().isNotEmpty) {
+          await widget.controller.settingsController.storeInternal
+              .clearSecretValueByRef(passwordRef);
+        }
+        await widget.controller.settingsController.refreshDerivedState();
+      }().timeout(mobileManualBridgeFeedbackTimeoutInternal);
+    } on TimeoutException {
+      // 清理链路卡住时不阻塞 UI：本地输入已清空，下次进入仍可重配。
+    } catch (e, stackTrace) {
+      debugPrint('Error: $e\n$stackTrace');
+      failure = '$e';
+    } finally {
+      if (mounted) {
+        setState(() => manualBridgeSaving = false);
+      }
+    }
+    if (!mounted || messenger == null) {
+      return;
+    }
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          key: const Key('mobile-settings-manual-bridge-snackbar'),
+          behavior: SnackBarBehavior.floating,
+          content: Text(
+            failure == null
+                ? appText('已清除手动 Bridge 配置', 'Manual Bridge config cleared')
+                : appText('清除失败：$failure', 'Reset failed: $failure'),
+          ),
         ),
       );
   }
@@ -442,6 +506,7 @@ class _MobileSettingsPageState extends State<MobileSettingsPage> {
                           onLogout: logoutAccount,
                           manualBridgeSaving: manualBridgeSaving,
                           onSaveManualBridge: () => saveManualBridge(settings),
+                          onResetManualBridge: resetManualBridge,
                         ),
                     ],
                   ),
@@ -478,6 +543,7 @@ class _AccountSection extends StatelessWidget {
     required this.onLogout,
     required this.manualBridgeSaving,
     required this.onSaveManualBridge,
+    required this.onResetManualBridge,
   });
 
   final SettingsSnapshot settings;
@@ -501,6 +567,7 @@ class _AccountSection extends StatelessWidget {
   final Future<void> Function() onLogout;
   final bool manualBridgeSaving;
   final Future<void> Function() onSaveManualBridge;
+  final Future<void> Function() onResetManualBridge;
 
   @override
   Widget build(BuildContext context) {
@@ -629,6 +696,7 @@ class _AccountSection extends StatelessWidget {
         bridgeTokenController: bridgeTokenController,
         manualBridgeSaving: manualBridgeSaving,
         onSaveManualBridge: onSaveManualBridge,
+        onResetManualBridge: onResetManualBridge,
       );
     }
     return Column(
@@ -725,6 +793,7 @@ class _ManualBridgeCard extends StatelessWidget {
     required this.bridgeTokenController,
     required this.manualBridgeSaving,
     required this.onSaveManualBridge,
+    this.onResetManualBridge,
   });
 
   final bool accountBusy;
@@ -732,6 +801,9 @@ class _ManualBridgeCard extends StatelessWidget {
   final TextEditingController bridgeTokenController;
   final bool manualBridgeSaving;
   final Future<void> Function() onSaveManualBridge;
+
+  /// 仅在手动 Bridge 已生效、账号登录卡片被隐藏时提供；否则本来就能走登录。
+  final Future<void> Function()? onResetManualBridge;
 
   @override
   Widget build(BuildContext context) {
@@ -786,6 +858,22 @@ class _ManualBridgeCard extends StatelessWidget {
             ),
           ),
         ),
+        if (onResetManualBridge != null) ...[
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: TextButton.icon(
+              key: const Key('mobile-settings-manual-bridge-reset-button'),
+              onPressed: accountBusy || manualBridgeSaving
+                  ? null
+                  : onResetManualBridge,
+              icon: const Icon(Icons.logout_rounded, size: 18),
+              label: Text(
+                appText('清除配置并返回登录', 'Clear config and back to sign-in'),
+              ),
+            ),
+          ),
+        ],
       ],
     );
   }

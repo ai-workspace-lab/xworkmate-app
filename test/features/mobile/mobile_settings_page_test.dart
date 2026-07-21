@@ -398,6 +398,80 @@ void main() {
       expect(find.text('保存手动配置'), findsOneWidget);
     });
 
+    testWidgets('manual bridge mode offers a way back to sign-in', (
+      tester,
+    ) async {
+      final store = _MemorySecureConfigStore();
+      final controller = _NoopRefreshAppController(store: store);
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light().copyWith(platform: TargetPlatform.iOS),
+          home: MediaQuery(
+            data: const MediaQueryData(size: Size(390, 844)),
+            child: Scaffold(body: MobileSettingsPage(controller: controller)),
+          ),
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 250));
+
+      // 未配置手动 Bridge 时登录卡片可见，此时不需要（也不该有）退出入口。
+      expect(
+        find.byKey(const Key('mobile-settings-account-login-card')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('mobile-settings-manual-bridge-reset-button')),
+        findsNothing,
+      );
+
+      final urlField = find.byKey(
+        const Key('mobile-settings-manual-bridge-url-field'),
+      );
+      await tester.ensureVisible(urlField);
+      await tester.enterText(
+        find.descendant(of: urlField, matching: find.byType(TextFormField)),
+        'http://127.0.0.1:1',
+      );
+      await tester.enterText(
+        find.descendant(
+          of: find.byKey(const Key('mobile-settings-manual-bridge-token-field')),
+          matching: find.byType(TextFormField),
+        ),
+        'mobile-manual-token',
+      );
+      final saveButton = find.byKey(
+        const Key('mobile-settings-manual-bridge-save-button'),
+      );
+      await tester.ensureVisible(saveButton);
+      tester.widget<FilledButton>(saveButton).onPressed!();
+      await tester.pump(mobileManualBridgeFeedbackTimeoutInternal);
+      await tester.pump(const Duration(milliseconds: 400));
+
+      // 手动 Bridge 生效后登录卡片被隐藏——此时必须给出退出口，
+      // 否则用户被困在手动模式里既退不出也换不回托管登录。
+      expect(
+        find.byKey(const Key('mobile-settings-account-login-card')),
+        findsNothing,
+      );
+      final resetButton = find.byKey(
+        const Key('mobile-settings-manual-bridge-reset-button'),
+      );
+      expect(resetButton, findsOneWidget);
+
+      await tester.ensureVisible(resetButton);
+      tester.widget<TextButton>(resetButton).onPressed!();
+      await tester.pump(mobileManualBridgeFeedbackTimeoutInternal);
+      await tester.pump(const Duration(milliseconds: 400));
+
+      // 清除后回到可登录状态。
+      expect(
+        find.byKey(const Key('mobile-settings-account-login-card')),
+        findsOneWidget,
+      );
+    });
+
     testWidgets('sync button reports in-flight state while syncing', (
       tester,
     ) async {
