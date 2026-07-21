@@ -14,6 +14,11 @@ import '../settings/settings_logs_panel.dart';
 import '../settings/settings_plugins_panel.dart';
 import '../settings/settings_help_panel.dart';
 
+/// 保存 + 连通性刷新的等待上限。设置持久化链路上任何一环卡住（历史上出现过
+/// store 写入在某些环境下不返回），都不能让按钮无限转圈——超时后按「仍在
+/// 后台继续」如实反馈，而不是假装成功或假装失败。
+const Duration mobileManualBridgeFeedbackTimeoutInternal = Duration(seconds: 8);
+
 class MobileSettingsPage extends StatefulWidget {
   const MobileSettingsPage({super.key, required this.controller});
 
@@ -34,6 +39,7 @@ class _MobileSettingsPageState extends State<MobileSettingsPage> {
   String lastSavedAccountIdentifier = '';
   String lastSavedBridgeUrl = '';
   bool accountSyncing = false;
+  bool manualBridgeSaving = false;
 
   @override
   void initState() {
@@ -103,10 +109,14 @@ class _MobileSettingsPageState extends State<MobileSettingsPage> {
     lastSavedBridgeUrl = bridgeConfig.selfHosted.serverUrl;
   }
 
-  Future<void> persistAccountProfileSettings({
+  /// 返回本次保存后手动 Bridge 是否已配置完整。调用方据此决定要不要等待
+  /// 能力刷新——[deferCapabilityRefresh] 为 true 时不在这里 fire-and-forget，
+  /// 由调用方 await，从而能把刷新结果反馈给用户。
+  Future<bool> persistAccountProfileSettings({
     required SettingsSnapshot settings,
     required bool isManualBridge,
     bool refreshAfterSave = true,
+    bool deferCapabilityRefresh = false,
   }) async {
     final nextSettings = await widget.controller.settingsController
         .buildSavedAccountProfileSettings(
@@ -125,10 +135,86 @@ class _MobileSettingsPageState extends State<MobileSettingsPage> {
     lastSavedAccountIdentifier = nextSettings.accountUsername;
     lastSavedBridgeUrl =
         nextSettings.acpBridgeServerModeConfig.selfHosted.serverUrl;
-    if (isManualBridge &&
-        nextSettings.acpBridgeServerModeConfig.selfHosted.isConfigured) {
+    final manualBridgeConfigured =
+        nextSettings.acpBridgeServerModeConfig.selfHosted.isConfigured;
+    if (isManualBridge && manualBridgeConfigured && !deferCapabilityRefresh) {
       unawaited(refreshBridgeCapabilities());
     }
+    return manualBridgeConfigured;
+  }
+
+  /// 保存手动 Bridge 配置并等待连通性刷新，把结果以 SnackBar 反馈出去。
+  /// 之前这里是 fire-and-forget：点了保存没有任何回执，用户无法判断
+  /// 地址/令牌是否真的能连上。
+  Future<void> saveManualBridge(SettingsSnapshot settings) async {
+    if (manualBridgeSaving) {
+      return;
+    }
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    setState(() => manualBridgeSaving = true);
+    bool configured = false;
+    bool timedOut = false;
+    String? failure;
+    try {
+      configured = await persistAccountProfileSettings(
+        settings: settings,
+        isManualBridge: true,
+        deferCapabilityRefresh: true,
+      ).timeout(mobileManualBridgeFeedbackTimeoutInternal);
+      if (configured) {
+        // 必须 await：按钮要保持忙碌态直到能力刷新落地，
+        // 否则反馈会早于真实连接状态出现。
+        await refreshBridgeCapabilities().timeout(
+          mobileManualBridgeFeedbackTimeoutInternal,
+        );
+      }
+    } on TimeoutException {
+      timedOut = true;
+    } catch (e, stackTrace) {
+      debugPrint('Error: $e\n$stackTrace');
+      failure = '$e';
+    } finally {
+      if (mounted) {
+        setState(() => manualBridgeSaving = false);
+      }
+    }
+    if (!mounted || messenger == null) {
+      return;
+    }
+    final connection = widget.controller.currentAssistantConnectionState;
+    final String message;
+    if (timedOut) {
+      message = appText(
+        '保存仍在进行中，请稍后在助手页确认连接状态',
+        'Still saving; check the connection status on the Assistant page',
+      );
+    } else if (failure != null) {
+      message = appText('保存失败：$failure', 'Save failed: $failure');
+    } else if (!configured) {
+      message = appText(
+        '已保存，但 Bridge 地址或令牌不完整',
+        'Saved, but the Bridge URL or token is incomplete',
+      );
+    } else if (connection.connected) {
+      message = appText(
+        '已保存 · 连接成功：${connection.detailLabel}',
+        'Saved · Connected: ${connection.detailLabel}',
+      );
+    } else {
+      final reason = (connection.lastError ?? '').trim().isNotEmpty
+          ? connection.lastError!.trim()
+          : connection.primaryLabel;
+      message = appText('已保存，但未能连接：$reason', 'Saved, but not connected: $reason');
+    }
+    messenger
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(
+          key: const Key('mobile-settings-manual-bridge-snackbar'),
+          behavior: SnackBarBehavior.floating,
+          content: Text(message),
+        ),
+      );
   }
 
   Future<void> loginAccount(SettingsSnapshot settings) async {
@@ -354,11 +440,8 @@ class _MobileSettingsPageState extends State<MobileSettingsPage> {
                           },
                           onSync: () => syncAccount(settings),
                           onLogout: logoutAccount,
-                          onSaveManualBridge: () =>
-                              persistAccountProfileSettings(
-                                settings: settings,
-                                isManualBridge: true,
-                              ),
+                          manualBridgeSaving: manualBridgeSaving,
+                          onSaveManualBridge: () => saveManualBridge(settings),
                         ),
                     ],
                   ),
@@ -393,6 +476,7 @@ class _AccountSection extends StatelessWidget {
     required this.onCancelMfa,
     required this.onSync,
     required this.onLogout,
+    required this.manualBridgeSaving,
     required this.onSaveManualBridge,
   });
 
@@ -415,6 +499,7 @@ class _AccountSection extends StatelessWidget {
   final Future<void> Function() onCancelMfa;
   final Future<void> Function() onSync;
   final Future<void> Function() onLogout;
+  final bool manualBridgeSaving;
   final Future<void> Function() onSaveManualBridge;
 
   @override
@@ -542,6 +627,7 @@ class _AccountSection extends StatelessWidget {
         accountBusy: accountBusy,
         bridgeUrlController: bridgeUrlController,
         bridgeTokenController: bridgeTokenController,
+        manualBridgeSaving: manualBridgeSaving,
         onSaveManualBridge: onSaveManualBridge,
       );
     }
@@ -624,6 +710,7 @@ class _AccountSection extends StatelessWidget {
           accountBusy: accountBusy,
           bridgeUrlController: bridgeUrlController,
           bridgeTokenController: bridgeTokenController,
+          manualBridgeSaving: manualBridgeSaving,
           onSaveManualBridge: onSaveManualBridge,
         ),
       ],
@@ -636,12 +723,14 @@ class _ManualBridgeCard extends StatelessWidget {
     required this.accountBusy,
     required this.bridgeUrlController,
     required this.bridgeTokenController,
+    required this.manualBridgeSaving,
     required this.onSaveManualBridge,
   });
 
   final bool accountBusy;
   final TextEditingController bridgeUrlController;
   final TextEditingController bridgeTokenController;
+  final bool manualBridgeSaving;
   final Future<void> Function() onSaveManualBridge;
 
   @override
@@ -672,16 +761,29 @@ class _ManualBridgeCard extends StatelessWidget {
           obscureText: true,
           keyboardType: TextInputType.visiblePassword,
           textInputAction: TextInputAction.done,
-          onSubmitted: (_) => onSaveManualBridge(),
+          onSubmitted: (_) =>
+              accountBusy || manualBridgeSaving ? null : onSaveManualBridge(),
         ),
         const SizedBox(height: 14),
         SizedBox(
           width: double.infinity,
           child: FilledButton.tonalIcon(
             key: const Key('mobile-settings-manual-bridge-save-button'),
-            onPressed: accountBusy ? null : onSaveManualBridge,
-            icon: const Icon(Icons.save_outlined),
-            label: Text(appText('保存手动配置', 'Save Manual Config')),
+            onPressed: accountBusy || manualBridgeSaving
+                ? null
+                : onSaveManualBridge,
+            icon: manualBridgeSaving
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.save_outlined),
+            label: Text(
+              manualBridgeSaving
+                  ? appText('正在连接…', 'Connecting…')
+                  : appText('保存手动配置', 'Save Manual Config'),
+            ),
           ),
         ),
       ],

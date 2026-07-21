@@ -322,7 +322,13 @@ void main() {
         ),
         'mobile-manual-token',
       );
-      await tester.pumpAndSettle();
+      // 保存链路在 test binding 下可能不返回（见 saveManualBridge 的超时
+      // 兜底），因此这里按超时窗口推进时钟,不能用 pumpAndSettle——只要
+      // 忙碌态的转圈图标还在,pumpAndSettle 永远不会 settle。
+      await tester.pump(
+        mobileManualBridgeFeedbackTimeoutInternal,
+      );
+      await tester.pump(const Duration(milliseconds: 400));
       expect(
         find.byKey(const Key('mobile-settings-manual-bridge-card')),
         findsOneWidget,
@@ -331,6 +337,65 @@ void main() {
         find.byKey(const Key('mobile-settings-account-login-card')),
         findsNothing,
       );
+    });
+
+    testWidgets('manual bridge save reports the connection result', (
+      tester,
+    ) async {
+      final store = _MemorySecureConfigStore();
+      final controller = _NoopRefreshAppController(store: store);
+      addTearDown(controller.dispose);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light().copyWith(platform: TargetPlatform.iOS),
+          home: MediaQuery(
+            data: const MediaQueryData(size: Size(390, 844)),
+            child: Scaffold(body: MobileSettingsPage(controller: controller)),
+          ),
+        ),
+      );
+      await tester.pump(const Duration(milliseconds: 250));
+
+      final urlField = find.byKey(
+        const Key('mobile-settings-manual-bridge-url-field'),
+      );
+      await tester.ensureVisible(urlField);
+      await tester.enterText(
+        find.descendant(of: urlField, matching: find.byType(TextFormField)),
+        'http://127.0.0.1:1',
+      );
+      final tokenField = find.byKey(
+        const Key('mobile-settings-manual-bridge-token-field'),
+      );
+      await tester.enterText(
+        find.descendant(of: tokenField, matching: find.byType(TextFormField)),
+        'mobile-manual-token',
+      );
+
+      final saveButton = find.byKey(
+        const Key('mobile-settings-manual-bridge-save-button'),
+      );
+      await tester.ensureVisible(saveButton);
+      tester.widget<FilledButton>(saveButton).onPressed!();
+      await tester.pump();
+
+      // 保存进行中：按钮禁用并给出「正在连接…」的可见回执。
+      expect(tester.widget<FilledButton>(saveButton).onPressed, isNull);
+      expect(find.text('正在连接…'), findsOneWidget);
+
+      // 不能用 pumpAndSettle：忙碌态的转圈图标会让它永远 settle 不了。
+      // 按超时窗口推进时钟，验证兜底路径也一定给出反馈。
+      await tester.pump(mobileManualBridgeFeedbackTimeoutInternal);
+      await tester.pump(const Duration(milliseconds: 400));
+
+      // 落地后必须给出结果反馈,而不是静默返回。
+      expect(
+        find.byKey(const Key('mobile-settings-manual-bridge-snackbar')),
+        findsOneWidget,
+      );
+      expect(tester.widget<FilledButton>(saveButton).onPressed, isNotNull);
+      expect(find.text('保存手动配置'), findsOneWidget);
     });
 
     testWidgets('sync button reports in-flight state while syncing', (
