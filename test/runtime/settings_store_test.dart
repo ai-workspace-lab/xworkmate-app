@@ -216,15 +216,20 @@ void main() {
       expect(index['threadIds'], ['draft-keep']);
     });
 
-    test('a fresh store instance prunes stale files on save', () async {
+    test('a fresh store instance prunes stale files only after load', () async {
       await store.saveTaskThreads([thread('draft-old')]);
       final secondStore = SettingsStore(
         StoreLayoutResolver(supportRootPathResolver: () async => tempRoot.path),
       );
       addTearDown(secondStore.dispose);
 
+      // 未经过 load 的保存不得删除陌生文件(启动早写防清库)。
       await secondStore.saveTaskThreads([thread('draft-new')]);
+      expect(threadFile('draft-new').existsSync(), isTrue);
+      expect(threadFile('draft-old').existsSync(), isTrue);
 
+      await secondStore.loadTaskThreads();
+      await secondStore.saveTaskThreads([thread('draft-new')]);
       expect(threadFile('draft-new').existsSync(), isTrue);
       expect(threadFile('draft-old').existsSync(), isFalse);
     });
