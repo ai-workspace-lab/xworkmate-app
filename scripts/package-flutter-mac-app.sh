@@ -75,7 +75,22 @@ patch_macos_project_for_ad_hoc_signing() {
   backup_for_signing_patch "$MACOS_APP_INFO_CONFIG"
 
   if [[ -f "$MACOS_PROJECT_FILE" ]]; then
-    perl -0pi -e 's/"CODE_SIGN_IDENTITY\[sdk=macosx\*\]" = "Apple Development";/CODE_SIGN_IDENTITY = "-";/g; s/CODE_SIGN_STYLE = Automatic;/CODE_SIGN_STYLE = Manual;/g; s/DEVELOPMENT_TEAM = [^;]+;/DEVELOPMENT_TEAM = "";/g' "$MACOS_PROJECT_FILE"
+    # SDK-qualified keys (KEY[sdk=macosx*]) override the unqualified key for
+    # macOS SDK builds, so both forms must be neutralized. The previous
+    # version of this patch only matched the qualified identity when its
+    # value was exactly "Apple Development"; the App Store Release config
+    # actually carries "3rd Party Mac Developer Application" there (and a
+    # matching DEVELOPMENT_TEAM[sdk=macosx*]), which the old regex silently
+    # skipped — CI kept trying to find a real "Mac App Distribution"
+    # certificate despite the "ad-hoc" log message. Match any value instead
+    # of a fixed string so this can't go stale again the same way.
+    perl -0pi -e '
+      s/CODE_SIGN_IDENTITY = "[^"]*";/CODE_SIGN_IDENTITY = "-";/g;
+      s/"CODE_SIGN_IDENTITY\[sdk=macosx\*\]" = "[^"]*";/"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";/g;
+      s/CODE_SIGN_STYLE = Automatic;/CODE_SIGN_STYLE = Manual;/g;
+      s/DEVELOPMENT_TEAM = [^;]+;/DEVELOPMENT_TEAM = "";/g;
+      s/"DEVELOPMENT_TEAM\[sdk=macosx\*\]" = [^;]+;/"DEVELOPMENT_TEAM[sdk=macosx*]" = "";/g;
+    ' "$MACOS_PROJECT_FILE"
   fi
 
   if [[ -f "$MACOS_APP_INFO_CONFIG" ]]; then
