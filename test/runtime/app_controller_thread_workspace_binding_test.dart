@@ -2399,10 +2399,15 @@ void main() {
           await localWorkspace.delete(recursive: true);
         }
       });
-      await File(
-        '${localWorkspace.path}/old-task-report.md',
-      ).writeAsString('stale task output');
+      final staleReport = File('${localWorkspace.path}/old-task-report.md');
+      await staleReport.writeAsString('stale task output');
       final startedAtMs = DateTime.now().millisecondsSinceEpoch.toDouble();
+      // mtime 过滤按「>= lastRunAtMs 即当次产物」判定(边界刻意含入)。
+      // 只靠写入与取时间戳之间的调度间隙拉开距离,高负载下两者会落在
+      // 同一毫秒,旧文件被误判为产物。显式回拨,消除测试自造的竞态。
+      await staleReport.setLastModified(
+        DateTime.fromMillisecondsSinceEpoch(startedAtMs.toInt() - 10000),
+      );
       await Future<void>.delayed(const Duration(milliseconds: 20));
       await Directory('${localWorkspace.path}/renders').create();
       await Directory('${localWorkspace.path}/prompts').create();

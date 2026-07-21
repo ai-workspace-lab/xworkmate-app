@@ -2,7 +2,9 @@
 
 > 日期:2026-07-20(Asia/Shanghai)
 > 范围:`test/runtime/app_controller_thread_workspace_binding_test.dart`、`lib/app/app_controller_desktop_runtime_helpers.dart`
-> 状态:**分析已完成、结论已定;代码修复未落地**(见 §4 说明)。
+> 状态:**已修复**(2026-07-21,随 `bugfix/ios-startup-session-wipe-race` 一并落地)。
+> 按 §3 方案修测试:旧文件 mtime 显式回拨 10 秒。验证:并发 `flutter build ios`
+> 负载下连续 3 次全文件跑全绿(此前该条件下必现失败)。
 > 首次记录:[2026-07-16 handoff](2026-07-16-openclaw-ios-artifact-return-handoff.md#L122)、[2026-07-20 加固记录 §2.2](2026-07-20-ios-session-persistence-hardening.md)均只标注"存量 flake、与本修复无关",未展开根因。本文补齐。
 
 ## 0. 复现现象
@@ -63,6 +65,8 @@ await Future<void>.delayed(const Duration(milliseconds: 20));
 
 验证方式:`flutter analyze` + 在并发负载下(如后台跑 `flutter build ios`)多次全量跑该测试文件,确认不再抖动。`"assistant history survives an iOS-style background flush"` 需单独处理 `_waitForControllerInitialization` 的 deadline 收紧或轮询策略,不在本文范围。
 
-## 4. 为何未落地
+## 4. 落地经过(原「为何未落地」)
 
-本次调查在临时 worktree(`jolly-shannon-495832`)中完成到 RED 复现阶段(把旧文件 mtime 显式钉到 `startedAtMs` 后,确认测试仍能稳定通过——即该改法不破坏既有断言,具备落地条件)。该 worktree 随后被清理,改动未合并回主仓,后续工作转向 [P1 存储层结构收敛](2026-07-20-ios-task-persistence-p1-refactor.md)。截至本文记录时,`test/runtime/app_controller_thread_workspace_binding_test.dart` 仍是原始状态,§3 的修复**尚未应用**——留作独立跟进任务,按 §3 方案直接实施即可,无需重新分析。
+本次调查在临时 worktree(`jolly-shannon-495832`)中完成到 RED 复现阶段(把旧文件 mtime 显式钉到 `startedAtMs` 后,确认测试仍能稳定通过——即该改法不破坏既有断言,具备落地条件)。该 worktree 随后被清理,改动未合并回主仓,后续工作转向 [P1 存储层结构收敛](2026-07-20-ios-task-persistence-p1-refactor.md)。
+
+2026-07-21 补记:排查 [iOS 启动竞态清空会话](2026-07-21-ios-startup-session-wipe-race.md) 时,这条 flake 一再污染全量回归的判读(每次都要先确认"这条是既有的、不是我引入的"),遂按 §3 方案一并修掉。
