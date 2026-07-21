@@ -110,12 +110,15 @@ class FileTaskThreadStore implements TaskThreadStore {
   final StoreLayoutResolver _layoutResolver;
   final TaskThreadSkipRecorder _onSkippedRecord;
 
-  /// 上次成功写入的每会话 JSON,按 threadId 记。null 值表示文件存在但
-  /// 内容未知(冷启动 prime 时只列了文件名),下次 save 会强制重写。
+  /// 本实例确实读过([load])或写过([save])的每会话 JSON,按 threadId 记。
+  ///
+  /// 删除对账只针对这里的条目:未被本实例观察过的会话一律不碰。曾经的
+  /// 实现会在冷启动 save 时先扫描介质、把所有现存会话填进来(值记 null),
+  /// 于是「初始化未完成时用部分快照保存」会把全部历史判为已删除——这正是
+  /// iOS 重启丢会话的根因。
   final Map<String, String?> _lastWrittenThreadJsonByThreadId =
       <String, String?>{};
   List<String> _lastWrittenThreadIndex = const <String>[];
-  bool _cachePrimed = false;
 
   bool _isThreadPayloadFile(File file) {
     final name = file.uri.pathSegments.last;
@@ -181,25 +184,6 @@ class FileTaskThreadStore implements TaskThreadStore {
   @override
   Future<void> save(List<TaskThread> threads) async {
     final layout = await _layoutResolver.resolve();
-    if (!_cachePrimed) {
-      // 冷缓存只需要文件名集合就能做删除对账;内容未知记 null,
-      // 本轮全部重写一遍。
-      _lastWrittenThreadJsonByThreadId.clear();
-      final existing = layout.tasksDirectory
-          .listSync()
-          .whereType<File>()
-          .where(_isThreadPayloadFile);
-      for (final file in existing) {
-        final threadId = decodeStableFileKey(
-          file.uri.pathSegments.last.replaceAll(RegExp(r'\.json$'), ''),
-        );
-        if (threadId != null) {
-          _lastWrittenThreadJsonByThreadId[threadId] = null;
-        }
-      }
-      _cachePrimed = true;
-    }
-
     final desiredJsonByThreadId = <String, String>{
       for (final thread in threads) thread.threadId: jsonEncode(thread),
     };
@@ -249,7 +233,6 @@ class FileTaskThreadStore implements TaskThreadStore {
     }
     _lastWrittenThreadJsonByThreadId.clear();
     _lastWrittenThreadIndex = const <String>[];
-    _cachePrimed = true;
   }
 
   Future<List<String>> _readThreadIndex(StoreLayout layout) async {
@@ -297,7 +280,6 @@ class FileTaskThreadStore implements TaskThreadStore {
     _lastWrittenThreadIndex = ordered
         .map((thread) => thread.threadId)
         .toList(growable: false);
-    _cachePrimed = true;
   }
 }
 
@@ -321,10 +303,11 @@ class PrefsTaskThreadStore implements TaskThreadStore {
 
   final TaskThreadSkipRecorder _onSkippedRecord;
 
+  /// 语义同 [FileTaskThreadStore]:只记录本实例读过或写过的会话,
+  /// 删除对账不碰未观察过的键。
   final Map<String, String?> _lastWrittenThreadJsonByThreadId =
       <String, String?>{};
   List<String> _lastWrittenThreadIndex = const <String>[];
-  bool _cachePrimed = false;
 
   @override
   Future<List<TaskThread>> load() async {
@@ -385,28 +368,12 @@ class PrefsTaskThreadStore implements TaskThreadStore {
     _lastWrittenThreadIndex = ordered
         .map((thread) => thread.threadId)
         .toList(growable: false);
-    _cachePrimed = true;
     return ordered;
   }
 
   @override
   Future<void> save(List<TaskThread> threads) async {
     final prefs = await SharedPreferences.getInstance();
-    if (!_cachePrimed) {
-      _lastWrittenThreadJsonByThreadId.clear();
-      final keys = prefs
-          .getKeys()
-          .where((key) => key.startsWith(threadKeyPrefix))
-          .toList();
-      for (final key in keys) {
-        _lastWrittenThreadJsonByThreadId[key.substring(
-              threadKeyPrefix.length,
-            )] =
-            null;
-      }
-      _cachePrimed = true;
-    }
-
     final desiredJsonByThreadId = <String, String>{
       for (final thread in threads) thread.threadId: jsonEncode(thread),
     };
@@ -452,7 +419,6 @@ class PrefsTaskThreadStore implements TaskThreadStore {
     }
     _lastWrittenThreadJsonByThreadId.clear();
     _lastWrittenThreadIndex = const <String>[];
-    _cachePrimed = true;
     await prefs.setInt(schemaVersionKey, schemaVersion);
   }
 

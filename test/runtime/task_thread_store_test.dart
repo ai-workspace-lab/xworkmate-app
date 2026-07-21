@@ -127,10 +127,33 @@ void main() {
       expect(index['threadIds'], ['draft-keep']);
     });
 
-    test('a fresh store instance prunes stale keys on save', () async {
+    test('a save before any load never deletes unknown keys', () async {
+      // 回归:启动早期用「仅含新 draft 的部分快照」保存,绝不能把
+      // 尚未 load 过的历史会话键当作已删除清掉(iOS 重启丢会话根因)。
+      await store.save([_thread('draft-history')]);
+
+      await newStore().save([_thread('draft-fresh')]);
+
+      final prefs = await SharedPreferences.getInstance();
+      expect(
+        prefs.getString(
+          '${PrefsTaskThreadStore.threadKeyPrefix}draft-history',
+        ),
+        isNotNull,
+      );
+      final reunited = await newStore().load();
+      expect(reunited.map((t) => t.threadId).toSet(), {
+        'draft-history',
+        'draft-fresh',
+      });
+    });
+
+    test('a fresh store instance prunes stale keys after loading', () async {
       await store.save([_thread('draft-old')]);
 
-      await newStore().save([_thread('draft-new')]);
+      final second = newStore();
+      await second.load();
+      await second.save([_thread('draft-new')]);
 
       final prefs = await SharedPreferences.getInstance();
       expect(
@@ -229,6 +252,18 @@ void main() {
         File('${tempRoot.path}/tasks/index.json').existsSync(),
         isFalse,
       );
+    });
+
+    test('a save before any load never deletes unknown files', () async {
+      await store.save([_thread('draft-history')]);
+
+      await newStore().save([_thread('draft-fresh')]);
+
+      final reunited = await newStore().load();
+      expect(reunited.map((t) => t.threadId).toSet(), {
+        'draft-history',
+        'draft-fresh',
+      });
     });
   });
 

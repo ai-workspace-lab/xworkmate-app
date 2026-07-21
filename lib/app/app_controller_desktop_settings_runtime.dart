@@ -469,6 +469,9 @@ extension AppControllerDesktopSettingsRuntime on AppController {
       final rebasedThreadWorkspaceCount = restoreAssistantThreadsInternal(
         sanitizedAssistantThreads,
       );
+      // 历史会话已进入 repository:此后 ensureActiveAssistantThreadInternal
+      // 才能正确判断「有可复用会话」还是「确实需要新建」。
+      completeAssistantThreadsRestoredInternal();
       if (rebasedThreadWorkspaceCount > 0) {
         // 一次性把重定位后的路径写回 threads.json，让备份文件与磁盘状态
         // 一致；不落盘也能在下次启动自愈，但排查时会一直看到旧容器路径。
@@ -542,6 +545,8 @@ extension AppControllerDesktopSettingsRuntime on AppController {
       }
       bootstrapErrorInternal = error.toString();
     } finally {
+      // 初始化中途异常或提前返回时兜底,等待恢复信号的调用方不会挂死。
+      completeAssistantThreadsRestoredInternal();
       if (!disposedInternal) {
         initializingInternal = false;
         notifyIfActiveInternal();
