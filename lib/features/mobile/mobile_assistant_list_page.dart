@@ -570,6 +570,26 @@ class _MobileDestinationList extends StatelessWidget {
           controller.navigateTo(WorkspaceDestination.settings);
         },
       ),
+      _MobileDestinationItem(
+        icon: Icons.language_outlined,
+        label: appText('语言切换 中/英', 'Language 中/EN'),
+        onTap: () {
+          controller.toggleAppLanguage();
+        },
+      ),
+      _MobileDestinationItem(
+        icon: controller.themeMode == ThemeMode.dark
+            ? Icons.light_mode_outlined
+            : Icons.dark_mode_outlined,
+        label: appText('主题切换 明/暗', 'Theme Light/Dark'),
+        onTap: () {
+          controller.setThemeMode(
+            controller.themeMode == ThemeMode.dark
+                ? ThemeMode.light
+                : ThemeMode.dark,
+          );
+        },
+      ),
     ];
 
     return Column(
