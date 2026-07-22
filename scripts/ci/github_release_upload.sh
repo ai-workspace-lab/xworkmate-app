@@ -23,7 +23,7 @@ if ! gh release view "$tag" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
   exit 0
 fi
 
-if gh release view "$tag" --repo "${GITHUB_REPOSITORY}" --json immutable --jq '.immutable' | grep -q '^true$'; then
+if gh release view "$tag" --repo "${GITHUB_REPOSITORY}" --json isImmutable --jq '.isImmutable' | grep -q '^true$'; then
   echo "Release $tag is immutable; skipping asset upload." >&2
   exit 0
 fi
