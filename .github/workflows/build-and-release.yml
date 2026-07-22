@@ -319,7 +319,7 @@ jobs:
       - name: Trigger OBS RPM build
         if: ${{ matrix.platform == 'linux' && steps.preflight.outputs.should_build_platform == 'true' && env.SHOULD_RELEASE == 'true' }}
         shell: bash
-        run: bash ./scripts/ci/trigger_obs_build.sh "${{ steps.vault_obs.outputs.OBS_TOKEN }}"
+        run: bash ./scripts/ci/trigger_obs_build.sh "${{ steps.vault_linux.outputs.OBS_TOKEN }}"
 
       - name: Publish to Launchpad PPA
         if: ${{ matrix.platform == 'linux' && steps.preflight.outputs.should_build_platform == 'true' && env.SHOULD_RELEASE == 'true' }}
