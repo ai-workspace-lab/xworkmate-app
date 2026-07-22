@@ -1,0 +1,30 @@
+#!/usr/bin/make -f
+
+%:
+	dh $@
+
+override_dh_auto_build:
+	@if command -v flutter >/dev/null 2>&1; then \
+		flutter build linux --release; \
+	else \
+		echo "flutter SDK missing, skipping build"; \
+	fi
+
+override_dh_auto_install:
+	mkdir -p debian/xworkmate/opt/xworkmate
+	if [ -d build/linux/x64/release/bundle ]; then \
+		cp -R build/linux/x64/release/bundle/* debian/xworkmate/opt/xworkmate/; \
+	elif [ -d build/linux/arm64/release/bundle ]; then \
+		cp -R build/linux/arm64/release/bundle/* debian/xworkmate/opt/xworkmate/; \
+	fi
+	mkdir -p debian/xworkmate/usr/bin
+	ln -sf /opt/xworkmate/xworkmate debian/xworkmate/usr/bin/xworkmate
+	mkdir -p debian/xworkmate/usr/share/applications
+	cp linux/packaging/xworkmate.desktop debian/xworkmate/usr/share/applications/xworkmate.desktop
+	mkdir -p debian/xworkmate/usr/share/xworkmate/autostart
+	cp linux/packaging/xworkmate-autostart.desktop debian/xworkmate/usr/share/xworkmate/autostart/xworkmate.desktop
+	mkdir -p debian/xworkmate/usr/share/icons/hicolor/scalable/apps
+	cp linux/packaging/icons/xworkmate.svg debian/xworkmate/usr/share/icons/hicolor/scalable/apps/xworkmate.svg
+
+override_dh_shlibdeps:
+	dh_shlibdeps --exclude=/opt/xworkmate/lib

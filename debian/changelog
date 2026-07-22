@@ -1,0 +1,6 @@
+xworkmate (1.1.9-1) unstable; urgency=medium
+
+  * Initial Debian and Launchpad PPA packaging release.
+  * Desktop integration with GNOME/KDE proxy and autostart capabilities.
+
+ -- AI Workspace Lab <dev@ai-workspace-lab.org>  Wed, 22 Jul 2026 10:55:00 +0800
