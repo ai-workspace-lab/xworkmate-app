@@ -76,7 +76,7 @@ This script will:
 
 ## 5. Uploading to Launchpad PPA via `dput`
 
-1. Ensure your OpenPGP/GPG public key is imported into your Launchpad account (`https://launchpad.net/~your-username/+editpgpkeys`).
+1. Generate GPG Key and import into Launchpad account (`https://launchpad.net/~your-username/+editpgpkeys`). For complete details on GPG generation and Vault secret provisioning (`GPG_PRIVATE_KEY` and `GPG_KEY_ID`), see the [GPG Key & Vault Setup Guide](file:///Users/shenlan/workspaces/ai-workspace-lab/xworkmate-app/docs/gpg-key-vault-setup-guide.md).
 2. Build the signed source package:
    ```bash
    cd dist/debian/xworkmate-<version>
@@ -87,6 +87,7 @@ This script will:
    dput ppa:ai-workspace-lab/ppa dist/debian/xworkmate_<version>_source.changes
    ```
 4. Monitor the build progress on `https://launchpad.net/~ai-workspace-lab/+archive/ubuntu/ppa`.
+
 
 ---
 
