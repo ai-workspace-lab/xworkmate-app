@@ -57,6 +57,6 @@ Added to `.github/workflows/build-and-release.yml`:
 - [x] Create `.github/actions/trigger-obs-build/action.yml`.
 - [x] Add `publish_ppa_package` and `publish_obs_package` inputs to `workflow_dispatch` in `build-and-release.yml`.
 - [x] Refactor `.github/workflows/build-and-release.yml` to consume both composite actions.
-- [x] Update `trigger_obs_build.sh` and `publish_launchpad_ppa.sh` for parameter flexibility.
-- [x] Run syntax checks and commit changes to `bugfix/ci-vault-obs-ppa-fix`.
-- [x] Push branch to origin and verify GitHub Actions workflow run.
+- [x] Extract `launchpad_ppa` and `obs_rpm` into dedicated parallel matrix targets under the `release` job.
+- [x] Push branch to origin and verify GitHub Actions workflow runs.
+- [x] Trigger `main` branch with `publish_ppa_package=true` and `publish_obs_package=true` to verify live delivery to Ubuntu PPA and Open Build Service.
