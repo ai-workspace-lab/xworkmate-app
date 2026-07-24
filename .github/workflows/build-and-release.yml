@@ -39,6 +39,14 @@ on:
         description: "Build & upload TestFlight (macOS/iOS App Store) artifacts"
         type: boolean
         default: false
+      publish_ppa_package:
+        description: "Publish Debian source package to Launchpad PPA"
+        type: boolean
+        default: true
+      publish_obs_package:
+        description: "Trigger Open Build Service (OBS) RPM build"
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -62,7 +70,9 @@ jobs:
       release_notes: ${{ steps.meta.outputs.release_notes }}
       should_release: ${{ steps.flags.outputs.should_release }}
       testflight_enabled: ${{ steps.flags.outputs.testflight_enabled }}
-      github_release_enabled: ${{ steps.flags.outputs.github_release_enabled }}    
+      github_release_enabled: ${{ steps.flags.outputs.github_release_enabled }}
+      ppa_publish_enabled: ${{ steps.flags.outputs.ppa_publish_enabled }}
+      obs_trigger_enabled: ${{ steps.flags.outputs.obs_trigger_enabled }}
 
     steps:
       - name: Checkout source
@@ -77,6 +87,8 @@ jobs:
           ENABLE_GITHUB_RELEASE_INPUT: ${{ github.event.inputs.enable_github_release }}
           ENABLE_TESTFLIGHT_INPUT: ${{ github.event.inputs.enable_testflight }}
           ENABLE_TESTFLIGHT_VAR: ${{ vars.ENABLE_TESTFLIGHT }}
+          ENABLE_PPA_PUBLISH_INPUT: ${{ github.event.inputs.publish_ppa_package }}
+          ENABLE_OBS_TRIGGER_INPUT: ${{ github.event.inputs.publish_obs_package }}
         run: bash ./.github/scripts/determine_release_mode.sh
 
       - name: Compute release metadata
@@ -306,14 +318,18 @@ jobs:
         run: bash ./scripts/ci/build_matrix_artifacts.sh "$PLATFORM" "$ARCH" "${{ matrix.package }}" "$SHOULD_RELEASE"
 
       - name: Trigger OBS RPM build
-        if: ${{ matrix.platform == 'linux' && steps.preflight.outputs.should_build_platform == 'true' && env.SHOULD_RELEASE == 'true' }}
-        shell: bash
-        run: bash ./scripts/ci/trigger_obs_build.sh "${{ steps.vault_obs.outputs.OBS_TOKEN }}"
+        if: ${{ matrix.platform == 'linux' && steps.preflight.outputs.should_build_platform == 'true' && env.SHOULD_RELEASE == 'true' && needs.prepare.outputs.obs_trigger_enabled == 'true' }}
+        uses: ./.github/actions/trigger-obs-build
+        with:
+          obs-token: ${{ steps.vault_obs.outputs.OBS_TOKEN }}
 
       - name: Publish to Launchpad PPA
-        if: ${{ matrix.platform == 'linux' && steps.preflight.outputs.should_build_platform == 'true' && env.SHOULD_RELEASE == 'true' }}
-        shell: bash
-        run: bash ./scripts/ci/publish_launchpad_ppa.sh "${{ steps.vault_gpg.outputs.GPG_PRIVATE_KEY }}" "${{ steps.vault_gpg.outputs.GPG_KEY_ID }}" "ppa:ai-workspace-lab/ppa"
+        if: ${{ matrix.platform == 'linux' && steps.preflight.outputs.should_build_platform == 'true' && env.SHOULD_RELEASE == 'true' && needs.prepare.outputs.ppa_publish_enabled == 'true' }}
+        uses: ./.github/actions/publish-launchpad-ppa
+        with:
+          gpg-private-key: ${{ steps.vault_gpg.outputs.GPG_PRIVATE_KEY }}
+          gpg-key-id: ${{ steps.vault_gpg.outputs.GPG_KEY_ID }}
+          ppa-target: "ppa:ai-workspace-lab/ppa"
 
       - name: Upload build artifacts
         if: ${{ steps.preflight.outputs.should_build_platform == 'true' && (matrix.release_only != 'true' || env.SHOULD_RELEASE == 'true') && (matrix.package != 'app-store-pkg' || needs.prepare.outputs.testflight_enabled == 'true') }}
