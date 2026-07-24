@@ -77,28 +77,7 @@ jobs:
           ENABLE_GITHUB_RELEASE_INPUT: ${{ github.event.inputs.enable_github_release }}
           ENABLE_TESTFLIGHT_INPUT: ${{ github.event.inputs.enable_testflight }}
           ENABLE_TESTFLIGHT_VAR: ${{ vars.ENABLE_TESTFLIGHT }}
-        run: |
-          if [[ "${GITHUB_REF:-}" == refs/tags/v* || "${GITHUB_EVENT_NAME:-}" == "workflow_dispatch" || "${GITHUB_REF:-}" == "refs/heads/main" || "${GITHUB_REF:-}" == refs/heads/release/* ]]; then
-            echo "should_release=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "should_release=false" >> "$GITHUB_OUTPUT"
-          fi
-
-          # TestFlight is opt-in (default OFF). Enabled only when explicitly
-          # requested via the workflow_dispatch input or the ENABLE_TESTFLIGHT
-          # repo/org variable. Keeps missing Apple signing secrets from failing
-          # the normal DMG/IPA release path.
-          if [[ "${ENABLE_TESTFLIGHT_INPUT:-}" == "true" || "${ENABLE_TESTFLIGHT_VAR:-}" == "true" ]]; then
-            echo "testflight_enabled=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "testflight_enabled=false" >> "$GITHUB_OUTPUT"
-          fi
-
-          if [[ "${GITHUB_EVENT_NAME:-}" == "workflow_dispatch" && "${ENABLE_GITHUB_RELEASE_INPUT:-}" == "false" ]]; then
-            echo "github_release_enabled=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "github_release_enabled=true" >> "$GITHUB_OUTPUT"
-          fi
+        run: bash ./.github/scripts/determine_release_mode.sh
 
       - name: Compute release metadata
         id: meta
@@ -245,10 +224,11 @@ jobs:
             kv/data/github-actions/xworkmate-app ANDROID_KEY_ALIAS | ANDROID_KEY_ALIAS ;
             kv/data/github-actions/xworkmate-app ANDROID_KEY_PASSWORD | ANDROID_KEY_PASSWORD
 
-      - name: Load Vault secrets (Linux OBS & PPA)
-        id: vault_linux
+      - name: Load Vault secret (Linux OBS)
+        id: vault_obs
         if: ${{ matrix.platform == 'linux' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
         uses: hashicorp/vault-action@v4
+        continue-on-error: true
         with:
           url: ${{ env.VAULT_ADDR }}
           method: jwt
@@ -256,29 +236,41 @@ jobs:
           jwtGithubAudience: vault
           ignoreNotFound: true
           secrets: |
-            kv/data/CICD OBS_TOKEN | OBS_TOKEN ;
-            kv/data/CICD GPG_PRIVATE_KEY | GPG_PRIVATE_KEY ;
-            kv/data/CICD GPG_KEY_ID | GPG_KEY_ID
+            kv/data/github-actions/xworkmate-app OBS_TOKEN | OBS_TOKEN
+
+      - name: Load Vault secrets (Linux PPA GPG)
+        id: vault_gpg
+        if: ${{ matrix.platform == 'linux' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+        uses: hashicorp/vault-action@v4
+        continue-on-error: true
+        with:
+          url: ${{ env.VAULT_ADDR }}
+          method: jwt
+          role: github-actions-xworkmate-app
+          jwtGithubAudience: vault
+          ignoreNotFound: true
+          secrets: |
+            kv/data/github-actions/xworkmate-app GPG_PRIVATE_KEY | GPG_PRIVATE_KEY ;
+            kv/data/github-actions/xworkmate-app GPG_KEY_ID | GPG_KEY_ID
 
       - name: Export signing secrets
         shell: bash
-        run: |
-          {
-            echo "XWORKMATE_SIGN_IDENTITY=${{ steps.vault_apple.outputs.XWORKMATE_SIGN_IDENTITY }}"
-            echo "APPLE_CERT_P12_BASE64=${{ steps.vault_apple.outputs.APPLE_CERT_P12_BASE64 }}"
-            echo "APPLE_CERT_PASSWORD=${{ steps.vault_apple.outputs.APPLE_CERT_PASSWORD }}"
-            echo "APPLE_PROVISION_PROFILE_BASE64=${{ steps.vault_apple.outputs.APPLE_PROVISION_PROFILE_BASE64 }}"
-            echo "APPLE_MAC_PROVISION_PROFILE_BASE64=${{ steps.vault_apple.outputs.APPLE_MAC_PROVISION_PROFILE_BASE64 }}"
-            echo "APPLE_KEYCHAIN_PASSWORD=${{ steps.vault_apple.outputs.APPLE_KEYCHAIN_PASSWORD }}"
-            echo "APPLE_EXPORT_METHOD=${{ steps.vault_apple.outputs.APPLE_EXPORT_METHOD }}"
-            echo "WINDOWS_PFX_BASE64=${{ steps.vault_windows.outputs.WINDOWS_PFX_BASE64 }}"
-            echo "WINDOWS_PFX_PASSWORD=${{ steps.vault_windows.outputs.WINDOWS_PFX_PASSWORD }}"
-            echo "WINDOWS_CODESIGN_SUBJECT=${{ steps.vault_windows.outputs.WINDOWS_CODESIGN_SUBJECT }}"
-            echo "ANDROID_KEYSTORE_BASE64=${{ steps.vault_android.outputs.ANDROID_KEYSTORE_BASE64 }}"
-            echo "ANDROID_KEYSTORE_PASSWORD=${{ steps.vault_android.outputs.ANDROID_KEYSTORE_PASSWORD }}"
-            echo "ANDROID_KEY_ALIAS=${{ steps.vault_android.outputs.ANDROID_KEY_ALIAS }}"
-            echo "ANDROID_KEY_PASSWORD=${{ steps.vault_android.outputs.ANDROID_KEY_PASSWORD }}"
-          } >> "$GITHUB_ENV"
+        env:
+          XWORKMATE_SIGN_IDENTITY: ${{ steps.vault_apple.outputs.XWORKMATE_SIGN_IDENTITY }}
+          APPLE_CERT_P12_BASE64: ${{ steps.vault_apple.outputs.APPLE_CERT_P12_BASE64 }}
+          APPLE_CERT_PASSWORD: ${{ steps.vault_apple.outputs.APPLE_CERT_PASSWORD }}
+          APPLE_PROVISION_PROFILE_BASE64: ${{ steps.vault_apple.outputs.APPLE_PROVISION_PROFILE_BASE64 }}
+          APPLE_MAC_PROVISION_PROFILE_BASE64: ${{ steps.vault_apple.outputs.APPLE_MAC_PROVISION_PROFILE_BASE64 }}
+          APPLE_KEYCHAIN_PASSWORD: ${{ steps.vault_apple.outputs.APPLE_KEYCHAIN_PASSWORD }}
+          APPLE_EXPORT_METHOD: ${{ steps.vault_apple.outputs.APPLE_EXPORT_METHOD }}
+          WINDOWS_PFX_BASE64: ${{ steps.vault_windows.outputs.WINDOWS_PFX_BASE64 }}
+          WINDOWS_PFX_PASSWORD: ${{ steps.vault_windows.outputs.WINDOWS_PFX_PASSWORD }}
+          WINDOWS_CODESIGN_SUBJECT: ${{ steps.vault_windows.outputs.WINDOWS_CODESIGN_SUBJECT }}
+          ANDROID_KEYSTORE_BASE64: ${{ steps.vault_android.outputs.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ steps.vault_android.outputs.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ steps.vault_android.outputs.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ steps.vault_android.outputs.ANDROID_KEY_PASSWORD }}
+        run: bash ./.github/scripts/export_signing_secrets.sh
 
       - name: Set up Flutter SDK
         uses: ./.github/actions/setup-flutter-sdk
@@ -316,12 +308,12 @@ jobs:
       - name: Trigger OBS RPM build
         if: ${{ matrix.platform == 'linux' && steps.preflight.outputs.should_build_platform == 'true' && env.SHOULD_RELEASE == 'true' }}
         shell: bash
-        run: bash ./scripts/ci/trigger_obs_build.sh "${{ steps.vault_linux.outputs.OBS_TOKEN }}"
+        run: bash ./scripts/ci/trigger_obs_build.sh "${{ steps.vault_obs.outputs.OBS_TOKEN }}"
 
       - name: Publish to Launchpad PPA
         if: ${{ matrix.platform == 'linux' && steps.preflight.outputs.should_build_platform == 'true' && env.SHOULD_RELEASE == 'true' }}
         shell: bash
-        run: bash ./scripts/ci/publish_launchpad_ppa.sh "${{ steps.vault_linux.outputs.GPG_PRIVATE_KEY }}" "${{ steps.vault_linux.outputs.GPG_KEY_ID }}" "ppa:ai-workspace-lab/ppa"
+        run: bash ./scripts/ci/publish_launchpad_ppa.sh "${{ steps.vault_gpg.outputs.GPG_PRIVATE_KEY }}" "${{ steps.vault_gpg.outputs.GPG_KEY_ID }}" "ppa:ai-workspace-lab/ppa"
 
       - name: Upload build artifacts
         if: ${{ steps.preflight.outputs.should_build_platform == 'true' && (matrix.release_only != 'true' || env.SHOULD_RELEASE == 'true') && (matrix.package != 'app-store-pkg' || needs.prepare.outputs.testflight_enabled == 'true') }}
@@ -377,12 +369,12 @@ jobs:
 
       - name: Export App Store Connect secrets
         if: ${{ matrix.target != 'github_release' && needs.prepare.outputs.testflight_enabled == 'true' }}
-        run: |
-          {
-            echo "APP_STORE_CONNECT_API_KEY_ID=${{ steps.vault.outputs.APP_STORE_CONNECT_API_KEY_ID }}"
-            echo "APP_STORE_CONNECT_ISSUER_ID=${{ steps.vault.outputs.APP_STORE_CONNECT_ISSUER_ID }}"
-            echo "APP_STORE_CONNECT_API_KEY_P8_BASE64=${{ steps.vault.outputs.APP_STORE_CONNECT_API_KEY_P8_BASE64 }}"
-          } >> "$GITHUB_ENV"
+        shell: bash
+        env:
+          APP_STORE_CONNECT_API_KEY_ID: ${{ steps.vault.outputs.APP_STORE_CONNECT_API_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ steps.vault.outputs.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY_P8_BASE64: ${{ steps.vault.outputs.APP_STORE_CONNECT_API_KEY_P8_BASE64 }}
+        run: bash ./.github/scripts/export_app_store_connect_secrets.sh
 
       - name: Download all artifacts
         if: ${{ matrix.target == 'github_release' && needs.prepare.outputs.github_release_enabled == 'true' }}
