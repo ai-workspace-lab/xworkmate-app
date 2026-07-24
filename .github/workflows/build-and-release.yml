@@ -236,34 +236,7 @@ jobs:
             kv/data/github-actions/xworkmate-app ANDROID_KEY_ALIAS | ANDROID_KEY_ALIAS ;
             kv/data/github-actions/xworkmate-app ANDROID_KEY_PASSWORD | ANDROID_KEY_PASSWORD
 
-      - name: Load Vault secret (Linux OBS)
-        id: vault_obs
-        if: ${{ matrix.platform == 'linux' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
-        uses: hashicorp/vault-action@v4
-        continue-on-error: true
-        with:
-          url: ${{ env.VAULT_ADDR }}
-          method: jwt
-          role: github-actions-xworkmate-app
-          jwtGithubAudience: vault
-          ignoreNotFound: true
-          secrets: |
-            kv/data/github-actions/xworkmate-app OBS_TOKEN | OBS_TOKEN
 
-      - name: Load Vault secrets (Linux PPA GPG)
-        id: vault_gpg
-        if: ${{ matrix.platform == 'linux' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
-        uses: hashicorp/vault-action@v4
-        continue-on-error: true
-        with:
-          url: ${{ env.VAULT_ADDR }}
-          method: jwt
-          role: github-actions-xworkmate-app
-          jwtGithubAudience: vault
-          ignoreNotFound: true
-          secrets: |
-            kv/data/github-actions/xworkmate-app GPG_PRIVATE_KEY | GPG_PRIVATE_KEY ;
-            kv/data/github-actions/xworkmate-app GPG_KEY_ID | GPG_KEY_ID
 
       - name: Export signing secrets
         shell: bash
@@ -317,19 +290,7 @@ jobs:
         shell: bash
         run: bash ./scripts/ci/build_matrix_artifacts.sh "$PLATFORM" "$ARCH" "${{ matrix.package }}" "$SHOULD_RELEASE"
 
-      - name: Trigger OBS RPM build
-        if: ${{ matrix.platform == 'linux' && steps.preflight.outputs.should_build_platform == 'true' && env.SHOULD_RELEASE == 'true' && needs.prepare.outputs.obs_trigger_enabled == 'true' }}
-        uses: ./.github/actions/trigger-obs-build
-        with:
-          obs-token: ${{ steps.vault_obs.outputs.OBS_TOKEN }}
 
-      - name: Publish to Launchpad PPA
-        if: ${{ matrix.platform == 'linux' && steps.preflight.outputs.should_build_platform == 'true' && env.SHOULD_RELEASE == 'true' && needs.prepare.outputs.ppa_publish_enabled == 'true' }}
-        uses: ./.github/actions/publish-launchpad-ppa
-        with:
-          gpg-private-key: ${{ steps.vault_gpg.outputs.GPG_PRIVATE_KEY }}
-          gpg-key-id: ${{ steps.vault_gpg.outputs.GPG_KEY_ID }}
-          ppa-target: "ppa:ai-workspace-lab/ppa"
 
       - name: Upload build artifacts
         if: ${{ steps.preflight.outputs.should_build_platform == 'true' && (matrix.release_only != 'true' || env.SHOULD_RELEASE == 'true') && (matrix.package != 'app-store-pkg' || needs.prepare.outputs.testflight_enabled == 'true') }}
@@ -347,6 +308,10 @@ jobs:
       matrix:
         include:
           - target: github_release
+            runs_on: ubuntu-22.04
+          - target: launchpad_ppa
+            runs_on: ubuntu-22.04
+          - target: obs_rpm
             runs_on: ubuntu-22.04
           - target: testflight_ios
             runs_on: macos-14
@@ -369,8 +334,8 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Load App Store Connect secrets
-        id: vault
-        if: ${{ matrix.target != 'github_release' && needs.prepare.outputs.testflight_enabled == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+        id: vault_appstore
+        if: ${{ (matrix.target == 'testflight_ios' || matrix.target == 'testflight_macos') && needs.prepare.outputs.testflight_enabled == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
         uses: hashicorp/vault-action@v4
         with:
           url: ${{ env.VAULT_ADDR }}
@@ -384,13 +349,61 @@ jobs:
             kv/data/github-actions/xworkmate-app APP_STORE_CONNECT_API_KEY_P8_BASE64 | APP_STORE_CONNECT_API_KEY_P8_BASE64
 
       - name: Export App Store Connect secrets
-        if: ${{ matrix.target != 'github_release' && needs.prepare.outputs.testflight_enabled == 'true' }}
+        if: ${{ (matrix.target == 'testflight_ios' || matrix.target == 'testflight_macos') && needs.prepare.outputs.testflight_enabled == 'true' }}
         shell: bash
         env:
-          APP_STORE_CONNECT_API_KEY_ID: ${{ steps.vault.outputs.APP_STORE_CONNECT_API_KEY_ID }}
-          APP_STORE_CONNECT_ISSUER_ID: ${{ steps.vault.outputs.APP_STORE_CONNECT_ISSUER_ID }}
-          APP_STORE_CONNECT_API_KEY_P8_BASE64: ${{ steps.vault.outputs.APP_STORE_CONNECT_API_KEY_P8_BASE64 }}
+          APP_STORE_CONNECT_API_KEY_ID: ${{ steps.vault_appstore.outputs.APP_STORE_CONNECT_API_KEY_ID }}
+          APP_STORE_CONNECT_ISSUER_ID: ${{ steps.vault_appstore.outputs.APP_STORE_CONNECT_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY_P8_BASE64: ${{ steps.vault_appstore.outputs.APP_STORE_CONNECT_API_KEY_P8_BASE64 }}
         run: bash ./.github/scripts/export_app_store_connect_secrets.sh
+
+      - name: Load Vault secret (Linux OBS)
+        id: vault_obs
+        if: ${{ matrix.target == 'obs_rpm' && needs.prepare.outputs.obs_trigger_enabled == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+        uses: hashicorp/vault-action@v4
+        continue-on-error: true
+        with:
+          url: ${{ env.VAULT_ADDR }}
+          method: jwt
+          role: github-actions-xworkmate-app
+          jwtGithubAudience: vault
+          ignoreNotFound: true
+          secrets: |
+            kv/data/github-actions/xworkmate-app OBS_TOKEN | OBS_TOKEN
+
+      - name: Load Vault secrets (Linux PPA GPG)
+        id: vault_gpg
+        if: ${{ matrix.target == 'launchpad_ppa' && needs.prepare.outputs.ppa_publish_enabled == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+        uses: hashicorp/vault-action@v4
+        continue-on-error: true
+        with:
+          url: ${{ env.VAULT_ADDR }}
+          method: jwt
+          role: github-actions-xworkmate-app
+          jwtGithubAudience: vault
+          ignoreNotFound: true
+          secrets: |
+            kv/data/github-actions/xworkmate-app GPG_PRIVATE_KEY | GPG_PRIVATE_KEY ;
+            kv/data/github-actions/xworkmate-app GPG_KEY_ID | GPG_KEY_ID
+
+      - name: Install Linux packaging dependencies
+        if: ${{ matrix.target == 'launchpad_ppa' && needs.prepare.outputs.ppa_publish_enabled == 'true' }}
+        shell: bash
+        run: bash ./scripts/ci/setup_platform_deps.sh linux
+
+      - name: Trigger OBS RPM build
+        if: ${{ matrix.target == 'obs_rpm' && needs.prepare.outputs.obs_trigger_enabled == 'true' }}
+        uses: ./.github/actions/trigger-obs-build
+        with:
+          obs-token: ${{ steps.vault_obs.outputs.OBS_TOKEN }}
+
+      - name: Publish to Launchpad PPA
+        if: ${{ matrix.target == 'launchpad_ppa' && needs.prepare.outputs.ppa_publish_enabled == 'true' }}
+        uses: ./.github/actions/publish-launchpad-ppa
+        with:
+          gpg-private-key: ${{ steps.vault_gpg.outputs.GPG_PRIVATE_KEY }}
+          gpg-key-id: ${{ steps.vault_gpg.outputs.GPG_KEY_ID }}
+          ppa-target: "ppa:ai-workspace-lab/ppa"
 
       - name: Download all artifacts
         if: ${{ matrix.target == 'github_release' && needs.prepare.outputs.github_release_enabled == 'true' }}
@@ -409,13 +422,13 @@ jobs:
           RELEASE_NOTES: ${{ needs.prepare.outputs.release_notes }}
 
       - name: Download TestFlight artifact
-        if: ${{ matrix.target != 'github_release' && needs.prepare.outputs.testflight_enabled == 'true' }}
+        if: ${{ (matrix.target == 'testflight_ios' || matrix.target == 'testflight_macos') && needs.prepare.outputs.testflight_enabled == 'true' }}
         uses: actions/download-artifact@v8
         with:
           name: ${{ matrix.artifact_name }}
           path: ${{ matrix.artifact_path }}
 
       - name: Upload to TestFlight
-        if: ${{ matrix.target != 'github_release' && needs.prepare.outputs.testflight_enabled == 'true' }}
+        if: ${{ (matrix.target == 'testflight_ios' || matrix.target == 'testflight_macos') && needs.prepare.outputs.testflight_enabled == 'true' }}
         shell: bash
         run: bash ./scripts/ci/testflight_upload.sh "${{ matrix.testflight_platform }}" "${{ matrix.artifact_path }}"
