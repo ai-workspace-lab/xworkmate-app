@@ -1,6 +1,6 @@
 # GPG Key Generation, Launchpad Import, and Vault Provisioning Guide
 
-This guide provides step-by-step instructions for generating GPG keys, uploading public keys to Ubuntu keyserver and Launchpad, exporting Base64-encoded private keys, and storing `GPG_PRIVATE_KEY` and `GPG_KEY_ID` into HashiCorp Vault (`kv/data/CICD`) for automated GitHub Actions PPA releases.
+This guide provides step-by-step instructions for generating GPG keys, uploading public keys to Ubuntu keyserver and Launchpad, exporting Base64-encoded private keys, and storing `GPG_PRIVATE_KEY` and `GPG_KEY_ID` into HashiCorp Vault (`kv/data/github-actions/xworkmate-app`) for automated GitHub Actions PPA releases.
 
 ---
 
@@ -81,11 +81,11 @@ echo "$GPG_PRIVATE_KEY_BASE64" | head -c 50
 
 ## 5. Step 4: Provision Secrets into HashiCorp Vault
 
-Store `GPG_PRIVATE_KEY` and `GPG_KEY_ID` under the `kv` mount at path `CICD` (`/v1/kv/data/CICD`):
+Store `GPG_PRIVATE_KEY` and `GPG_KEY_ID` under the `kv` mount at path `github-actions/xworkmate-app` (`/v1/kv/data/github-actions/xworkmate-app`):
 
 ```bash
 # Using Vault CLI (preserving existing OBS_TOKEN)
-vault kv put -mount="kv" CICD \
+vault kv put -mount="kv" github-actions/xworkmate-app \
   OBS_TOKEN="<your_obs_token>" \
   GPG_KEY_ID="<GPG_KEY_ID>" \
   GPG_PRIVATE_KEY="$GPG_PRIVATE_KEY_BASE64"
@@ -93,7 +93,7 @@ vault kv put -mount="kv" CICD \
 
 ### Verification in Vault:
 ```bash
-vault kv get -mount="kv" CICD
+vault kv get -mount="kv" github-actions/xworkmate-app
 ```
 
 ---
@@ -111,9 +111,9 @@ In `.github/workflows/build-and-release.yml`, the workflow uses `hashicorp/vault
           method: jwt
           role: github-actions-xworkmate-app
           secrets: |
-            kv/data/CICD OBS_TOKEN | OBS_TOKEN ;
-            kv/data/CICD GPG_PRIVATE_KEY | GPG_PRIVATE_KEY ;
-            kv/data/CICD GPG_KEY_ID | GPG_KEY_ID
+            kv/data/github-actions/xworkmate-app OBS_TOKEN | OBS_TOKEN ;
+            kv/data/github-actions/xworkmate-app GPG_PRIVATE_KEY | GPG_PRIVATE_KEY ;
+            kv/data/github-actions/xworkmate-app GPG_KEY_ID | GPG_KEY_ID
 
       - name: Publish to Launchpad PPA
         run: bash ./scripts/ci/publish_launchpad_ppa.sh "${{ steps.vault_linux.outputs.GPG_PRIVATE_KEY }}" "${{ steps.vault_linux.outputs.GPG_KEY_ID }}" "ppa:ai-workspace-lab/ppa"
