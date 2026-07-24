@@ -224,10 +224,11 @@ jobs:
             kv/data/github-actions/xworkmate-app ANDROID_KEY_ALIAS | ANDROID_KEY_ALIAS ;
             kv/data/github-actions/xworkmate-app ANDROID_KEY_PASSWORD | ANDROID_KEY_PASSWORD
 
-      - name: Load Vault secrets (Linux OBS & PPA)
-        id: vault_linux
+      - name: Load Vault secret (Linux OBS)
+        id: vault_obs
         if: ${{ matrix.platform == 'linux' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
         uses: hashicorp/vault-action@v4
+        continue-on-error: true
         with:
           url: ${{ env.VAULT_ADDR }}
           method: jwt
@@ -235,7 +236,20 @@ jobs:
           jwtGithubAudience: vault
           ignoreNotFound: true
           secrets: |
-            kv/data/github-actions/xworkmate-app OBS_TOKEN | OBS_TOKEN ;
+            kv/data/github-actions/xworkmate-app OBS_TOKEN | OBS_TOKEN
+
+      - name: Load Vault secrets (Linux PPA GPG)
+        id: vault_gpg
+        if: ${{ matrix.platform == 'linux' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+        uses: hashicorp/vault-action@v4
+        continue-on-error: true
+        with:
+          url: ${{ env.VAULT_ADDR }}
+          method: jwt
+          role: github-actions-xworkmate-app
+          jwtGithubAudience: vault
+          ignoreNotFound: true
+          secrets: |
             kv/data/github-actions/xworkmate-app GPG_PRIVATE_KEY | GPG_PRIVATE_KEY ;
             kv/data/github-actions/xworkmate-app GPG_KEY_ID | GPG_KEY_ID
 
@@ -294,12 +308,12 @@ jobs:
       - name: Trigger OBS RPM build
         if: ${{ matrix.platform == 'linux' && steps.preflight.outputs.should_build_platform == 'true' && env.SHOULD_RELEASE == 'true' }}
         shell: bash
-        run: bash ./scripts/ci/trigger_obs_build.sh "${{ steps.vault_linux.outputs.OBS_TOKEN }}"
+        run: bash ./scripts/ci/trigger_obs_build.sh "${{ steps.vault_obs.outputs.OBS_TOKEN }}"
 
       - name: Publish to Launchpad PPA
         if: ${{ matrix.platform == 'linux' && steps.preflight.outputs.should_build_platform == 'true' && env.SHOULD_RELEASE == 'true' }}
         shell: bash
-        run: bash ./scripts/ci/publish_launchpad_ppa.sh "${{ steps.vault_linux.outputs.GPG_PRIVATE_KEY }}" "${{ steps.vault_linux.outputs.GPG_KEY_ID }}" "ppa:ai-workspace-lab/ppa"
+        run: bash ./scripts/ci/publish_launchpad_ppa.sh "${{ steps.vault_gpg.outputs.GPG_PRIVATE_KEY }}" "${{ steps.vault_gpg.outputs.GPG_KEY_ID }}" "ppa:ai-workspace-lab/ppa"
 
       - name: Upload build artifacts
         if: ${{ steps.preflight.outputs.should_build_platform == 'true' && (matrix.release_only != 'true' || env.SHOULD_RELEASE == 'true') && (matrix.package != 'app-store-pkg' || needs.prepare.outputs.testflight_enabled == 'true') }}
