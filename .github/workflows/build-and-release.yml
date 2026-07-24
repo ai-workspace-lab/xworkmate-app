@@ -326,6 +326,7 @@ jobs:
     runs-on: ${{ matrix.runs_on }}
     permissions:
       contents: write
+      id-token: write
     needs:
       - prepare
       - build
