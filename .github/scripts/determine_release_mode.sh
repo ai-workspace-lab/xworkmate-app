@@ -18,3 +18,15 @@ if [[ "${GITHUB_EVENT_NAME:-}" == "workflow_dispatch" && "${ENABLE_GITHUB_RELEAS
 else
   echo "github_release_enabled=true" >> "$GITHUB_OUTPUT"
 fi
+
+if [[ "${GITHUB_EVENT_NAME:-}" == "workflow_dispatch" && "${ENABLE_PPA_PUBLISH_INPUT:-}" == "false" ]]; then
+  echo "ppa_publish_enabled=false" >> "$GITHUB_OUTPUT"
+else
+  echo "ppa_publish_enabled=true" >> "$GITHUB_OUTPUT"
+fi
+
+if [[ "${GITHUB_EVENT_NAME:-}" == "workflow_dispatch" && "${ENABLE_OBS_TRIGGER_INPUT:-}" == "false" ]]; then
+  echo "obs_trigger_enabled=false" >> "$GITHUB_OUTPUT"
+else
+  echo "obs_trigger_enabled=true" >> "$GITHUB_OUTPUT"
+fi

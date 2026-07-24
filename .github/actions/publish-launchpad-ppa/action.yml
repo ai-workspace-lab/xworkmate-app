@@ -1,0 +1,23 @@
+name: "Publish to Launchpad PPA"
+description: "Imports GPG key, packages Debian source, signs .changes, and uploads to Launchpad PPA using dput"
+
+inputs:
+  gpg-private-key:
+    description: "Base64-encoded ASCII-armored GPG private key"
+    required: false
+    default: ""
+  gpg-key-id:
+    description: "GPG key identifier for signing"
+    required: false
+    default: ""
+  ppa-target:
+    description: "Target Launchpad PPA repository"
+    required: false
+    default: "ppa:ai-workspace-lab/ppa"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Publish to Launchpad PPA
+      shell: bash
+      run: bash ./scripts/ci/publish_launchpad_ppa.sh "${{ inputs.gpg-private-key }}" "${{ inputs.gpg-key-id }}" "${{ inputs.ppa-target }}"

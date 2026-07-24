@@ -1,0 +1,27 @@
+name: "Trigger Open Build Service Build"
+description: "Triggers a package build service run on Open Build Service (OBS)"
+
+inputs:
+  obs-token:
+    description: "Open Build Service trigger authorization token"
+    required: false
+    default: ""
+  obs-project:
+    description: "OBS project namespace"
+    required: false
+    default: "home:haitaopanhq"
+  obs-package:
+    description: "OBS package identifier"
+    required: false
+    default: "xworkmate"
+  obs-url:
+    description: "OBS trigger endpoint URL"
+    required: false
+    default: "https://build.opensuse.org/trigger/runservice"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Trigger OBS build
+      shell: bash
+      run: bash ./scripts/ci/trigger_obs_build.sh "${{ inputs.obs-token }}" "${{ inputs.obs-project }}" "${{ inputs.obs-package }}" "${{ inputs.obs-url }}"
