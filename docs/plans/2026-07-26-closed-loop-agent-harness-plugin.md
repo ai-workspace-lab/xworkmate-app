@@ -34,7 +34,7 @@
 - App 不自研 Policy Engine，不代替 CI / 分支保护 / Vault 做强制。
 - **App 侧不执行 git / gh / ssh**，不持有任何仓库或云凭据。执行面在网关 agent 所在主机
   （其上已有 git / gh / ansible / 技能包），App 是控制面与证据收集面。
-- 不改动 Vault / GitHub Actions / platform-ops-toolkit。跨仓改动另立规划。
+- 不改动机密后端 / CI 系统 / 运维工具仓。跨仓改动另立规划。
 
 ## 2. 分组模型（新增）
 
@@ -62,7 +62,7 @@ enum BuiltinPluginGroup { contentProduction, developmentWorkflow }
 
 ```dart
 class HarnessRepoBinding {
-  final String name;            // ai-workspace-infra/platform-ops-toolkit
+  final String name;            // <org>/<repo>
   final String url;
   final HarnessRepoRole role;   // app | infra | gitops | playbooks | service
   final String checkoutPath;    // 网关主机上的路径
@@ -117,8 +117,10 @@ class HarnessTarget {
 
 ### 反"假绿"是第一原则
 
-`platform-ops-toolkit` 的两次事故都是**看起来绿了但什么都没做**：
-inventory 路径错 → ansible 0 主机命中仍 exit 0；skip 沿 `needs` 链传递 → deploy job 根本没被求值。
+交付流水线上最贵的一类故障是**看起来绿了但什么都没做**，两种典型形态：
+配置编排工具因 inventory 路径错误命中 0 台主机，却仍以 exit 0 收场；
+CI 里的 skip 沿 `needs` 链向下传递，导致部署 job 的条件根本没被求值就跳过，整条链显示成功。
+两者的共同点是「退出码为 0」并不等于「事情发生了」。
 所以每一步的完成判定必须是**声明式证据断言**，不是 agent 自述：
 
 ```dart
@@ -194,8 +196,9 @@ class BuiltinPluginStepVerification {
 
 每个里程碑一个 `feature/*` → `main` 的小步 PR。自己吃自己的狗粮：Harness 的落地按 Harness 走。
 
-**首个验收场景建议**：拿 `platform-ops-toolkit` + `gitops` 双仓的一个 UAT 小变更做 M5 验收——
-这正是现成的多仓多环境负载业务系统，且已知的假绿坑都在那条链路上，能真正检验证据断言是否有效。
+**首个验收场景建议**：选一个现成的「运维工具仓 + gitops 仓」双仓 UAT 小变更做 M5 验收——
+这类链路本身就是多仓多环境形态，且已知的假绿坑都在上面，能真正检验证据断言是否有效。
+具体仓库在内部渠道约定，不写进本公开仓文档。
 
 ## 8. 测试
 
@@ -219,7 +222,7 @@ class BuiltinPluginStepVerification {
 | agent 编造证据 | 证据必须是可复查 id/URL；UI 标注"agent 自报"；E2 阶段改为服务端核实 |
 | 跨仓顺序错（app 先于 infra 部署） | `HarnessRepoBinding.order` 声明依赖顺序，`change`/`deploy`/`rollback` 按序/逆序推进，不由 agent 决定 |
 | 生产误发 | `promote` 强制人工闸门 + 环境路由刚性校验（非 tag 分支类别直接拒绝） |
-| 凭据边界 | App 不持有任何仓库/云凭据；执行面凭据在网关主机与 Vault；delivery target 只存名称与路径 |
+| 凭据边界 | App 不持有任何仓库/云凭据；执行面凭据留在网关主机与机密后端；delivery target 只存名称与路径 |
 | 微调回路无限重部署 | `maxTuneIterations` 默认 5，耗尽进 rollback |
 | 模型一步跨成通用工作流引擎 | 只加 `replan` 一种非线性转移 + perRepo 一种扇出；分支/汇合/guard 留后续 |
 | 存量插件被误伤 | 新字段全默认值；分组缺省 `contentProduction`；prompt 快照锁定模板不变 |
@@ -230,8 +233,80 @@ class BuiltinPluginStepVerification {
 
 1. **分组命名**：「开发工作流 / Development Workflow」是否定稿？该分组后续还会放什么插件
    （如"仅代码评审"、"仅事故止损"），会影响分组与 kind 的粒度划分。
-2. **交付目标从哪来**：手工在设置页配置（M2 方案），还是从 CMDB / gitops 仓自动发现？
-   自动发现更贴合"组织/项目"的规模，但要新增跨仓读取能力。
-3. **微调（`tune`）的观测数据源**：健康探针足够，还是要接 observability
-   （`ai-workspace-infra/observability`）的指标？后者会把范围扩到监控集成。
-4. **M5 验收场景**：是否就用 `platform-ops-toolkit` + `gitops` 的 UAT 双仓变更。
+2. ~~**交付目标从哪来**~~：已定 —— 手工在设置页配置（M2 方案）。从配置管理库 / gitops 仓
+   自动发现更贴合"组织/项目"规模，但要新增跨仓读取能力，留作后续里程碑。
+3. **微调（`tune`）的观测数据源**：健康探针足够，还是要接内部可观测性平台的指标？
+   后者会把范围扩到监控集成。
+4. **M5 验收场景**：用哪一对双仓变更做首个验收（内部渠道约定）。
+5. **需求来源绑定的优先级**（见 §11）：`HarnessRequirementSource` 与"自取上下文"指令
+   是否提到 M4 一起做——这决定插件首版是否具备"派发一个 issue 就开工"的形态。
+
+## 11. 对标：云端研发智能体（CodeBuddy NPC 类产品）
+
+2026-07-26 补充。这类产品的定位是「进入研发流程的智能队友」：开发者派发一个任务，
+智能体自主走完 方案规划 → 编码 → 提交 PR → 测试，并**按 CI 结果反复修改直到可验收**；
+过程中无需人工反复粘贴需求或报错日志，因为它原生打通 代码仓库 / Issue / PR / CI/CD，
+会自动读取项目结构、需求记录与变更历史作为上下文。
+
+拆成四个支柱，与本规划逐条对照：
+
+| 支柱 | 该类产品的表现 | 本规划的对应物 | 差距 |
+| --- | --- | --- | --- |
+| ① 一次派发、自主闭环 | 派发即走完全流程 | §4 的 13 步状态机 + §5 的 run 推进 | 形状已对齐；执行端在 M5 |
+| ② 原生打通仓库/Issue/PR/CI | 自动读取项目结构、需求记录、变更历史 | §3 `HarnessTarget` 只建模了**改哪些仓、发哪个环境** | **缺口：没有"需求从哪来"** |
+| ③ 无需人工中转 | 不用粘贴需求与报错日志 | 目前仍靠用户把需求贴进输入框 | **缺口：缺"自取上下文"指令** |
+| ④ CI 反馈驱动迭代 | 按 CI 结果反复改直到可验收 | §4 `validate` 失败 → `replan` 回 `change`，受 `maxLoopIterations` 约束 | 已覆盖，且比"自判可验收"更严 |
+
+### 我们要保留的差异化：可验收 ≠ 自称完成
+
+这类产品的宣传语是"直到交付可验收的成果"，但**谁来判定可验收**通常是模糊的。
+本规划的 §4「反假绿是第一原则」给出的是硬判定：完成必须有可复查证据
+（PR URL / CI conclusion 且 job 未被 skip / 部署命中数 / 健康探针），
+**拿不到证据即判定失败，没有 degrade 出口**。这条不因对标而放松——
+它恰恰是企业研发场景里比"自主性"更稀缺的东西。
+
+同理保留：计划审批、CI+review、生产发布三道人工闸门。全自动直达生产不是目标，
+**可审计、可回滚、可拦截的自动化**才是。
+
+### 补齐 ②③：需求来源绑定（`HarnessRequirementSource`）
+
+在交付目标旁边加一个轻量绑定，不改动 `HarnessTarget` 既有的 repos / environments 结构：
+
+```dart
+enum HarnessRequirementSourceKind { issue, pullRequest, freeText }
+
+class HarnessRequirementSource {
+  final HarnessRequirementSourceKind kind;
+  final String repo;       // 关联到 HarnessTarget.repos 里的某个 name
+  final String reference;  // issue / PR 的编号或 URL；freeText 时为空
+  final String note;       // 补充说明，freeText 时即需求正文
+}
+```
+
+- 随 delivery context 一并注入，让 agent 知道「本轮的需求锚点在哪」。
+- `analyze` 步骤的验收证据增加一项：必须回报**已读取到的需求摘要与来源引用**，
+  没读到就不算通过——把"自己去读"变成可断言的义务，而不是可选的礼貌。
+
+### 补齐 ③ 的关键其实在提示词，不在数据模型
+
+真正消除"反复粘贴"的，是在各步指令里显式写清**自取上下文的义务与手段**（成本极低、收益最大）：
+
+| 步骤 | 追加的自取上下文指令 |
+| --- | --- |
+| `analyze` | 用 `gh issue view` / `gh pr view` 读需求；用 `git log` / `git diff` 读变更历史；读仓库结构与既有约定，**不要等我粘贴** |
+| `change` | 变更前先读相关既有实现与邻近测试，遵循仓内既有约定而非通用写法 |
+| `test` | 失败时用 `gh run view --log-failed` 自取失败日志，**不要向我要报错内容** |
+| `validate` | 用 `gh pr checks` / `gh run view` 自取 CI 结论与失败详情，据此决定 `replan` 还是通过 |
+
+这些指令属于 §5 已规划的 workflow 步骤文案，随 M4 落地即可，无需额外模型改动。
+
+### 结论：路线不变，插入一个小里程碑
+
+对标下来**不需要推翻既有 M1–M6**，只需在 M4 前后插入一个小步：
+
+| 里程碑 | 内容 | 分支 |
+| --- | --- | --- |
+| M3.5 | `HarnessRequirementSource` 模型 + 注入 delivery context + `analyze` 需求摘要证据 | `feature/harness-requirement-source` |
+
+排序理由：M3.5 依赖 §3 的交付目标模型（已在 M2a 落地），且必须早于 M4 的插件条目定稿——
+否则 `analyze` 步骤的指令与证据要求要改两遍。
