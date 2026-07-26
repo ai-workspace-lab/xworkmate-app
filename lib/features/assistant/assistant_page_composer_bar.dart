@@ -460,7 +460,7 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
                             ),
                       ),
                     ),
-                    for (final plugin in BuiltinPluginCatalog.firstBatch)
+                    for (final plugin in BuiltinPluginCatalog.all)
                       PopupMenuItem<String>(
                         key: Key(
                           'assistant-builtin-plugin-item-${plugin.id}',

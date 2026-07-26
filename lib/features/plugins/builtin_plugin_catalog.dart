@@ -9,6 +9,17 @@ import 'builtin_plugin_workflow.dart';
 /// See docs/plans/2026-07-04-builtin-plugins-batch-1.md for the full plan.
 enum BuiltinPluginKind { document, spreadsheet, presentation, image, video }
 
+/// Which shelf a plugin belongs to in plugin-facing UI (composer menu,
+/// settings panel).
+///
+/// See docs/plans/2026-07-26-closed-loop-agent-harness-plugin.md §2. Batch 1
+/// plugins are all [contentProduction] (conversation content in, files out).
+/// [developmentWorkflow] is for plugins that act on a caller-supplied code
+/// repository across an org/project's multiple repos and environments
+/// (Harness — plan §2 onward); it starts out empty and is populated in a
+/// later batch.
+enum BuiltinPluginGroup { contentProduction, developmentWorkflow }
+
 /// Rollout status of a built-in plugin.
 enum BuiltinPluginStatus { preview, beta, stable }
 
@@ -44,10 +55,13 @@ class BuiltinPluginDescriptor {
     required this.workflow,
     this.runtime = BuiltinPluginRuntimeBinding.builtinDart,
     this.status = BuiltinPluginStatus.preview,
+    this.group = BuiltinPluginGroup.contentProduction,
   });
 
   final String id;
   final BuiltinPluginKind kind;
+  /// Which UI shelf this plugin is listed under. See [BuiltinPluginGroup].
+  final BuiltinPluginGroup group;
   final IconData icon;
   final String nameZh;
   final String nameEn;
@@ -447,9 +461,31 @@ abstract final class BuiltinPluginCatalog {
         ),
       ];
 
+  /// The "development workflow" shelf (plan
+  /// docs/plans/2026-07-26-closed-loop-agent-harness-plugin.md §2 onward):
+  /// plugins that act on a caller-supplied code repository across an
+  /// org/project's repos and environments, rather than on conversation
+  /// content. Empty until the Harness plugin lands in a later batch.
+  static const List<BuiltinPluginDescriptor> developmentWorkflowBatch =
+      <BuiltinPluginDescriptor>[];
+
+  /// All built-in plugins across every group, [firstBatch] followed by
+  /// [developmentWorkflowBatch]. Prefer this (or [pluginsByGroup]) over
+  /// [firstBatch] in new call sites — [firstBatch] is kept only for the
+  /// content-production group's own identity, not as "the whole catalog".
+  static const List<BuiltinPluginDescriptor> all = <BuiltinPluginDescriptor>[
+    ...firstBatch,
+    ...developmentWorkflowBatch,
+  ];
+
+  /// Plugins belonging to [group], in catalog order.
+  static List<BuiltinPluginDescriptor> pluginsByGroup(
+    BuiltinPluginGroup group,
+  ) => all.where((plugin) => plugin.group == group).toList(growable: false);
+
   static BuiltinPluginDescriptor? byId(String id) {
     final normalized = id.trim();
-    for (final plugin in firstBatch) {
+    for (final plugin in all) {
       if (plugin.id == normalized) {
         return plugin;
       }

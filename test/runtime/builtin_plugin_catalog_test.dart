@@ -105,4 +105,58 @@ void main() {
       expect(BuiltinPluginCatalog.byId(''), isNull);
     });
   });
+
+  group('BuiltinPluginCatalog groups (docs/plans/2026-07-26-closed-loop-'
+      'agent-harness-plugin.md §2)', () {
+    test('every first-batch plugin defaults to the content-production group',
+        () {
+      for (final plugin in BuiltinPluginCatalog.firstBatch) {
+        expect(
+          plugin.group,
+          BuiltinPluginGroup.contentProduction,
+          reason: plugin.id,
+        );
+      }
+    });
+
+    test('developmentWorkflowBatch starts empty', () {
+      expect(BuiltinPluginCatalog.developmentWorkflowBatch, isEmpty);
+    });
+
+    test('all is firstBatch followed by developmentWorkflowBatch', () {
+      expect(
+        BuiltinPluginCatalog.all,
+        <BuiltinPluginDescriptor>[
+          ...BuiltinPluginCatalog.firstBatch,
+          ...BuiltinPluginCatalog.developmentWorkflowBatch,
+        ],
+      );
+      // Batch is empty today, so `all` and `firstBatch` coincide — but call
+      // sites must read `all`, not `firstBatch`, so a future non-empty
+      // developmentWorkflowBatch shows up without touching those call sites.
+      expect(BuiltinPluginCatalog.all, hasLength(5));
+    });
+
+    test('pluginsByGroup partitions all by group and covers every plugin',
+        () {
+      final contentProduction = BuiltinPluginCatalog.pluginsByGroup(
+        BuiltinPluginGroup.contentProduction,
+      );
+      final developmentWorkflow = BuiltinPluginCatalog.pluginsByGroup(
+        BuiltinPluginGroup.developmentWorkflow,
+      );
+      expect(contentProduction, BuiltinPluginCatalog.firstBatch);
+      expect(developmentWorkflow, isEmpty);
+      expect(
+        contentProduction.length + developmentWorkflow.length,
+        BuiltinPluginCatalog.all.length,
+      );
+    });
+
+    test('byId resolves plugins via all, not just firstBatch', () {
+      for (final plugin in BuiltinPluginCatalog.all) {
+        expect(BuiltinPluginCatalog.byId(plugin.id), same(plugin));
+      }
+    });
+  });
 }

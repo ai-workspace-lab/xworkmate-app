@@ -367,8 +367,7 @@ class MobileAssistantComposer extends StatelessWidget {
                             spacing: 8,
                             runSpacing: 8,
                             children: [
-                              for (final plugin
-                                  in BuiltinPluginCatalog.firstBatch)
+                              for (final plugin in BuiltinPluginCatalog.all)
                                 MobileBuiltinPluginChoiceChip(
                                   key: ValueKey(
                                     'mobile-assistant-plugin-chip-${plugin.id}',

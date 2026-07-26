@@ -19,7 +19,7 @@ class SettingsPluginsPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final palette = context.palette;
-    final items = plugins ?? BuiltinPluginCatalog.firstBatch;
+    final items = plugins ?? BuiltinPluginCatalog.all;
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 24, 24, 28),
       child: Column(
