@@ -559,29 +559,23 @@ extension AppControllerDesktopThreadActions on AppController {
               const <TaskInputAttachmentRecord>[])
         if (item.key.isNotEmpty) item.key: item,
     };
-    final inlineAttachmentsToUpload = <GatewayChatAttachmentPayload>[];
     final nextByKey = <String, TaskInputAttachmentRecord>{...existingByKey};
     final uploadedAtMs = DateTime.now().millisecondsSinceEpoch.toDouble();
     for (final attachment in attachments) {
       final key = gatewayAttachmentPayloadSha256Internal(attachment);
-      if (key.isEmpty) {
-        inlineAttachmentsToUpload.add(attachment);
-        continue;
+      if (key.isNotEmpty) {
+        nextByKey.putIfAbsent(
+          key,
+          () => TaskInputAttachmentRecord(
+            name: attachment.fileName.trim(),
+            mimeType: attachment.mimeType.trim(),
+            sha256: key,
+            type: attachment.type.trim(),
+            uploadedAtMs: uploadedAtMs,
+            sourcePath: attachment.sourcePath.trim(),
+          ),
+        );
       }
-      if (!existingByKey.containsKey(key)) {
-        inlineAttachmentsToUpload.add(attachment);
-      }
-      nextByKey.putIfAbsent(
-        key,
-        () => TaskInputAttachmentRecord(
-          name: attachment.fileName.trim(),
-          mimeType: attachment.mimeType.trim(),
-          sha256: key,
-          type: attachment.type.trim(),
-          uploadedAtMs: uploadedAtMs,
-          sourcePath: attachment.sourcePath.trim(),
-        ),
-      );
     }
     if (nextByKey.length != existingByKey.length) {
       upsertTaskThreadInternal(
@@ -590,7 +584,11 @@ extension AppControllerDesktopThreadActions on AppController {
         updatedAtMs: uploadedAtMs,
       );
     }
-    return inlineAttachmentsToUpload;
+    // A task record is conversation context, not proof that the remote
+    // Gateway still has the file. Every explicitly selected file must be
+    // included in the current request; the bridge materializes its content
+    // in the server workspace.
+    return List<GatewayChatAttachmentPayload>.unmodifiable(attachments);
   }
 
   String gatewayAttachmentPayloadSha256Internal(
