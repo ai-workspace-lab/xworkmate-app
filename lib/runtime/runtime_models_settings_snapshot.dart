@@ -2,6 +2,7 @@
 
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import '../features/plugins/harness_delivery_target.dart';
 import '../i18n/app_language.dart';
 import '../models/app_models.dart';
 import 'runtime_models_account.dart';
@@ -45,6 +46,7 @@ class SettingsSnapshot {
     required this.linuxDesktop,
     required this.assistantExecutionTarget,
     required this.assistantPermissionLevel,
+    this.harnessTargets = const <HarnessTarget>[],
   });
 
   final int schemaVersion;
@@ -77,6 +79,12 @@ class SettingsSnapshot {
   final LinuxDesktopConfig linuxDesktop;
   final AssistantExecutionTarget assistantExecutionTarget;
   final AssistantPermissionLevel assistantPermissionLevel;
+
+  /// Configured delivery targets for the closed-loop Harness plugin (plan
+  /// docs/plans/2026-07-26-closed-loop-agent-harness-plugin.md §3). Empty
+  /// until the settings UI to manage them lands — this only carries the
+  /// data through persistence.
+  final List<HarnessTarget> harnessTargets;
 
   factory SettingsSnapshot.defaults() {
     return SettingsSnapshot(
@@ -144,6 +152,7 @@ class SettingsSnapshot {
     LinuxDesktopConfig? linuxDesktop,
     AssistantExecutionTarget? assistantExecutionTarget,
     AssistantPermissionLevel? assistantPermissionLevel,
+    List<HarnessTarget>? harnessTargets,
   }) {
     final resolvedGatewayProfiles = gatewayProfiles != null
         ? normalizeGatewayProfiles(profiles: gatewayProfiles)
@@ -154,6 +163,9 @@ class SettingsSnapshot {
             directories: authorizedSkillDirectories,
           )
         : this.authorizedSkillDirectories;
+    final resolvedHarnessTargets = harnessTargets != null
+        ? normalizeHarnessTargets(targets: harnessTargets)
+        : this.harnessTargets;
     return SettingsSnapshot(
       schemaVersion: schemaVersion ?? this.schemaVersion,
       appLanguage: appLanguage ?? this.appLanguage,
@@ -190,6 +202,7 @@ class SettingsSnapshot {
           assistantExecutionTarget ?? this.assistantExecutionTarget,
       assistantPermissionLevel:
           assistantPermissionLevel ?? this.assistantPermissionLevel,
+      harnessTargets: resolvedHarnessTargets,
     );
   }
 
@@ -229,6 +242,10 @@ class SettingsSnapshot {
       'linuxDesktop': linuxDesktop.toJson(),
       'assistantExecutionTarget': assistantExecutionTarget.name,
       'assistantPermissionLevel': assistantPermissionLevel.name,
+      if (harnessTargets.isNotEmpty)
+        'harnessTargets': harnessTargets
+            .map((target) => target.toJson())
+            .toList(growable: false),
     };
   }
 
@@ -328,6 +345,11 @@ class SettingsSnapshot {
       ),
       assistantPermissionLevel: AssistantPermissionLevelCopy.fromJsonValue(
         json['assistantPermissionLevel'] as String?,
+      ),
+      harnessTargets: normalizeHarnessTargets(
+        targets: ((json['harnessTargets'] as List?) ?? const <Object>[])
+            .whereType<Map>()
+            .map((item) => HarnessTarget.fromJson(item.cast<String, dynamic>())),
       ),
     );
   }
