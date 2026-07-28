@@ -7,6 +7,15 @@
 
 - [个人工作管理、学习能力与成果规划](./2026-07-28-personal-work-management-design.md)
 
+## 工作台设计评审
+
+第 4 稿以 macOS Desktop 三栏工作空间为基础，只新增一个一级入口“工作台”；入口内包含总览、我的待办、项目 / 专项与工作收件箱。
+
+- 关联评审：[Issue #213 · Work Management 与内置学习闭环](https://github.com/ai-workspace-lab/xworkmate-app/issues/213)
+- [macOS Desktop 工作台设计稿（第 4 稿）](./assets/workbench-macos-desktop-v4.png)
+
+![macOS Desktop 工作台设计稿（第 4 稿）](./assets/workbench-macos-desktop-v4.png)
+
 ## 第一批 Connectors 详细设计
 
 1. [GitHub Issues 只读连接器](./2026-07-28-github-issues-connector-detailed-design.md)
