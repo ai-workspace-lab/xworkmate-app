@@ -277,7 +277,7 @@ class AppController extends ChangeNotifier {
   int localMessageCounterInternal = 0;
   int assistantDraftSessionCounterInternal = 0;
 
-  WorkspaceDestination destinationInternal = WorkspaceDestination.assistant;
+  WorkspaceDestination destinationInternal = WorkspaceDestination.workbench;
   ThemeMode themeModeInternal = ThemeMode.light;
   AppSidebarState sidebarStateInternal = AppSidebarState.expanded;
   SettingsTab settingsTabInternal = SettingsTab.gateway;

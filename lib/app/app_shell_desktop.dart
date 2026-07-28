@@ -27,12 +27,14 @@ class _AppShellState extends State<AppShell> {
   static const _mainContentMinWidth = 640.0;
   static const _sidebarExpandedBaseWidth = 336.0;
   static const _desktopDestinations = <WorkspaceDestination>[
+    WorkspaceDestination.workbench,
     WorkspaceDestination.assistant,
     WorkspaceDestination.settings,
   ];
   double? _sidebarExpandedWidth;
 
   static const _mobileDestinations = [
+    WorkspaceDestination.workbench,
     WorkspaceDestination.assistant,
     WorkspaceDestination.settings,
   ];
@@ -496,7 +498,7 @@ class _AppShellState extends State<AppShell> {
     if (_desktopDestinations.contains(destination)) {
       return destination;
     }
-    return WorkspaceDestination.assistant;
+    return WorkspaceDestination.workbench;
   }
 
   Widget _pageForDestination(

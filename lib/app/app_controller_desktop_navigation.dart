@@ -58,7 +58,9 @@ extension AppControllerDesktopNavigation on AppController {
 
   void navigateHome() {
     final homeDestination =
-        capabilities.supportsDestination(WorkspaceDestination.assistant)
+        capabilities.supportsDestination(WorkspaceDestination.workbench)
+        ? WorkspaceDestination.workbench
+        : capabilities.supportsDestination(WorkspaceDestination.assistant)
         ? WorkspaceDestination.assistant
         : (capabilities.allowedDestinations.isEmpty
               ? WorkspaceDestination.assistant

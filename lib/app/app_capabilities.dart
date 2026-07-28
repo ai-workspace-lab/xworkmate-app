@@ -17,12 +17,18 @@ class AppCapabilities {
   final bool supportsDesktopRuntime;
 
   bool supportsDestination(WorkspaceDestination destination) {
+    if (destination == WorkspaceDestination.workbench) {
+      return true;
+    }
     return allowedDestinations.contains(destination);
   }
 
   factory AppCapabilities.fromFeatureAccess(UiFeatureAccess access) {
     return AppCapabilities(
-      allowedDestinations: access.allowedDestinations,
+      allowedDestinations: <WorkspaceDestination>{
+        WorkspaceDestination.workbench,
+        ...access.allowedDestinations,
+      },
       supportsFileAttachments: access.supportsFileAttachments,
       supportsLocalGateway: access.supportsLocalGateway,
       supportsRelayGateway: access.supportsRelayGateway,
