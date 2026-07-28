@@ -53,6 +53,12 @@ void main() {
     await tester.pump();
     expect(find.text('工作洞察'), findsOneWidget);
 
+    tester.view.physicalSize = const Size(900, 960);
+    await tester.pump();
+    expect(find.text('工作洞察'), findsOneWidget);
+    expect(find.text('本周节奏'), findsOneWidget);
+    expect(find.text('AI 整理建议'), findsOneWidget);
+
     await tester.tap(find.byKey(const Key('workbench-tab-1')));
     await tester.pump();
     expect(find.byKey(const Key('workbench-todo-page')), findsOneWidget);
