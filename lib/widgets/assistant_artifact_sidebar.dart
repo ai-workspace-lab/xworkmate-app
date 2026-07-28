@@ -443,7 +443,10 @@ class _AssistantArtifactSidebarState extends State<AssistantArtifactSidebar> {
       ...snapshot.fileEntries,
     ];
     return merged
-        .where((item) => seen.add(item.relativePath))
+        .where(
+          (item) =>
+              seen.add('${item.workspacePath.trim()}::${item.relativePath}'),
+        )
         .toList(growable: false);
   }
 
@@ -550,11 +553,19 @@ class _AssistantArtifactSidebarState extends State<AssistantArtifactSidebar> {
       return candidates.isEmpty ? null : candidates.first;
     }
     for (final item in candidates) {
-      if (item.relativePath == previous.relativePath) {
+      if (_sameArtifactEntry(item, previous)) {
         return item;
       }
     }
     return candidates.isEmpty ? null : candidates.first;
+  }
+
+  bool _sameArtifactEntry(
+    AssistantArtifactEntry left,
+    AssistantArtifactEntry right,
+  ) {
+    return left.relativePath == right.relativePath &&
+        left.workspacePath.trim() == right.workspacePath.trim();
   }
 
   Future<void> _selectEntry(AssistantArtifactEntry entry) async {
