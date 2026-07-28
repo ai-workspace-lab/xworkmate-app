@@ -26,6 +26,8 @@ class WorkbenchPage extends StatefulWidget {
 class _WorkbenchPageState extends State<WorkbenchPage> {
   WorkbenchSection _section = WorkbenchSection.overview;
   final _snapshot = WorkbenchSnapshot.sample;
+  late final List<WorkItem> _workItems;
+  final List<WorkNote> _quickNotes = <WorkNote>[];
   List<runtime.TaskThread> _liveThreads = const <runtime.TaskThread>[];
   List<Artifact> _liveArtifacts = const <Artifact>[];
   bool _liveContextLoading = true;
@@ -33,6 +35,7 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
   @override
   void initState() {
     super.initState();
+    _workItems = List<WorkItem>.of(_snapshot.workItems);
     widget.controller.addListener(_onControllerChanged);
     _loadLiveContext();
   }
@@ -138,9 +141,14 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
                     if (_section == WorkbenchSection.overview)
                       _OverviewContent(
                         snapshot: _snapshot,
+                        workItems: _workItems,
                         onOpenItem: _openWorkItem,
                         onOpenProject: _openProject,
                         onQuickRecord: _showQuickRecord,
+                        onCreateTodo: _createSuggestedTodo,
+                        onShowProjects: () => setState(
+                          () => _section = WorkbenchSection.projects,
+                        ),
                         liveThreads: _liveThreads,
                         liveArtifacts: _liveArtifacts,
                         liveContextLoading: _liveContextLoading,
@@ -149,8 +157,12 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
                       _SectionPlaceholder(
                         section: _section,
                         snapshot: _snapshot,
+                        workItems: _workItems,
+                        quickNotes: _quickNotes,
                         onOpenItem: _openWorkItem,
                         onOpenProject: _openProject,
+                        onQuickRecord: _showQuickRecord,
+                        onCreateTodo: _createSuggestedTodo,
                         liveThreads: _liveThreads,
                         liveArtifacts: _liveArtifacts,
                         liveContextLoading: _liveContextLoading,
@@ -237,6 +249,7 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
         return AlertDialog(
           title: const Text('快速记录'),
           content: TextField(
+            key: const Key('workbench-quick-record-field'),
             controller: noteController,
             autofocus: true,
             maxLines: 4,
@@ -256,13 +269,49 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
       },
     );
     final note = noteController.text.trim();
-    noteController.dispose();
     if (!mounted || shouldSave != true || note.isEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => noteController.dispose(),
+      );
       return;
     }
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(const SnackBar(content: Text('已记录到 WorkNote，后续可由 AI 整理。')));
+    setState(() {
+      _quickNotes.insert(
+        0,
+        WorkNote(
+          id: 'quick-${DateTime.now().microsecondsSinceEpoch}',
+          title: note.length > 28 ? '${note.substring(0, 28)}…' : note,
+          body: note,
+          source: '快速记录 · 刚刚',
+        ),
+      );
+    });
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => noteController.dispose(),
+    );
+  }
+
+  void _createSuggestedTodo() {
+    setState(() {
+      _workItems.insert(
+        0,
+        const WorkItem(
+          id: 'wi-follow-up-auth',
+          title: '跟进统一鉴权服务上线进度',
+          source: 'AI 整理建议',
+          state: WorkItemState.todo,
+          meta: '刚刚创建 · 待确认截止时间',
+          projectId: 'xstream',
+        ),
+      );
+      _section = WorkbenchSection.myWork;
+    });
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('已创建待办，可在“我的待办”中继续处理。')));
   }
 }
 
@@ -355,18 +404,24 @@ class _WorkbenchTabs extends StatelessWidget {
 class _OverviewContent extends StatelessWidget {
   const _OverviewContent({
     required this.snapshot,
+    required this.workItems,
     required this.onOpenItem,
     required this.onOpenProject,
     required this.onQuickRecord,
+    required this.onCreateTodo,
+    required this.onShowProjects,
     required this.liveThreads,
     required this.liveArtifacts,
     required this.liveContextLoading,
   });
 
   final WorkbenchSnapshot snapshot;
+  final List<WorkItem> workItems;
   final ValueChanged<WorkItem> onOpenItem;
   final ValueChanged<Project> onOpenProject;
   final VoidCallback onQuickRecord;
+  final VoidCallback onCreateTodo;
+  final VoidCallback onShowProjects;
   final List<runtime.TaskThread> liveThreads;
   final List<Artifact> liveArtifacts;
   final bool liveContextLoading;
@@ -379,9 +434,13 @@ class _OverviewContent extends StatelessWidget {
         final main = Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _NeedsAttentionCard(items: snapshot.workItems, onOpen: onOpenItem),
+            _NeedsAttentionCard(items: workItems, onOpen: onOpenItem),
             const SizedBox(height: 16),
-            _ProjectsCard(projects: snapshot.projects, onOpen: onOpenProject),
+            _ProjectsCard(
+              projects: snapshot.projects,
+              onOpen: onOpenProject,
+              onShowAll: onShowProjects,
+            ),
           ],
         );
         if (!showInsightRail) {
@@ -392,6 +451,7 @@ class _OverviewContent extends StatelessWidget {
               _InsightRail(
                 snapshot: snapshot,
                 onQuickRecord: onQuickRecord,
+                onCreateTodo: onCreateTodo,
                 liveThreads: liveThreads,
                 liveArtifacts: liveArtifacts,
                 liveContextLoading: liveContextLoading,
@@ -409,6 +469,7 @@ class _OverviewContent extends StatelessWidget {
               child: _InsightRail(
                 snapshot: snapshot,
                 onQuickRecord: onQuickRecord,
+                onCreateTodo: onCreateTodo,
                 liveThreads: liveThreads,
                 liveArtifacts: liveArtifacts,
                 liveContextLoading: liveContextLoading,
@@ -445,10 +506,15 @@ class _NeedsAttentionCard extends StatelessWidget {
 }
 
 class _ProjectsCard extends StatelessWidget {
-  const _ProjectsCard({required this.projects, required this.onOpen});
+  const _ProjectsCard({
+    required this.projects,
+    required this.onOpen,
+    this.onShowAll,
+  });
 
   final List<Project> projects;
   final ValueChanged<Project> onOpen;
+  final VoidCallback? onShowAll;
 
   @override
   Widget build(BuildContext context) {
@@ -464,7 +530,7 @@ class _ProjectsCard extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 4, 20, 18),
             child: TextButton.icon(
-              onPressed: () {},
+              onPressed: onShowAll,
               icon: const Icon(Icons.arrow_forward_rounded, size: 17),
               label: const Text('查看全部专项'),
             ),
@@ -479,6 +545,7 @@ class _InsightRail extends StatelessWidget {
   const _InsightRail({
     required this.snapshot,
     required this.onQuickRecord,
+    required this.onCreateTodo,
     required this.liveThreads,
     required this.liveArtifacts,
     required this.liveContextLoading,
@@ -486,6 +553,7 @@ class _InsightRail extends StatelessWidget {
 
   final WorkbenchSnapshot snapshot;
   final VoidCallback onQuickRecord;
+  final VoidCallback onCreateTodo;
   final List<runtime.TaskThread> liveThreads;
   final List<Artifact> liveArtifacts;
   final bool liveContextLoading;
@@ -498,7 +566,10 @@ class _InsightRail extends StatelessWidget {
         const SizedBox(height: 16),
         _CadenceCard(snapshot: snapshot),
         const SizedBox(height: 16),
-        _AiSuggestionCard(onQuickRecord: onQuickRecord),
+        _AiSuggestionCard(
+          onQuickRecord: onQuickRecord,
+          onCreateTodo: onCreateTodo,
+        ),
         const SizedBox(height: 16),
         _LiveContextCard(
           threads: liveThreads,
@@ -894,9 +965,13 @@ class _MetricBar extends StatelessWidget {
 }
 
 class _AiSuggestionCard extends StatelessWidget {
-  const _AiSuggestionCard({required this.onQuickRecord});
+  const _AiSuggestionCard({
+    required this.onQuickRecord,
+    required this.onCreateTodo,
+  });
 
   final VoidCallback onQuickRecord;
+  final VoidCallback onCreateTodo;
 
   @override
   Widget build(BuildContext context) {
@@ -927,7 +1002,7 @@ class _AiSuggestionCard extends StatelessWidget {
             title: '建议创建待办任务',
             subtitle: '跟进统一鉴权服务上线进度',
             action: '创建',
-            onTap: onQuickRecord,
+            onTap: onCreateTodo,
           ),
           const SizedBox(height: 12),
           Text(
@@ -1056,11 +1131,13 @@ class _LiveInboxBody extends StatelessWidget {
   const _LiveInboxBody({
     required this.threads,
     required this.artifacts,
+    required this.notes,
     required this.loading,
   });
 
   final List<runtime.TaskThread> threads;
   final List<Artifact> artifacts;
+  final List<WorkNote> notes;
   final bool loading;
 
   @override
@@ -1075,7 +1152,7 @@ class _LiveInboxBody extends StatelessWidget {
         ],
       );
     }
-    if (threads.isEmpty && artifacts.isEmpty) {
+    if (threads.isEmpty && artifacts.isEmpty && notes.isEmpty) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -1090,8 +1167,30 @@ class _LiveInboxBody extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text('真实工作上下文', style: Theme.of(context).textTheme.titleMedium),
+        Text('工作收件箱', style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 12),
+        if (notes.isNotEmpty) ...[
+          Text(
+            '待整理记录',
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+              color: context.palette.textSecondary,
+            ),
+          ),
+          for (final note in notes)
+            _LiveContextRow(
+              icon: Icons.sticky_note_2_outlined,
+              title: note.title,
+              subtitle: '${note.source} · 等待 AI 整理',
+            ),
+          const SizedBox(height: 12),
+        ],
+        if (threads.isNotEmpty || artifacts.isNotEmpty)
+          Text(
+            '已关联的任务与成果',
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+              color: context.palette.textSecondary,
+            ),
+          ),
         for (final thread in threads)
           _LiveContextRow(
             icon: Icons.forum_outlined,
@@ -1149,12 +1248,124 @@ class _LiveContextRow extends StatelessWidget {
   }
 }
 
+class _MyWorkContent extends StatelessWidget {
+  const _MyWorkContent({
+    required this.items,
+    required this.onOpen,
+    required this.onCreateTodo,
+  });
+
+  final List<WorkItem> items;
+  final ValueChanged<WorkItem> onOpen;
+  final VoidCallback onCreateTodo;
+
+  @override
+  Widget build(BuildContext context) {
+    final overdue = items
+        .where((item) => item.state == WorkItemState.overdue)
+        .length;
+    final blocked = items
+        .where((item) => item.state == WorkItemState.blocked)
+        .length;
+    final review = items
+        .where((item) => item.state == WorkItemState.needsReview)
+        .length;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: [
+            _WorkFilterPill(label: '全部 ${items.length}', selected: true),
+            _WorkFilterPill(label: '逾期 $overdue', tone: StatusTone.danger),
+            _WorkFilterPill(label: '待整理 $review', tone: StatusTone.warning),
+            _WorkFilterPill(label: '被阻塞 $blocked', tone: StatusTone.danger),
+          ],
+        ),
+        const SizedBox(height: 14),
+        SurfaceCard(
+          padding: EdgeInsets.zero,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 18, 14, 12),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '待办列表',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                    ),
+                    TextButton.icon(
+                      onPressed: onCreateTodo,
+                      icon: const Icon(Icons.add_rounded, size: 18),
+                      label: const Text('新建待办'),
+                    ),
+                  ],
+                ),
+              ),
+              for (final item in items)
+                _WorkItemRow(item: item, onOpen: () => onOpen(item)),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _WorkFilterPill extends StatelessWidget {
+  const _WorkFilterPill({
+    required this.label,
+    this.selected = false,
+    this.tone,
+  });
+
+  final String label;
+  final bool selected;
+  final StatusTone? tone;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final color = switch (tone) {
+      StatusTone.danger => Theme.of(context).colorScheme.error,
+      StatusTone.warning => palette.warning,
+      _ => palette.accent,
+    };
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: selected ? palette.accentMuted : palette.surfacePrimary,
+        border: Border.all(
+          color: selected ? palette.accent : palette.strokeSoft,
+        ),
+        borderRadius: BorderRadius.circular(AppRadius.button),
+      ),
+      child: Text(
+        label,
+        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+          color: color,
+          fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+        ),
+      ),
+    );
+  }
+}
+
 class _SectionPlaceholder extends StatelessWidget {
   const _SectionPlaceholder({
     required this.section,
     required this.snapshot,
+    required this.workItems,
+    required this.quickNotes,
     required this.onOpenItem,
     required this.onOpenProject,
+    required this.onQuickRecord,
+    required this.onCreateTodo,
     required this.liveThreads,
     required this.liveArtifacts,
     required this.liveContextLoading,
@@ -1162,8 +1373,12 @@ class _SectionPlaceholder extends StatelessWidget {
 
   final WorkbenchSection section;
   final WorkbenchSnapshot snapshot;
+  final List<WorkItem> workItems;
+  final List<WorkNote> quickNotes;
   final ValueChanged<WorkItem> onOpenItem;
   final ValueChanged<Project> onOpenProject;
+  final VoidCallback onQuickRecord;
+  final VoidCallback onCreateTodo;
   final List<runtime.TaskThread> liveThreads;
   final List<Artifact> liveArtifacts;
   final bool liveContextLoading;
@@ -1177,9 +1392,10 @@ class _SectionPlaceholder extends StatelessWidget {
       WorkbenchSection.overview => '总览',
     };
     final body = switch (section) {
-      WorkbenchSection.myWork => _NeedsAttentionCard(
-        items: snapshot.workItems,
+      WorkbenchSection.myWork => _MyWorkContent(
+        items: workItems,
         onOpen: onOpenItem,
+        onCreateTodo: onCreateTodo,
       ),
       WorkbenchSection.projects => _ProjectsCard(
         projects: snapshot.projects,
@@ -1189,6 +1405,7 @@ class _SectionPlaceholder extends StatelessWidget {
         child: _LiveInboxBody(
           threads: liveThreads,
           artifacts: liveArtifacts,
+          notes: quickNotes,
           loading: liveContextLoading,
         ),
       ),

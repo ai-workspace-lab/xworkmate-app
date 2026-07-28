@@ -58,5 +58,23 @@ void main() {
     await tester.tap(find.byKey(const Key('workbench-tab-inbox')));
     await tester.pumpAndSettle();
     expect(find.text('工作收件箱暂时为空'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('workbench-quick-record-button')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('workbench-quick-record-field')),
+      '补充 GitHub Issues 连接器的验收场景',
+    );
+    await tester.tap(find.text('保存记录'));
+    await tester.pumpAndSettle();
+    expect(find.text('待整理记录'), findsOneWidget);
+    expect(find.text('补充 GitHub Issues 连接器的验收场景'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('workbench-tab-overview')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('创建').last);
+    await tester.pumpAndSettle();
+    expect(find.text('待办列表'), findsOneWidget);
+    expect(find.text('跟进统一鉴权服务上线进度'), findsOneWidget);
   });
 }
