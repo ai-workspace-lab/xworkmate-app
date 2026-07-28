@@ -28,8 +28,13 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.byKey(const Key('mobile-assistant-page')), findsOneWidget);
+      expect(find.text('工作台'), findsWidgets);
       expect(find.byKey(const Key('mobile-settings-page')), findsNothing);
+
+      controller.navigateTo(WorkspaceDestination.assistant);
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('mobile-assistant-page')), findsOneWidget);
       expect(find.text('你想先用哪个内置插件？'), findsOneWidget);
 
       await tester.tap(
@@ -78,13 +83,18 @@ void main() {
       );
       await tester.pump();
 
-      expect(
-        find.byKey(const Key('assistant-conversation-shell')),
-        findsOneWidget,
-      );
+      expect(find.text('工作台'), findsWidgets);
       expect(
         find.byKey(const Key('settings-account-panel-card')),
         findsNothing,
+      );
+
+      controller.navigateTo(WorkspaceDestination.assistant);
+      await tester.pump();
+
+      expect(
+        find.byKey(const Key('assistant-conversation-shell')),
+        findsOneWidget,
       );
 
       controller.openSettings();
