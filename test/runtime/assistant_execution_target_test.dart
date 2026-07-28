@@ -1711,15 +1711,7 @@ void main() {
         expect(fakeGoTaskService.requests.last.inlineAttachments, hasLength(1));
         expect(
           fakeGoTaskService.requests.last.prompt,
-          contains('- taskInputAttachments:'),
-        );
-        expect(
-          fakeGoTaskService.requests.last.prompt,
-          contains('diagram.png (image/png, sha256:'),
-        );
-        expect(
-          fakeGoTaskService.requests.last.prompt,
-          contains('path: /Users/shenlan/Pictures/diagram.png'),
+          isNot(contains('taskInputAttachments')),
         );
         final thread = controller.requireTaskThreadForSessionInternal(
           fakeGoTaskService.requests.last.sessionId,
