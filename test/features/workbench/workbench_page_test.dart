@@ -57,6 +57,6 @@ void main() {
 
     await tester.tap(find.byKey(const Key('workbench-tab-inbox')));
     await tester.pumpAndSettle();
-    expect(find.text('待整理内容会先进入这里'), findsOneWidget);
+    expect(find.text('工作收件箱暂时为空'), findsOneWidget);
   });
 }

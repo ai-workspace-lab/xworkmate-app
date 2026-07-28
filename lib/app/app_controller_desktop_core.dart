@@ -339,6 +339,14 @@ class AppController extends ChangeNotifier {
   String? get bootstrapError => bootstrapErrorInternal;
   String? get startupTaskThreadWarning => startupTaskThreadWarningInternal;
 
+  /// Read-only view used by the Workbench. The assistant remains the owner of
+  /// TaskThread mutations and persistence; Workbench only projects this view.
+  Iterable<TaskThread> get workbenchTaskThreads =>
+      assistantThreadRecordsInternal.values;
+
+  Future<void> get waitForAssistantThreadsRestored =>
+      assistantThreadsRestoredInternal.future;
+
   void dismissStartupTaskThreadWarning() {
     if ((startupTaskThreadWarningInternal ?? '').trim().isEmpty) {
       return;

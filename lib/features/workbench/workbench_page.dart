@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../app/app_controller.dart';
 import '../../models/app_models.dart';
+import '../../runtime/assistant_artifacts.dart';
+import '../../runtime/runtime_models.dart' as runtime;
 import '../../theme/app_palette.dart';
 import '../../theme/app_theme.dart';
 import '../../widgets/surface_card.dart';
@@ -24,6 +26,84 @@ class WorkbenchPage extends StatefulWidget {
 class _WorkbenchPageState extends State<WorkbenchPage> {
   WorkbenchSection _section = WorkbenchSection.overview;
   final _snapshot = WorkbenchSnapshot.sample;
+  List<runtime.TaskThread> _liveThreads = const <runtime.TaskThread>[];
+  List<Artifact> _liveArtifacts = const <Artifact>[];
+  bool _liveContextLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.addListener(_onControllerChanged);
+    _loadLiveContext();
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_onControllerChanged);
+    super.dispose();
+  }
+
+  void _onControllerChanged() {
+    if (!_liveContextLoading && _liveThreads.isEmpty) {
+      _loadLiveContext();
+    }
+  }
+
+  Future<void> _loadLiveContext() async {
+    if (_liveContextLoading && _liveThreads.isNotEmpty) return;
+    if (mounted) setState(() => _liveContextLoading = true);
+    try {
+      final threads = widget.controller.workbenchTaskThreads
+          .where((thread) => !thread.archived)
+          .toList(growable: false);
+      final artifacts = <Artifact>[];
+      for (final thread in threads.take(12)) {
+        // Remote artifact synchronization is owned by the assistant artifact
+        // panel. Workbench only projects already-local task artifacts so
+        // opening the dashboard never starts a network sync.
+        if (thread.workspaceKind != runtime.WorkspaceKind.localFs ||
+            thread.lastTaskArtifactRelativePaths.isEmpty) {
+          continue;
+        }
+        final artifactSnapshot = await widget.controller
+            .loadAssistantArtifactSnapshot(sessionKey: thread.threadId);
+        final entries = <String, AssistantArtifactEntry>{};
+        for (final entry in [
+          ...artifactSnapshot.resultEntries,
+          ...artifactSnapshot.fileEntries,
+        ]) {
+          entries[entry.id] = entry;
+        }
+        for (final entry in entries.values) {
+          artifacts.add(
+            Artifact(
+              id: entry.id,
+              name: entry.label,
+              kind: entry.mimeType,
+              updatedAt: _formatTimestamp(entry.updatedAtMs),
+            ),
+          );
+        }
+      }
+      if (!mounted) return;
+      setState(() {
+        _liveThreads = threads;
+        _liveArtifacts = artifacts;
+        _liveContextLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _liveContextLoading = false);
+    }
+  }
+
+  String _formatTimestamp(double? timestampMs) {
+    if (timestampMs == null || timestampMs <= 0) return '已记录';
+    final date = DateTime.fromMillisecondsSinceEpoch(timestampMs.toInt());
+    final month = date.month.toString().padLeft(2, '0');
+    final day = date.day.toString().padLeft(2, '0');
+    return '${date.year}-$month-$day';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -61,6 +141,9 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
                         onOpenItem: _openWorkItem,
                         onOpenProject: _openProject,
                         onQuickRecord: _showQuickRecord,
+                        liveThreads: _liveThreads,
+                        liveArtifacts: _liveArtifacts,
+                        liveContextLoading: _liveContextLoading,
                       )
                     else
                       _SectionPlaceholder(
@@ -68,6 +151,9 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
                         snapshot: _snapshot,
                         onOpenItem: _openWorkItem,
                         onOpenProject: _openProject,
+                        liveThreads: _liveThreads,
+                        liveArtifacts: _liveArtifacts,
+                        liveContextLoading: _liveContextLoading,
                       ),
                     const SizedBox(height: 8),
                     Text(
@@ -272,12 +358,18 @@ class _OverviewContent extends StatelessWidget {
     required this.onOpenItem,
     required this.onOpenProject,
     required this.onQuickRecord,
+    required this.liveThreads,
+    required this.liveArtifacts,
+    required this.liveContextLoading,
   });
 
   final WorkbenchSnapshot snapshot;
   final ValueChanged<WorkItem> onOpenItem;
   final ValueChanged<Project> onOpenProject;
   final VoidCallback onQuickRecord;
+  final List<runtime.TaskThread> liveThreads;
+  final List<Artifact> liveArtifacts;
+  final bool liveContextLoading;
 
   @override
   Widget build(BuildContext context) {
@@ -297,7 +389,13 @@ class _OverviewContent extends StatelessWidget {
             children: [
               main,
               const SizedBox(height: 16),
-              _InsightRail(snapshot: snapshot, onQuickRecord: onQuickRecord),
+              _InsightRail(
+                snapshot: snapshot,
+                onQuickRecord: onQuickRecord,
+                liveThreads: liveThreads,
+                liveArtifacts: liveArtifacts,
+                liveContextLoading: liveContextLoading,
+              ),
             ],
           );
         }
@@ -311,6 +409,9 @@ class _OverviewContent extends StatelessWidget {
               child: _InsightRail(
                 snapshot: snapshot,
                 onQuickRecord: onQuickRecord,
+                liveThreads: liveThreads,
+                liveArtifacts: liveArtifacts,
+                liveContextLoading: liveContextLoading,
               ),
             ),
           ],
@@ -375,10 +476,19 @@ class _ProjectsCard extends StatelessWidget {
 }
 
 class _InsightRail extends StatelessWidget {
-  const _InsightRail({required this.snapshot, required this.onQuickRecord});
+  const _InsightRail({
+    required this.snapshot,
+    required this.onQuickRecord,
+    required this.liveThreads,
+    required this.liveArtifacts,
+    required this.liveContextLoading,
+  });
 
   final WorkbenchSnapshot snapshot;
   final VoidCallback onQuickRecord;
+  final List<runtime.TaskThread> liveThreads;
+  final List<Artifact> liveArtifacts;
+  final bool liveContextLoading;
 
   @override
   Widget build(BuildContext context) {
@@ -389,6 +499,12 @@ class _InsightRail extends StatelessWidget {
         _CadenceCard(snapshot: snapshot),
         const SizedBox(height: 16),
         _AiSuggestionCard(onQuickRecord: onQuickRecord),
+        const SizedBox(height: 16),
+        _LiveContextCard(
+          threads: liveThreads,
+          artifacts: liveArtifacts,
+          loading: liveContextLoading,
+        ),
       ],
     );
   }
@@ -870,18 +986,187 @@ class _SuggestionRow extends StatelessWidget {
   }
 }
 
+class _LiveContextCard extends StatelessWidget {
+  const _LiveContextCard({
+    required this.threads,
+    required this.artifacts,
+    required this.loading,
+  });
+
+  final List<runtime.TaskThread> threads;
+  final List<Artifact> artifacts;
+  final bool loading;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    return SurfaceCard(
+      key: const Key('workbench-live-context-card'),
+      padding: const EdgeInsets.all(18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.link_rounded, color: palette.accent),
+              const SizedBox(width: 8),
+              Text('真实工作上下文', style: Theme.of(context).textTheme.titleMedium),
+            ],
+          ),
+          const SizedBox(height: 8),
+          if (loading)
+            const LinearProgressIndicator(minHeight: 3)
+          else ...[
+            Text(
+              '${threads.length} 个 TaskThread · ${artifacts.length} 个 Artifact',
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: palette.textSecondary),
+            ),
+            const SizedBox(height: 10),
+            for (final thread in threads.take(3))
+              _LiveContextRow(
+                icon: Icons.forum_outlined,
+                title: thread.title.trim().isEmpty
+                    ? thread.threadId
+                    : thread.title,
+                subtitle: 'TaskThread · ${thread.lifecycleState.status}',
+              ),
+            for (final artifact in artifacts.take(2))
+              _LiveContextRow(
+                icon: Icons.description_outlined,
+                title: artifact.name,
+                subtitle: 'Artifact · ${artifact.kind}',
+              ),
+            if (threads.isEmpty && artifacts.isEmpty)
+              Text(
+                '完成一次助手任务后，真实线程和产物会显示在这里。',
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: palette.textMuted),
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _LiveInboxBody extends StatelessWidget {
+  const _LiveInboxBody({
+    required this.threads,
+    required this.artifacts,
+    required this.loading,
+  });
+
+  final List<runtime.TaskThread> threads;
+  final List<Artifact> artifacts;
+  final bool loading;
+
+  @override
+  Widget build(BuildContext context) {
+    if (loading) {
+      return const Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text('正在读取 TaskThread 与 Artifact…'),
+          SizedBox(height: 12),
+          LinearProgressIndicator(),
+        ],
+      );
+    }
+    if (threads.isEmpty && artifacts.isEmpty) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text('工作收件箱暂时为空', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 8),
+          const Text(
+            'WorkNote、TaskThread 与 Artifact 会在确认后归入对应的 Project 或 WorkItem。',
+          ),
+        ],
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text('真实工作上下文', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 12),
+        for (final thread in threads)
+          _LiveContextRow(
+            icon: Icons.forum_outlined,
+            title: thread.title.trim().isEmpty ? thread.threadId : thread.title,
+            subtitle: 'TaskThread · ${thread.lifecycleState.status}',
+          ),
+        for (final artifact in artifacts)
+          _LiveContextRow(
+            icon: Icons.description_outlined,
+            title: artifact.name,
+            subtitle: 'Artifact · ${artifact.kind} · ${artifact.updatedAt}',
+          ),
+      ],
+    );
+  }
+}
+
+class _LiveContextRow extends StatelessWidget {
+  const _LiveContextRow({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: palette.accent),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
+                Text(
+                  subtitle,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: palette.textSecondary),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _SectionPlaceholder extends StatelessWidget {
   const _SectionPlaceholder({
     required this.section,
     required this.snapshot,
     required this.onOpenItem,
     required this.onOpenProject,
+    required this.liveThreads,
+    required this.liveArtifacts,
+    required this.liveContextLoading,
   });
 
   final WorkbenchSection section;
   final WorkbenchSnapshot snapshot;
   final ValueChanged<WorkItem> onOpenItem;
   final ValueChanged<Project> onOpenProject;
+  final List<runtime.TaskThread> liveThreads;
+  final List<Artifact> liveArtifacts;
+  final bool liveContextLoading;
 
   @override
   Widget build(BuildContext context) {
@@ -901,15 +1186,10 @@ class _SectionPlaceholder extends StatelessWidget {
         onOpen: onOpenProject,
       ),
       WorkbenchSection.inbox => SurfaceCard(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text('待整理内容会先进入这里', style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 8),
-            Text(
-              'WorkNote、TaskThread 与 Artifact 会在确认后归入对应的 Project 或 WorkItem。',
-            ),
-          ],
+        child: _LiveInboxBody(
+          threads: liveThreads,
+          artifacts: liveArtifacts,
+          loading: liveContextLoading,
         ),
       ),
       WorkbenchSection.overview => const SizedBox.shrink(),
