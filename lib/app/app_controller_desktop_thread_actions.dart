@@ -630,9 +630,6 @@ extension AppControllerDesktopThreadActions on AppController {
       executionWorkingDirectory: executionWorkingDirectory ?? workingDirectory,
       remoteWorkingDirectoryHint: remoteWorkingDirectoryHint,
       target: target,
-      taskInputAttachments:
-          taskThreadForSessionInternal(sessionKey)?.taskInputAttachments ??
-          const <TaskInputAttachmentRecord>[],
     );
     if (appendUserTurn) {
       appendGatewayUserTurnInternal(sessionKey, message);
@@ -1003,8 +1000,6 @@ extension AppControllerDesktopThreadActions on AppController {
     String? executionWorkingDirectory,
     required String remoteWorkingDirectoryHint,
     required AssistantExecutionTarget target,
-    List<TaskInputAttachmentRecord> taskInputAttachments =
-        const <TaskInputAttachmentRecord>[],
   }) {
     // The composer prepends structured blocks (Execution context, Attached
     // files, Preferred skills, Builtin plugins) to the typed text. Those must
@@ -1044,19 +1039,6 @@ extension AppControllerDesktopThreadActions on AppController {
     final remoteHint = remoteWorkingDirectoryHint.trim();
     if (remoteHint.isNotEmpty && remoteHint != currentTaskWorkspace) {
       buffer.writeln('- remoteWorkspaceHint: $remoteHint');
-    }
-    final visibleTaskInputAttachments = taskInputAttachments
-        .where((item) => item.name.trim().isNotEmpty && item.key.isNotEmpty)
-        .toList(growable: false);
-    if (visibleTaskInputAttachments.isNotEmpty) {
-      buffer.writeln('- taskInputAttachments:');
-      for (final attachment in visibleTaskInputAttachments) {
-        final sourcePath = attachment.sourcePath.trim();
-        final pathSuffix = sourcePath.isEmpty ? '' : ', path: $sourcePath';
-        buffer.writeln(
-          '  - ${attachment.name.trim()} (${attachment.mimeType.trim()}, sha256: ${attachment.key}$pathSuffix)',
-        );
-      }
     }
     // Structured blocks hoisted out of the composed prompt, emitted as
     // siblings of the workspace context so they no longer bury the request.
