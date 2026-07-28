@@ -160,7 +160,6 @@ class MessageBubbleBodyInternal extends StatefulWidget {
 }
 
 class MessageBubbleBodyStateInternal extends State<MessageBubbleBodyInternal> {
-  bool attachmentsExpandedInternal = false;
   bool executionContextExpandedInternal = false;
   bool hoveredInternal = false;
 
@@ -168,7 +167,6 @@ class MessageBubbleBodyStateInternal extends State<MessageBubbleBodyInternal> {
   void didUpdateWidget(covariant MessageBubbleBodyInternal oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.text != widget.text) {
-      attachmentsExpandedInternal = false;
       executionContextExpandedInternal = false;
     }
   }
@@ -194,8 +192,9 @@ class MessageBubbleBodyStateInternal extends State<MessageBubbleBodyInternal> {
       final bodyText = parsed.bodyText.trim().isEmpty
           ? appText('暂无内容。', 'No content yet.')
           : parsed.bodyText;
-      final showAttachments =
-          attachmentsExpandedInternal && parsed.attachmentsBlock != null;
+      final attachmentNames = parsed.attachmentsBlock == null
+          ? const <String>[]
+          : _attachmentNamesInternal(parsed.attachmentsBlock!);
       final showExecutionContext =
           executionContextExpandedInternal &&
           parsed.executionContextBlock != null;
@@ -203,27 +202,12 @@ class MessageBubbleBodyStateInternal extends State<MessageBubbleBodyInternal> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SelectableText(bodyText, style: messageBodyStyle),
-          if (hoveredInternal || showAttachments || showExecutionContext) ...[
+          if (hoveredInternal || showExecutionContext) ...[
             const SizedBox(height: 6),
             Wrap(
               spacing: 4,
               runSpacing: 4,
               children: [
-                if (parsed.attachmentsBlock != null)
-                  MessageMetaToggleButtonInternal(
-                    key: const Key('assistant-user-meta-attachments-toggle'),
-                    icon: Icons.attach_file_rounded,
-                    expanded: attachmentsExpandedInternal,
-                    tooltip: attachmentsExpandedInternal
-                        ? appText('折叠附件信息', 'Collapse attached files')
-                        : appText('展开附件信息', 'Expand attached files'),
-                    onTap: () {
-                      setState(() {
-                        attachmentsExpandedInternal =
-                            !attachmentsExpandedInternal;
-                      });
-                    },
-                  ),
                 if (parsed.executionContextBlock != null)
                   MessageMetaToggleButtonInternal(
                     key: const Key('assistant-user-meta-context-toggle'),
@@ -242,12 +226,9 @@ class MessageBubbleBodyStateInternal extends State<MessageBubbleBodyInternal> {
               ],
             ),
           ],
-          if (showAttachments) ...[
+          if (attachmentNames.isNotEmpty) ...[
             const SizedBox(height: 6),
-            MessageMetaBlockInternal(
-              key: const Key('assistant-user-meta-attachments-block'),
-              content: parsed.attachmentsBlock!,
-            ),
+            AttachmentCardsInternal(names: attachmentNames),
           ],
           if (showExecutionContext) ...[
             const SizedBox(height: 6),
@@ -321,6 +302,79 @@ class MessageBubbleBodyStateInternal extends State<MessageBubbleBodyInternal> {
       onTapLink: (text, href, title) {},
     );
   }
+}
+
+List<String> _attachmentNamesInternal(String block) {
+  return block
+      .split('\n')
+      .skip(1)
+      .map((line) => line.trim())
+      .where((line) => line.startsWith('- '))
+      .map((line) => line.substring(2).trim())
+      .where((name) => name.isNotEmpty)
+      .toList(growable: false);
+}
+
+class AttachmentCardsInternal extends StatelessWidget {
+  const AttachmentCardsInternal({super.key, required this.names});
+
+  final List<String> names;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final theme = Theme.of(context);
+    return Wrap(
+      key: const Key('assistant-user-attachment-cards'),
+      spacing: 6,
+      runSpacing: 6,
+      children: [
+        for (var index = 0; index < names.length; index++)
+          Container(
+            key: Key('assistant-user-attachment-card-$index'),
+            constraints: const BoxConstraints(maxWidth: 280),
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 7),
+            decoration: BoxDecoration(
+              color: palette.surfaceSecondary.withValues(alpha: 0.78),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: palette.strokeSoft),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  _attachmentIconInternal(names[index]),
+                  size: 17,
+                  color: palette.accent,
+                ),
+                const SizedBox(width: 7),
+                Flexible(
+                  child: Text(
+                    names[index],
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: palette.textPrimary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+IconData _attachmentIconInternal(String name) {
+  final extension = name.split('.').last.toLowerCase();
+  return switch (extension) {
+    'png' || 'jpg' || 'jpeg' || 'gif' || 'webp' => Icons.image_outlined,
+    'pdf' => Icons.picture_as_pdf_outlined,
+    'md' || 'txt' || 'log' || 'json' || 'csv' => Icons.description_outlined,
+    _ => Icons.insert_drive_file_outlined,
+  };
 }
 
 class MessageMetaToggleButtonInternal extends StatelessWidget {
