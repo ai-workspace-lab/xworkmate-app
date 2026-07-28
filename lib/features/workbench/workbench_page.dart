@@ -19,6 +19,7 @@ class WorkbenchPage extends StatefulWidget {
 
 class _WorkbenchPageState extends State<WorkbenchPage> {
   int _tabIndex = 0;
+  bool _isRightRailCollapsed = false;
 
   Future<void> _openThread(String sessionKey) async {
     await widget.controller.switchSession(sessionKey);
@@ -62,10 +63,21 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
                   if (showRightRail) ...[
                     const SizedBox(width: 12),
                     SizedBox(
-                      width: constraints.maxWidth >= 1200 ? 380 : 340,
+                      width: _isRightRailCollapsed
+                          ? 44
+                          : constraints.maxWidth >= 1200
+                          ? 380
+                          : 340,
                       child: _WorkbenchRightRail(
                         projection: projection,
                         onSuggestionAction: _openAssistant,
+                        isCollapsed: _isRightRailCollapsed,
+                        onToggleCollapsed: () {
+                          setState(
+                            () =>
+                                _isRightRailCollapsed = !_isRightRailCollapsed,
+                          );
+                        },
                       ),
                     ),
                   ],
@@ -294,6 +306,8 @@ class _WorkbenchOverview extends StatelessWidget {
           _WorkbenchRightRail(
             projection: projection,
             onSuggestionAction: onSuggestionAction,
+            isCollapsed: false,
+            onToggleCollapsed: () {},
           ),
         ],
       ],
@@ -1152,15 +1166,55 @@ class _WorkbenchRightRail extends StatelessWidget {
   const _WorkbenchRightRail({
     required this.projection,
     required this.onSuggestionAction,
+    required this.isCollapsed,
+    required this.onToggleCollapsed,
   });
 
   final WorkbenchProjection projection;
   final VoidCallback onSuggestionAction;
+  final bool isCollapsed;
+  final VoidCallback onToggleCollapsed;
 
   @override
   Widget build(BuildContext context) {
+    if (isCollapsed) {
+      return Align(
+        alignment: Alignment.topCenter,
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            key: const Key('workbench-right-rail-expand-button'),
+            onTap: onToggleCollapsed,
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: context.palette.surfacePrimary,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: context.palette.strokeSoft),
+              ),
+              child: Icon(
+                Icons.chevron_left_rounded,
+                color: context.palette.textSecondary,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
     return Column(
       children: [
+        Align(
+          alignment: Alignment.centerRight,
+          child: IconButton(
+            key: const Key('workbench-right-rail-collapse-button'),
+            tooltip: appText('收起侧栏', 'Collapse sidebar'),
+            onPressed: onToggleCollapsed,
+            icon: const Icon(Icons.chevron_right_rounded),
+            visualDensity: VisualDensity.compact,
+          ),
+        ),
         _InsightPanel(projection: projection),
         const SizedBox(height: 12),
         _WeeklyRhythmCard(projection: projection),
