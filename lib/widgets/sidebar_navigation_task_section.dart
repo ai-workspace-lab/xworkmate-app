@@ -38,6 +38,7 @@ class SidebarTaskSection extends StatefulWidget {
     this.onRefreshTasks,
     this.onCreateTask,
     this.onReturnToAssistant,
+    this.onOpenWorkbench,
     this.onSelectTask,
     this.onArchiveTask,
     this.onRenameTask,
@@ -52,6 +53,7 @@ class SidebarTaskSection extends StatefulWidget {
   final Future<void> Function()? onRefreshTasks;
   final Future<void> Function()? onCreateTask;
   final VoidCallback? onReturnToAssistant;
+  final VoidCallback? onOpenWorkbench;
   final Future<void> Function(String sessionKey)? onSelectTask;
   final Future<void> Function(String sessionKey)? onArchiveTask;
   final Future<void> Function(String sessionKey, String title)? onRenameTask;
@@ -193,6 +195,13 @@ class _SidebarTaskSectionState extends State<SidebarTaskSection> {
           child: Text(
             appText('任务列表', 'Task list'),
             style: theme.textTheme.titleSmall,
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(4, 0, 4, 6),
+          child: _SidebarWorkbenchButton(
+            selected: widget.currentSection == WorkspaceDestination.workbench,
+            onPressed: widget.onOpenWorkbench,
           ),
         ),
         Expanded(
@@ -375,6 +384,47 @@ class _SidebarTaskSectionState extends State<SidebarTaskSection> {
     }
     _expandedTargets.addAll(
       compactAssistantExecutionTargets(widget.visibleExecutionTargets),
+    );
+  }
+}
+
+class _SidebarWorkbenchButton extends StatelessWidget {
+  const _SidebarWorkbenchButton({required this.selected, this.onPressed});
+
+  final bool selected;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    return Material(
+      color: selected ? palette.accentMuted : Colors.transparent,
+      borderRadius: BorderRadius.circular(AppRadius.button),
+      child: InkWell(
+        key: const Key('workspace-sidebar-workbench-button'),
+        borderRadius: BorderRadius.circular(AppRadius.button),
+        onTap: onPressed,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+          child: Row(
+            children: [
+              Icon(
+                WorkspaceDestination.workbench.icon,
+                size: 19,
+                color: selected ? palette.accent : palette.textSecondary,
+              ),
+              const SizedBox(width: 10),
+              Text(
+                WorkspaceDestination.workbench.label,
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  color: selected ? palette.accent : palette.textPrimary,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

@@ -34,6 +34,7 @@ class MobileShellStateInternal extends State<MobileShell> {
   MobileShellTab tabForDestinationInternal(WorkspaceDestination destination) {
     return switch (destination) {
       WorkspaceDestination.assistant => MobileShellTab.assistant,
+      WorkspaceDestination.workbench => MobileShellTab.assistant,
       WorkspaceDestination.settings => MobileShellTab.settings,
     };
   }

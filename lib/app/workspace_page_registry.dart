@@ -4,6 +4,7 @@ import '../features/assistant/assistant_page.dart';
 import '../features/mobile/mobile_assistant_nav_page.dart';
 import '../features/mobile/mobile_settings_page.dart';
 import '../features/settings/settings_page.dart';
+import '../features/workbench/workbench_page.dart';
 import '../models/app_models.dart';
 import 'app_controller.dart';
 
@@ -66,6 +67,17 @@ final Map<WorkspaceDestination, WorkspacePageSpec> workspacePageSpecsInternal =
         ),
         mobileBuilder: (controller, onOpenDetail, mobileActions) =>
             MobileSettingsPage(controller: controller),
+      ),
+      WorkspaceDestination.workbench: WorkspacePageSpec(
+        destination: WorkspaceDestination.workbench,
+        desktopBuilder: (controller, onOpenDetail) =>
+            WorkbenchPage(controller: controller, onOpenDetail: onOpenDetail),
+        mobileBuilder: (controller, onOpenDetail, mobileActions) =>
+            MobileAssistantNavPage(
+              controller: controller,
+              onOpenDetail: onOpenDetail,
+              mobileActions: mobileActions,
+            ),
       ),
     };
 

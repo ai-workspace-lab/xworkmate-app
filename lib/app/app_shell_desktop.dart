@@ -28,6 +28,7 @@ class _AppShellState extends State<AppShell> {
   static const _sidebarExpandedBaseWidth = 336.0;
   static const _desktopDestinations = <WorkspaceDestination>[
     WorkspaceDestination.assistant,
+    WorkspaceDestination.workbench,
     WorkspaceDestination.settings,
   ];
   double? _sidebarExpandedWidth;
@@ -380,6 +381,9 @@ class _AppShellState extends State<AppShell> {
                                       WorkspaceDestination.assistant,
                                     );
                                   },
+                                  onOpenWorkbench: () => controller.navigateTo(
+                                    WorkspaceDestination.workbench,
+                                  ),
                                   onSelectTask: (sessionKey) async {
                                     controller.navigateTo(
                                       WorkspaceDestination.assistant,

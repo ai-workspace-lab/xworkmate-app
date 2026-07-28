@@ -136,6 +136,12 @@ desktop:
       build_modes: [debug, profile, release]
       description: Desktop assistant destination
       ui_surface: sidebar_navigation
+    workbench:
+      enabled: true
+      release_tier: beta
+      build_modes: [debug, profile, release]
+      description: Desktop workbench destination for work management
+      ui_surface: sidebar_navigation
     settings:
       enabled: true
       release_tier: stable

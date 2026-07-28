@@ -45,6 +45,7 @@ class SidebarNavigation extends StatelessWidget {
     this.onRefreshTasks,
     this.onCreateTask,
     this.onReturnToAssistant,
+    this.onOpenWorkbench,
     this.onSelectTask,
     this.onArchiveTask,
     this.onRenameTask,
@@ -81,6 +82,7 @@ class SidebarNavigation extends StatelessWidget {
   final Future<void> Function()? onRefreshTasks;
   final Future<void> Function()? onCreateTask;
   final VoidCallback? onReturnToAssistant;
+  final VoidCallback? onOpenWorkbench;
   final Future<void> Function(String sessionKey)? onSelectTask;
   final Future<void> Function(String sessionKey)? onArchiveTask;
   final Future<void> Function(String sessionKey, String title)? onRenameTask;
@@ -132,6 +134,7 @@ class SidebarNavigation extends StatelessWidget {
                         onRefreshTasks: onRefreshTasks,
                         onCreateTask: onCreateTask,
                         onReturnToAssistant: onReturnToAssistant,
+                        onOpenWorkbench: onOpenWorkbench,
                         onSelectTask: onSelectTask,
                         onArchiveTask: onArchiveTask,
                         onRenameTask: onRenameTask,
