@@ -1674,7 +1674,7 @@ void main() {
     );
 
     test(
-      'sendChatMessage records task input attachments and does not reupload duplicates',
+      'sendChatMessage reuploads explicitly selected attachments on each turn',
       () async {
         final fakeGoTaskService = _RecordingGoTaskServiceClient();
         final controller = _connectedGatewayController(fakeGoTaskService);
@@ -1708,7 +1708,7 @@ void main() {
           fakeGoTaskService.requests.first.inlineAttachments,
           hasLength(1),
         );
-        expect(fakeGoTaskService.requests.last.inlineAttachments, isEmpty);
+        expect(fakeGoTaskService.requests.last.inlineAttachments, hasLength(1));
         expect(
           fakeGoTaskService.requests.last.prompt,
           contains('- taskInputAttachments:'),
