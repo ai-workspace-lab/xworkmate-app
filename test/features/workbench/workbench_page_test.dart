@@ -37,6 +37,22 @@ void main() {
     expect(find.text('本周节奏'), findsOneWidget);
     expect(find.text('AI 整理建议'), findsOneWidget);
 
+    await tester.tap(
+      find.byKey(const Key('workbench-right-rail-collapse-button')),
+    );
+    await tester.pump();
+    expect(
+      find.byKey(const Key('workbench-right-rail-expand-button')),
+      findsOneWidget,
+    );
+    expect(find.text('工作洞察'), findsNothing);
+
+    await tester.tap(
+      find.byKey(const Key('workbench-right-rail-expand-button')),
+    );
+    await tester.pump();
+    expect(find.text('工作洞察'), findsOneWidget);
+
     await tester.tap(find.byKey(const Key('workbench-tab-1')));
     await tester.pump();
     expect(find.byKey(const Key('workbench-todo-page')), findsOneWidget);
