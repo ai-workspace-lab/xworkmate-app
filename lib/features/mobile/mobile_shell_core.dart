@@ -7,16 +7,16 @@ import '../../models/app_models.dart';
 import '../../theme/app_palette.dart';
 import '../../widgets/detail_drawer.dart';
 
-enum MobileShellTab { assistant, settings }
+enum MobileShellTab { workbench, settings }
 
 extension MobileShellTabPresentationInternal on MobileShellTab {
   String get label => switch (this) {
-    MobileShellTab.assistant => appText('助手', 'Assistant'),
+    MobileShellTab.workbench => appText('工作台', 'Workbench'),
     MobileShellTab.settings => appText('设置', 'Settings'),
   };
 
   IconData get icon => switch (this) {
-    MobileShellTab.assistant => Icons.chat_bubble_outline_rounded,
+    MobileShellTab.workbench => Icons.view_quilt_outlined,
     MobileShellTab.settings => Icons.settings_rounded,
   };
 }
@@ -33,15 +33,16 @@ class MobileShell extends StatefulWidget {
 class MobileShellStateInternal extends State<MobileShell> {
   MobileShellTab tabForDestinationInternal(WorkspaceDestination destination) {
     return switch (destination) {
-      WorkspaceDestination.assistant => MobileShellTab.assistant,
+      WorkspaceDestination.workbench => MobileShellTab.workbench,
+      WorkspaceDestination.assistant => MobileShellTab.workbench,
       WorkspaceDestination.settings => MobileShellTab.settings,
     };
   }
 
   void selectTabInternal(MobileShellTab tab) {
     switch (tab) {
-      case MobileShellTab.assistant:
-        widget.controller.navigateTo(WorkspaceDestination.assistant);
+      case MobileShellTab.workbench:
+        widget.controller.navigateTo(WorkspaceDestination.workbench);
         return;
       case MobileShellTab.settings:
         widget.controller.navigateTo(WorkspaceDestination.settings);

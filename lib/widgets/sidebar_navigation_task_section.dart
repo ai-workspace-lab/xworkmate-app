@@ -30,6 +30,7 @@ class SidebarTaskSection extends StatefulWidget {
   const SidebarTaskSection({
     super.key,
     required this.currentSection,
+    this.onOpenHome,
     required this.items,
     required this.visibleExecutionTargets,
     required this.skillCount,
@@ -44,6 +45,7 @@ class SidebarTaskSection extends StatefulWidget {
   });
 
   final WorkspaceDestination currentSection;
+  final VoidCallback? onOpenHome;
   final List<SidebarTaskItem> items;
   final List<AssistantExecutionTarget> visibleExecutionTargets;
   final int skillCount;
@@ -163,6 +165,21 @@ class _SidebarTaskSectionState extends State<SidebarTaskSection> {
                 ),
               ],
             ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+          child: FilledButton.tonalIcon(
+            key: const Key('workspace-sidebar-workbench-button'),
+            onPressed: widget.onOpenHome,
+            icon: const Icon(Icons.view_quilt_outlined),
+            label: Text(appText('工作台', 'Workbench')),
+            style: FilledButton.styleFrom(
+              minimumSize: const Size(0, 40),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
           ),
         ),
         Padding(

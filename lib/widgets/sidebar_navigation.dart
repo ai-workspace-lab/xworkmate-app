@@ -124,6 +124,7 @@ class SidebarNavigation extends StatelessWidget {
                     Expanded(
                       child: SidebarTaskSection(
                         currentSection: currentSection,
+                        onOpenHome: onOpenHome,
                         items: taskItems,
                         visibleExecutionTargets: visibleExecutionTargets,
                         skillCount: assistantSkillCount,

@@ -2,20 +2,26 @@ import 'package:flutter/material.dart';
 
 import '../i18n/app_language.dart';
 
-enum WorkspaceDestination { assistant, settings }
+enum WorkspaceDestination { workbench, assistant, settings }
 
 extension WorkspaceDestinationCopy on WorkspaceDestination {
   String get label => switch (this) {
+    WorkspaceDestination.workbench => appText('工作台', 'Workbench'),
     WorkspaceDestination.assistant => appText('助手', 'Assistant'),
     WorkspaceDestination.settings => appText('设置', 'Settings'),
   };
 
   IconData get icon => switch (this) {
+    WorkspaceDestination.workbench => Icons.view_quilt_outlined,
     WorkspaceDestination.assistant => Icons.chat_bubble_outline_rounded,
     WorkspaceDestination.settings => Icons.tune_rounded,
   };
 
   String get description => switch (this) {
+    WorkspaceDestination.workbench => appText(
+      '把进度、待办、专项、收件箱和学习建议放在一个首页。',
+      'One home for progress, todos, projects, inbox items, and learning suggestions.',
+    ),
     WorkspaceDestination.assistant => appText(
       'AI 主入口，优先承接自然输入和高频工作发起。',
       'Primary AI entry point for natural input and frequent task starts.',
@@ -94,6 +100,11 @@ extension AssistantFocusEntryCopy on AssistantFocusEntry {
 
   static AssistantFocusEntry fromDestination(WorkspaceDestination destination) {
     return switch (destination) {
+      WorkspaceDestination.workbench => throw ArgumentError.value(
+        destination,
+        'destination',
+        'Workbench is not a pinnable focus entry.',
+      ),
       WorkspaceDestination.settings => AssistantFocusEntry.settings,
       WorkspaceDestination.assistant => throw ArgumentError.value(
         destination,
