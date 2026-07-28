@@ -153,6 +153,14 @@ extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
         selectedSkillLabels: selectedSkillLabels,
       );
       clearComposerDraftForSessionInternal(submittedSessionKey);
+      // Attachments belong to this message. Do not leave the composer showing
+      // files that are no longer part of the next message.
+      if (mounted) {
+        setState(() {
+          attachmentsInternal = const <ComposerAttachmentInternal>[];
+          saveComposerAttachmentsForSessionInternal(submittedSessionKey);
+        });
+      }
     } catch (error) {
       debugPrint('Assistant task submission failed: $error');
       if (!mounted) {
