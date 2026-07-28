@@ -41,23 +41,31 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
         );
         return LayoutBuilder(
           builder: (context, constraints) {
-            final showRightRail = constraints.maxWidth >= 1080;
+            // Keep the three-column desktop composition visible as soon as
+            // there is room for a compact center surface. The center column
+            // is intentionally the only flexible column; the insight rail
+            // must not be squeezed out by the workbench content.
+            final showRightRail = constraints.maxWidth >= 900;
             return Padding(
               padding: const EdgeInsets.all(12),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: _WorkbenchMain(
-                      tabIndex: _tabIndex,
-                      projection: projection,
-                      showInlineInsights: !showRightRail,
-                      onTabChanged: (index) {
-                        setState(() => _tabIndex = index);
-                      },
-                      onQuickRecord: _openAssistant,
-                      onOpenThread: _openThread,
-                      onSuggestionAction: _openAssistant,
+                  Flexible(
+                    fit: FlexFit.tight,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(minWidth: 0),
+                      child: _WorkbenchMain(
+                        tabIndex: _tabIndex,
+                        projection: projection,
+                        showInlineInsights: !showRightRail,
+                        onTabChanged: (index) {
+                          setState(() => _tabIndex = index);
+                        },
+                        onQuickRecord: _openAssistant,
+                        onOpenThread: _openThread,
+                        onSuggestionAction: _openAssistant,
+                      ),
                     ),
                   ),
                   if (showRightRail) ...[
@@ -66,8 +74,8 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
                       width: _isRightRailCollapsed
                           ? 44
                           : constraints.maxWidth >= 1200
-                          ? 380
-                          : 340,
+                          ? 360
+                          : 320,
                       child: _WorkbenchRightRail(
                         projection: projection,
                         onSuggestionAction: _openAssistant,
