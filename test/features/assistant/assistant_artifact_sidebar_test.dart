@@ -127,6 +127,79 @@ void main() {
     },
   );
 
+  testWidgets(
+    'does not reuse a same-named preview from a different workspace',
+    (tester) async {
+      var workspacePath = '/tmp/task-a';
+      await tester.pumpWidget(
+        _buildTestApp(
+          sessionKey: 'same-session',
+          workspacePath: workspacePath,
+          artifactSyncAtMs: 1,
+          loadSnapshot: () async => AssistantArtifactSnapshot(
+            workspacePath: workspacePath,
+            workspaceKind: WorkspaceRefKind.localPath,
+            fileEntries: <AssistantArtifactEntry>[
+              AssistantArtifactEntry(
+                id: 'readme-a',
+                label: 'README.md',
+                relativePath: 'README.md',
+                kind: AssistantArtifactEntryKind.file,
+                mimeType: 'text/markdown',
+                previewable: true,
+                workspacePath: workspacePath,
+              ),
+            ],
+          ),
+          loadPreview: (entry) async => AssistantArtifactPreview(
+            kind: AssistantArtifactPreviewKind.markdown,
+            content: entry.workspacePath,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(
+          const ValueKey<String>('assistant-artifact-entry-README.md'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('/tmp/task-a'), findsAtLeastNWidgets(1));
+
+      workspacePath = '/tmp/task-b';
+      await tester.pumpWidget(
+        _buildTestApp(
+          sessionKey: 'same-session',
+          workspacePath: workspacePath,
+          artifactSyncAtMs: 2,
+          loadSnapshot: () async => AssistantArtifactSnapshot(
+            workspacePath: workspacePath,
+            workspaceKind: WorkspaceRefKind.localPath,
+            fileEntries: <AssistantArtifactEntry>[
+              AssistantArtifactEntry(
+                id: 'readme-b',
+                label: 'README.md',
+                relativePath: 'README.md',
+                kind: AssistantArtifactEntryKind.file,
+                mimeType: 'text/markdown',
+                previewable: true,
+                workspacePath: workspacePath,
+              ),
+            ],
+          ),
+          loadPreview: (entry) async => AssistantArtifactPreview(
+            kind: AssistantArtifactPreviewKind.markdown,
+            content: entry.workspacePath,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('/tmp/task-a'), findsNothing);
+      expect(find.text('/tmp/task-b'), findsOneWidget);
+    },
+  );
+
   testWidgets('keeps polling partial artifact snapshots', (tester) async {
     var loadCount = 0;
 
