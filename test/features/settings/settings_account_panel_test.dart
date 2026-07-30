@@ -49,6 +49,19 @@ void main() {
         expect(find.text('连接器'), findsOneWidget);
         expect(find.text('本地工作空间'), findsOneWidget);
         expect(find.text('svc.plus Workspace'), findsOneWidget);
+        expect(find.text('MCP Servers'), findsOneWidget);
+        final mcpButton = tester.widget<FilledButton>(
+          find.byKey(const ValueKey('settings-connector-action-mcp-servers')),
+        );
+        expect(mcpButton.onPressed, isNotNull);
+        await tester.tap(
+          find.byKey(const ValueKey('settings-connector-action-mcp-servers')),
+        );
+        await tester.pump();
+        expect(
+          find.byKey(const ValueKey('settings-mcp-server-name-field')),
+          findsOneWidget,
+        );
         await tester.tap(
           find.byKey(
             const ValueKey('settings-connector-action-svc-plus-workspace'),
