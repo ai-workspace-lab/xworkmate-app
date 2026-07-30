@@ -40,6 +40,7 @@ class _MobileSettingsPageState extends State<MobileSettingsPage> {
   String lastSavedBridgeUrl = '';
   bool accountSyncing = false;
   bool manualBridgeSaving = false;
+
   /// 手动 Bridge 已生效时，默认展示「已连接视图」；用户点「编辑配置」才
   /// 回到表单。未生效时表单本来就是常驻的，这个标志不参与判断。
   bool manualBridgeEditing = false;
@@ -221,7 +222,10 @@ class _MobileSettingsPageState extends State<MobileSettingsPage> {
       final reason = (connection.lastError ?? '').trim().isNotEmpty
           ? connection.lastError!.trim()
           : connection.primaryLabel;
-      message = appText('已保存，但未能连接：$reason', 'Saved, but not connected: $reason');
+      message = appText(
+        '已保存，但未能连接：$reason',
+        'Saved, but not connected: $reason',
+      );
     }
     messenger
       ..hideCurrentSnackBar()
@@ -599,45 +603,47 @@ class _AccountSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (accountMfaRequired) {
-      return MobileSettingsCardInternal(
-        key: const Key('mobile-settings-mfa-card'),
-        icon: Icons.verified_user_outlined,
-        title: appText('双重验证', 'Multi-Factor Authentication'),
-        subtitle: appText(
-          '输入验证码完成登录并同步托管 Bridge。',
-          'Enter the code to finish sign-in and sync the managed Bridge.',
+      return _ConnectorsLayout(
+        child: MobileSettingsCardInternal(
+          key: const Key('mobile-settings-mfa-card'),
+          icon: Icons.verified_user_outlined,
+          title: appText('双重验证', 'Multi-Factor Authentication'),
+          subtitle: appText(
+            '输入验证码以完成此连接。',
+            'Enter the code to complete this connection.',
+          ),
+          children: [
+            MobileSettingsTextFieldInternal(
+              key: const Key('mobile-settings-account-mfa-code-field'),
+              controller: accountMfaCodeController,
+              label: appText('验证码', 'Code'),
+              icon: Icons.key_outlined,
+              keyboardType: TextInputType.number,
+              textInputAction: TextInputAction.done,
+              onSubmitted: (_) => onVerifyMfa(),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: FilledButton(
+                    key: const Key('mobile-settings-account-mfa-verify-button'),
+                    onPressed: accountBusy ? null : onVerifyMfa,
+                    child: Text(appText('验证', 'Verify')),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: FilledButton.tonal(
+                    key: const Key('mobile-settings-account-mfa-cancel-button'),
+                    onPressed: accountBusy ? null : onCancelMfa,
+                    child: Text(appText('返回', 'Back')),
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
-        children: [
-          MobileSettingsTextFieldInternal(
-            key: const Key('mobile-settings-account-mfa-code-field'),
-            controller: accountMfaCodeController,
-            label: appText('验证码', 'Code'),
-            icon: Icons.key_outlined,
-            keyboardType: TextInputType.number,
-            textInputAction: TextInputAction.done,
-            onSubmitted: (_) => onVerifyMfa(),
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: FilledButton(
-                  key: const Key('mobile-settings-account-mfa-verify-button'),
-                  onPressed: accountBusy ? null : onVerifyMfa,
-                  child: Text(appText('验证', 'Verify')),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: FilledButton.tonal(
-                  key: const Key('mobile-settings-account-mfa-cancel-button'),
-                  onPressed: accountBusy ? null : onCancelMfa,
-                  child: Text(appText('返回', 'Back')),
-                ),
-              ),
-            ],
-          ),
-        ],
       );
     }
     final manualBridgeConfigured =
@@ -649,176 +655,238 @@ class _AccountSection extends StatelessWidget {
       final status = accountState?.syncMessage.trim().isNotEmpty == true
           ? accountState!.syncMessage.trim()
           : accountStatus.trim();
-      return Column(
-        children: [
-          MobileSettingsCardInternal(
-            key: const Key('mobile-settings-account-signed-in-card'),
-            icon: accountSyncing
-                ? Icons.sync_rounded
-                : Icons.cloud_done_outlined,
-            title: email.isEmpty ? appText('已登录', 'Signed In') : email,
-            subtitle: accountSyncing
-                ? appText('正在同步托管 Bridge…', 'Syncing managed Bridge…')
-                : status.isEmpty
-                ? appText('svc.plus 托管 Bridge 已就绪。', 'Managed Bridge is ready.')
-                : status,
-            children: [
-              MobileSettingsMetaRowInternal(
-                icon: Icons.hub_outlined,
-                label: appText('托管入口', 'Managed Endpoint'),
-                value: kManagedBridgeServerUrl,
-              ),
-              const SizedBox(height: 8),
-              MobileSettingsMetaRowInternal(
-                key: const Key('mobile-settings-account-last-sync-row'),
-                icon: Icons.schedule_rounded,
-                label: appText('最近同步', 'Last Sync'),
-                value: accountSyncing
-                    ? appText('同步中…', 'Syncing…')
-                    : _formatLastSyncTime(accountState?.lastSyncAtMs ?? 0),
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: FilledButton.icon(
-                      key: const Key('mobile-settings-account-sync-button'),
-                      onPressed: accountBusy || accountSyncing ? null : onSync,
-                      icon: accountSyncing
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.sync_rounded),
-                      label: Text(
-                        accountSyncing
-                            ? appText('同步中…', 'Syncing…')
-                            : appText('同步', 'Sync'),
+      return _ConnectorsLayout(
+        child: Column(
+          children: [
+            MobileSettingsCardInternal(
+              key: const Key('mobile-settings-account-signed-in-card'),
+              icon: accountSyncing
+                  ? Icons.sync_rounded
+                  : Icons.cloud_done_outlined,
+              title: email.isEmpty ? 'svc.plus Workspace' : email,
+              subtitle: accountSyncing
+                  ? appText('正在更新连接信息…', 'Updating connection information…')
+                  : status.isEmpty
+                  ? appText('已有工作空间已连接。', 'Existing workspace connected.')
+                  : status,
+              children: [
+                MobileSettingsMetaRowInternal(
+                  icon: Icons.hub_outlined,
+                  label: appText('服务地址', 'Service URL'),
+                  value: kManagedBridgeServerUrl,
+                ),
+                const SizedBox(height: 8),
+                MobileSettingsMetaRowInternal(
+                  key: const Key('mobile-settings-account-last-sync-row'),
+                  icon: Icons.schedule_rounded,
+                  label: appText('最近同步', 'Last Sync'),
+                  value: accountSyncing
+                      ? appText('同步中…', 'Syncing…')
+                      : _formatLastSyncTime(accountState?.lastSyncAtMs ?? 0),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: FilledButton.icon(
+                        key: const Key('mobile-settings-account-sync-button'),
+                        onPressed: accountBusy || accountSyncing
+                            ? null
+                            : onSync,
+                        icon: accountSyncing
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(Icons.sync_rounded),
+                        label: Text(
+                          accountSyncing
+                              ? appText('同步中…', 'Syncing…')
+                              : appText('同步', 'Sync'),
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: FilledButton.tonalIcon(
-                      key: const Key('mobile-settings-account-logout-button'),
-                      onPressed: accountBusy || accountSyncing
-                          ? null
-                          : onLogout,
-                      icon: const Icon(Icons.logout_rounded),
-                      label: Text(appText('退出', 'Sign Out')),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: FilledButton.tonalIcon(
+                        key: const Key('mobile-settings-account-logout-button'),
+                        onPressed: accountBusy || accountSyncing
+                            ? null
+                            : onLogout,
+                        icon: const Icon(Icons.logout_rounded),
+                        label: Text(appText('断开连接', 'Disconnect')),
+                      ),
                     ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ],
+                  ],
+                ),
+              ],
+            ),
+          ],
+        ),
       );
     }
     if (manualBridgeConfigured) {
       // 与账号「已连接视图」对称：默认展示连接状态而不是编辑表单，
       // 需要改地址/令牌时再显式进入编辑。
       if (!manualBridgeEditing) {
-        return _ManualBridgeConnectedCard(
-          accountBusy: accountBusy,
-          manualBridgeSaving: manualBridgeSaving,
-          endpoint: settings.acpBridgeServerModeConfig.selfHosted.serverUrl,
-          onEdit: onEditManualBridge,
-          onReset: onResetManualBridge,
+        return _ConnectorsLayout(
+          child: _ManualBridgeConnectedCard(
+            accountBusy: accountBusy,
+            manualBridgeSaving: manualBridgeSaving,
+            endpoint: settings.acpBridgeServerModeConfig.selfHosted.serverUrl,
+            onEdit: onEditManualBridge,
+            onReset: onResetManualBridge,
+          ),
         );
       }
-      return _ManualBridgeCard(
-        accountBusy: accountBusy,
-        bridgeUrlController: bridgeUrlController,
-        bridgeTokenController: bridgeTokenController,
-        manualBridgeSaving: manualBridgeSaving,
-        onSaveManualBridge: onSaveManualBridge,
-        onCancelEdit: onCancelManualBridgeEdit,
-      );
-    }
-    return Column(
-      children: [
-        MobileSettingsCardInternal(
-          key: const Key('mobile-settings-account-login-card'),
-          icon: Icons.cloud_outlined,
-          title: appText('svc.plus 登录', 'svc.plus Sign In'),
-          subtitle: appText(
-            '登录后同步托管 Bridge，助手会直接使用统一入口。',
-            'Sign in to sync the managed Bridge for Assistant.',
-          ),
-          children: [
-            if (accountStatus.trim().isNotEmpty &&
-                accountStatus.trim() != 'Signed out') ...[
-              MobileSettingsMetaRowInternal(
-                icon: accountBusy
-                    ? Icons.sync_rounded
-                    : Icons.info_outline_rounded,
-                label: appText('登录状态', 'Sign-in Status'),
-                value: accountStatus.trim(),
-              ),
-              const SizedBox(height: 12),
-            ],
-            MobileSettingsTextFieldInternal(
-              key: const Key('mobile-settings-account-base-url-field'),
-              controller: accountBaseUrlController,
-              label: appText('服务地址', 'Service URL'),
-              icon: Icons.dns_outlined,
-              keyboardType: TextInputType.url,
-              textInputAction: TextInputAction.next,
-              autofillHints: const [AutofillHints.url],
-            ),
-            const SizedBox(height: 10),
-            MobileSettingsTextFieldInternal(
-              key: const Key('mobile-settings-account-identifier-field'),
-              controller: accountIdentifierController,
-              label: appText('邮箱或账号', 'Email or Username'),
-              icon: Icons.person_outline_rounded,
-              keyboardType: TextInputType.emailAddress,
-              textInputAction: TextInputAction.next,
-              autofillHints: const [
-                AutofillHints.username,
-                AutofillHints.email,
-              ],
-            ),
-            const SizedBox(height: 10),
-            MobileSettingsTextFieldInternal(
-              key: const Key('mobile-settings-account-password-field'),
-              controller: accountPasswordController,
-              label: appText('密码', 'Password'),
-              icon: Icons.lock_outline_rounded,
-              obscureText: true,
-              keyboardType: TextInputType.visiblePassword,
-              textInputAction: TextInputAction.done,
-              autofillHints: const [AutofillHints.password],
-              onSubmitted: (_) => onLogin(),
-            ),
-            const SizedBox(height: 14),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                key: const Key('mobile-settings-account-login-button'),
-                onPressed: accountBusy ? null : onLogin,
-                icon: accountBusy
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.login_rounded),
-                label: Text(appText('登录', 'Sign In')),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        _ManualBridgeCard(
+      return _ConnectorsLayout(
+        child: _ManualBridgeCard(
           accountBusy: accountBusy,
           bridgeUrlController: bridgeUrlController,
           bridgeTokenController: bridgeTokenController,
           manualBridgeSaving: manualBridgeSaving,
           onSaveManualBridge: onSaveManualBridge,
+          onCancelEdit: onCancelManualBridgeEdit,
         ),
+      );
+    }
+    return _ConnectorsLayout(
+      child: Column(
+        children: [
+          MobileSettingsCardInternal(
+            key: const Key('mobile-settings-account-login-card'),
+            icon: Icons.cloud_outlined,
+            title: 'svc.plus Workspace',
+            subtitle: appText(
+              '连接你已有的工作空间配置。',
+              'Connect an existing workspace configuration.',
+            ),
+            children: [
+              if (accountStatus.trim().isNotEmpty &&
+                  accountStatus.trim() != 'Signed out') ...[
+                MobileSettingsMetaRowInternal(
+                  icon: accountBusy
+                      ? Icons.sync_rounded
+                      : Icons.info_outline_rounded,
+                  label: appText('连接状态', 'Connection status'),
+                  value: accountStatus.trim(),
+                ),
+                const SizedBox(height: 12),
+              ],
+              MobileSettingsTextFieldInternal(
+                key: const Key('mobile-settings-account-base-url-field'),
+                controller: accountBaseUrlController,
+                label: appText('服务地址', 'Service URL'),
+                icon: Icons.dns_outlined,
+                keyboardType: TextInputType.url,
+                textInputAction: TextInputAction.next,
+                autofillHints: const [AutofillHints.url],
+              ),
+              const SizedBox(height: 10),
+              MobileSettingsTextFieldInternal(
+                key: const Key('mobile-settings-account-identifier-field'),
+                controller: accountIdentifierController,
+                label: appText('邮箱或账号', 'Email or Username'),
+                icon: Icons.person_outline_rounded,
+                keyboardType: TextInputType.emailAddress,
+                textInputAction: TextInputAction.next,
+                autofillHints: const [
+                  AutofillHints.username,
+                  AutofillHints.email,
+                ],
+              ),
+              const SizedBox(height: 10),
+              MobileSettingsTextFieldInternal(
+                key: const Key('mobile-settings-account-password-field'),
+                controller: accountPasswordController,
+                label: appText('密码', 'Password'),
+                icon: Icons.lock_outline_rounded,
+                obscureText: true,
+                keyboardType: TextInputType.visiblePassword,
+                textInputAction: TextInputAction.done,
+                autofillHints: const [AutofillHints.password],
+                onSubmitted: (_) => onLogin(),
+              ),
+              const SizedBox(height: 14),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  key: const Key('mobile-settings-account-login-button'),
+                  onPressed: accountBusy ? null : onLogin,
+                  icon: accountBusy
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.login_rounded),
+                  label: Text(appText('连接', 'Connect')),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _ManualBridgeCard(
+            accountBusy: accountBusy,
+            bridgeUrlController: bridgeUrlController,
+            bridgeTokenController: bridgeTokenController,
+            manualBridgeSaving: manualBridgeSaving,
+            onSaveManualBridge: onSaveManualBridge,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ConnectorsLayout extends StatelessWidget {
+  const _ConnectorsLayout({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          appText('连接器', 'Connectors'),
+          style: Theme.of(context).textTheme.headlineSmall,
+        ),
+        const SizedBox(height: 4),
+        Text(
+          appText(
+            '连接外部服务；已连接的服务会优先显示。',
+            'Connect external services. Connected services appear first.',
+          ),
+          style: Theme.of(context).textTheme.bodyMedium,
+        ),
+        const SizedBox(height: 16),
+        Text(
+          appText('已连接 · 1', 'Connected · 1'),
+          style: Theme.of(context).textTheme.titleSmall,
+        ),
+        const SizedBox(height: 8),
+        MobileSettingsCardInternal(
+          key: const Key('mobile-settings-local-workspace-card'),
+          icon: Icons.phone_iphone_outlined,
+          title: appText('本地工作空间', 'Local Workspace'),
+          subtitle: appText(
+            '数据和任务保存在当前设备，无需账号。',
+            'Tasks and data stay on this device. No account required.',
+          ),
+          children: const [],
+        ),
+        const SizedBox(height: 16),
+        Text(
+          appText('可用连接器', 'Available connectors'),
+          style: Theme.of(context).textTheme.titleSmall,
+        ),
+        const SizedBox(height: 8),
+        child,
       ],
     );
   }
@@ -848,18 +916,15 @@ class _ManualBridgeConnectedCard extends StatelessWidget {
     return MobileSettingsCardInternal(
       key: const Key('mobile-settings-manual-bridge-connected-card'),
       icon: manualBridgeSaving ? Icons.sync_rounded : Icons.link_rounded,
-      title: appText('手动 Bridge 已连接', 'Manual Bridge Connected'),
+      title: appText('自托管工作空间已连接', 'Self-hosted Workspace Connected'),
       subtitle: manualBridgeSaving
           ? appText('正在处理…', 'Working…')
-          : appText(
-              '当前使用手动配置的 Bridge，未走 svc.plus 托管登录。',
-              'Using a manually configured Bridge instead of managed sign-in.',
-            ),
+          : appText('当前正在使用你自行管理的工作空间。', 'Using a workspace that you manage.'),
       children: [
         MobileSettingsMetaRowInternal(
           key: const Key('mobile-settings-manual-bridge-endpoint-row'),
           icon: Icons.dns_outlined,
-          label: appText('Bridge 地址', 'Bridge URL'),
+          label: appText('服务地址', 'Service URL'),
           value: endpoint.trim().isEmpty ? '—' : endpoint.trim(),
         ),
         const SizedBox(height: 12),
@@ -885,7 +950,7 @@ class _ManualBridgeConnectedCard extends StatelessWidget {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : const Icon(Icons.logout_rounded),
-                label: Text(appText('退出', 'Exit')),
+                label: Text(appText('断开连接', 'Disconnect')),
               ),
             ),
           ],
@@ -919,16 +984,16 @@ class _ManualBridgeCard extends StatelessWidget {
     return MobileSettingsCardInternal(
       key: const Key('mobile-settings-manual-bridge-card'),
       icon: Icons.link_outlined,
-      title: appText('手动 Bridge', 'Manual Bridge'),
+      title: appText('自托管工作空间', 'Self-hosted Workspace'),
       subtitle: appText(
-        '仅用于私有或本地 Bridge；远端托管登录优先。',
-        'Use only for private or local Bridge; managed sign-in is preferred.',
+        '连接你自行部署和管理的 AI Workspace。',
+        'Connect an AI Workspace that you deploy and manage.',
       ),
       children: [
         MobileSettingsTextFieldInternal(
           key: const Key('mobile-settings-manual-bridge-url-field'),
           controller: bridgeUrlController,
-          label: appText('Bridge 地址', 'Bridge URL'),
+          label: appText('服务地址', 'Service URL'),
           icon: Icons.dns_outlined,
           keyboardType: TextInputType.url,
           textInputAction: TextInputAction.next,
@@ -937,7 +1002,7 @@ class _ManualBridgeCard extends StatelessWidget {
         MobileSettingsTextFieldInternal(
           key: const Key('mobile-settings-manual-bridge-token-field'),
           controller: bridgeTokenController,
-          label: appText('鉴权令牌', 'Auth Token'),
+          label: appText('访问令牌', 'Access token'),
           icon: Icons.key_outlined,
           obscureText: true,
           keyboardType: TextInputType.visiblePassword,
@@ -963,7 +1028,7 @@ class _ManualBridgeCard extends StatelessWidget {
             label: Text(
               manualBridgeSaving
                   ? appText('正在连接…', 'Connecting…')
-                  : appText('保存手动配置', 'Save Manual Config'),
+                  : appText('连接', 'Connect'),
             ),
           ),
         ),
@@ -972,7 +1037,9 @@ class _ManualBridgeCard extends StatelessWidget {
           SizedBox(
             width: double.infinity,
             child: TextButton(
-              key: const Key('mobile-settings-manual-bridge-cancel-edit-button'),
+              key: const Key(
+                'mobile-settings-manual-bridge-cancel-edit-button',
+              ),
               onPressed: manualBridgeSaving ? null : onCancelEdit,
               child: Text(appText('取消', 'Cancel')),
             ),
