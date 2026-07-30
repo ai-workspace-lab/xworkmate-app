@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../../i18n/app_language.dart';
-import '../../runtime/codex_config_bridge.dart';
 import '../../runtime/runtime_models.dart';
 
 class SettingsAccountPanel extends StatefulWidget {
@@ -98,36 +97,7 @@ class _SettingsAccountPanelState extends State<SettingsAccountPanel> {
   }
 }
 
-enum _ConnectorSelection { svcPlus, selfHosted, mcpServers }
-
-const _plannedConnectors = <_PlannedConnector>[
-  _PlannedConnector(
-    id: 'mcp-servers',
-    icon: Icons.memory_outlined,
-    titleZh: 'MCP Servers',
-    titleEn: 'MCP Servers',
-    subtitleZh: '添加和管理你自行选择的 MCP 服务。',
-    subtitleEn: 'Add and manage MCP services that you choose.',
-  ),
-];
-
-class _PlannedConnector {
-  const _PlannedConnector({
-    required this.id,
-    required this.icon,
-    required this.titleZh,
-    required this.titleEn,
-    required this.subtitleZh,
-    required this.subtitleEn,
-  });
-
-  final String id;
-  final IconData icon;
-  final String titleZh;
-  final String titleEn;
-  final String subtitleZh;
-  final String subtitleEn;
-}
+enum _ConnectorSelection { svcPlus, selfHosted }
 
 class _AvailableConnectorsPanel extends StatefulWidget {
   const _AvailableConnectorsPanel({
@@ -227,38 +197,12 @@ class _AvailableConnectorsPanelState extends State<_AvailableConnectorsPanel> {
             onAction: () =>
                 setState(() => _selection = _ConnectorSelection.selfHosted),
           ),
-          for (final connector in _plannedConnectors) ...[
-            const SizedBox(height: 12),
-            _ConnectorCard(
-              connectorId: connector.id,
-              icon: connector.icon,
-              title: appText(connector.titleZh, connector.titleEn),
-              subtitle: appText(connector.subtitleZh, connector.subtitleEn),
-              actionLabel: appText('添加', 'Add'),
-              onAction: () =>
-                  setState(() => _selection = _ConnectorSelection.mcpServers),
-            ),
-          ],
-          const SizedBox(height: 12),
-          _ConnectorCard(
-            connectorId: 'add-connector',
-            icon: Icons.add_rounded,
-            title: appText('添加连接器', 'Add connector'),
-            subtitle: appText(
-              '更多连接器将在可用时显示在这里。',
-              'More connectors will appear here when available.',
-            ),
-            actionLabel: appText('即将推出', 'Coming soon'),
-            actionEnabled: false,
-          ),
           if (_selection != null) ...[
             const SizedBox(height: 20),
             _ConnectorConfiguration(
               title: _selection == _ConnectorSelection.svcPlus
                   ? 'svc.plus Workspace'
-                  : _selection == _ConnectorSelection.selfHosted
-                  ? appText('自托管工作空间', 'Self-hosted Workspace')
-                  : 'MCP Servers',
+                  : appText('自托管工作空间', 'Self-hosted Workspace'),
               onClose: () => setState(() => _selection = null),
               child: _selection == _ConnectorSelection.svcPlus
                   ? _SignedOutAccountPanel(
@@ -271,149 +215,17 @@ class _AvailableConnectorsPanelState extends State<_AvailableConnectorsPanel> {
                       onSaveAccountProfile: widget.onSaveAccountProfile,
                       onLogin: widget.onLogin,
                     )
-                  : _selection == _ConnectorSelection.selfHosted
-                  ? _ManualBridgePanel(
+                  : _ManualBridgePanel(
                       settings: SettingsSnapshot.defaults(),
                       accountBusy: widget.accountBusy,
                       bridgeUrlController: widget.bridgeUrlController,
                       bridgeTokenController: widget.bridgeTokenController,
                       onSaveAccountProfile: widget.onSaveAccountProfile,
-                    )
-                  : const _McpServersPanel(),
+                    ),
             ),
           ],
         ],
       ),
-    );
-  }
-}
-
-class _McpServersPanel extends StatefulWidget {
-  const _McpServersPanel();
-
-  @override
-  State<_McpServersPanel> createState() => _McpServersPanelState();
-}
-
-class _McpServersPanelState extends State<_McpServersPanel> {
-  final _nameController = TextEditingController();
-  final _commandController = TextEditingController();
-  final _argsController = TextEditingController();
-  bool _saving = false;
-  String? _message;
-
-  @override
-  void dispose() {
-    _nameController.dispose();
-    _commandController.dispose();
-    _argsController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _save() async {
-    final name = _nameController.text.trim();
-    final command = _commandController.text.trim();
-    if (!RegExp(r'^[a-zA-Z0-9_-]+$').hasMatch(name) ||
-        command.isEmpty ||
-        command.contains('\n')) {
-      setState(
-        () => _message = appText(
-          '请填写名称和命令。名称只能使用字母、数字、连字符或下划线。',
-          'Enter a name and command. Names may contain only letters, numbers, hyphens, and underscores.',
-        ),
-      );
-      return;
-    }
-    setState(() {
-      _saving = true;
-      _message = null;
-    });
-    try {
-      await CodexConfigBridge().configureManagedMcpServers(
-        servers: [
-          CodexMcpServer(
-            name: name,
-            command: command,
-            args: _argsController.text
-                .trim()
-                .split(RegExp(r'\s+'))
-                .where((argument) => argument.isNotEmpty)
-                .toList(growable: false),
-          ),
-        ],
-      );
-      if (mounted) {
-        setState(
-          () => _message = appText(
-            'MCP Server 已添加到本机的受管 Codex 配置。',
-            'MCP server added to the managed Codex configuration on this device.',
-          ),
-        );
-      }
-    } catch (_) {
-      if (mounted) {
-        setState(
-          () => _message = appText(
-            '无法保存 MCP Server 配置。',
-            'Unable to save the MCP server configuration.',
-          ),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _saving = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          appText(
-            '添加一个本地 MCP Server。凭据请由命令本身或系统环境安全管理。',
-            'Add a local MCP server. Let the command or system environment manage credentials securely.',
-          ),
-        ),
-        const SizedBox(height: 16),
-        TextFormField(
-          key: const ValueKey('settings-mcp-server-name-field'),
-          controller: _nameController,
-          decoration: InputDecoration(
-            labelText: appText('名称', 'Name'),
-            hintText: 'filesystem',
-          ),
-        ),
-        const SizedBox(height: 12),
-        TextFormField(
-          key: const ValueKey('settings-mcp-server-command-field'),
-          controller: _commandController,
-          decoration: InputDecoration(
-            labelText: appText('命令', 'Command'),
-            hintText: 'npx',
-          ),
-        ),
-        const SizedBox(height: 12),
-        TextFormField(
-          key: const ValueKey('settings-mcp-server-args-field'),
-          controller: _argsController,
-          decoration: InputDecoration(
-            labelText: appText('参数（以空格分隔）', 'Arguments (space-separated)'),
-            hintText: '-y @modelcontextprotocol/server-filesystem',
-          ),
-        ),
-        const SizedBox(height: 16),
-        FilledButton(
-          key: const ValueKey('settings-mcp-server-add-button'),
-          onPressed: _saving ? null : _save,
-          child: Text(
-            _saving
-                ? appText('添加中…', 'Adding…')
-                : appText('添加 MCP Server', 'Add MCP Server'),
-          ),
-        ),
-        if (_message != null) ...[const SizedBox(height: 12), Text(_message!)],
-      ],
     );
   }
 }
@@ -467,7 +279,6 @@ class _ConnectorCard extends StatelessWidget {
     required this.subtitle,
     this.trailing,
     this.actionLabel,
-    this.actionEnabled = true,
     this.onAction,
   });
   final String connectorId;
@@ -476,7 +287,6 @@ class _ConnectorCard extends StatelessWidget {
   final String subtitle;
   final Widget? trailing;
   final String? actionLabel;
-  final bool actionEnabled;
   final VoidCallback? onAction;
   @override
   Widget build(BuildContext context) => Material(
@@ -504,7 +314,7 @@ class _ConnectorCard extends StatelessWidget {
           if (actionLabel != null)
             FilledButton.tonal(
               key: ValueKey('settings-connector-action-$connectorId'),
-              onPressed: actionEnabled ? onAction : null,
+              onPressed: onAction,
               child: Text(actionLabel!),
             ),
         ],

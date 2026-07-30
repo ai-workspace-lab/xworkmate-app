@@ -887,78 +887,7 @@ class _ConnectorsLayout extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         child,
-        const SizedBox(height: 12),
-        for (final connector in _mobilePlannedConnectors) ...[
-          _MobilePlannedConnectorCard(connector: connector),
-          const SizedBox(height: 10),
-        ],
-        const _MobileAddConnectorCard(),
       ],
-    );
-  }
-}
-
-const _mobilePlannedConnectors = <_MobilePlannedConnector>[
-  _MobilePlannedConnector(
-    icon: Icons.memory_outlined,
-    titleZh: 'MCP Servers',
-    titleEn: 'MCP Servers',
-    subtitleZh: '添加和管理你自行选择的 MCP 服务。',
-    subtitleEn: 'Add and manage MCP services that you choose.',
-  ),
-];
-
-class _MobilePlannedConnector {
-  const _MobilePlannedConnector({
-    required this.icon,
-    required this.titleZh,
-    required this.titleEn,
-    required this.subtitleZh,
-    required this.subtitleEn,
-  });
-
-  final IconData icon;
-  final String titleZh;
-  final String titleEn;
-  final String subtitleZh;
-  final String subtitleEn;
-}
-
-class _MobilePlannedConnectorCard extends StatelessWidget {
-  const _MobilePlannedConnectorCard({required this.connector});
-
-  final _MobilePlannedConnector connector;
-
-  @override
-  Widget build(BuildContext context) {
-    return Opacity(
-      opacity: 0.72,
-      child: MobileSettingsCardInternal(
-        icon: connector.icon,
-        title: appText(connector.titleZh, connector.titleEn),
-        subtitle: appText(connector.subtitleZh, connector.subtitleEn),
-        children: const [],
-      ),
-    );
-  }
-}
-
-class _MobileAddConnectorCard extends StatelessWidget {
-  const _MobileAddConnectorCard();
-
-  @override
-  Widget build(BuildContext context) {
-    return Opacity(
-      opacity: 0.72,
-      child: MobileSettingsCardInternal(
-        icon: Icons.add_rounded,
-        title: appText('添加连接器', 'Add connector'),
-        subtitle: appText(
-          '更多连接器将在可用时显示在这里。',
-          'More connectors will appear here when available.',
-        ),
-        children: const [],
-      ),
     );
   }
 }
