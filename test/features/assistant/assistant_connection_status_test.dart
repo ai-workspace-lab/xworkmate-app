@@ -106,8 +106,8 @@ void main() {
 
       expect(state.connected, isFalse);
       expect(state.status, RuntimeConnectionStatus.offline);
-      expect(state.primaryLabel, '已退出登录');
-      expect(state.detailLabel, '请先登录 svc.plus');
+      expect(state.primaryLabel, '未连接');
+      expect(state.detailLabel, '请在连接器中选择一个工作空间');
       expect(state.gatewayTokenMissing, isFalse);
     });
 

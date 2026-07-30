@@ -1084,13 +1084,13 @@ void main() {
             isA<StateError>().having(
               (error) => error.message,
               'message',
-              contains('请先登录 svc.plus'),
+              contains('请在连接器中选择一个工作空间'),
             ),
           ),
         );
 
         expect(fakeGoTaskService.executeCount, 0);
-        expect(controller.chatMessages.last.text, contains('请先登录 svc.plus'));
+        expect(controller.chatMessages.last.text, contains('请在连接器中选择一个工作空间'));
       },
     );
 
@@ -1199,7 +1199,7 @@ void main() {
             isA<StateError>().having(
               (error) => error.message,
               'message',
-              anyOf(contains('ACP_HTTP_401'), contains('请先登录 svc.plus')),
+              anyOf(contains('ACP_HTTP_401'), contains('请在连接器中选择一个工作空间')),
             ),
           ),
         );
@@ -1209,7 +1209,7 @@ void main() {
         if (controller.chatMessages.isNotEmpty) {
           expect(
             controller.chatMessages.last.text,
-            anyOf(contains('ACP_HTTP_401'), contains('请先登录 svc.plus')),
+            anyOf(contains('ACP_HTTP_401'), contains('请在连接器中选择一个工作空间')),
           );
         }
       },

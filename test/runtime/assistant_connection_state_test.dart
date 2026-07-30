@@ -53,7 +53,7 @@ void main() {
         final state = controller.currentAssistantConnectionState;
         expect(state.connected, isFalse);
         expect(state.status, RuntimeConnectionStatus.offline);
-        expect(state.detailLabel, '请先登录 svc.plus');
+        expect(state.detailLabel, '请在连接器中选择一个工作空间');
       },
     );
 
@@ -296,8 +296,8 @@ void main() {
 
       final state = controller.currentAssistantConnectionState;
       expect(state.status, RuntimeConnectionStatus.offline);
-      expect(state.primaryLabel, '已退出登录');
-      expect(state.detailLabel, '请先登录 svc.plus');
+      expect(state.primaryLabel, '未连接');
+      expect(state.detailLabel, '请在连接器中选择一个工作空间');
     });
 
     test('keeps true offline state as bridge not connected', () async {
@@ -316,8 +316,8 @@ void main() {
 
       final state = controller.currentAssistantConnectionState;
       expect(state.status, RuntimeConnectionStatus.offline);
-      expect(state.primaryLabel, '已退出登录');
-      expect(state.detailLabel, '请先登录 svc.plus');
+      expect(state.primaryLabel, '未连接');
+      expect(state.detailLabel, '请在连接器中选择一个工作空间');
     });
 
     test(
@@ -347,8 +347,8 @@ void main() {
 
         final state = controller.currentAssistantConnectionState;
         expect(state.status, RuntimeConnectionStatus.offline);
-        expect(state.primaryLabel, '已退出登录');
-        expect(state.detailLabel, '请先登录 svc.plus');
+        expect(state.primaryLabel, '未连接');
+        expect(state.detailLabel, '请在连接器中选择一个工作空间');
       },
     );
 
@@ -379,8 +379,8 @@ void main() {
 
         final state = controller.currentAssistantConnectionState;
         expect(state.status, RuntimeConnectionStatus.offline);
-        expect(state.primaryLabel, '已退出登录');
-        expect(state.detailLabel, '请先登录 svc.plus');
+        expect(state.primaryLabel, '未连接');
+        expect(state.detailLabel, '请在连接器中选择一个工作空间');
       },
     );
 
@@ -410,8 +410,8 @@ void main() {
 
         final state = controller.currentAssistantConnectionState;
         expect(state.status, RuntimeConnectionStatus.offline);
-        expect(state.primaryLabel, '已退出登录');
-        expect(state.detailLabel, '请先登录 svc.plus');
+        expect(state.primaryLabel, '未连接');
+        expect(state.detailLabel, '请在连接器中选择一个工作空间');
       },
     );
 
@@ -437,7 +437,7 @@ void main() {
 
       final snapshot = controller.desktopStatusSnapshot();
       expect(snapshot['connectionStatus'], 'disconnected');
-      expect(snapshot['connectionLabel'], '已退出登录');
+      expect(snapshot['connectionLabel'], '未连接');
     });
   });
 }
