@@ -53,6 +53,7 @@ abstract final class UiFeatureKeys {
   static const settingsLogs = 'settings.logs';
   static const settingsHelp = 'settings.help';
   static const settingsAccountAccess = 'settings.account_access';
+  static const settingsGitHubRepository = 'settings.github_repository';
   static const settingsVaultServer = 'settings.vault_server';
   static const settingsExperimentalCanvas = 'settings.experimental_canvas';
   static const settingsExperimentalBridge = 'settings.experimental_bridge';
@@ -433,6 +434,10 @@ class UiFeatureAccess {
 
   bool get supportsAccountAccess =>
       isEnabledPath(UiFeatureKeys.settingsAccountAccess);
+
+  bool get supportsGitHubRepository =>
+      platform == UiFeaturePlatform.desktop &&
+      isEnabledPath(UiFeatureKeys.settingsGitHubRepository);
 
   bool get supportsVaultServer =>
       isEnabledPath(UiFeatureKeys.settingsVaultServer);

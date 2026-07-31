@@ -3,6 +3,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../features/plugins/harness_delivery_target.dart';
+import '../features/settings/local_git_repository_connection.dart';
 import '../i18n/app_language.dart';
 import '../models/app_models.dart';
 import 'runtime_models_account.dart';
@@ -47,6 +48,7 @@ class SettingsSnapshot {
     required this.assistantExecutionTarget,
     required this.assistantPermissionLevel,
     this.harnessTargets = const <HarnessTarget>[],
+    this.githubRepository = const GitHubRepositoryConnectorConfig(),
   });
 
   final int schemaVersion;
@@ -85,6 +87,7 @@ class SettingsSnapshot {
   /// until the settings UI to manage them lands — this only carries the
   /// data through persistence.
   final List<HarnessTarget> harnessTargets;
+  final GitHubRepositoryConnectorConfig githubRepository;
 
   factory SettingsSnapshot.defaults() {
     return SettingsSnapshot(
@@ -153,6 +156,7 @@ class SettingsSnapshot {
     AssistantExecutionTarget? assistantExecutionTarget,
     AssistantPermissionLevel? assistantPermissionLevel,
     List<HarnessTarget>? harnessTargets,
+    GitHubRepositoryConnectorConfig? githubRepository,
   }) {
     final resolvedGatewayProfiles = gatewayProfiles != null
         ? normalizeGatewayProfiles(profiles: gatewayProfiles)
@@ -203,6 +207,7 @@ class SettingsSnapshot {
       assistantPermissionLevel:
           assistantPermissionLevel ?? this.assistantPermissionLevel,
       harnessTargets: resolvedHarnessTargets,
+      githubRepository: githubRepository ?? this.githubRepository,
     );
   }
 
@@ -246,6 +251,8 @@ class SettingsSnapshot {
         'harnessTargets': harnessTargets
             .map((target) => target.toJson())
             .toList(growable: false),
+      if (githubRepository.isConfigured)
+        'githubRepository': githubRepository.toJson(),
     };
   }
 
@@ -349,7 +356,13 @@ class SettingsSnapshot {
       harnessTargets: normalizeHarnessTargets(
         targets: ((json['harnessTargets'] as List?) ?? const <Object>[])
             .whereType<Map>()
-            .map((item) => HarnessTarget.fromJson(item.cast<String, dynamic>())),
+            .map(
+              (item) => HarnessTarget.fromJson(item.cast<String, dynamic>()),
+            ),
+      ),
+      githubRepository: GitHubRepositoryConnectorConfig.fromJson(
+        (json['githubRepository'] as Map?)?.cast<String, dynamic>() ??
+            const <String, dynamic>{},
       ),
     );
   }
@@ -361,7 +374,8 @@ class SettingsSnapshot {
     try {
       final decoded = jsonDecode(raw) as Map<String, dynamic>;
       return SettingsSnapshot.fromJson(decoded);
-    } catch (e, stackTrace) { debugPrint('Error: $e\n$stackTrace');
+    } catch (e, stackTrace) {
+      debugPrint('Error: $e\n$stackTrace');
       return SettingsSnapshot.defaults();
     }
   }

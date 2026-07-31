@@ -110,6 +110,7 @@ class AssistantPageStateInternal extends State<AssistantPage> {
   double composerMeasuredContentHeightInternal = 0;
   double workspaceLowerPaneHeightAdjustmentInternal = 0;
   bool artifactPaneCollapsedInternal = true;
+  bool publishingConversationInternal = false;
   double artifactPaneWidthInternal = assistantArtifactPaneDefaultWidthInternal;
   String composerDraftSessionKeyInternal = '';
 
@@ -701,6 +702,9 @@ class ConversationAreaInternal extends StatelessWidget {
     required this.onMessageViewModeChanged,
     required this.onRecallUserMessage,
     required this.onEditUserMessage,
+    required this.onPublishConversation,
+    required this.publishEnabled,
+    required this.publishing,
   });
 
   final AppController controller;
@@ -719,6 +723,9 @@ class ConversationAreaInternal extends StatelessWidget {
   onMessageViewModeChanged;
   final ValueChanged<TimelineItemInternal> onRecallUserMessage;
   final ValueChanged<TimelineItemInternal> onEditUserMessage;
+  final Future<void> Function() onPublishConversation;
+  final bool publishEnabled;
+  final bool publishing;
 
   @override
   Widget build(BuildContext context) {
@@ -741,6 +748,24 @@ class ConversationAreaInternal extends StatelessWidget {
                   runSpacing: 6,
                   alignment: WrapAlignment.end,
                   children: [
+                    FilledButton.tonalIcon(
+                      key: const Key('assistant-publish-github-button'),
+                      onPressed: publishEnabled && !publishing
+                          ? onPublishConversation
+                          : null,
+                      icon: publishing
+                          ? const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.cloud_upload_outlined, size: 17),
+                      label: Text(
+                        publishing
+                            ? appText('发布中', 'Publishing')
+                            : appText('发布到 GitHub', 'Publish to GitHub'),
+                      ),
+                    ),
                     MessageViewModeChipInternal(
                       value: messageViewMode,
                       onSelected: onMessageViewModeChanged,
