@@ -53,6 +53,20 @@ void main() {
           find.byKey(const Key('mobile-settings-manual-bridge-card')),
           findsOneWidget,
         );
+        expect(
+          tester
+              .getTopLeft(
+                find.byKey(const Key('mobile-settings-manual-bridge-card')),
+              )
+              .dy,
+          lessThan(
+            tester
+                .getTopLeft(
+                  find.byKey(const Key('mobile-settings-account-login-card')),
+                )
+                .dy,
+          ),
+        );
       },
     );
 
@@ -325,9 +339,7 @@ void main() {
       // 保存链路在 test binding 下可能不返回（见 saveManualBridge 的超时
       // 兜底），因此这里按超时窗口推进时钟,不能用 pumpAndSettle——只要
       // 忙碌态的转圈图标还在,pumpAndSettle 永远不会 settle。
-      await tester.pump(
-        mobileManualBridgeFeedbackTimeoutInternal,
-      );
+      await tester.pump(mobileManualBridgeFeedbackTimeoutInternal);
       await tester.pump(const Duration(milliseconds: 400));
       expect(
         find.byKey(const Key('mobile-settings-manual-bridge-connected-card')),
@@ -472,7 +484,9 @@ void main() {
       );
       await tester.enterText(
         find.descendant(
-          of: find.byKey(const Key('mobile-settings-manual-bridge-token-field')),
+          of: find.byKey(
+            const Key('mobile-settings-manual-bridge-token-field'),
+          ),
           matching: find.byType(TextFormField),
         ),
         'mobile-manual-token',

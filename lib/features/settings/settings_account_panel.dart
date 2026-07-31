@@ -173,19 +173,6 @@ class _AvailableConnectorsPanelState extends State<_AvailableConnectorsPanel> {
           ),
           const SizedBox(height: 10),
           _ConnectorCard(
-            connectorId: 'svc-plus-workspace',
-            icon: Icons.cloud_outlined,
-            title: 'svc.plus Workspace',
-            subtitle: appText(
-              '连接你已有的工作空间配置。',
-              'Connect an existing workspace configuration.',
-            ),
-            actionLabel: appText('连接', 'Connect'),
-            onAction: () =>
-                setState(() => _selection = _ConnectorSelection.svcPlus),
-          ),
-          const SizedBox(height: 12),
-          _ConnectorCard(
             connectorId: 'self-hosted-workspace',
             icon: Icons.dns_outlined,
             title: appText('自托管工作空间', 'Self-hosted Workspace'),
@@ -196,6 +183,19 @@ class _AvailableConnectorsPanelState extends State<_AvailableConnectorsPanel> {
             actionLabel: appText('连接', 'Connect'),
             onAction: () =>
                 setState(() => _selection = _ConnectorSelection.selfHosted),
+          ),
+          const SizedBox(height: 12),
+          _ConnectorCard(
+            connectorId: 'svc-plus-workspace',
+            icon: Icons.cloud_outlined,
+            title: 'svc.plus Workspace',
+            subtitle: appText(
+              '连接你已有的工作空间配置。',
+              'Connect an existing workspace configuration.',
+            ),
+            actionLabel: appText('连接', 'Connect'),
+            onAction: () =>
+                setState(() => _selection = _ConnectorSelection.svcPlus),
           ),
           if (_selection != null) ...[
             const SizedBox(height: 20),

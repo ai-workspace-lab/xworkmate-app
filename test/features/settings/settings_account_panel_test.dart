@@ -49,6 +49,28 @@ void main() {
         expect(find.text('连接器'), findsOneWidget);
         expect(find.text('本地工作空间'), findsOneWidget);
         expect(find.text('svc.plus Workspace'), findsOneWidget);
+        expect(
+          tester
+              .getTopLeft(
+                find.byKey(
+                  const ValueKey(
+                    'settings-connector-action-self-hosted-workspace',
+                  ),
+                ),
+              )
+              .dy,
+          lessThan(
+            tester
+                .getTopLeft(
+                  find.byKey(
+                    const ValueKey(
+                      'settings-connector-action-svc-plus-workspace',
+                    ),
+                  ),
+                )
+                .dy,
+          ),
+        );
         await tester.tap(
           find.byKey(
             const ValueKey('settings-connector-action-svc-plus-workspace'),

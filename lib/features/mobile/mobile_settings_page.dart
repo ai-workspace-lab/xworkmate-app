@@ -756,6 +756,14 @@ class _AccountSection extends StatelessWidget {
     return _ConnectorsLayout(
       child: Column(
         children: [
+          _ManualBridgeCard(
+            accountBusy: accountBusy,
+            bridgeUrlController: bridgeUrlController,
+            bridgeTokenController: bridgeTokenController,
+            manualBridgeSaving: manualBridgeSaving,
+            onSaveManualBridge: onSaveManualBridge,
+          ),
+          const SizedBox(height: 12),
           MobileSettingsCardInternal(
             key: const Key('mobile-settings-account-login-card'),
             icon: Icons.cloud_outlined,
@@ -827,14 +835,6 @@ class _AccountSection extends StatelessWidget {
                 ),
               ),
             ],
-          ),
-          const SizedBox(height: 12),
-          _ManualBridgeCard(
-            accountBusy: accountBusy,
-            bridgeUrlController: bridgeUrlController,
-            bridgeTokenController: bridgeTokenController,
-            manualBridgeSaving: manualBridgeSaving,
-            onSaveManualBridge: onSaveManualBridge,
           ),
         ],
       ),
