@@ -819,6 +819,103 @@ void main() {
       );
       expect(syncButton.onPressed, isNull);
     });
+
+    testWidgets('keeps the GitHub connector visible while signed in', (
+      tester,
+    ) async {
+      final controllers = _TestControllers();
+      addTearDown(controllers.dispose);
+
+      await tester.pumpWidget(
+        _buildTestApp(
+          child: SettingsAccountPanel(
+            settings: SettingsSnapshot.defaults().copyWith(
+              accountBaseUrl: 'https://accounts.svc.plus',
+              accountUsername: 'review@svc.plus',
+            ),
+            accountSession: const AccountSessionSummary(
+              userId: 'u-1',
+              email: 'review@svc.plus',
+              name: 'Review User',
+              role: 'operator',
+              mfaEnabled: false,
+            ),
+            accountState: AccountSyncState.defaults(),
+            accountBusy: false,
+            accountSignedIn: true,
+            accountMfaRequired: false,
+            accountBaseUrlController: controllers.baseUrl,
+            accountIdentifierController: controllers.identifier,
+            accountPasswordController: controllers.password,
+            accountMfaCodeController: controllers.mfaCode,
+            bridgeUrlController: controllers.bridgeUrl,
+            bridgeTokenController: controllers.bridgeToken,
+            onSaveAccountProfile: ({required bool isManualBridge}) async {},
+            onLogin: () async {},
+            onVerifyMfa: () async {},
+            onCancelMfa: () async {},
+            onSync: () async {},
+            onResetManualBridge: () async {},
+            onLogout: () async {},
+          ),
+        ),
+      );
+
+      expect(
+        find.byKey(const ValueKey('settings-connector-local-git-repository')),
+        findsOneWidget,
+      );
+    });
+
+    testWidgets(
+      'keeps the GitHub connector visible with a self-hosted workspace',
+      (tester) async {
+        final controllers = _TestControllers();
+        addTearDown(controllers.dispose);
+
+        await tester.pumpWidget(
+          _buildTestApp(
+            child: SettingsAccountPanel(
+              settings: SettingsSnapshot.defaults().copyWith(
+                acpBridgeServerModeConfig: AcpBridgeServerModeConfig.defaults()
+                    .copyWith(
+                      effective: const AcpBridgeServerEffectiveConfig(
+                        endpoint: 'http://127.0.0.1:8787',
+                        tokenRef: 'acp_bridge_server_password',
+                        source: 'bridge',
+                        reason:
+                            'Manual Bridge configuration is present and valid',
+                      ),
+                    ),
+              ),
+              accountSession: null,
+              accountState: null,
+              accountBusy: false,
+              accountSignedIn: false,
+              accountMfaRequired: false,
+              accountBaseUrlController: controllers.baseUrl,
+              accountIdentifierController: controllers.identifier,
+              accountPasswordController: controllers.password,
+              accountMfaCodeController: controllers.mfaCode,
+              bridgeUrlController: controllers.bridgeUrl,
+              bridgeTokenController: controllers.bridgeToken,
+              onSaveAccountProfile: ({required bool isManualBridge}) async {},
+              onLogin: () async {},
+              onVerifyMfa: () async {},
+              onCancelMfa: () async {},
+              onSync: () async {},
+              onResetManualBridge: () async {},
+              onLogout: () async {},
+            ),
+          ),
+        );
+
+        expect(
+          find.byKey(const ValueKey('settings-connector-local-git-repository')),
+          findsOneWidget,
+        );
+      },
+    );
   });
 }
 
