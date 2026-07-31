@@ -173,6 +173,20 @@ class _AvailableConnectorsPanelState extends State<_AvailableConnectorsPanel> {
           ),
           const SizedBox(height: 10),
           _ConnectorCard(
+            connectorId: 'local-git-repository',
+            icon: Icons.account_tree_outlined,
+            title: appText('Git 仓库（本地 SSH）', 'Git Repository (Local SSH)'),
+            subtitle: appText(
+              '使用本机 Git 与 SSH 密钥连接仓库；凭据始终留在当前设备。',
+              'Use local Git and SSH keys to connect a repository. Credentials stay on this device.',
+            ),
+            trailing: Text(
+              appText('本地可用', 'Available locally'),
+              style: TextStyle(color: theme.colorScheme.primary),
+            ),
+          ),
+          const SizedBox(height: 12),
+          _ConnectorCard(
             connectorId: 'svc-plus-workspace',
             icon: Icons.cloud_outlined,
             title: 'svc.plus Workspace',

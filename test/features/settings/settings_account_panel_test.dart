@@ -49,6 +49,11 @@ void main() {
         expect(find.text('连接器'), findsOneWidget);
         expect(find.text('本地工作空间'), findsOneWidget);
         expect(find.text('svc.plus Workspace'), findsOneWidget);
+        expect(find.text('Git 仓库（本地 SSH）'), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('settings-connector-local-git-repository')),
+          findsOneWidget,
+        );
         await tester.tap(
           find.byKey(
             const ValueKey('settings-connector-action-svc-plus-workspace'),
