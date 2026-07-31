@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../features/assistant/assistant_page.dart';
 import '../features/mobile/mobile_assistant_nav_page.dart';
 import '../features/mobile/mobile_settings_page.dart';
+import '../features/mobile/mobile_workbench_page.dart';
 import '../features/workbench/workbench_page.dart';
 import '../features/settings/settings_page.dart';
 import '../models/app_models.dart';
@@ -61,11 +62,10 @@ final Map<WorkspaceDestination, WorkspacePageSpec> workspacePageSpecsInternal =
       ),
       WorkspaceDestination.workbench: WorkspacePageSpec(
         destination: WorkspaceDestination.workbench,
-        desktopBuilder: (controller, onOpenDetail) => WorkbenchPage(
-          controller: controller,
-        ),
-        mobileBuilder: (controller, onOpenDetail, mobileActions) =>
+        desktopBuilder: (controller, onOpenDetail) =>
             WorkbenchPage(controller: controller),
+        mobileBuilder: (controller, onOpenDetail, mobileActions) =>
+            MobileWorkbenchPage(controller: controller),
       ),
       WorkspaceDestination.settings: WorkspacePageSpec(
         destination: WorkspaceDestination.settings,
