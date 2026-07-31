@@ -165,12 +165,17 @@ extension AssistantPageStateClosureInternal on AssistantPageStateInternal {
                     onEditUserMessage: AssistantPageStateActionsInternal(
                       this,
                     ).editUserMessageInternal,
-                    onPublishConversation: AssistantPageStateActionsInternal(
-                      this,
-                    ).publishConversationToGitHubInternal,
-                    publishEnabled:
-                        controller.canPublishCurrentConversationToGitHub,
-                    publishing: publishingConversationInternal,
+                    onRunConversationWorkflow:
+                        AssistantPageStateActionsInternal(
+                          this,
+                        ).runConversationWorkflowInternal,
+                    workflowSupported: controller
+                        .featuresFor(
+                          resolveUiFeaturePlatformFromContext(context),
+                        )
+                        .supportsGitHubRepository,
+                    workflowEnabled: controller.canRunConversationWorkflow,
+                    workflowRunning: publishingConversationInternal,
                   ),
                 ),
               ),

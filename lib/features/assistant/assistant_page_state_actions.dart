@@ -34,23 +34,27 @@ import 'assistant_page_composer_skill_picker.dart';
 import 'assistant_page_composer_clipboard.dart';
 import 'assistant_attachment_payloads.dart';
 import 'assistant_page_components_core.dart';
+import 'conversation_workflow_dialog.dart';
 
 extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
-  Future<void> publishConversationToGitHubInternal() async {
+  Future<void> runConversationWorkflowInternal() async {
     if (publishingConversationInternal) return;
+    final controller = widget.controller;
+    final request = await showConversationWorkflowDialog(
+      context: context,
+      availableTargets: controller.settings.harnessTargets,
+      github: controller.settings.githubRepository,
+      onOpenPluginSettings: () => controller.openSettings(),
+      onOpenConnectorSettings: () => controller.openSettings(),
+    );
+    if (request == null || !mounted) return;
     setState(() => publishingConversationInternal = true);
-    final result = await widget.controller.publishCurrentConversationToGitHub();
+    final outcome = await controller.runConversationWorkflow(request);
     if (!mounted) return;
     setState(() => publishingConversationInternal = false);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          result.success
-              ? appText('对话已发布到 GitHub。', 'Conversation published to GitHub.')
-              : result.message,
-        ),
-      ),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(outcome.message)));
   }
 
   Future<void> pickAttachmentsInternal() async {

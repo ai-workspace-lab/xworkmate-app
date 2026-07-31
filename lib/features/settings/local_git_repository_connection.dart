@@ -161,6 +161,13 @@ typedef GitHubRequest =
       required Map<String, String> headers,
     });
 
+typedef GitHubWriteRequest =
+    Future<http.Response> Function(
+      Uri url, {
+      required Map<String, String> headers,
+      required String body,
+    });
+
 /// Connects to GitHub over HTTPS. It never starts a system process or reads an
 /// SSH key; the user-provided fine-grained token is sent only to GitHub.
 Future<GitHubApiResult> verifyGitHubRepositoryConnection({
@@ -204,12 +211,7 @@ Future<GitHubApiResult> publishConversationToGitHub({
   required String branch,
   required String path,
   required String markdown,
-  Future<http.Response> Function(
-    Uri url, {
-    required Map<String, String> headers,
-    required String body,
-  })?
-  put,
+  GitHubWriteRequest? put,
 }) async {
   final target = GitHubRepositoryTarget.tryParse(repository);
   if (target == null ||

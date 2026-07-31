@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xworkmate/app/app_controller.dart';
+import 'package:xworkmate/app/ui_feature_manifest.dart';
 import 'package:xworkmate/features/assistant/assistant_page_composer_clipboard.dart';
 import 'package:xworkmate/features/assistant/assistant_page_main.dart';
 import 'package:xworkmate/features/assistant/assistant_page_state_actions.dart';
@@ -15,6 +17,7 @@ void main() {
   ) async {
     final controller = AppController(
       environmentOverride: const <String, String>{},
+      uiFeatureManifest: _defaultDesktopManifest(),
     );
     addTearDown(controller.dispose);
 
@@ -51,7 +54,7 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
-        theme: AppTheme.light(),
+        theme: AppTheme.light().copyWith(platform: TargetPlatform.macOS),
         home: Material(
           child: SizedBox(
             width: 1280,
@@ -70,7 +73,7 @@ void main() {
     expect(find.text('current session message'), findsAtLeastNWidgets(1));
     expect(find.text('stale gateway message'), findsNothing);
     expect(
-      find.byKey(const Key('assistant-publish-github-button')),
+      find.byKey(const Key('assistant-conversation-workflow-button')),
       findsOneWidget,
     );
   });
@@ -344,4 +347,10 @@ List<GatewayChatMessage> _conversationMessages({
       error: false,
     );
   }, growable: false);
+}
+
+UiFeatureManifest _defaultDesktopManifest() {
+  return UiFeatureManifest.fromYamlString(
+    File(UiFeatureManifest.assetPath).readAsStringSync(),
+  );
 }

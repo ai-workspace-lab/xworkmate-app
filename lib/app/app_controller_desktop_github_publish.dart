@@ -6,7 +6,9 @@ extension AppControllerDesktopGitHubPublish on AppController {
   bool get canPublishCurrentConversationToGitHub =>
       settings.githubRepository.isConfigured && chatMessages.isNotEmpty;
 
-  Future<GitHubApiResult> publishCurrentConversationToGitHub() async {
+  Future<GitHubApiResult> publishCurrentConversationToGitHub({
+    GitHubWriteRequest? put,
+  }) async {
     final config = settings.githubRepository;
     if (!config.isConfigured) {
       return GitHubApiResult.failure(
@@ -49,6 +51,7 @@ extension AppControllerDesktopGitHubPublish on AppController {
       branch: config.branch,
       path: path,
       markdown: markdown,
+      put: put,
     );
   }
 }

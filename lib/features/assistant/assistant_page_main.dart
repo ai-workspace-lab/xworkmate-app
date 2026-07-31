@@ -702,9 +702,10 @@ class ConversationAreaInternal extends StatelessWidget {
     required this.onMessageViewModeChanged,
     required this.onRecallUserMessage,
     required this.onEditUserMessage,
-    required this.onPublishConversation,
-    required this.publishEnabled,
-    required this.publishing,
+    required this.onRunConversationWorkflow,
+    required this.workflowSupported,
+    required this.workflowEnabled,
+    required this.workflowRunning,
   });
 
   final AppController controller;
@@ -723,9 +724,10 @@ class ConversationAreaInternal extends StatelessWidget {
   onMessageViewModeChanged;
   final ValueChanged<TimelineItemInternal> onRecallUserMessage;
   final ValueChanged<TimelineItemInternal> onEditUserMessage;
-  final Future<void> Function() onPublishConversation;
-  final bool publishEnabled;
-  final bool publishing;
+  final Future<void> Function() onRunConversationWorkflow;
+  final bool workflowSupported;
+  final bool workflowEnabled;
+  final bool workflowRunning;
 
   @override
   Widget build(BuildContext context) {
@@ -748,24 +750,29 @@ class ConversationAreaInternal extends StatelessWidget {
                   runSpacing: 6,
                   alignment: WrapAlignment.end,
                   children: [
-                    FilledButton.tonalIcon(
-                      key: const Key('assistant-publish-github-button'),
-                      onPressed: publishEnabled && !publishing
-                          ? onPublishConversation
-                          : null,
-                      icon: publishing
-                          ? const SizedBox(
-                              width: 14,
-                              height: 14,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.cloud_upload_outlined, size: 17),
-                      label: Text(
-                        publishing
-                            ? appText('发布中', 'Publishing')
-                            : appText('发布到 GitHub', 'Publish to GitHub'),
+                    if (workflowSupported)
+                      FilledButton.tonalIcon(
+                        key: const Key(
+                          'assistant-conversation-workflow-button',
+                        ),
+                        onPressed: workflowEnabled && !workflowRunning
+                            ? onRunConversationWorkflow
+                            : null,
+                        icon: workflowRunning
+                            ? const SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(Icons.play_circle_outline, size: 17),
+                        label: Text(
+                          workflowRunning
+                              ? appText('运行中', 'Running')
+                              : appText('对话工作流', 'Conversation workflow'),
+                        ),
                       ),
-                    ),
                     MessageViewModeChipInternal(
                       value: messageViewMode,
                       onSelected: onMessageViewModeChanged,
