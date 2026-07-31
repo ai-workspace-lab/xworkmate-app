@@ -75,6 +75,16 @@ class GitHubRepositoryTarget {
   }
 }
 
+/// A token-free one-line summary of where a publish would land, safe to show
+/// in the settings card and the conversation workflow dialog.
+String describeGitHubConnectorTarget(GitHubRepositoryConnectorConfig config) {
+  final target = GitHubRepositoryTarget.tryParse(config.repository);
+  final repository = target == null
+      ? config.repository.trim()
+      : '${target.owner}/${target.repository}';
+  return '$repository · ${config.branch.trim()} · ${config.publishPath.trim()}';
+}
+
 String renderGitHubConversationMarkdown({
   required String title,
   required Iterable<({String role, String text})> messages,

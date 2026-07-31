@@ -66,6 +66,26 @@ class SettingsAccountPanel extends StatefulWidget {
 class _SettingsAccountPanelState extends State<SettingsAccountPanel> {
   @override
   Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _buildWorkspacePanel(),
+          if (widget.gitHubRepositoryEnabled) ...[
+            const SizedBox(height: 20),
+            _GitHubConnectorSection(
+              key: const ValueKey('settings-github-connector-section'),
+              config: widget.settings.githubRepository,
+              onSave: widget.onSaveGitHubRepository,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWorkspacePanel() {
     final isManualBridgeConfigured =
         widget.settings.acpBridgeServerModeConfig.effective.source == 'bridge';
     if (!widget.accountSignedIn &&
@@ -73,8 +93,6 @@ class _SettingsAccountPanelState extends State<SettingsAccountPanel> {
         !isManualBridgeConfigured) {
       return _AvailableConnectorsPanel(
         accountBusy: widget.accountBusy,
-        gitHubRepositoryEnabled: widget.gitHubRepositoryEnabled,
-        githubRepository: widget.settings.githubRepository,
         accountBaseUrlController: widget.accountBaseUrlController,
         accountIdentifierController: widget.accountIdentifierController,
         accountPasswordController: widget.accountPasswordController,
@@ -82,7 +100,6 @@ class _SettingsAccountPanelState extends State<SettingsAccountPanel> {
         bridgeTokenController: widget.bridgeTokenController,
         onSaveAccountProfile: widget.onSaveAccountProfile,
         onLogin: widget.onLogin,
-        onSaveGitHubRepository: widget.onSaveGitHubRepository,
       );
     }
     if (widget.accountMfaRequired) {
@@ -109,13 +126,102 @@ class _SettingsAccountPanelState extends State<SettingsAccountPanel> {
   }
 }
 
-enum _ConnectorSelection { svcPlus, selfHosted, localGitRepository }
+/// The GitHub API connector, rendered outside the workspace-connection panels
+/// so it stays reachable whether or not a workspace is already connected.
+class _GitHubConnectorSection extends StatefulWidget {
+  const _GitHubConnectorSection({super.key, required this.config, this.onSave});
+
+  final GitHubRepositoryConnectorConfig config;
+  final Future<void> Function(
+    GitHubRepositoryConnectorConfig config,
+    String token,
+  )?
+  onSave;
+
+  @override
+  State<_GitHubConnectorSection> createState() =>
+      _GitHubConnectorSectionState();
+}
+
+class _GitHubConnectorSectionState extends State<_GitHubConnectorSection> {
+  bool _expanded = false;
+  late final TextEditingController _repositoryController;
+  late final TextEditingController _tokenController;
+  late final TextEditingController _branchController;
+  late final TextEditingController _publishPathController;
+
+  @override
+  void initState() {
+    super.initState();
+    _repositoryController = TextEditingController(
+      text: widget.config.repository,
+    );
+    _tokenController = TextEditingController();
+    _branchController = TextEditingController(text: widget.config.branch);
+    _publishPathController = TextEditingController(
+      text: widget.config.publishPath,
+    );
+  }
+
+  @override
+  void dispose() {
+    _repositoryController.dispose();
+    _tokenController.dispose();
+    _branchController.dispose();
+    _publishPathController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          appText('发布连接器', 'Publish connectors'),
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        const SizedBox(height: 10),
+        _ConnectorCard(
+          connectorId: 'local-git-repository',
+          icon: Icons.account_tree_outlined,
+          title: appText('GitHub 仓库（API）', 'GitHub Repository (API)'),
+          subtitle: widget.config.isConfigured
+              ? describeGitHubConnectorTarget(widget.config)
+              : appText(
+                  '通过 GitHub API 发布对话，无需启动本机 Git。',
+                  'Publish conversations through the GitHub API without starting local Git.',
+                ),
+          actionLabel: widget.config.isConfigured
+              ? appText('配置', 'Configure')
+              : appText('连接', 'Connect'),
+          onAction: () => setState(() => _expanded = true),
+        ),
+        if (_expanded) ...[
+          const SizedBox(height: 20),
+          _ConnectorConfiguration(
+            title: appText('GitHub 仓库（API）', 'GitHub Repository (API)'),
+            onClose: () => setState(() => _expanded = false),
+            child: _LocalGitRepositoryPanel(
+              repositoryUrlController: _repositoryController,
+              tokenController: _tokenController,
+              branchController: _branchController,
+              publishPathController: _publishPathController,
+              onSave: widget.onSave,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+enum _ConnectorSelection { svcPlus, selfHosted }
 
 class _AvailableConnectorsPanel extends StatefulWidget {
   const _AvailableConnectorsPanel({
     required this.accountBusy,
-    required this.gitHubRepositoryEnabled,
-    required this.githubRepository,
     required this.accountBaseUrlController,
     required this.accountIdentifierController,
     required this.accountPasswordController,
@@ -123,12 +229,9 @@ class _AvailableConnectorsPanel extends StatefulWidget {
     required this.bridgeTokenController,
     required this.onSaveAccountProfile,
     required this.onLogin,
-    required this.onSaveGitHubRepository,
   });
 
   final bool accountBusy;
-  final bool gitHubRepositoryEnabled;
-  final GitHubRepositoryConnectorConfig githubRepository;
   final TextEditingController accountBaseUrlController;
   final TextEditingController accountIdentifierController;
   final TextEditingController accountPasswordController;
@@ -137,11 +240,6 @@ class _AvailableConnectorsPanel extends StatefulWidget {
   final Future<void> Function({required bool isManualBridge})
   onSaveAccountProfile;
   final Future<void> Function() onLogin;
-  final Future<void> Function(
-    GitHubRepositoryConnectorConfig config,
-    String token,
-  )?
-  onSaveGitHubRepository;
 
   @override
   State<_AvailableConnectorsPanel> createState() =>
@@ -150,141 +248,83 @@ class _AvailableConnectorsPanel extends StatefulWidget {
 
 class _AvailableConnectorsPanelState extends State<_AvailableConnectorsPanel> {
   _ConnectorSelection? _selection;
-  late final TextEditingController _gitRepositoryUrlController;
-  late final TextEditingController _gitHubTokenController;
-  late final TextEditingController _gitBranchController;
-  late final TextEditingController _gitPublishPathController;
-
-  @override
-  void initState() {
-    super.initState();
-    _gitRepositoryUrlController = TextEditingController(
-      text: widget.githubRepository.repository,
-    );
-    _gitHubTokenController = TextEditingController();
-    _gitBranchController = TextEditingController(
-      text: widget.githubRepository.branch,
-    );
-    _gitPublishPathController = TextEditingController(
-      text: widget.githubRepository.publishPath,
-    );
-  }
-
-  @override
-  void dispose() {
-    _gitRepositoryUrlController.dispose();
-    _gitHubTokenController.dispose();
-    _gitBranchController.dispose();
-    _gitPublishPathController.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return SingleChildScrollView(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            appText('连接器', 'Connectors'),
-            style: theme.textTheme.headlineSmall,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          appText('连接器', 'Connectors'),
+          style: theme.textTheme.headlineSmall,
+        ),
+        const SizedBox(height: 6),
+        Text(
+          appText(
+            '连接外部服务，为 XWorkmate 增加工作空间与协作能力。',
+            'Connect external services to add workspace and collaboration capabilities to XWorkmate.',
           ),
-          const SizedBox(height: 6),
-          Text(
-            appText(
-              '连接外部服务，为 XWorkmate 增加工作空间与协作能力。',
-              'Connect external services to add workspace and collaboration capabilities to XWorkmate.',
-            ),
+        ),
+        const SizedBox(height: 20),
+        Text(
+          appText('可用连接器', 'Available connectors'),
+          style: theme.textTheme.titleMedium,
+        ),
+        const SizedBox(height: 10),
+        _ConnectorCard(
+          connectorId: 'svc-plus-workspace',
+          icon: Icons.cloud_outlined,
+          title: 'svc.plus Workspace',
+          subtitle: appText(
+            '连接你已有的工作空间配置。',
+            'Connect an existing workspace configuration.',
           ),
+          actionLabel: appText('连接', 'Connect'),
+          onAction: () =>
+              setState(() => _selection = _ConnectorSelection.svcPlus),
+        ),
+        const SizedBox(height: 12),
+        _ConnectorCard(
+          connectorId: 'self-hosted-workspace',
+          icon: Icons.dns_outlined,
+          title: appText('自托管工作空间', 'Self-hosted Workspace'),
+          subtitle: appText(
+            '连接你自行部署的 AI Workspace。',
+            'Connect an AI Workspace that you deploy and manage.',
+          ),
+          actionLabel: appText('连接', 'Connect'),
+          onAction: () =>
+              setState(() => _selection = _ConnectorSelection.selfHosted),
+        ),
+        if (_selection != null) ...[
           const SizedBox(height: 20),
-          Text(
-            appText('可用连接器', 'Available connectors'),
-            style: theme.textTheme.titleMedium,
+          _ConnectorConfiguration(
+            title: _selection == _ConnectorSelection.svcPlus
+                ? 'svc.plus Workspace'
+                : appText('自托管工作空间', 'Self-hosted Workspace'),
+            onClose: () => setState(() => _selection = null),
+            child: _selection == _ConnectorSelection.svcPlus
+                ? _SignedOutAccountPanel(
+                    accountBusy: widget.accountBusy,
+                    accountBaseUrlController: widget.accountBaseUrlController,
+                    accountIdentifierController:
+                        widget.accountIdentifierController,
+                    accountPasswordController: widget.accountPasswordController,
+                    onSaveAccountProfile: widget.onSaveAccountProfile,
+                    onLogin: widget.onLogin,
+                  )
+                : _ManualBridgePanel(
+                    settings: SettingsSnapshot.defaults(),
+                    accountBusy: widget.accountBusy,
+                    bridgeUrlController: widget.bridgeUrlController,
+                    bridgeTokenController: widget.bridgeTokenController,
+                    onSaveAccountProfile: widget.onSaveAccountProfile,
+                  ),
           ),
-          const SizedBox(height: 10),
-          if (widget.gitHubRepositoryEnabled) ...[
-            _ConnectorCard(
-              connectorId: 'local-git-repository',
-              icon: Icons.account_tree_outlined,
-              title: appText('GitHub 仓库（API）', 'GitHub Repository (API)'),
-              subtitle: appText(
-                '通过 GitHub API 发布对话，无需启动本机 Git。',
-                'Publish conversations through the GitHub API without starting local Git.',
-              ),
-              actionLabel: widget.githubRepository.isConfigured
-                  ? appText('配置', 'Configure')
-                  : appText('连接', 'Connect'),
-              onAction: () => setState(
-                () => _selection = _ConnectorSelection.localGitRepository,
-              ),
-            ),
-            const SizedBox(height: 12),
-          ],
-          _ConnectorCard(
-            connectorId: 'svc-plus-workspace',
-            icon: Icons.cloud_outlined,
-            title: 'svc.plus Workspace',
-            subtitle: appText(
-              '连接你已有的工作空间配置。',
-              'Connect an existing workspace configuration.',
-            ),
-            actionLabel: appText('连接', 'Connect'),
-            onAction: () =>
-                setState(() => _selection = _ConnectorSelection.svcPlus),
-          ),
-          const SizedBox(height: 12),
-          _ConnectorCard(
-            connectorId: 'self-hosted-workspace',
-            icon: Icons.dns_outlined,
-            title: appText('自托管工作空间', 'Self-hosted Workspace'),
-            subtitle: appText(
-              '连接你自行部署的 AI Workspace。',
-              'Connect an AI Workspace that you deploy and manage.',
-            ),
-            actionLabel: appText('连接', 'Connect'),
-            onAction: () =>
-                setState(() => _selection = _ConnectorSelection.selfHosted),
-          ),
-          if (_selection != null) ...[
-            const SizedBox(height: 20),
-            _ConnectorConfiguration(
-              title: _selection == _ConnectorSelection.svcPlus
-                  ? 'svc.plus Workspace'
-                  : _selection == _ConnectorSelection.selfHosted
-                  ? appText('自托管工作空间', 'Self-hosted Workspace')
-                  : appText('GitHub 仓库（API）', 'GitHub Repository (API)'),
-              onClose: () => setState(() => _selection = null),
-              child: _selection == _ConnectorSelection.svcPlus
-                  ? _SignedOutAccountPanel(
-                      accountBusy: widget.accountBusy,
-                      accountBaseUrlController: widget.accountBaseUrlController,
-                      accountIdentifierController:
-                          widget.accountIdentifierController,
-                      accountPasswordController:
-                          widget.accountPasswordController,
-                      onSaveAccountProfile: widget.onSaveAccountProfile,
-                      onLogin: widget.onLogin,
-                    )
-                  : _selection == _ConnectorSelection.selfHosted
-                  ? _ManualBridgePanel(
-                      settings: SettingsSnapshot.defaults(),
-                      accountBusy: widget.accountBusy,
-                      bridgeUrlController: widget.bridgeUrlController,
-                      bridgeTokenController: widget.bridgeTokenController,
-                      onSaveAccountProfile: widget.onSaveAccountProfile,
-                    )
-                  : _LocalGitRepositoryPanel(
-                      repositoryUrlController: _gitRepositoryUrlController,
-                      tokenController: _gitHubTokenController,
-                      branchController: _gitBranchController,
-                      publishPathController: _gitPublishPathController,
-                      onSave: widget.onSaveGitHubRepository,
-                    ),
-            ),
-          ],
         ],
-      ),
+      ],
     );
   }
 }
