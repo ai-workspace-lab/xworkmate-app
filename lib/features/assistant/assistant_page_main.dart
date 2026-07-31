@@ -36,7 +36,7 @@ import 'assistant_page_components_core.dart';
 import 'assistant_page_state_closure.dart';
 import 'assistant_page_state_actions.dart';
 
-const double assistantComposerDefaultInputHeightInternal = 78;
+const double assistantComposerDefaultInputHeightInternal = 40;
 const double assistantWorkspaceMinConversationHeightInternal = 180;
 const double assistantWorkspaceMinLowerPaneHeightInternal = 160;
 const double assistantHorizontalResizeHandleWidthInternal = 6;
