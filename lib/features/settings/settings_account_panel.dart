@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../i18n/app_language.dart';
 import '../../runtime/runtime_models.dart';
+import 'local_git_repository_connection.dart';
 
 class SettingsAccountPanel extends StatefulWidget {
   const SettingsAccountPanel({
@@ -13,6 +14,7 @@ class SettingsAccountPanel extends StatefulWidget {
     this.accountStatus = '',
     required this.accountSignedIn,
     required this.accountMfaRequired,
+    this.gitHubRepositoryEnabled = true,
     required this.accountBaseUrlController,
     required this.accountIdentifierController,
     required this.accountPasswordController,
@@ -35,6 +37,7 @@ class SettingsAccountPanel extends StatefulWidget {
   final String accountStatus;
   final bool accountSignedIn;
   final bool accountMfaRequired;
+  final bool gitHubRepositoryEnabled;
   final TextEditingController accountBaseUrlController;
   final TextEditingController accountIdentifierController;
   final TextEditingController accountPasswordController;
@@ -64,6 +67,7 @@ class _SettingsAccountPanelState extends State<SettingsAccountPanel> {
         !isManualBridgeConfigured) {
       return _AvailableConnectorsPanel(
         accountBusy: widget.accountBusy,
+        gitHubRepositoryEnabled: widget.gitHubRepositoryEnabled,
         accountBaseUrlController: widget.accountBaseUrlController,
         accountIdentifierController: widget.accountIdentifierController,
         accountPasswordController: widget.accountPasswordController,
@@ -97,11 +101,12 @@ class _SettingsAccountPanelState extends State<SettingsAccountPanel> {
   }
 }
 
-enum _ConnectorSelection { svcPlus, selfHosted }
+enum _ConnectorSelection { svcPlus, selfHosted, localGitRepository }
 
 class _AvailableConnectorsPanel extends StatefulWidget {
   const _AvailableConnectorsPanel({
     required this.accountBusy,
+    required this.gitHubRepositoryEnabled,
     required this.accountBaseUrlController,
     required this.accountIdentifierController,
     required this.accountPasswordController,
@@ -112,6 +117,7 @@ class _AvailableConnectorsPanel extends StatefulWidget {
   });
 
   final bool accountBusy;
+  final bool gitHubRepositoryEnabled;
   final TextEditingController accountBaseUrlController;
   final TextEditingController accountIdentifierController;
   final TextEditingController accountPasswordController;
@@ -128,6 +134,28 @@ class _AvailableConnectorsPanel extends StatefulWidget {
 
 class _AvailableConnectorsPanelState extends State<_AvailableConnectorsPanel> {
   _ConnectorSelection? _selection;
+  late final TextEditingController _gitRepositoryUrlController;
+  late final TextEditingController _gitHubTokenController;
+  late final TextEditingController _gitBranchController;
+  late final TextEditingController _gitPublishPathController;
+
+  @override
+  void initState() {
+    super.initState();
+    _gitRepositoryUrlController = TextEditingController();
+    _gitHubTokenController = TextEditingController();
+    _gitBranchController = TextEditingController(text: 'main');
+    _gitPublishPathController = TextEditingController(text: 'conversations');
+  }
+
+  @override
+  void dispose() {
+    _gitRepositoryUrlController.dispose();
+    _gitHubTokenController.dispose();
+    _gitBranchController.dispose();
+    _gitPublishPathController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -149,43 +177,26 @@ class _AvailableConnectorsPanelState extends State<_AvailableConnectorsPanel> {
           ),
           const SizedBox(height: 20),
           Text(
-            appText('已连接 · 1', 'Connected · 1'),
-            style: theme.textTheme.titleMedium,
-          ),
-          const SizedBox(height: 10),
-          _ConnectorCard(
-            connectorId: 'local-workspace',
-            icon: Icons.laptop_mac_outlined,
-            title: appText('本地工作空间', 'Local Workspace'),
-            subtitle: appText(
-              '数据和任务保存在当前设备，无需账号。',
-              'Tasks and data stay on this device. No account required.',
-            ),
-            trailing: Text(
-              appText('就绪', 'Ready'),
-              style: TextStyle(color: theme.colorScheme.primary),
-            ),
-          ),
-          const SizedBox(height: 22),
-          Text(
             appText('可用连接器', 'Available connectors'),
             style: theme.textTheme.titleMedium,
           ),
           const SizedBox(height: 10),
-          _ConnectorCard(
-            connectorId: 'local-git-repository',
-            icon: Icons.account_tree_outlined,
-            title: appText('Git 仓库（本地 SSH）', 'Git Repository (Local SSH)'),
-            subtitle: appText(
-              '使用本机 Git 与 SSH 密钥连接仓库；凭据始终留在当前设备。',
-              'Use local Git and SSH keys to connect a repository. Credentials stay on this device.',
+          if (widget.gitHubRepositoryEnabled) ...[
+            _ConnectorCard(
+              connectorId: 'local-git-repository',
+              icon: Icons.account_tree_outlined,
+              title: appText('GitHub 仓库（API）', 'GitHub Repository (API)'),
+              subtitle: appText(
+                '通过 GitHub API 发布对话，无需启动本机 Git。',
+                'Publish conversations through the GitHub API without starting local Git.',
+              ),
+              actionLabel: appText('连接', 'Connect'),
+              onAction: () => setState(
+                () => _selection = _ConnectorSelection.localGitRepository,
+              ),
             ),
-            trailing: Text(
-              appText('本地可用', 'Available locally'),
-              style: TextStyle(color: theme.colorScheme.primary),
-            ),
-          ),
-          const SizedBox(height: 12),
+            const SizedBox(height: 12),
+          ],
           _ConnectorCard(
             connectorId: 'svc-plus-workspace',
             icon: Icons.cloud_outlined,
@@ -216,7 +227,9 @@ class _AvailableConnectorsPanelState extends State<_AvailableConnectorsPanel> {
             _ConnectorConfiguration(
               title: _selection == _ConnectorSelection.svcPlus
                   ? 'svc.plus Workspace'
-                  : appText('自托管工作空间', 'Self-hosted Workspace'),
+                  : _selection == _ConnectorSelection.selfHosted
+                  ? appText('自托管工作空间', 'Self-hosted Workspace')
+                  : appText('GitHub 仓库（API）', 'GitHub Repository (API)'),
               onClose: () => setState(() => _selection = null),
               child: _selection == _ConnectorSelection.svcPlus
                   ? _SignedOutAccountPanel(
@@ -229,12 +242,19 @@ class _AvailableConnectorsPanelState extends State<_AvailableConnectorsPanel> {
                       onSaveAccountProfile: widget.onSaveAccountProfile,
                       onLogin: widget.onLogin,
                     )
-                  : _ManualBridgePanel(
+                  : _selection == _ConnectorSelection.selfHosted
+                  ? _ManualBridgePanel(
                       settings: SettingsSnapshot.defaults(),
                       accountBusy: widget.accountBusy,
                       bridgeUrlController: widget.bridgeUrlController,
                       bridgeTokenController: widget.bridgeTokenController,
                       onSaveAccountProfile: widget.onSaveAccountProfile,
+                    )
+                  : _LocalGitRepositoryPanel(
+                      repositoryUrlController: _gitRepositoryUrlController,
+                      tokenController: _gitHubTokenController,
+                      branchController: _gitBranchController,
+                      publishPathController: _gitPublishPathController,
                     ),
             ),
           ],
@@ -242,6 +262,128 @@ class _AvailableConnectorsPanelState extends State<_AvailableConnectorsPanel> {
       ),
     );
   }
+}
+
+class _LocalGitRepositoryPanel extends StatefulWidget {
+  const _LocalGitRepositoryPanel({
+    required this.repositoryUrlController,
+    required this.tokenController,
+    required this.branchController,
+    required this.publishPathController,
+  });
+
+  final TextEditingController repositoryUrlController;
+  final TextEditingController tokenController;
+  final TextEditingController branchController;
+  final TextEditingController publishPathController;
+
+  @override
+  State<_LocalGitRepositoryPanel> createState() =>
+      _LocalGitRepositoryPanelState();
+}
+
+class _LocalGitRepositoryPanelState extends State<_LocalGitRepositoryPanel> {
+  bool _checking = false;
+  String? _connectionStatus;
+
+  Future<void> _verifyConnection() async {
+    setState(() {
+      _checking = true;
+      _connectionStatus = null;
+    });
+    final result = await verifyGitHubRepositoryConnection(
+      repository: widget.repositoryUrlController.text,
+      token: widget.tokenController.text,
+    );
+    if (!mounted) return;
+    setState(() {
+      _checking = false;
+      _connectionStatus = result.message;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Text(
+        appText(
+          '使用 GitHub Fine-grained token 连接仓库。令牌只用于当前请求，且不会写入日志。',
+          'Connect with a GitHub fine-grained token. It is only used for this request and never written to logs.',
+        ),
+      ),
+      const SizedBox(height: 16),
+      TextFormField(
+        key: const ValueKey('settings-local-git-repository-url-field'),
+        controller: widget.repositoryUrlController,
+        decoration: InputDecoration(
+          labelText: appText('GitHub 仓库', 'GitHub repository'),
+          hintText: 'haitaopanhq/knowledge',
+        ),
+        keyboardType: TextInputType.url,
+        autofillHints: const <String>[],
+      ),
+      const SizedBox(height: 12),
+      TextFormField(
+        key: const ValueKey('settings-github-token-field'),
+        controller: widget.tokenController,
+        decoration: InputDecoration(
+          labelText: appText('Fine-grained token', 'Fine-grained token'),
+        ),
+        obscureText: true,
+        enableSuggestions: false,
+        autocorrect: false,
+        autofillHints: const <String>[],
+      ),
+      const SizedBox(height: 12),
+      TextFormField(
+        key: const ValueKey('settings-local-git-branch-field'),
+        controller: widget.branchController,
+        decoration: InputDecoration(labelText: appText('分支', 'Branch')),
+      ),
+      const SizedBox(height: 12),
+      TextFormField(
+        key: const ValueKey('settings-local-git-publish-path-field'),
+        controller: widget.publishPathController,
+        decoration: InputDecoration(
+          labelText: appText('对话发布目录', 'Conversation publish directory'),
+          hintText: 'conversations',
+        ),
+      ),
+      const SizedBox(height: 16),
+      Align(
+        alignment: Alignment.centerRight,
+        child: FilledButton.icon(
+          key: const ValueKey('settings-local-git-test-connection'),
+          onPressed: _checking ? null : _verifyConnection,
+          icon: _checking
+              ? const SizedBox(
+                  height: 16,
+                  width: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.link_outlined),
+          label: Text(appText('验证连接', 'Verify connection')),
+        ),
+      ),
+      if (_connectionStatus case final status?) ...[
+        const SizedBox(height: 10),
+        Text(
+          status,
+          key: const ValueKey('settings-local-git-connection-status'),
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+      ],
+      const SizedBox(height: 16),
+      Text(
+        appText(
+          '验证连接只会调用 GitHub 的 HTTPS API；不会启动外部进程，也不会读取 SSH 私钥。',
+          'Verification only calls the GitHub HTTPS API. It never starts an external process or reads SSH private keys.',
+        ),
+        style: Theme.of(context).textTheme.bodySmall,
+      ),
+    ],
+  );
 }
 
 class _ConnectorConfiguration extends StatelessWidget {
@@ -291,7 +433,6 @@ class _ConnectorCard extends StatelessWidget {
     required this.icon,
     required this.title,
     required this.subtitle,
-    this.trailing,
     this.actionLabel,
     this.onAction,
   });
@@ -299,7 +440,6 @@ class _ConnectorCard extends StatelessWidget {
   final IconData icon;
   final String title;
   final String subtitle;
-  final Widget? trailing;
   final String? actionLabel;
   final VoidCallback? onAction;
   @override
@@ -323,8 +463,6 @@ class _ConnectorCard extends StatelessWidget {
               ],
             ),
           ),
-          // ignore: use_null_aware_elements
-          if (trailing case final trailing?) trailing,
           if (actionLabel != null)
             FilledButton.tonal(
               key: ValueKey('settings-connector-action-$connectorId'),

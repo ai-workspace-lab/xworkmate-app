@@ -519,6 +519,9 @@ class _SettingsPageState extends State<SettingsPage> {
                   accountStatus: accountStatus,
                   accountSignedIn: accountSignedIn,
                   accountMfaRequired: accountMfaRequired,
+                  gitHubRepositoryEnabled: controller
+                      .featuresFor(resolveUiFeaturePlatformFromContext(context))
+                      .supportsGitHubRepository,
                   accountBaseUrlController: _accountBaseUrlController,
                   accountIdentifierController: _accountIdentifierController,
                   accountPasswordController: _accountPasswordController,

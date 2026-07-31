@@ -228,6 +228,12 @@ desktop:
       build_modes: [debug, profile, release]
       description: Desktop account access settings
       ui_surface: settings_page
+    github_repository:
+      enabled: true
+      release_tier: stable
+      build_modes: [debug, profile, release]
+      description: Desktop GitHub API repository connection and conversation publishing
+      ui_surface: settings_page
     vault_server:
       enabled: true
       release_tier: stable

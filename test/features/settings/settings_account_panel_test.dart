@@ -47,11 +47,29 @@ void main() {
         );
 
         expect(find.text('连接器'), findsOneWidget);
-        expect(find.text('本地工作空间'), findsOneWidget);
+        expect(find.text('已连接 · 1'), findsNothing);
         expect(find.text('svc.plus Workspace'), findsOneWidget);
-        expect(find.text('Git 仓库（本地 SSH）'), findsOneWidget);
+        expect(find.text('GitHub 仓库（API）'), findsOneWidget);
         expect(
           find.byKey(const ValueKey('settings-connector-local-git-repository')),
+          findsOneWidget,
+        );
+        await tester.tap(
+          find.byKey(
+            const ValueKey('settings-connector-action-local-git-repository'),
+          ),
+        );
+        await tester.pump();
+        expect(
+          find.byKey(const ValueKey('settings-local-git-repository-url-field')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const ValueKey('settings-github-token-field')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const ValueKey('settings-local-git-test-connection')),
           findsOneWidget,
         );
         await tester.tap(
