@@ -5,6 +5,7 @@ import '../../i18n/app_language.dart';
 import '../../models/app_models.dart';
 import '../../theme/app_palette.dart';
 import '../workbench/workbench_projection.dart';
+import 'mobile_workbench_page_widgets.dart';
 
 /// A touch-first view of the desktop workbench. It deliberately keeps the
 /// desktop's data model, while reducing its three columns to one clear action
@@ -244,7 +245,7 @@ class _MobileWorkbenchContent extends StatelessWidget {
         key: const Key('mobile-workbench-tab-content-inbox'),
         title: appText('工作收件箱', 'Work inbox'),
         subtitle: appText('最近的产物、附件与记录', 'Recent artifacts, files, and notes'),
-        child: _MobileInboxList(
+        child: MobileWorkbenchInboxList(
           items: projection.inbox,
           onOpenThread: onOpenThread,
         ),
@@ -291,7 +292,7 @@ class _MobileWorkbenchOverview extends StatelessWidget {
           const SizedBox(height: 20),
           _MobileSection(
             title: appText('最近收件', 'Recent inbox'),
-            child: _MobileInboxList(
+            child: MobileWorkbenchInboxList(
               items: projection.inbox.take(2).toList(growable: false),
               onOpenThread: onOpenThread,
             ),
@@ -463,13 +464,13 @@ class _MobileTaskList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (items.isEmpty) {
-      return _MobileEmptyCard(
+      return MobileWorkbenchEmptyCard(
         icon: Icons.task_alt_rounded,
         title: appText('目前没有待处理事项', 'Nothing needs attention'),
         subtitle: appText('新的工作会自动出现在这里。', 'New work will appear here.'),
       );
     }
-    return _MobileSurface(
+    return MobileWorkbenchSurface(
       child: Column(
         children: [
           for (var index = 0; index < items.length; index++) ...[
@@ -501,7 +502,7 @@ class _MobileTaskTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
-    final visual = _taskVisual(context, item.state);
+    final visual = mobileWorkbenchTaskVisual(context, item.state);
     return InkWell(
       key: Key('mobile-workbench-task-${item.sessionKey}'),
       onTap: onTap,
@@ -596,13 +597,13 @@ class _MobileProjectList extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (projects.isEmpty) {
-      return _MobileEmptyCard(
+      return MobileWorkbenchEmptyCard(
         icon: Icons.folder_open_rounded,
         title: appText('暂无项目进展', 'No projects yet'),
         subtitle: appText('绑定工作目录后会自动聚合。', 'Workspace work groups here.'),
       );
     }
-    return _MobileSurface(
+    return MobileWorkbenchSurface(
       child: Column(
         children: [
           for (var index = 0; index < projects.length; index++) ...[
@@ -701,203 +702,4 @@ class _MobileProjectTile extends StatelessWidget {
       ),
     );
   }
-}
-
-class _MobileInboxList extends StatelessWidget {
-  const _MobileInboxList({required this.items, required this.onOpenThread});
-
-  final List<WorkbenchInboxItem> items;
-  final ValueChanged<String> onOpenThread;
-
-  @override
-  Widget build(BuildContext context) {
-    if (items.isEmpty) {
-      return _MobileEmptyCard(
-        icon: Icons.inbox_rounded,
-        title: appText('收件箱是空的', 'Your inbox is empty'),
-        subtitle: appText('产物和附件会集中显示在这里。', 'Artifacts and files appear here.'),
-      );
-    }
-    return _MobileSurface(
-      child: Column(
-        children: [
-          for (var index = 0; index < items.length; index++) ...[
-            _MobileInboxTile(
-              item: items[index],
-              onTap: () => onOpenThread(items[index].sessionKey),
-            ),
-            if (index < items.length - 1)
-              Divider(height: 1, color: context.palette.strokeSoft),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _MobileInboxTile extends StatelessWidget {
-  const _MobileInboxTile({required this.item, required this.onTap});
-
-  final WorkbenchInboxItem item;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.palette;
-    final visual = switch (item.kind) {
-      WorkbenchInboxKind.artifact => (
-        Icons.description_rounded,
-        palette.accent,
-      ),
-      WorkbenchInboxKind.attachment => (
-        Icons.attach_file_rounded,
-        palette.success,
-      ),
-      WorkbenchInboxKind.note => (Icons.sticky_note_2_rounded, palette.warning),
-    };
-    return InkWell(
-      key: Key('mobile-workbench-inbox-${item.sessionKey}-${item.title}'),
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Row(
-          children: [
-            Container(
-              width: 38,
-              height: 38,
-              decoration: BoxDecoration(
-                color: visual.$2.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(visual.$1, color: visual.$2, size: 20),
-            ),
-            const SizedBox(width: 11),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    item.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    item.sourceTitle,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: palette.textSecondary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Icon(Icons.chevron_right_rounded, color: palette.textMuted),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _MobileSurface extends StatelessWidget {
-  const _MobileSurface({required this.child});
-
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.palette;
-    return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: palette.surfacePrimary,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: palette.strokeSoft),
-        boxShadow: [palette.chromeShadowAmbient],
-      ),
-      child: child,
-    );
-  }
-}
-
-class _MobileEmptyCard extends StatelessWidget {
-  const _MobileEmptyCard({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-  });
-
-  final IconData icon;
-  final String title;
-  final String subtitle;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.palette;
-    return _MobileSurface(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            Icon(icon, size: 28, color: palette.accent),
-            const SizedBox(height: 9),
-            Text(
-              title,
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: 3),
-            Text(
-              subtitle,
-              textAlign: TextAlign.center,
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(color: palette.textSecondary),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-({IconData icon, String label, Color color}) _taskVisual(
-  BuildContext context,
-  WorkbenchItemState state,
-) {
-  final palette = context.palette;
-  return switch (state) {
-    WorkbenchItemState.blocked => (
-      icon: Icons.error_outline_rounded,
-      label: appText('需要处理', 'Needs attention'),
-      color: palette.danger,
-    ),
-    WorkbenchItemState.syncing => (
-      icon: Icons.sync_rounded,
-      label: appText('正在同步', 'Syncing'),
-      color: palette.warning,
-    ),
-    WorkbenchItemState.running => (
-      icon: Icons.play_circle_outline_rounded,
-      label: appText('进行中', 'In progress'),
-      color: palette.accent,
-    ),
-    WorkbenchItemState.ready => (
-      icon: Icons.radio_button_checked_rounded,
-      label: appText('待处理', 'To do'),
-      color: palette.accent,
-    ),
-    WorkbenchItemState.completed => (
-      icon: Icons.check_circle_outline_rounded,
-      label: appText('已完成', 'Done'),
-      color: palette.success,
-    ),
-  };
 }
