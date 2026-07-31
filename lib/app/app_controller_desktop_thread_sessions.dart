@@ -77,8 +77,11 @@ AssistantThreadConnectionState resolveGatewayThreadConnectionStateInternal({
     return AssistantThreadConnectionState(
       executionTarget: target,
       status: RuntimeConnectionStatus.offline,
-      primaryLabel: appText('已退出登录', 'Signed out'),
-      detailLabel: appText('请先登录 svc.plus', 'Please sign in to svc.plus first'),
+      primaryLabel: appText('未连接', 'Not connected'),
+      detailLabel: appText(
+        '请在连接器中选择一个工作空间',
+        'Choose a workspace in Connectors',
+      ),
       ready: false,
       gatewayTokenMissing: false,
       lastError: null,

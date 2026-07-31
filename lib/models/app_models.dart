@@ -164,7 +164,7 @@ enum SettingsTab { gateway, archivedTasks, remoteDesktop, plugins, logs, help }
 
 extension SettingsTabCopy on SettingsTab {
   String get label => switch (this) {
-    SettingsTab.gateway => appText('集成', 'Integrations'),
+    SettingsTab.gateway => appText('连接器', 'Connectors'),
     SettingsTab.archivedTasks => appText('归档任务', 'Archived tasks'),
     SettingsTab.remoteDesktop => appText('AI工作空间', 'AI Workspace'),
     SettingsTab.plugins => appText('插件', 'Plugins'),

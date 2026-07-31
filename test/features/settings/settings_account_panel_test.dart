@@ -10,63 +10,74 @@ import 'package:xworkmate/widgets/surface_card.dart';
 
 void main() {
   group('SettingsAccountPanel', () {
-    testWidgets('shows login form and triggers login when signed out', (
-      tester,
-    ) async {
-      final controllers = _TestControllers();
-      addTearDown(controllers.dispose);
+    testWidgets(
+      'shows available connectors and opens the svc.plus connection',
+      (tester) async {
+        final controllers = _TestControllers();
+        addTearDown(controllers.dispose);
 
-      var loginCount = 0;
+        var loginCount = 0;
 
-      await tester.pumpWidget(
-        _buildTestApp(
-          child: SettingsAccountPanel(
-            settings: SettingsSnapshot.defaults(),
-            accountSession: null,
-            accountState: null,
-            accountBusy: false,
-            accountSignedIn: false,
-            accountMfaRequired: false,
-            accountBaseUrlController: controllers.baseUrl,
-            accountIdentifierController: controllers.identifier,
-            accountPasswordController: controllers.password,
-            accountMfaCodeController: controllers.mfaCode,
-            bridgeUrlController: controllers.bridgeUrl,
-            bridgeTokenController: controllers.bridgeToken,
-            onSaveAccountProfile: ({required bool isManualBridge}) async {},
-            onLogin: () async {
-              loginCount += 1;
-            },
-            onVerifyMfa: () async {},
-            onCancelMfa: () async {},
-            onSync: () async {},
-            onResetManualBridge: () async {},
-            onLogout: () async {},
+        await tester.pumpWidget(
+          _buildTestApp(
+            child: SettingsAccountPanel(
+              settings: SettingsSnapshot.defaults(),
+              accountSession: null,
+              accountState: null,
+              accountBusy: false,
+              accountSignedIn: false,
+              accountMfaRequired: false,
+              accountBaseUrlController: controllers.baseUrl,
+              accountIdentifierController: controllers.identifier,
+              accountPasswordController: controllers.password,
+              accountMfaCodeController: controllers.mfaCode,
+              bridgeUrlController: controllers.bridgeUrl,
+              bridgeTokenController: controllers.bridgeToken,
+              onSaveAccountProfile: ({required bool isManualBridge}) async {},
+              onLogin: () async {
+                loginCount += 1;
+              },
+              onVerifyMfa: () async {},
+              onCancelMfa: () async {},
+              onSync: () async {},
+              onResetManualBridge: () async {},
+              onLogout: () async {},
+            ),
           ),
-        ),
-      );
+        );
 
-      expect(find.text('账号登录'), findsOneWidget);
-      expect(
-        find.byKey(const ValueKey('settings-account-login-button')),
-        findsOneWidget,
-      );
-      expect(
-        find.byKey(const ValueKey('settings-account-sync-button')),
-        findsNothing,
-      );
-      expect(
-        find.byKey(const ValueKey('settings-account-logout-button')),
-        findsNothing,
-      );
+        expect(find.text('连接器'), findsOneWidget);
+        expect(find.text('本地工作空间'), findsOneWidget);
+        expect(find.text('svc.plus Workspace'), findsOneWidget);
+        await tester.tap(
+          find.byKey(
+            const ValueKey('settings-connector-action-svc-plus-workspace'),
+          ),
+        );
+        await tester.pump();
+        expect(
+          find.byKey(const ValueKey('settings-account-login-button')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const ValueKey('settings-account-sync-button')),
+          findsNothing,
+        );
+        expect(
+          find.byKey(const ValueKey('settings-account-logout-button')),
+          findsNothing,
+        );
 
-      await tester.tap(
-        find.byKey(const ValueKey('settings-account-login-button')),
-      );
-      await tester.pump();
+        final loginButton = find.byKey(
+          const ValueKey('settings-account-login-button'),
+        );
+        await tester.ensureVisible(loginButton);
+        await tester.tap(loginButton);
+        await tester.pump();
 
-      expect(loginCount, 1);
-    });
+        expect(loginCount, 1);
+      },
+    );
 
     testWidgets('accepts password input on the cloud sign-in form', (
       tester,
@@ -108,11 +119,21 @@ void main() {
         const ValueKey('settings-account-password-field'),
       );
 
+      await tester.tap(
+        find.byKey(
+          const ValueKey('settings-connector-action-svc-plus-workspace'),
+        ),
+      );
+      await tester.pump();
+
+      await tester.ensureVisible(passwordField);
       await tester.tap(passwordField);
       await tester.enterText(passwordField, 'typed-password');
-      await tester.tap(
-        find.byKey(const ValueKey('settings-account-login-button')),
+      final loginButton = find.byKey(
+        const ValueKey('settings-account-login-button'),
       );
+      await tester.ensureVisible(loginButton);
+      await tester.tap(loginButton);
       await tester.pump();
 
       expect(controllers.password.text, 'typed-password');
@@ -159,19 +180,27 @@ void main() {
         ),
       );
 
-      await tester.tap(find.text('AI 智能体工作空间'));
-      await tester.pump();
-      await tester.enterText(
-        find.byKey(const ValueKey('settings-manual-bridge-url-field')),
-        'https://cn-xworkmate-bridge.svc.plus',
-      );
-      await tester.enterText(
-        find.byKey(const ValueKey('settings-manual-bridge-token-field')),
-        'typed-manual-token',
-      );
       await tester.tap(
-        find.byKey(const ValueKey('settings-manual-bridge-save-button')),
+        find.byKey(
+          const ValueKey('settings-connector-action-self-hosted-workspace'),
+        ),
       );
+      await tester.pump();
+      final bridgeUrl = find.byKey(
+        const ValueKey('settings-manual-bridge-url-field'),
+      );
+      await tester.ensureVisible(bridgeUrl);
+      await tester.enterText(bridgeUrl, 'https://cn-xworkmate-bridge.svc.plus');
+      final bridgeToken = find.byKey(
+        const ValueKey('settings-manual-bridge-token-field'),
+      );
+      await tester.ensureVisible(bridgeToken);
+      await tester.enterText(bridgeToken, 'typed-manual-token');
+      final saveButton = find.byKey(
+        const ValueKey('settings-manual-bridge-save-button'),
+      );
+      await tester.ensureVisible(saveButton);
+      await tester.tap(saveButton);
       await tester.pump();
 
       expect(savedAsManualBridge, isTrue);
@@ -215,7 +244,11 @@ void main() {
         ),
       );
 
-      await tester.tap(find.text('AI 智能体工作空间'));
+      await tester.tap(
+        find.byKey(
+          const ValueKey('settings-connector-action-self-hosted-workspace'),
+        ),
+      );
       await tester.pump();
 
       expect(saveCount, 0);
@@ -270,19 +303,27 @@ void main() {
         ),
       );
 
-      await tester.tap(find.text('AI 智能体工作空间'));
-      await tester.pump();
-      await tester.enterText(
-        find.byKey(const ValueKey('settings-manual-bridge-url-field')),
-        'http://127.0.0.1:1',
-      );
-      await tester.enterText(
-        find.byKey(const ValueKey('settings-manual-bridge-token-field')),
-        'typed-manual-token',
-      );
       await tester.tap(
-        find.byKey(const ValueKey('settings-manual-bridge-save-button')),
+        find.byKey(
+          const ValueKey('settings-connector-action-self-hosted-workspace'),
+        ),
       );
+      await tester.pump();
+      final bridgeUrl = find.byKey(
+        const ValueKey('settings-manual-bridge-url-field'),
+      );
+      await tester.ensureVisible(bridgeUrl);
+      await tester.enterText(bridgeUrl, 'http://127.0.0.1:1');
+      final bridgeToken = find.byKey(
+        const ValueKey('settings-manual-bridge-token-field'),
+      );
+      await tester.ensureVisible(bridgeToken);
+      await tester.enterText(bridgeToken, 'typed-manual-token');
+      final saveButton = find.byKey(
+        const ValueKey('settings-manual-bridge-save-button'),
+      );
+      await tester.ensureVisible(saveButton);
+      await tester.tap(saveButton);
 
       for (
         var attempt = 0;
@@ -398,9 +439,9 @@ void main() {
           ),
         );
 
-        expect(find.text('账号登录与同步'), findsOneWidget);
-        expect(find.text('账号同步'), findsOneWidget);
-        expect(find.textContaining('账号同步状态'), findsOneWidget);
+        expect(find.text('已连接的连接器'), findsOneWidget);
+        expect(find.text('svc.plus Workspace'), findsOneWidget);
+        expect(find.textContaining('连接状态'), findsOneWidget);
         expect(
           find.byKey(const ValueKey('settings-account-sync-button')),
           findsOneWidget,
@@ -600,8 +641,8 @@ void main() {
           ),
         );
 
-        expect(find.text('手动 Bridge'), findsOneWidget);
-        expect(find.textContaining('保存状态'), findsOneWidget);
+        expect(find.text('自托管工作空间'), findsOneWidget);
+        expect(find.textContaining('连接状态'), findsOneWidget);
         expect(
           find.byKey(const ValueKey('settings-account-manual-reset-button')),
           findsOneWidget,
@@ -682,8 +723,8 @@ void main() {
           ),
         );
 
-        expect(find.text('手动 Bridge'), findsOneWidget);
-        expect(find.textContaining('保存状态'), findsOneWidget);
+        expect(find.text('自托管工作空间'), findsOneWidget);
+        expect(find.textContaining('连接状态'), findsOneWidget);
         expect(
           find.byKey(const ValueKey('settings-account-manual-reset-button')),
           findsOneWidget,

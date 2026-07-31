@@ -54,41 +54,7 @@ class SettingsAccountPanel extends StatefulWidget {
   State<SettingsAccountPanel> createState() => _SettingsAccountPanelState();
 }
 
-class _SettingsAccountPanelState extends State<SettingsAccountPanel>
-    with SingleTickerProviderStateMixin {
-  late final TabController _signedOutTabController;
-
-  @override
-  void initState() {
-    super.initState();
-    _signedOutTabController = TabController(
-      length: 2,
-      vsync: this,
-      initialIndex: _tabIndexFor(widget.settings),
-    );
-  }
-
-  @override
-  void didUpdateWidget(SettingsAccountPanel oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.accountSignedIn != widget.accountSignedIn ||
-        oldWidget.accountMfaRequired != widget.accountMfaRequired) {
-      _signedOutTabController.index = _tabIndexFor(widget.settings);
-    }
-  }
-
-  @override
-  void dispose() {
-    _signedOutTabController.dispose();
-    super.dispose();
-  }
-
-  int _tabIndexFor(SettingsSnapshot settings) {
-    return settings.acpBridgeServerModeConfig.effective.source == 'bridge'
-        ? 1
-        : 0;
-  }
-
+class _SettingsAccountPanelState extends State<SettingsAccountPanel> {
   @override
   Widget build(BuildContext context) {
     final isManualBridgeConfigured =
@@ -96,47 +62,15 @@ class _SettingsAccountPanelState extends State<SettingsAccountPanel>
     if (!widget.accountSignedIn &&
         !widget.accountMfaRequired &&
         !isManualBridgeConfigured) {
-      return AnimatedBuilder(
-        animation: _signedOutTabController,
-        builder: (context, _) {
-          return Column(
-            children: [
-              TabBar(
-                controller: _signedOutTabController,
-                tabs: [
-                  Tab(text: appText('svc.plus 云端同步', 'svc.plus Cloud Sync')),
-                  Tab(text: appText('AI 智能体工作空间', 'AI Agentic Workspace')),
-                ],
-              ),
-              const SizedBox(height: 24),
-              SizedBox(
-                height: 480,
-                child: IndexedStack(
-                  index: _signedOutTabController.index,
-                  children: [
-                    _SignedOutAccountPanel(
-                      accountBusy: widget.accountBusy,
-                      accountBaseUrlController: widget.accountBaseUrlController,
-                      accountIdentifierController:
-                          widget.accountIdentifierController,
-                      accountPasswordController:
-                          widget.accountPasswordController,
-                      onSaveAccountProfile: widget.onSaveAccountProfile,
-                      onLogin: widget.onLogin,
-                    ),
-                    _ManualBridgePanel(
-                      settings: widget.settings,
-                      accountBusy: widget.accountBusy,
-                      bridgeUrlController: widget.bridgeUrlController,
-                      bridgeTokenController: widget.bridgeTokenController,
-                      onSaveAccountProfile: widget.onSaveAccountProfile,
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          );
-        },
+      return _AvailableConnectorsPanel(
+        accountBusy: widget.accountBusy,
+        accountBaseUrlController: widget.accountBaseUrlController,
+        accountIdentifierController: widget.accountIdentifierController,
+        accountPasswordController: widget.accountPasswordController,
+        bridgeUrlController: widget.bridgeUrlController,
+        bridgeTokenController: widget.bridgeTokenController,
+        onSaveAccountProfile: widget.onSaveAccountProfile,
+        onLogin: widget.onLogin,
       );
     }
     if (widget.accountMfaRequired) {
@@ -161,6 +95,232 @@ class _SettingsAccountPanelState extends State<SettingsAccountPanel>
       onLogout: widget.onLogout,
     );
   }
+}
+
+enum _ConnectorSelection { svcPlus, selfHosted }
+
+class _AvailableConnectorsPanel extends StatefulWidget {
+  const _AvailableConnectorsPanel({
+    required this.accountBusy,
+    required this.accountBaseUrlController,
+    required this.accountIdentifierController,
+    required this.accountPasswordController,
+    required this.bridgeUrlController,
+    required this.bridgeTokenController,
+    required this.onSaveAccountProfile,
+    required this.onLogin,
+  });
+
+  final bool accountBusy;
+  final TextEditingController accountBaseUrlController;
+  final TextEditingController accountIdentifierController;
+  final TextEditingController accountPasswordController;
+  final TextEditingController bridgeUrlController;
+  final TextEditingController bridgeTokenController;
+  final Future<void> Function({required bool isManualBridge})
+  onSaveAccountProfile;
+  final Future<void> Function() onLogin;
+
+  @override
+  State<_AvailableConnectorsPanel> createState() =>
+      _AvailableConnectorsPanelState();
+}
+
+class _AvailableConnectorsPanelState extends State<_AvailableConnectorsPanel> {
+  _ConnectorSelection? _selection;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            appText('连接器', 'Connectors'),
+            style: theme.textTheme.headlineSmall,
+          ),
+          const SizedBox(height: 6),
+          Text(
+            appText(
+              '连接外部服务，为 XWorkmate 增加工作空间与协作能力。',
+              'Connect external services to add workspace and collaboration capabilities to XWorkmate.',
+            ),
+          ),
+          const SizedBox(height: 20),
+          Text(
+            appText('已连接 · 1', 'Connected · 1'),
+            style: theme.textTheme.titleMedium,
+          ),
+          const SizedBox(height: 10),
+          _ConnectorCard(
+            connectorId: 'local-workspace',
+            icon: Icons.laptop_mac_outlined,
+            title: appText('本地工作空间', 'Local Workspace'),
+            subtitle: appText(
+              '数据和任务保存在当前设备，无需账号。',
+              'Tasks and data stay on this device. No account required.',
+            ),
+            trailing: Text(
+              appText('就绪', 'Ready'),
+              style: TextStyle(color: theme.colorScheme.primary),
+            ),
+          ),
+          const SizedBox(height: 22),
+          Text(
+            appText('可用连接器', 'Available connectors'),
+            style: theme.textTheme.titleMedium,
+          ),
+          const SizedBox(height: 10),
+          _ConnectorCard(
+            connectorId: 'svc-plus-workspace',
+            icon: Icons.cloud_outlined,
+            title: 'svc.plus Workspace',
+            subtitle: appText(
+              '连接你已有的工作空间配置。',
+              'Connect an existing workspace configuration.',
+            ),
+            actionLabel: appText('连接', 'Connect'),
+            onAction: () =>
+                setState(() => _selection = _ConnectorSelection.svcPlus),
+          ),
+          const SizedBox(height: 12),
+          _ConnectorCard(
+            connectorId: 'self-hosted-workspace',
+            icon: Icons.dns_outlined,
+            title: appText('自托管工作空间', 'Self-hosted Workspace'),
+            subtitle: appText(
+              '连接你自行部署的 AI Workspace。',
+              'Connect an AI Workspace that you deploy and manage.',
+            ),
+            actionLabel: appText('连接', 'Connect'),
+            onAction: () =>
+                setState(() => _selection = _ConnectorSelection.selfHosted),
+          ),
+          if (_selection != null) ...[
+            const SizedBox(height: 20),
+            _ConnectorConfiguration(
+              title: _selection == _ConnectorSelection.svcPlus
+                  ? 'svc.plus Workspace'
+                  : appText('自托管工作空间', 'Self-hosted Workspace'),
+              onClose: () => setState(() => _selection = null),
+              child: _selection == _ConnectorSelection.svcPlus
+                  ? _SignedOutAccountPanel(
+                      accountBusy: widget.accountBusy,
+                      accountBaseUrlController: widget.accountBaseUrlController,
+                      accountIdentifierController:
+                          widget.accountIdentifierController,
+                      accountPasswordController:
+                          widget.accountPasswordController,
+                      onSaveAccountProfile: widget.onSaveAccountProfile,
+                      onLogin: widget.onLogin,
+                    )
+                  : _ManualBridgePanel(
+                      settings: SettingsSnapshot.defaults(),
+                      accountBusy: widget.accountBusy,
+                      bridgeUrlController: widget.bridgeUrlController,
+                      bridgeTokenController: widget.bridgeTokenController,
+                      onSaveAccountProfile: widget.onSaveAccountProfile,
+                    ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _ConnectorConfiguration extends StatelessWidget {
+  const _ConnectorConfiguration({
+    required this.title,
+    required this.onClose,
+    required this.child,
+  });
+  final String title;
+  final VoidCallback onClose;
+  final Widget child;
+  @override
+  Widget build(BuildContext context) => Material(
+    color: Theme.of(context).colorScheme.surfaceContainerHighest,
+    borderRadius: BorderRadius.circular(16),
+    child: Padding(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  appText('连接 $title', 'Connect $title'),
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+              ),
+              IconButton(
+                onPressed: onClose,
+                icon: const Icon(Icons.close_rounded),
+                tooltip: appText('关闭', 'Close'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          child,
+        ],
+      ),
+    ),
+  );
+}
+
+class _ConnectorCard extends StatelessWidget {
+  const _ConnectorCard({
+    required this.connectorId,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    this.trailing,
+    this.actionLabel,
+    this.onAction,
+  });
+  final String connectorId;
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Widget? trailing;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+  @override
+  Widget build(BuildContext context) => Material(
+    key: ValueKey('settings-connector-$connectorId'),
+    color: Theme.of(context).colorScheme.surfaceContainerHighest,
+    borderRadius: BorderRadius.circular(16),
+    child: Padding(
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        children: [
+          Icon(icon, color: Theme.of(context).colorScheme.primary),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: 3),
+                Text(subtitle, style: Theme.of(context).textTheme.bodySmall),
+              ],
+            ),
+          ),
+          // ignore: use_null_aware_elements
+          if (trailing case final trailing?) trailing,
+          if (actionLabel != null)
+            FilledButton.tonal(
+              key: ValueKey('settings-connector-action-$connectorId'),
+              onPressed: onAction,
+              child: Text(actionLabel!),
+            ),
+        ],
+      ),
+    ),
+  );
 }
 
 class _ManualBridgePanel extends StatelessWidget {
@@ -196,15 +356,15 @@ class _ManualBridgePanel extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             Text(
-              appText('AI 智能体工作空间', 'AI Agentic Workspace'),
+              appText('自托管工作空间', 'Self-hosted Workspace'),
               style: theme.textTheme.headlineMedium,
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 10),
             Text(
               appText(
-                '直接配置本地或私有 AI 智能体工作空间地址与令牌。',
-                'Configure a local or private AI Agentic Workspace address and token directly.',
+                '连接你自行部署的 AI Workspace。',
+                'Connect an AI Workspace that you deploy and manage.',
               ),
               style: theme.textTheme.titleMedium?.copyWith(
                 color: theme.textTheme.bodyMedium?.color?.withValues(
@@ -218,7 +378,7 @@ class _ManualBridgePanel extends StatelessWidget {
               key: const ValueKey('settings-manual-bridge-url-field'),
               controller: bridgeUrlController,
               decoration: InputDecoration(
-                labelText: appText('Bridge 地址', 'Bridge URL'),
+                labelText: appText('服务地址', 'Service URL'),
                 prefixIcon: const Icon(Icons.dns_outlined),
                 hintText: 'https://xworkmate-bridge.svc.plus',
               ),
@@ -231,7 +391,7 @@ class _ManualBridgePanel extends StatelessWidget {
               controller: bridgeTokenController,
               obscureText: true,
               decoration: InputDecoration(
-                labelText: appText('鉴权令牌 (TOKEN)', 'Auth Token'),
+                labelText: appText('访问令牌', 'Access token'),
                 prefixIcon: const Icon(Icons.key_outlined),
               ),
               onFieldSubmitted: (_) =>
@@ -245,7 +405,7 @@ class _ManualBridgePanel extends StatelessWidget {
                 onPressed: accountBusy
                     ? null
                     : () => onSaveAccountProfile(isManualBridge: true),
-                child: Text(appText('保存配置', 'Save Configuration')),
+                child: Text(appText('连接', 'Connect')),
               ),
             ),
           ],
@@ -290,15 +450,15 @@ class _SignedOutAccountPanel extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             Text(
-              appText('账号登录', 'Account Sign In'),
+              appText('连接 svc.plus Workspace', 'Connect svc.plus Workspace'),
               style: theme.textTheme.headlineMedium,
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 10),
             Text(
               appText(
-                '登录后可直接同步 svc.plus 托管连接配置。',
-                'Sign in to sync the managed svc.plus connection profile.',
+                '访问你已有的工作空间配置。',
+                'Access an existing workspace configuration.',
               ),
               style: theme.textTheme.titleMedium?.copyWith(
                 color: theme.textTheme.bodyMedium?.color?.withValues(
@@ -346,7 +506,7 @@ class _SignedOutAccountPanel extends StatelessWidget {
               child: FilledButton(
                 key: const ValueKey('settings-account-login-button'),
                 onPressed: accountBusy ? null : () => onLogin(),
-                child: Text(appText('登录', 'Sign In')),
+                child: Text(appText('连接', 'Connect')),
               ),
             ),
           ],
@@ -397,8 +557,8 @@ class _PendingMfaAccountPanel extends StatelessWidget {
             const SizedBox(height: 10),
             Text(
               appText(
-                '请输入验证码完成登录并同步设置。',
-                'Enter your code to finish signing in and sync settings.',
+                '请输入验证码以完成此连接。',
+                'Enter your code to complete this connection.',
               ),
               style: theme.textTheme.titleMedium?.copyWith(
                 color: theme.textTheme.bodyMedium?.color?.withValues(
@@ -446,7 +606,7 @@ class _PendingMfaAccountPanel extends StatelessWidget {
                 FilledButton(
                   key: const ValueKey('settings-account-mfa-verify-button'),
                   onPressed: accountBusy ? null : () => onVerifyMfa(),
-                  child: Text(appText('验证并同步', 'Verify & Sync')),
+                  child: Text(appText('验证并连接', 'Verify & Connect')),
                 ),
                 FilledButton.tonal(
                   key: const ValueKey('settings-account-mfa-cancel-button'),
@@ -526,11 +686,11 @@ class _SignedInAccountPanel extends StatelessWidget {
         ? Icons.cloud_outlined
         : Icons.link_outlined;
     final modeTitle = isAccountSyncMode
-        ? appText('账号同步', 'Account Sync')
-        : appText('手动 Bridge', 'Manual Bridge');
+        ? 'svc.plus Workspace'
+        : appText('自托管工作空间', 'Self-hosted Workspace');
     final primaryActionLabel = isAccountSyncMode
-        ? appText('重新同步', 'Resync')
-        : appText('重新设置', 'Reset');
+        ? appText('刷新连接', 'Refresh connection')
+        : appText('断开连接', 'Disconnect');
     final primaryActionKey = isAccountSyncMode
         ? 'settings-account-sync-button'
         : 'settings-account-manual-reset-button';
@@ -543,14 +703,14 @@ class _SignedInAccountPanel extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          appText('账号登录与同步', 'Account Sign In & Sync'),
+          appText('已连接的连接器', 'Connected connectors'),
           style: Theme.of(context).textTheme.titleLarge,
         ),
         const SizedBox(height: 8),
         Text(
           appText(
-            '登录后只保留状态条和主动作，详细信息默认折叠。',
-            'After sign-in, keep only the status bar and primary actions; details stay collapsed by default.',
+            '已连接的服务优先显示；详细连接信息默认折叠。',
+            'Connected services appear first; connection details stay collapsed by default.',
           ),
         ),
         const SizedBox(height: 16),
@@ -564,130 +724,133 @@ class _SignedInAccountPanel extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Icon(modeIcon, color: Theme.of(context).colorScheme.primary),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      modeIcon,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            modeTitle,
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            isAccountSyncMode
+                                ? '${appText('连接状态', 'Connection status')}: $modeStateLabel'
+                                : '${appText('连接状态', 'Connection status')}: $modeStateLabel',
+                            key: const ValueKey('settings-account-sync-status'),
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            accountSession?.email.trim().isNotEmpty == true
+                                ? accountSession!.email.trim()
+                                : appText('当前账号', 'Current account'),
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(
+                                  color: Theme.of(context)
+                                      .textTheme
+                                      .bodySmall
+                                      ?.color
+                                      ?.withValues(alpha: 0.78),
+                                ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 12,
+                      alignment: WrapAlignment.end,
                       children: [
-                        Text(
-                          modeTitle,
-                          style: Theme.of(context).textTheme.titleMedium,
+                        FilledButton.tonal(
+                          key: ValueKey(primaryActionKey),
+                          onPressed: accountBusy ? null : () => primaryAction(),
+                          child: accountBusy
+                              ? Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    SizedBox(
+                                      width: 14,
+                                      height: 14,
+                                      child: CircularProgressIndicator(
+                                        key: const ValueKey(
+                                          'settings-account-sync-progress',
+                                        ),
+                                        strokeWidth: 2,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      isAccountSyncMode
+                                          ? appText('同步中', 'Syncing')
+                                          : appText('保存中', 'Saving'),
+                                    ),
+                                  ],
+                                )
+                              : Text(primaryActionLabel),
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          isAccountSyncMode
-                              ? '${appText('账号同步状态', 'Account Sync Status')}: $modeStateLabel'
-                              : '${appText('保存状态', 'Save Status')}: $modeStateLabel',
-                          key: const ValueKey('settings-account-sync-status'),
-                          style: Theme.of(context).textTheme.bodySmall,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          accountSession?.email.trim().isNotEmpty == true
-                              ? accountSession!.email.trim()
-                              : appText('当前账号', 'Current account'),
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(
-                                color: Theme.of(context)
-                                    .textTheme
-                                    .bodySmall
-                                    ?.color
-                                    ?.withValues(alpha: 0.78),
-                              ),
+                        TextButton(
+                          key: const ValueKey('settings-account-logout-button'),
+                          onPressed: accountBusy ? null : () => exitAction(),
+                          child: Text(appText('断开连接', 'Disconnect')),
                         ),
                       ],
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Wrap(
-                    spacing: 12,
-                    runSpacing: 12,
-                    alignment: WrapAlignment.end,
-                    children: [
-                      FilledButton.tonal(
-                        key: ValueKey(primaryActionKey),
-                        onPressed: accountBusy ? null : () => primaryAction(),
-                        child: accountBusy
-                            ? Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  SizedBox(
-                                    width: 14,
-                                    height: 14,
-                                    child: CircularProgressIndicator(
-                                      key: const ValueKey(
-                                        'settings-account-sync-progress',
-                                      ),
-                                      strokeWidth: 2,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    isAccountSyncMode
-                                        ? appText('同步中', 'Syncing')
-                                        : appText('保存中', 'Saving'),
-                                  ),
-                                ],
-                              )
-                            : Text(primaryActionLabel),
-                      ),
-                      TextButton(
-                        key: const ValueKey('settings-account-logout-button'),
-                        onPressed: accountBusy ? null : () => exitAction(),
-                        child: Text(appText('退出', 'Exit')),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Text(
-                isAccountSyncMode
-                    ? '${appText('同步说明', 'Sync Summary')}: $modeStatusLabel'
-                    : '${appText('保存说明', 'Save Summary')}: $modeStatusLabel',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(
-                    context,
-                  ).textTheme.bodySmall?.color?.withValues(alpha: 0.78),
+                  ],
                 ),
-              ),
-              const SizedBox(height: 8),
-              ExpansionTile(
-                key: const ValueKey('settings-account-summary-expansion'),
-                initiallyExpanded: false,
-                tilePadding: EdgeInsets.zero,
-                childrenPadding: const EdgeInsets.only(top: 8),
-                title: Text(
-                  appText('详细信息', 'Details'),
-                  style: Theme.of(context).textTheme.titleSmall,
-                ),
-                subtitle: Text(
-                  appText(
-                    '查看服务地址、令牌与远端摘要',
-                    'View service URL, tokens, and remote summary',
+                const SizedBox(height: 12),
+                Text(
+                  isAccountSyncMode
+                      ? '${appText('连接说明', 'Connection summary')}: $modeStatusLabel'
+                      : '${appText('连接说明', 'Connection summary')}: $modeStatusLabel',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(
+                      context,
+                    ).textTheme.bodySmall?.color?.withValues(alpha: 0.78),
                   ),
-                  style: Theme.of(context).textTheme.bodySmall,
                 ),
-                children: [
-                  _SignedInAccountDetails(
-                    settings: settings,
-                    accountSession: accountSession,
-                    accountState: accountState,
-                    serviceUrl: serviceUrl,
-                    accountIdentifier: accountIdentifier,
-                    remoteSummary: remoteSummary,
-                    syncScope: syncScope,
-                    mfaEnabled: mfaEnabled,
+                const SizedBox(height: 8),
+                ExpansionTile(
+                  key: const ValueKey('settings-account-summary-expansion'),
+                  initiallyExpanded: false,
+                  tilePadding: EdgeInsets.zero,
+                  childrenPadding: const EdgeInsets.only(top: 8),
+                  title: Text(
+                    appText('详细信息', 'Details'),
+                    style: Theme.of(context).textTheme.titleSmall,
                   ),
-                ],
-              ),
-            ],
+                  subtitle: Text(
+                    appText(
+                      '查看服务地址、令牌与远端摘要',
+                      'View service URL, tokens, and remote summary',
+                    ),
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  children: [
+                    _SignedInAccountDetails(
+                      settings: settings,
+                      accountSession: accountSession,
+                      accountState: accountState,
+                      serviceUrl: serviceUrl,
+                      accountIdentifier: accountIdentifier,
+                      remoteSummary: remoteSummary,
+                      syncScope: syncScope,
+                      mfaEnabled: mfaEnabled,
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
-        ),
         ),
       ],
     );
@@ -729,7 +892,7 @@ class _SignedInAccountDetails extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            '${appText('账户标识', 'Account Identifier')}: ${accountIdentifier.isEmpty ? appText('待登录', 'Not signed in') : accountIdentifier}',
+            '${appText('连接身份', 'Connection identity')}: ${accountIdentifier.isEmpty ? appText('待连接', 'Not connected') : accountIdentifier}',
             key: const ValueKey('settings-account-summary-account-identifier'),
           ),
           const SizedBox(height: 6),
@@ -809,8 +972,8 @@ String _connectionSourceLabel(
     accountState: accountState,
   );
   return mode == _SignedInAccountMode.accountSync
-      ? appText('svc.plus 托管配置', 'svc.plus managed profile')
-      : appText('AI 智能体工作空间', 'AI Agentic Workspace');
+      ? 'svc.plus Workspace'
+      : appText('自托管工作空间', 'Self-hosted Workspace');
 }
 
 class _TokenConfiguredSummary extends StatelessWidget {
