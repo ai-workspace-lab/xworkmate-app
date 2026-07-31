@@ -69,6 +69,10 @@ void main() {
 
     expect(find.text('current session message'), findsAtLeastNWidgets(1));
     expect(find.text('stale gateway message'), findsNothing);
+    expect(
+      find.byKey(const Key('assistant-publish-github-button')),
+      findsOneWidget,
+    );
   });
 
   testWidgets('preserves unsent composer drafts per assistant session', (

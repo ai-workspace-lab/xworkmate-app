@@ -9,3 +9,4 @@ export 'app_controller_desktop_settings_runtime.dart';
 export 'app_controller_desktop_thread_storage.dart';
 export 'app_controller_desktop_skill_permissions.dart';
 export 'app_controller_desktop_runtime_helpers.dart';
+export 'app_controller_desktop_github_publish.dart';

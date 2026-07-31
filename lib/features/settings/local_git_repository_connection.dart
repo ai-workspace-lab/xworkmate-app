@@ -2,6 +2,55 @@ import 'dart:convert';
 
 import 'package:http/http.dart' as http;
 
+const String githubRepositoryTokenRef = 'custom.github_repository.token';
+
+class GitHubRepositoryConnectorConfig {
+  const GitHubRepositoryConnectorConfig({
+    this.repository = '',
+    this.branch = 'main',
+    this.publishPath = 'conversations',
+    this.tokenRef = githubRepositoryTokenRef,
+    this.connected = false,
+  });
+
+  final String repository;
+  final String branch;
+  final String publishPath;
+  final String tokenRef;
+  final bool connected;
+
+  bool get isConfigured =>
+      connected &&
+      GitHubRepositoryTarget.tryParse(repository) != null &&
+      branch.trim().isNotEmpty &&
+      publishPath.trim().isNotEmpty &&
+      tokenRef.trim().isNotEmpty;
+
+  Map<String, dynamic> toJson() => <String, dynamic>{
+    'repository': repository,
+    'branch': branch,
+    'publishPath': publishPath,
+    'tokenRef': tokenRef,
+    'connected': connected,
+  };
+
+  factory GitHubRepositoryConnectorConfig.fromJson(Map<String, dynamic> json) {
+    return GitHubRepositoryConnectorConfig(
+      repository: json['repository']?.toString().trim() ?? '',
+      branch: json['branch']?.toString().trim().isNotEmpty == true
+          ? json['branch'].toString().trim()
+          : 'main',
+      publishPath: json['publishPath']?.toString().trim().isNotEmpty == true
+          ? json['publishPath'].toString().trim()
+          : 'conversations',
+      tokenRef: json['tokenRef']?.toString().trim().isNotEmpty == true
+          ? json['tokenRef'].toString().trim()
+          : githubRepositoryTokenRef,
+      connected: json['connected'] as bool? ?? false,
+    );
+  }
+}
+
 class GitHubRepositoryTarget {
   const GitHubRepositoryTarget({required this.owner, required this.repository});
 
@@ -24,6 +73,63 @@ class GitHubRepositoryTarget {
       repository: match.group(2)!,
     );
   }
+}
+
+String renderGitHubConversationMarkdown({
+  required String title,
+  required Iterable<({String role, String text})> messages,
+}) {
+  final buffer = StringBuffer()
+    ..writeln(
+      '# ${title.trim().isEmpty ? 'XWorkmate conversation' : title.trim()}',
+    )
+    ..writeln()
+    ..writeln('> Published from XWorkmate')
+    ..writeln();
+  for (final message in messages) {
+    final text = message.text.trim();
+    if (text.isEmpty) continue;
+    final role = switch (message.role.trim().toLowerCase()) {
+      'user' => 'User',
+      'assistant' => 'Assistant',
+      'tool' => 'Tool',
+      final other when other.isNotEmpty => other,
+      _ => 'Message',
+    };
+    buffer
+      ..writeln('## $role')
+      ..writeln()
+      ..writeln(text)
+      ..writeln();
+  }
+  return buffer.toString().trimRight();
+}
+
+String buildGitHubConversationPath({
+  required String directory,
+  required String title,
+  required DateTime timestamp,
+}) {
+  final normalizedDirectory = directory
+      .trim()
+      .split('/')
+      .where((part) => part.isNotEmpty && part != '.' && part != '..')
+      .join('/');
+  final slug = title
+      .trim()
+      .toLowerCase()
+      .replaceAll(RegExp(r'[^a-z0-9\u4e00-\u9fff]+'), '-')
+      .replaceAll(RegExp(r'^-+|-+$'), '');
+  final safeSlug = slug.isEmpty ? 'conversation' : slug;
+  final local = timestamp.toLocal();
+  String two(int value) => value.toString().padLeft(2, '0');
+  final suffix =
+      '${local.year}${two(local.month)}${two(local.day)}-'
+      '${two(local.hour)}${two(local.minute)}${two(local.second)}';
+  final fileName = '$safeSlug-$suffix.md';
+  return normalizedDirectory.isEmpty
+      ? fileName
+      : '$normalizedDirectory/$fileName';
 }
 
 class GitHubApiResult {

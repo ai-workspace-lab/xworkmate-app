@@ -73,4 +73,32 @@ void main() {
       base64Encode(utf8.encode('# Hello')),
     );
   });
+
+  test('renders plugin context inside the published conversation', () {
+    final markdown = renderGitHubConversationMarkdown(
+      title: 'Release notes',
+      messages: const <({String role, String text})>[
+        (
+          role: 'user',
+          text: 'Prepare the release.\n\nBuiltin plugins:\n- document',
+        ),
+        (role: 'assistant', text: 'Release notes are ready.'),
+      ],
+    );
+
+    expect(markdown, contains('# Release notes'));
+    expect(markdown, contains('Builtin plugins:'));
+    expect(markdown, contains('## Assistant'));
+  });
+
+  test('builds a safe unique Markdown path', () {
+    expect(
+      buildGitHubConversationPath(
+        directory: 'conversations/daily',
+        title: 'Release Notes!',
+        timestamp: DateTime(2026, 7, 31, 8, 9, 10),
+      ),
+      'conversations/daily/release-notes-20260731-080910.md',
+    );
+  });
 }

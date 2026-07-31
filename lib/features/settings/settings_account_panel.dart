@@ -28,6 +28,7 @@ class SettingsAccountPanel extends StatefulWidget {
     required this.onSync,
     required this.onResetManualBridge,
     required this.onLogout,
+    this.onSaveGitHubRepository,
   });
 
   final SettingsSnapshot settings;
@@ -52,6 +53,11 @@ class SettingsAccountPanel extends StatefulWidget {
   final Future<void> Function() onSync;
   final Future<void> Function() onResetManualBridge;
   final Future<void> Function() onLogout;
+  final Future<void> Function(
+    GitHubRepositoryConnectorConfig config,
+    String token,
+  )?
+  onSaveGitHubRepository;
 
   @override
   State<SettingsAccountPanel> createState() => _SettingsAccountPanelState();
@@ -68,6 +74,7 @@ class _SettingsAccountPanelState extends State<SettingsAccountPanel> {
       return _AvailableConnectorsPanel(
         accountBusy: widget.accountBusy,
         gitHubRepositoryEnabled: widget.gitHubRepositoryEnabled,
+        githubRepository: widget.settings.githubRepository,
         accountBaseUrlController: widget.accountBaseUrlController,
         accountIdentifierController: widget.accountIdentifierController,
         accountPasswordController: widget.accountPasswordController,
@@ -75,6 +82,7 @@ class _SettingsAccountPanelState extends State<SettingsAccountPanel> {
         bridgeTokenController: widget.bridgeTokenController,
         onSaveAccountProfile: widget.onSaveAccountProfile,
         onLogin: widget.onLogin,
+        onSaveGitHubRepository: widget.onSaveGitHubRepository,
       );
     }
     if (widget.accountMfaRequired) {
@@ -107,6 +115,7 @@ class _AvailableConnectorsPanel extends StatefulWidget {
   const _AvailableConnectorsPanel({
     required this.accountBusy,
     required this.gitHubRepositoryEnabled,
+    required this.githubRepository,
     required this.accountBaseUrlController,
     required this.accountIdentifierController,
     required this.accountPasswordController,
@@ -114,10 +123,12 @@ class _AvailableConnectorsPanel extends StatefulWidget {
     required this.bridgeTokenController,
     required this.onSaveAccountProfile,
     required this.onLogin,
+    required this.onSaveGitHubRepository,
   });
 
   final bool accountBusy;
   final bool gitHubRepositoryEnabled;
+  final GitHubRepositoryConnectorConfig githubRepository;
   final TextEditingController accountBaseUrlController;
   final TextEditingController accountIdentifierController;
   final TextEditingController accountPasswordController;
@@ -126,6 +137,11 @@ class _AvailableConnectorsPanel extends StatefulWidget {
   final Future<void> Function({required bool isManualBridge})
   onSaveAccountProfile;
   final Future<void> Function() onLogin;
+  final Future<void> Function(
+    GitHubRepositoryConnectorConfig config,
+    String token,
+  )?
+  onSaveGitHubRepository;
 
   @override
   State<_AvailableConnectorsPanel> createState() =>
@@ -142,10 +158,16 @@ class _AvailableConnectorsPanelState extends State<_AvailableConnectorsPanel> {
   @override
   void initState() {
     super.initState();
-    _gitRepositoryUrlController = TextEditingController();
+    _gitRepositoryUrlController = TextEditingController(
+      text: widget.githubRepository.repository,
+    );
     _gitHubTokenController = TextEditingController();
-    _gitBranchController = TextEditingController(text: 'main');
-    _gitPublishPathController = TextEditingController(text: 'conversations');
+    _gitBranchController = TextEditingController(
+      text: widget.githubRepository.branch,
+    );
+    _gitPublishPathController = TextEditingController(
+      text: widget.githubRepository.publishPath,
+    );
   }
 
   @override
@@ -190,7 +212,9 @@ class _AvailableConnectorsPanelState extends State<_AvailableConnectorsPanel> {
                 '通过 GitHub API 发布对话，无需启动本机 Git。',
                 'Publish conversations through the GitHub API without starting local Git.',
               ),
-              actionLabel: appText('连接', 'Connect'),
+              actionLabel: widget.githubRepository.isConfigured
+                  ? appText('配置', 'Configure')
+                  : appText('连接', 'Connect'),
               onAction: () => setState(
                 () => _selection = _ConnectorSelection.localGitRepository,
               ),
@@ -255,6 +279,7 @@ class _AvailableConnectorsPanelState extends State<_AvailableConnectorsPanel> {
                       tokenController: _gitHubTokenController,
                       branchController: _gitBranchController,
                       publishPathController: _gitPublishPathController,
+                      onSave: widget.onSaveGitHubRepository,
                     ),
             ),
           ],
@@ -270,12 +295,18 @@ class _LocalGitRepositoryPanel extends StatefulWidget {
     required this.tokenController,
     required this.branchController,
     required this.publishPathController,
+    required this.onSave,
   });
 
   final TextEditingController repositoryUrlController;
   final TextEditingController tokenController;
   final TextEditingController branchController;
   final TextEditingController publishPathController;
+  final Future<void> Function(
+    GitHubRepositoryConnectorConfig config,
+    String token,
+  )?
+  onSave;
 
   @override
   State<_LocalGitRepositoryPanel> createState() =>
@@ -295,6 +326,18 @@ class _LocalGitRepositoryPanelState extends State<_LocalGitRepositoryPanel> {
       repository: widget.repositoryUrlController.text,
       token: widget.tokenController.text,
     );
+    if (!mounted) return;
+    if (result.success && widget.onSave != null) {
+      await widget.onSave!(
+        GitHubRepositoryConnectorConfig(
+          repository: widget.repositoryUrlController.text.trim(),
+          branch: widget.branchController.text.trim(),
+          publishPath: widget.publishPathController.text.trim(),
+          connected: true,
+        ),
+        widget.tokenController.text,
+      );
+    }
     if (!mounted) return;
     setState(() {
       _checking = false;
@@ -363,7 +406,7 @@ class _LocalGitRepositoryPanelState extends State<_LocalGitRepositoryPanel> {
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
               : const Icon(Icons.link_outlined),
-          label: Text(appText('验证连接', 'Verify connection')),
+          label: Text(appText('连接并保存', 'Connect and save')),
         ),
       ),
       if (_connectionStatus case final status?) ...[

@@ -540,6 +540,21 @@ class _SettingsPageState extends State<SettingsPage> {
                   onSync: () => _syncAccount(widget.controller.settings),
                   onResetManualBridge: _resetManualBridge,
                   onLogout: _logoutAccount,
+                  onSaveGitHubRepository: (config, token) async {
+                    await widget.controller.settingsController
+                        .saveSecretValueByRef(
+                          config.tokenRef,
+                          token,
+                          provider: 'GitHub',
+                          module: 'github_repository',
+                        );
+                    await widget.controller.saveSettings(
+                      widget.controller.settings.copyWith(
+                        githubRepository: config,
+                      ),
+                      refreshAfterSave: false,
+                    );
+                  },
                 ),
               ),
               const SizedBox(height: 24),

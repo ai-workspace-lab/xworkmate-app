@@ -36,6 +36,23 @@ import 'assistant_attachment_payloads.dart';
 import 'assistant_page_components_core.dart';
 
 extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
+  Future<void> publishConversationToGitHubInternal() async {
+    if (publishingConversationInternal) return;
+    setState(() => publishingConversationInternal = true);
+    final result = await widget.controller.publishCurrentConversationToGitHub();
+    if (!mounted) return;
+    setState(() => publishingConversationInternal = false);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          result.success
+              ? appText('对话已发布到 GitHub。', 'Conversation published to GitHub.')
+              : result.message,
+        ),
+      ),
+    );
+  }
+
   Future<void> pickAttachmentsInternal() async {
     final uiFeatures = widget.controller.featuresFor(
       resolveUiFeaturePlatformFromContext(context),
@@ -323,8 +340,8 @@ extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
       return body;
     }
     return rawPrompt.startsWith(
-      '${ComposerBarStateInternal.builtinPluginsBlockHeading}:\n',
-    )
+          '${ComposerBarStateInternal.builtinPluginsBlockHeading}:\n',
+        )
         ? appText('内置插件任务', 'Built-in plugin task')
         : rawPrompt;
   }
