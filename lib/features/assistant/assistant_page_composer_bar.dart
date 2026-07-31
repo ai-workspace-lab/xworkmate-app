@@ -87,7 +87,7 @@ class ComposerBarInternal extends StatefulWidget {
 }
 
 class ComposerBarStateInternal extends State<ComposerBarInternal> {
-  static const double minInputHeightInternal = 68;
+  static const double minInputHeightInternal = 40;
   static const double defaultInputHeightInternal =
       assistantComposerDefaultInputHeightInternal;
   static const double maxInputHeightInternal = 220;
@@ -123,8 +123,9 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
 
   /// The current session's selected plugin ids (empty when none).
   List<String> get selectedBuiltinPluginIdsInternal =>
-      selectedBuiltinPluginIdsBySessionInternal[
-          widget.controller.currentSessionKey] ??
+      selectedBuiltinPluginIdsBySessionInternal[widget
+          .controller
+          .currentSessionKey] ??
       const <String>[];
 
   @override
@@ -402,388 +403,393 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
 
     return Padding(
       key: contentKeyInternal,
-      padding: const EdgeInsets.fromLTRB(10, 8, 10, 0),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        mainAxisAlignment: MainAxisAlignment.end,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              if (uiFeatures.supportsFileAttachments) ...[
-                PopupMenuButton<String>(
-                  key: const Key('assistant-attachment-menu-button'),
-                  tooltip: appText('添加文件等', 'Add files'),
-                  offset: const Offset(0, 48),
-                  onSelected: (value) {
-                    switch (value) {
-                      case 'attach':
-                        widget.onPickAttachments();
-                        break;
-                    }
-                  },
-                  itemBuilder: (context) => [
-                    const PopupMenuItem<String>(
-                      value: 'attach',
-                      child: ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: Icon(Icons.attach_file_rounded),
-                        title: Text('添加照片和文件'),
-                      ),
-                    ),
-                  ],
-                  child: const ComposerIconButtonInternal(
-                    icon: Icons.add_rounded,
-                  ),
-                ),
-                const SizedBox(width: 6),
-              ],
-              if (uiFeatures.supportsBuiltinPlugins) ...[
-                PopupMenuButton<String>(
-                  key: const Key('assistant-builtin-plugin-menu-button'),
-                  tooltip: appText('内置插件', 'Built-in plugins'),
-                  offset: const Offset(0, 48),
-                  constraints: const BoxConstraints(
-                    minWidth: 320,
-                    maxWidth: 420,
-                  ),
-                  onSelected: toggleBuiltinPluginInternal,
-                  itemBuilder: (context) => [
-                    PopupMenuItem<String>(
-                      enabled: false,
-                      height: 30,
-                      child: Text(
-                        appText('插件', 'Plugins'),
-                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                              color: palette.textMuted,
-                              fontWeight: FontWeight.w600,
-                            ),
-                      ),
-                    ),
-                    for (final plugin in BuiltinPluginCatalog.firstBatch)
-                      PopupMenuItem<String>(
-                        key: Key(
-                          'assistant-builtin-plugin-item-${plugin.id}',
+      padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
+        decoration: BoxDecoration(
+          color: palette.surfacePrimary,
+          border: Border.all(color: palette.strokeSoft),
+          borderRadius: BorderRadius.circular(AppRadius.card),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.end,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                if (uiFeatures.supportsFileAttachments) ...[
+                  PopupMenuButton<String>(
+                    key: const Key('assistant-attachment-menu-button'),
+                    tooltip: appText('添加文件等', 'Add files'),
+                    offset: const Offset(0, 48),
+                    onSelected: (value) {
+                      switch (value) {
+                        case 'attach':
+                          widget.onPickAttachments();
+                          break;
+                      }
+                    },
+                    itemBuilder: (context) => [
+                      const PopupMenuItem<String>(
+                        value: 'attach',
+                        child: ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: Icon(Icons.attach_file_rounded),
+                          title: Text('添加照片和文件'),
                         ),
-                        value: plugin.id,
-                        child: Row(
-                          children: [
-                            BuiltinPluginIconTile(plugin: plugin),
-                            const SizedBox(width: 10),
-                            Text(
-                              plugin.name,
-                              style: const TextStyle(
+                      ),
+                    ],
+                    child: const ComposerIconButtonInternal(
+                      icon: Icons.add_rounded,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                ],
+                if (uiFeatures.supportsBuiltinPlugins) ...[
+                  PopupMenuButton<String>(
+                    key: const Key('assistant-builtin-plugin-menu-button'),
+                    tooltip: appText('内置插件', 'Built-in plugins'),
+                    offset: const Offset(0, 48),
+                    constraints: const BoxConstraints(
+                      minWidth: 320,
+                      maxWidth: 420,
+                    ),
+                    onSelected: toggleBuiltinPluginInternal,
+                    itemBuilder: (context) => [
+                      PopupMenuItem<String>(
+                        enabled: false,
+                        height: 30,
+                        child: Text(
+                          appText('插件', 'Plugins'),
+                          style: Theme.of(context).textTheme.labelSmall
+                              ?.copyWith(
+                                color: palette.textMuted,
                                 fontWeight: FontWeight.w600,
                               ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                plugin.description,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .bodySmall
-                                    ?.copyWith(color: palette.textMuted),
-                              ),
-                            ),
-                            if (selectedBuiltinPluginIdsInternal
-                                .contains(plugin.id)) ...[
-                              const SizedBox(width: 6),
-                              Icon(
-                                Icons.check_rounded,
-                                size: 16,
-                                color: palette.accent,
-                              ),
-                            ],
-                          ],
                         ),
                       ),
-                  ],
-                  child: const ComposerIconButtonInternal(
-                    icon: Icons.extension_rounded,
-                  ),
-                ),
-                const SizedBox(width: 6),
-              ],
-              AssistantTaskDialogModeControlsInternal(controller: controller),
-              const SizedBox(width: 4),
-              if (widget.showModelControl) ...[
-                widget.modelOptions.isEmpty
-                    ? ComposerToolbarChipInternal(
-                        key: const Key('assistant-model-button'),
-                        icon: Icons.bolt_rounded,
-                        tooltip: modelTooltipInternal(widget.modelLabel),
-                        showChevron: false,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 6,
-                        ),
-                      )
-                    : PopupMenuButton<String>(
-                        key: const Key('assistant-model-button'),
-                        tooltip: appText('模型', 'Model'),
-                        onSelected: widget.onModelChanged,
-                        itemBuilder: (context) => widget.modelOptions
-                            .map(
-                              (value) => PopupMenuItem<String>(
-                                value: value,
-                                child: Row(
-                                  children: [
-                                    Expanded(child: Text(value)),
-                                    if (value == widget.modelLabel)
-                                      const Icon(Icons.check_rounded, size: 18),
-                                  ],
+                      for (final plugin in BuiltinPluginCatalog.firstBatch)
+                        PopupMenuItem<String>(
+                          key: Key(
+                            'assistant-builtin-plugin-item-${plugin.id}',
+                          ),
+                          value: plugin.id,
+                          child: Row(
+                            children: [
+                              BuiltinPluginIconTile(plugin: plugin),
+                              const SizedBox(width: 10),
+                              Text(
+                                plugin.name,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
                                 ),
                               ),
-                            )
-                            .toList(),
-                        child: ComposerToolbarChipInternal(
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  plugin.description,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: Theme.of(context).textTheme.bodySmall
+                                      ?.copyWith(color: palette.textMuted),
+                                ),
+                              ),
+                              if (selectedBuiltinPluginIdsInternal.contains(
+                                plugin.id,
+                              )) ...[
+                                const SizedBox(width: 6),
+                                Icon(
+                                  Icons.check_rounded,
+                                  size: 16,
+                                  color: palette.accent,
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                    ],
+                    child: const ComposerIconButtonInternal(
+                      icon: Icons.extension_rounded,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                ],
+                AssistantTaskDialogModeControlsInternal(controller: controller),
+                const SizedBox(width: 4),
+                if (widget.showModelControl) ...[
+                  widget.modelOptions.isEmpty
+                      ? ComposerToolbarChipInternal(
+                          key: const Key('assistant-model-button'),
                           icon: Icons.bolt_rounded,
                           tooltip: modelTooltipInternal(widget.modelLabel),
-                          showChevron: true,
+                          showChevron: false,
                           padding: const EdgeInsets.symmetric(
                             horizontal: 10,
                             vertical: 6,
                           ),
-                        ),
-                      ),
-                const SizedBox(width: 4),
-              ],
-            ],
-          ),
-          const SizedBox(height: 8),
-          if (widget.attachments.isNotEmpty) ...[
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: widget.attachments
-                  .map(
-                    (attachment) => InputChip(
-                      avatar: Icon(attachment.icon, size: 16),
-                      label: Text(attachment.name),
-                      onDeleted: () => widget.onRemoveAttachment(attachment),
-                    ),
-                  )
-                  .toList(),
-            ),
-            const SizedBox(height: 6),
-          ],
-          SizedBox(
-            key: const Key('assistant-composer-input-area'),
-            height: inputHeightInternal,
-            child: Shortcuts(
-              shortcuts: pasteShortcutsInternal,
-              child: Actions(
-                actions: <Type, Action<Intent>>{
-                  AssistantPasteIntent: CallbackAction<AssistantPasteIntent>(
-                    onInvoke: (_) {
-                      unawaited(handlePasteShortcutInternal());
-                      return null;
-                    },
-                  ),
-                },
-                child: TextField(
-                  key: const Key('assistant-input-field'),
-                  controller: widget.inputController,
-                  focusNode: widget.focusNode,
-                  autofocus: true,
-                  expands: true,
-                  minLines: null,
-                  maxLines: null,
-                  textAlignVertical: TextAlignVertical.top,
-                  decoration: InputDecoration(
-                    isCollapsed: true,
-                    filled: true,
-                    fillColor: palette.surfacePrimary,
-                    contentPadding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide(color: palette.strokeSoft),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: BorderSide(
-                        color: palette.accent.withValues(alpha: 0.24),
-                      ),
-                    ),
-                    hintText: appText(
-                      '输入需求、补充上下文，XWorkmate 会沿用当前任务上下文持续处理。',
-                      'Describe the task or add context. XWorkmate keeps the current task context.',
-                    ),
-                  ),
-                  onSubmitted: (_) => handleSendInternal(),
-                ),
-              ),
-            ),
-          ),
-          ComposerResizeHandleInternal(
-            key: const Key('assistant-composer-resize-handle'),
-            onDelta: resizeInputInternal,
-          ),
-          if (selectedSkills.isNotEmpty ||
-              selectedBuiltinPluginIdsInternal.isNotEmpty) ...[
-            const SizedBox(height: 6),
-            Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: [
-                for (final pluginId in selectedBuiltinPluginIdsInternal)
-                  if (BuiltinPluginCatalog.byId(pluginId)
-                      case final plugin?)
-                    ComposerSelectedPluginChipInternal(
-                      key: ValueKey<String>(
-                        'assistant-selected-plugin-$pluginId',
-                      ),
-                      plugin: plugin,
-                      onDeleted: () => toggleBuiltinPluginInternal(pluginId),
-                    ),
-                ...selectedSkills.map(
-                  (skill) => ComposerSelectedSkillChipInternal(
-                    key: ValueKey<String>(
-                      'assistant-selected-skill-${skill.key}',
-                    ),
-                    option: skill,
-                    onDeleted: () => widget.onToggleSkill(skill.key),
-                  ),
-                ),
-              ],
-            ),
-          ],
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              Expanded(
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      CompositedTransformTarget(
-                        key: skillPickerTargetKeyInternal,
-                        link: skillPickerLayerLinkInternal,
-                        child: OverlayPortal(
-                          controller: skillPickerPortalControllerInternal,
-                          overlayChildBuilder: buildSkillPickerOverlayInternal,
-                          child: InkWell(
-                            key: const Key('assistant-skill-picker-button'),
-                            borderRadius: BorderRadius.circular(AppRadius.chip),
-                            onTap: toggleSkillPickerInternal,
-                            child: ComposerToolbarChipInternal(
-                              icon: Icons.key_rounded,
-                              tooltip: skillsTooltipInternal(
-                                selectedSkills.length,
-                              ),
-                              showChevron: true,
+                        )
+                      : PopupMenuButton<String>(
+                          key: const Key('assistant-model-button'),
+                          tooltip: appText('模型', 'Model'),
+                          onSelected: widget.onModelChanged,
+                          itemBuilder: (context) => widget.modelOptions
+                              .map(
+                                (value) => PopupMenuItem<String>(
+                                  value: value,
+                                  child: Row(
+                                    children: [
+                                      Expanded(child: Text(value)),
+                                      if (value == widget.modelLabel)
+                                        const Icon(
+                                          Icons.check_rounded,
+                                          size: 18,
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              )
+                              .toList(),
+                          child: ComposerToolbarChipInternal(
+                            icon: Icons.bolt_rounded,
+                            tooltip: modelTooltipInternal(widget.modelLabel),
+                            showChevron: true,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
                             ),
                           ),
                         ),
+                  const SizedBox(width: 4),
+                ],
+              ],
+            ),
+            const SizedBox(height: 8),
+            if (widget.attachments.isNotEmpty) ...[
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: widget.attachments
+                    .map(
+                      (attachment) => InputChip(
+                        avatar: Icon(attachment.icon, size: 16),
+                        label: Text(attachment.name),
+                        onDeleted: () => widget.onRemoveAttachment(attachment),
                       ),
-                      const SizedBox(width: 6),
-                      PopupMenuButton<AssistantPermissionLevel>(
-                        key: const Key('assistant-permission-button'),
-                        tooltip: appText('权限', 'Permissions'),
-                        onSelected: (value) {
-                          controller.setAssistantPermissionLevel(value);
-                        },
-                        itemBuilder: (context) => AssistantPermissionLevel
-                            .values
-                            .map(
-                              (value) =>
-                                  PopupMenuItem<AssistantPermissionLevel>(
-                                    value: value,
-                                    child: Row(
-                                      children: [
-                                        Icon(value.icon, size: 18),
-                                        const SizedBox(width: 10),
-                                        Expanded(child: Text(value.label)),
-                                        if (value == permissionLevel)
-                                          const Icon(
-                                            Icons.check_rounded,
-                                            size: 18,
-                                          ),
-                                      ],
-                                    ),
-                                  ),
-                            )
-                            .toList(),
-                        child: ComposerToolbarChipInternal(
-                          icon: permissionLevel.icon,
-                          tooltip: permissionTooltipInternal(permissionLevel),
-                          showChevron: true,
-                        ),
+                    )
+                    .toList(),
+              ),
+              const SizedBox(height: 6),
+            ],
+            SizedBox(
+              key: const Key('assistant-composer-input-area'),
+              height: inputHeightInternal,
+              child: Shortcuts(
+                shortcuts: pasteShortcutsInternal,
+                child: Actions(
+                  actions: <Type, Action<Intent>>{
+                    AssistantPasteIntent: CallbackAction<AssistantPasteIntent>(
+                      onInvoke: (_) {
+                        unawaited(handlePasteShortcutInternal());
+                        return null;
+                      },
+                    ),
+                  },
+                  child: TextField(
+                    key: const Key('assistant-input-field'),
+                    controller: widget.inputController,
+                    focusNode: widget.focusNode,
+                    autofocus: true,
+                    expands: true,
+                    minLines: null,
+                    maxLines: null,
+                    textAlignVertical: TextAlignVertical.top,
+                    decoration: InputDecoration(
+                      isCollapsed: true,
+                      filled: false,
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      contentPadding: EdgeInsets.zero,
+                      hintText: appText(
+                        '输入需求、补充上下文，XWorkmate 会沿用当前任务上下文持续处理。',
+                        'Describe the task or add context. XWorkmate keeps the current task context.',
                       ),
-                      const SizedBox(width: 6),
-                      PopupMenuButton<String>(
-                        key: const Key('assistant-thinking-button'),
-                        tooltip: appText('推理强度', 'Reasoning'),
-                        onSelected: widget.onThinkingChanged,
-                        itemBuilder: (context) =>
-                            const <String>['low', 'medium', 'high', 'max']
-                                .map(
-                                  (value) => PopupMenuItem<String>(
-                                    value: value,
-                                    child: Row(
-                                      children: [
-                                        Expanded(
-                                          child: Text(
-                                            assistantThinkingLabelInternal(
-                                              value,
-                                            ),
-                                          ),
-                                        ),
-                                        if (value == widget.thinkingLabel)
-                                          const Icon(
-                                            Icons.check_rounded,
-                                            size: 18,
-                                          ),
-                                      ],
-                                    ),
-                                  ),
-                                )
-                                .toList(),
-                        child: ComposerToolbarChipInternal(
-                          icon: Icons.psychology_alt_outlined,
-                          tooltip: thinkingTooltipInternal(
-                            widget.thinkingLabel,
-                          ),
-                          showChevron: true,
-                        ),
-                      ),
-                    ],
+                    ),
+                    onSubmitted: (_) => handleSendInternal(),
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
-              Tooltip(
-                message: submitLabel,
-                child: FilledButton(
-                  key: const Key('assistant-send-button'),
-                  onPressed: handleSendInternal,
-                  style: FilledButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 4,
-                    ),
-                    minimumSize: const Size(64, 28),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
+            ),
+            ComposerResizeHandleInternal(
+              key: const Key('assistant-composer-resize-handle'),
+              onDelta: resizeInputInternal,
+            ),
+            if (selectedSkills.isNotEmpty ||
+                selectedBuiltinPluginIdsInternal.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  for (final pluginId in selectedBuiltinPluginIdsInternal)
+                    if (BuiltinPluginCatalog.byId(pluginId) case final plugin?)
+                      ComposerSelectedPluginChipInternal(
+                        key: ValueKey<String>(
+                          'assistant-selected-plugin-$pluginId',
+                        ),
+                        plugin: plugin,
+                        onDeleted: () => toggleBuiltinPluginInternal(pluginId),
+                      ),
+                  ...selectedSkills.map(
+                    (skill) => ComposerSelectedSkillChipInternal(
+                      key: ValueKey<String>(
+                        'assistant-selected-skill-${skill.key}',
+                      ),
+                      option: skill,
+                      onDeleted: () => widget.onToggleSkill(skill.key),
                     ),
                   ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.arrow_upward_rounded, size: 18),
-                      const SizedBox(width: 4),
-                      Text(submitLabel),
-                    ],
-                  ),
-                ),
+                ],
               ),
             ],
-          ),
-        ],
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                Expanded(
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        CompositedTransformTarget(
+                          key: skillPickerTargetKeyInternal,
+                          link: skillPickerLayerLinkInternal,
+                          child: OverlayPortal(
+                            controller: skillPickerPortalControllerInternal,
+                            overlayChildBuilder:
+                                buildSkillPickerOverlayInternal,
+                            child: InkWell(
+                              key: const Key('assistant-skill-picker-button'),
+                              borderRadius: BorderRadius.circular(
+                                AppRadius.chip,
+                              ),
+                              onTap: toggleSkillPickerInternal,
+                              child: ComposerToolbarChipInternal(
+                                icon: Icons.key_rounded,
+                                tooltip: skillsTooltipInternal(
+                                  selectedSkills.length,
+                                ),
+                                showChevron: true,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        PopupMenuButton<AssistantPermissionLevel>(
+                          key: const Key('assistant-permission-button'),
+                          tooltip: appText('权限', 'Permissions'),
+                          onSelected: (value) {
+                            controller.setAssistantPermissionLevel(value);
+                          },
+                          itemBuilder: (context) => AssistantPermissionLevel
+                              .values
+                              .map(
+                                (value) =>
+                                    PopupMenuItem<AssistantPermissionLevel>(
+                                      value: value,
+                                      child: Row(
+                                        children: [
+                                          Icon(value.icon, size: 18),
+                                          const SizedBox(width: 10),
+                                          Expanded(child: Text(value.label)),
+                                          if (value == permissionLevel)
+                                            const Icon(
+                                              Icons.check_rounded,
+                                              size: 18,
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                              )
+                              .toList(),
+                          child: ComposerToolbarChipInternal(
+                            icon: permissionLevel.icon,
+                            tooltip: permissionTooltipInternal(permissionLevel),
+                            showChevron: true,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        PopupMenuButton<String>(
+                          key: const Key('assistant-thinking-button'),
+                          tooltip: appText('推理强度', 'Reasoning'),
+                          onSelected: widget.onThinkingChanged,
+                          itemBuilder: (context) =>
+                              const <String>['low', 'medium', 'high', 'max']
+                                  .map(
+                                    (value) => PopupMenuItem<String>(
+                                      value: value,
+                                      child: Row(
+                                        children: [
+                                          Expanded(
+                                            child: Text(
+                                              assistantThinkingLabelInternal(
+                                                value,
+                                              ),
+                                            ),
+                                          ),
+                                          if (value == widget.thinkingLabel)
+                                            const Icon(
+                                              Icons.check_rounded,
+                                              size: 18,
+                                            ),
+                                        ],
+                                      ),
+                                    ),
+                                  )
+                                  .toList(),
+                          child: ComposerToolbarChipInternal(
+                            icon: Icons.psychology_alt_outlined,
+                            tooltip: thinkingTooltipInternal(
+                              widget.thinkingLabel,
+                            ),
+                            showChevron: true,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Tooltip(
+                  message: submitLabel,
+                  child: FilledButton(
+                    key: const Key('assistant-send-button'),
+                    onPressed: handleSendInternal,
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
+                      minimumSize: const Size(64, 28),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.arrow_upward_rounded, size: 18),
+                        const SizedBox(width: 4),
+                        Text(submitLabel),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
