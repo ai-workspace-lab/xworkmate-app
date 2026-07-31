@@ -408,7 +408,7 @@ UI 页面变化按仓库 `AGENTS.md` 还应增加/更新 widget 与 golden 测�
 3. 完成上表测试与视觉检查。
 4. 更新本文件的 checklist、验证结果和最终 commit。
 5. 提交到 `agent/github-plugin-publish`。
-6. 推送分支并创建面向 `main` 的 ready-for-review PR。
+6. 已推送分支并创建面向 `main` 的 draft PR：[#234](https://github.com/ai-workspace-lab/xworkmate-app/pull/234)。
 7. PR 描述必须说明：
    - PR #211 / #218 的 Harness 模型复用关系；
    - 插件和连接器独立可选；
@@ -426,7 +426,7 @@ UI 页面变化按仓库 `AGENTS.md` 还应增加/更新 widget 与 golden 测�
 
 - 可以保留 GitHub API、SecretStore、配置持久化和 Markdown 渲染部分。
 - 必须重构直接发布按钮/action，不能以现状提交为最终产品。
-- 尚未推送分支、尚未创建新 PR、尚未合并 `main`。
+- 已推送分支并创建 draft PR #234；尚未完成选择式工作流重构，也尚未合并 `main`。
 
 ## 十四、Code Agent 交接规则
 
