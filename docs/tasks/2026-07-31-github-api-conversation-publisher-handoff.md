@@ -352,30 +352,30 @@ body：
 - [x] Contents API 的 URL、branch、commit message、UTF-8 Base64。
 - [x] GitHub 配置 JSON round trip，确认无 token。
 - [x] Markdown 保留完整插件块。
-- [ ] `ConversationWorkflowRequest` 的组合合法性。
-- [ ] Harness target 缺失/无效时拒绝运行。
-- [ ] 未选择 connector 时不读取 token、不发 HTTP。
-- [ ] 插件失败时不自动发布。
+- [x] `ConversationWorkflowRequest` 的组合合法性。
+- [x] Harness target 缺失/无效时拒绝运行。
+- [x] 未选择 connector 时不读取 token、不发 HTTP。
+- [x] 插件失败时不自动发布。
 
 ### 10.2 Widget 测试
 
 - [x] 未登录/未连接工作空间时显示 GitHub 卡片和“连接”按钮。
 - [x] 点击卡片显示四个输入字段。
-- [ ] 已连接 svc.plus 时仍显示 GitHub 卡片。
-- [ ] 已连接自托管工作空间时仍显示 GitHub 卡片。
-- [ ] 点击“对话工作流”打开对话框。
-- [ ] 插件与连接器可以独立选择。
-- [ ] Harness 无 target、GitHub 未连接时给出正确引导。
-- [ ] 四种组合的主按钮文案和启用状态正确。
-- [ ] 发布中防止重复提交。
+- [x] 已连接 svc.plus 时仍显示 GitHub 卡片。
+- [x] 已连接自托管工作空间时仍显示 GitHub 卡片。
+- [x] 点击“对话工作流”打开对话框。
+- [x] 插件与连接器可以独立选择。
+- [x] Harness 无 target、GitHub 未连接时给出正确引导。
+- [x] 四种组合的主按钮文案和启用状态正确。
+- [x] 发布中防止重复提交（`publishingConversationInternal` 守卫）。
 
 ### 10.3 集成/策略测试
 
 - [x] `app_store_policy_test.dart` 确认 GitHub API 能力在商店策略下可用。
-- [ ] 对话工作流入口受 feature manifest 控制。
-- [ ] 静态扫描新增文件不引用 `Process`、shell 或 SSH 私钥路径。
-- [ ] HTTP fake 验证“未选 GitHub = 0 次请求”。
-- [ ] HTTP fake 验证“选 GitHub = 1 次 Contents API PUT”。
+- [x] 对话工作流入口受 feature manifest 控制（`supportsGitHubRepository`）。
+- [x] 静态扫描新增文件不引用 `Process`、shell 或 SSH 私钥路径。
+- [x] HTTP fake 验证“未选 GitHub = 0 次请求”。
+- [x] HTTP fake 验证“选 GitHub = 1 次 Contents API PUT”。
 
 ### 10.4 必跑命令
 
@@ -386,6 +386,9 @@ flutter test test/runtime/settings_snapshot_github_repository_test.dart
 flutter test test/features/settings/settings_account_panel_test.dart
 flutter test test/features/assistant/assistant_page_session_binding_test.dart
 flutter test test/app/app_store_policy_test.dart
+flutter test test/features/connectors/conversation_workflow_request_test.dart
+flutter test test/features/assistant/conversation_workflow_dialog_test.dart
+flutter test test/app/conversation_workflow_controller_test.dart
 git diff --check
 ```
 
@@ -394,21 +397,28 @@ UI 页面变化按仓库 `AGENTS.md` 还应增加/更新 widget 与 golden 测�
 
 ## 十一、当前验证记录
 
+更新时间：2026-07-31（对话工作流对话框阶段）
+
 - `flutter analyze`：通过，无 issue。
-- 5 组目标测试：通过，共 23 tests。
+- 8 组目标测试：通过，共 49 tests。
 - `git diff --check`：通过。
-- `flutter test` 全量曾出现仓库现有 mobile golden/page 测试失败
-  （找不到 `mobile-assistant-page` 等 key）；当前判断与 GitHub API 文件无直接调用关系，
-  提交前需再次确认失败基线并在 PR 中如实记录。
+- `flutter test` 全量：501 passed / 6 failed。
+- 失败基线已确认：在未修改的 `origin/main@9276e342` 上另建 worktree 跑
+  `flutter test test/features/mobile/`，同样是这 6 个 mobile golden/page 用例失败，
+  与本分支改动无关。
 
 ## 十二、提交、PR 与合并步骤
 
-1. 先完成选择式对话框，删除/替换直接发布原型。
-2. 修复“已连接工作空间后 GitHub 卡片不可见”的设置布局。
-3. 完成上表测试与视觉检查。
-4. 更新本文件的 checklist、验证结果和最终 commit。
-5. 提交到 `agent/github-plugin-publish`。
-6. 已推送分支并创建面向 `main` 的 draft PR：[#234](https://github.com/ai-workspace-lab/xworkmate-app/pull/234)。
+1. [x] 先完成选择式对话框，删除/替换直接发布原型。
+2. [x] 修复“已连接工作空间后 GitHub 卡片不可见”的设置布局。
+3. [x] 完成上表测试。
+4. [x] 更新本文件的 checklist、验证结果和最终 commit。
+5. [x] 第一阶段（GitHub API 连接器 + 直接发布原型）已随 PR
+   [#234](https://github.com/ai-workspace-lab/xworkmate-app/pull/234) squash 合并进
+   `main@9276e342`。
+6. [x] 第二阶段在 `feature/conversation-workflow-dialog` 上开发。
+   注意：`agent/*` 不是仓库规范允许的分支前缀，`Validate Release PR` 在 #234 上因此失败；
+   进入 `main` 只接受 `feature/`、`bugfix/`、`cherry-pick/`。
 7. PR 描述必须说明：
    - PR #211 / #218 的 Harness 模型复用关系；
    - 插件和连接器独立可选；
@@ -422,11 +432,21 @@ UI 页面变化按仓库 `AGENTS.md` 还应增加/更新 widget 与 golden 测�
 
 ## 十三、当前工作树说明
 
-当前分支有未提交代码，约 282 行增量，属于“GitHub 配置持久化 + 直接发布原型”：
+`agent/github-plugin-publish` 的内容已完整进入 `main@9276e342`（squash 后树一致）。
+后续工作在 `feature/conversation-workflow-dialog` 上进行，已交付：
 
-- 可以保留 GitHub API、SecretStore、配置持久化和 Markdown 渲染部分。
-- 必须重构直接发布按钮/action，不能以现状提交为最终产品。
-- 已推送分支并创建 draft PR #234；尚未完成选择式工作流重构，也尚未合并 `main`。
+- 设置页 GitHub 连接器在任意工作空间连接状态下都可见、可配置。
+- `ConversationPluginSelection` / `ConversationPublishSelection` /
+  `ConversationWorkflowRequest` 三个模型，插件与连接器完全独立。
+- `ConversationWorkflowDialog` 选择式对话框，含四种组合的主按钮文案、空状态引导与执行摘要。
+- `runConversationWorkflow(...)` 控制器入口，直接发布原型已删除。
+
+尚未完成（下一阶段）：
+
+- Harness 完成信号的可靠监听；当前“运行并发布”只启动插件并提示稍后手动发布最新结果
+  （`publishPending`），不做轮询猜测。
+- 对话框的 golden 测试与视觉检查。
+- 设置 → 插件中的 Harness target 增删改 UI（沿用 PR #211 的后续项）。
 
 ## 十四、Code Agent 交接规则
 
