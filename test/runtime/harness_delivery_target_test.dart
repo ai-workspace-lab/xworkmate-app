@@ -45,6 +45,7 @@ HarnessTarget _sampleTarget() {
         deploy: HarnessDeployKind.docoCdWebhook,
       ),
     ],
+    requiredSkills: <String>['github-actions-operational-dispatch'],
   );
 }
 
@@ -207,6 +208,37 @@ void main() {
       expect(target.isValid, isFalse);
     });
 
+    test('requiredSkills is omitted from JSON when empty, present when set',
+        () {
+      const withSkills = HarnessTarget(
+        id: 't',
+        org: 'o',
+        project: 'p',
+        requiredSkills: <String>['github-actions-operational-dispatch'],
+      );
+      expect(withSkills.toJson()['requiredSkills'], <String>[
+        'github-actions-operational-dispatch',
+      ]);
+      expect(HarnessTarget.fromJson(withSkills.toJson()), withSkills);
+
+      const withoutSkills = HarnessTarget(id: 't', org: 'o', project: 'p');
+      expect(withoutSkills.toJson().containsKey('requiredSkills'), isFalse);
+      expect(
+        HarnessTarget.fromJson(withoutSkills.toJson()).requiredSkills,
+        isEmpty,
+      );
+    });
+
+    test('fromJson tolerates a non-list requiredSkills value', () {
+      final restored = HarnessTarget.fromJson(const <String, dynamic>{
+        'id': 't',
+        'org': 'o',
+        'project': 'p',
+        'requiredSkills': 'not-a-list',
+      });
+      expect(restored.requiredSkills, isEmpty);
+    });
+
     test('validation flags duplicate environment names', () {
       const target = HarnessTarget(
         id: 't',
@@ -267,6 +299,7 @@ void main() {
       expect(appIndex, lessThan(gitopsIndex));
       expect(block, contains('prod'));
       expect(block, contains('需人工确认'));
+      expect(block, contains('- skills: github-actions-operational-dispatch'));
     });
 
     test('en rendering uses English labels and still orders repos', () {
@@ -279,6 +312,27 @@ void main() {
       final gitopsIndex = block.indexOf('gitops');
       expect(infraIndex, lessThan(appIndex));
       expect(appIndex, lessThan(gitopsIndex));
+      expect(block, contains('- skills: github-actions-operational-dispatch'));
+    });
+
+    test('omits the skills line entirely when a target declares none', () {
+      const target = HarnessTarget(
+        id: 't',
+        org: 'o',
+        project: 'p',
+        repos: <HarnessRepoBinding>[
+          HarnessRepoBinding(name: 'a', checkoutPath: '/a'),
+        ],
+        environments: <HarnessEnvironment>[
+          HarnessEnvironment(
+            name: 'sit',
+            trigger: HarnessTriggerKind.pullRequest,
+            deploy: HarnessDeployKind.ghWorkflowDispatch,
+          ),
+        ],
+      );
+      final block = renderHarnessDeliveryContextBlock(target);
+      expect(block, isNot(contains('- skills:')));
     });
   });
 }
