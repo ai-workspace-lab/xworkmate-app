@@ -250,6 +250,7 @@ class HarnessTarget {
     required this.project,
     this.repos = const <HarnessRepoBinding>[],
     this.environments = const <HarnessEnvironment>[],
+    this.requiredSkills = const <String>[],
   });
 
   /// Stable id, unique across a user's configured targets.
@@ -258,6 +259,13 @@ class HarnessTarget {
   final String project;
   final List<HarnessRepoBinding> repos;
   final List<HarnessEnvironment> environments;
+
+  /// Gateway-side skill packages the agent must load before acting on this
+  /// target (e.g. `github-actions-operational-dispatch`). The App never executes these —
+  /// it only carries the name through to the delivery context block so the
+  /// plan/think step on the gateway loads the matching rules before it picks
+  /// a workflow (plan §one: select happens before plan/think, not after).
+  final List<String> requiredSkills;
 
   String get label => '$org/$project';
 
@@ -360,6 +368,7 @@ class HarnessTarget {
     String? project,
     List<HarnessRepoBinding>? repos,
     List<HarnessEnvironment>? environments,
+    List<String>? requiredSkills,
   }) {
     return HarnessTarget(
       id: id ?? this.id,
@@ -367,6 +376,7 @@ class HarnessTarget {
       project: project ?? this.project,
       repos: repos ?? this.repos,
       environments: environments ?? this.environments,
+      requiredSkills: requiredSkills ?? this.requiredSkills,
     );
   }
 
@@ -378,11 +388,13 @@ class HarnessTarget {
     'environments': environments
         .map((environment) => environment.toJson())
         .toList(growable: false),
+    if (requiredSkills.isNotEmpty) 'requiredSkills': requiredSkills,
   };
 
   factory HarnessTarget.fromJson(Map<String, dynamic> json) {
     final rawRepos = json['repos'];
     final rawEnvironments = json['environments'];
+    final rawSkills = json['requiredSkills'];
     return HarnessTarget(
       id: json['id']?.toString().trim() ?? '',
       org: json['org']?.toString().trim() ?? '',
@@ -399,6 +411,9 @@ class HarnessTarget {
               .map(HarnessEnvironment.fromJson)
               .toList(growable: false)
           : const <HarnessEnvironment>[],
+      requiredSkills: rawSkills is List
+          ? rawSkills.map((item) => item.toString()).toList(growable: false)
+          : const <String>[],
     );
   }
 
@@ -409,7 +424,8 @@ class HarnessTarget {
       other.org == org &&
       other.project == project &&
       listEquals(other.repos, repos) &&
-      listEquals(other.environments, environments);
+      listEquals(other.environments, environments) &&
+      listEquals(other.requiredSkills, requiredSkills);
 
   @override
   int get hashCode => Object.hash(
@@ -418,6 +434,7 @@ class HarnessTarget {
     project,
     Object.hashAll(repos),
     Object.hashAll(environments),
+    Object.hashAll(requiredSkills),
   );
 }
 
@@ -458,8 +475,11 @@ String renderHarnessDeliveryContextBlockZh(HarnessTarget target) {
   final buffer = StringBuffer()
     ..writeln('Harness delivery context:')
     ..writeln('- org: ${target.org}')
-    ..writeln('- project: ${target.project}')
-    ..writeln('- repos:');
+    ..writeln('- project: ${target.project}');
+  if (target.requiredSkills.isNotEmpty) {
+    buffer.writeln('- skills: ${target.requiredSkills.join(', ')}');
+  }
+  buffer.writeln('- repos:');
   for (final repo in target.reposInExecutionOrder) {
     buffer.writeln(
       '  - ${repo.name} (${repo.role.label}, order: ${repo.order}): '
@@ -481,8 +501,11 @@ String renderHarnessDeliveryContextBlockEn(HarnessTarget target) {
   final buffer = StringBuffer()
     ..writeln('Harness delivery context:')
     ..writeln('- org: ${target.org}')
-    ..writeln('- project: ${target.project}')
-    ..writeln('- repos:');
+    ..writeln('- project: ${target.project}');
+  if (target.requiredSkills.isNotEmpty) {
+    buffer.writeln('- skills: ${target.requiredSkills.join(', ')}');
+  }
+  buffer.writeln('- repos:');
   for (final repo in target.reposInExecutionOrder) {
     buffer.writeln(
       '  - ${repo.name} (${repo.role.label}, order: ${repo.order}): '
