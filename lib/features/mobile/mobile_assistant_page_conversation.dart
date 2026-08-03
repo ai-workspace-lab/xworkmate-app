@@ -335,8 +335,7 @@ class MobileAssistantEmptyState extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 2),
                     child: Row(
                       children: [
-                        for (final plugin
-                            in BuiltinPluginCatalog.firstBatch) ...[
+                        for (final plugin in BuiltinPluginCatalog.all) ...[
                           MobileBuiltinPluginChoiceChip(
                             key: ValueKey(
                               'mobile-plugin-shortcut-${plugin.id}',
@@ -348,7 +347,7 @@ class MobileAssistantEmptyState extends StatelessWidget {
                             large: true,
                             onSelected: (_) => onToggleBuiltinPlugin(plugin.id),
                           ),
-                          if (plugin != BuiltinPluginCatalog.firstBatch.last)
+                          if (plugin != BuiltinPluginCatalog.all.last)
                             const SizedBox(width: 10),
                         ],
                       ],

@@ -7,7 +7,7 @@ import 'package:flutter/foundation.dart';
 /// pipeline; a runtime binding only decides how the app obtains the plugin's
 /// workflow manifest and, later, optional local pre/post-processing hooks.
 enum BuiltinPluginRuntimeKind {
-  /// Compiled into the app as Dart code (`BuiltinPluginCatalog.firstBatch`).
+  /// Compiled into the app as Dart code (`BuiltinPluginCatalog.all`).
   builtinDart,
 
   /// Loaded at runtime from an external JSON workflow manifest

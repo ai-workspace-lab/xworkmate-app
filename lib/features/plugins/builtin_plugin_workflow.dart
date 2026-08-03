@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../../i18n/app_language.dart';
+import 'builtin_plugin_input_slot.dart';
 
 /// What the executor does with a step once its retries are exhausted.
 enum BuiltinPluginStepFailurePolicy {
@@ -142,6 +143,7 @@ class BuiltinPluginWorkflow {
     required this.steps,
     required this.inputPromptZh,
     required this.inputPromptEn,
+    this.inputSlots = const <BuiltinPluginInputSlot>[],
   });
 
   /// Serialization schema version for external manifests (plan §8.2).
@@ -149,7 +151,12 @@ class BuiltinPluginWorkflow {
   /// v2 (batch 2): per-step `maxRetries` + `failurePolicy` replace the v1
   /// boolean `retryable`; v1 manifests still parse (legacy mapping in
   /// [BuiltinPluginWorkflowStep.fromJson]).
-  static const int schemaVersion = 2;
+  ///
+  /// v3 (batch 3): optional `inputSlots` declare typed inputs so a plugin can
+  /// bind several reference images to distinct roles. Slots are additive —
+  /// v1/v2 manifests parse into an empty slot list and behave exactly as
+  /// before.
+  static const int schemaVersion = 3;
 
   /// Opening line of the composer template, states the overall goal.
   final String goalZh;
@@ -160,6 +167,17 @@ class BuiltinPluginWorkflow {
   /// Trailing line inviting the user to fill in their specifics.
   final String inputPromptZh;
   final String inputPromptEn;
+
+  /// Typed inputs this plugin declares. Empty for plugins whose only input is
+  /// the conversation itself.
+  final List<BuiltinPluginInputSlot> inputSlots;
+
+  /// Slots the plugin cannot run without.
+  List<BuiltinPluginInputSlot> get requiredInputSlots => inputSlots
+      .where((slot) => slot.required)
+      .toList(growable: false);
+
+  bool get hasInputSlots => inputSlots.isNotEmpty;
 
   /// Union of step output formats, first-seen order preserved.
   List<String> get outputFormats => _orderedUnion(
@@ -185,6 +203,14 @@ class BuiltinPluginWorkflow {
       final terminator = i == steps.length - 1 ? '。' : '；';
       buffer.writeln('${i + 1}. ${step.instructionZh}$fallback$terminator');
     }
+    if (hasInputSlots) {
+      buffer
+        ..writeln()
+        ..writeln('参考输入与各自的作用（未提供的条目直接忽略，不要凭空补全）：');
+      for (final slot in inputSlots) {
+        buffer.writeln(slot.renderPromptLineZh());
+      }
+    }
     buffer.write(inputPromptZh);
     return buffer.toString();
   }
@@ -197,6 +223,17 @@ class BuiltinPluginWorkflow {
           ? ' (on failure: ${step.fallbackEn.trim()})'
           : '';
       buffer.writeln('${i + 1}. ${step.instructionEn}$fallback.');
+    }
+    if (hasInputSlots) {
+      buffer
+        ..writeln()
+        ..writeln(
+          'Reference inputs and what each contributes (ignore any entry I '
+          'did not provide; never invent one):',
+        );
+      for (final slot in inputSlots) {
+        buffer.writeln(slot.renderPromptLineEn());
+      }
     }
     buffer.write(inputPromptEn);
     return buffer.toString();
@@ -212,10 +249,15 @@ class BuiltinPluginWorkflow {
         'inputPromptZh': inputPromptZh,
         'inputPromptEn': inputPromptEn,
         'steps': steps.map((step) => step.toJson()).toList(growable: false),
+        if (inputSlots.isNotEmpty)
+          'inputSlots': inputSlots
+              .map((slot) => slot.toJson())
+              .toList(growable: false),
       };
 
   factory BuiltinPluginWorkflow.fromJson(Map<String, dynamic> json) {
     final rawSteps = json['steps'];
+    final rawSlots = json['inputSlots'];
     return BuiltinPluginWorkflow(
       goalZh: json['goalZh'] as String? ?? '',
       goalEn: json['goalEn'] as String? ?? '',
@@ -227,6 +269,12 @@ class BuiltinPluginWorkflow {
               .map(BuiltinPluginWorkflowStep.fromJson)
               .toList(growable: false)
           : const <BuiltinPluginWorkflowStep>[],
+      inputSlots: rawSlots is List
+          ? rawSlots
+              .whereType<Map<String, dynamic>>()
+              .map(BuiltinPluginInputSlot.fromJson)
+              .toList(growable: false)
+          : const <BuiltinPluginInputSlot>[],
     );
   }
 
