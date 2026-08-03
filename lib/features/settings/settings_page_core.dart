@@ -261,11 +261,37 @@ class _SettingsPageState extends State<SettingsPage> {
         identifier: identifier,
         password: _accountPasswordController.text,
       );
+      if (!widget.controller.settingsController.accountSignedIn) {
+        // The controller already recorded why; the connector panel renders it.
+        return;
+      }
       await _refreshBridgeCapabilities();
       await _verifyAccountBridgeRuntimeAccess();
+    } catch (error, stackTrace) {
+      // Persisting the profile or refreshing capabilities can fail outside the
+      // controller's own error handling. Without this the button would simply
+      // stop responding with nothing on screen.
+      debugPrint('Connector login flow failed: $error\n$stackTrace');
+      _showConnectorError(error);
     } finally {
       _accountPasswordController.clear();
     }
+  }
+
+  void _showConnectorError(Object error) {
+    if (!mounted) {
+      return;
+    }
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    if (messenger == null) {
+      return;
+    }
+    messenger.showSnackBar(
+      SnackBar(
+        key: const ValueKey('settings-connector-error-snackbar'),
+        content: Text('${appText('连接失败', 'Connection failed')}: $error'),
+      ),
+    );
   }
 
   Future<void> _syncAccount(SettingsSnapshot settings) async {
@@ -472,6 +498,8 @@ class _SettingsPageState extends State<SettingsPage> {
         final accountState = controller.settingsController.accountSyncState;
         final accountBusy = controller.settingsController.accountBusy;
         final accountStatus = controller.settingsController.accountStatus;
+        final accountStatusIsError =
+            controller.settingsController.accountStatusIsError;
         final accountSignedIn = controller.settingsController.accountSignedIn;
         final accountMfaRequired =
             controller.settingsController.accountMfaRequired;
@@ -517,6 +545,7 @@ class _SettingsPageState extends State<SettingsPage> {
                   accountState: accountState,
                   accountBusy: accountBusy,
                   accountStatus: accountStatus,
+                  accountStatusIsError: accountStatusIsError,
                   accountSignedIn: accountSignedIn,
                   accountMfaRequired: accountMfaRequired,
                   gitHubRepositoryEnabled: controller
