@@ -7,6 +7,11 @@ extension SettingsControllerAccountExtension on SettingsController {
       accountSyncStateInternal?.syncedDefaults;
   bool get accountBusy => accountBusyInternal;
   String get accountStatus => accountStatusInternal;
+
+  /// Whether [accountStatus] describes a failure rather than progress or a
+  /// steady state. The connector panels use this to decide between a neutral
+  /// and an error presentation.
+  bool get accountStatusIsError => accountStatusIsErrorInternal;
   bool get accountSignedIn =>
       accountSessionTokenInternal.trim().isNotEmpty &&
       accountSessionInternal != null;
@@ -182,9 +187,14 @@ extension SettingsControllerAccountExtension on SettingsController {
         accountStatusInternal = email.isEmpty
             ? 'Signed in'
             : 'Signed in as $email';
+        accountStatusIsErrorInternal = false;
       } else if (accountMfaRequired) {
         accountStatusInternal = 'MFA required';
-      } else {
+        accountStatusIsErrorInternal = false;
+      } else if (!accountStatusIsErrorInternal) {
+        // A recorded failure must survive derived-state reloads (settings file
+        // watchers, snapshot saves), otherwise the reason for a failed connect
+        // is erased before the user can read it.
         accountStatusInternal = 'Signed out';
       }
     }

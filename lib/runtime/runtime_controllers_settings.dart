@@ -46,6 +46,7 @@ class SettingsController extends ChangeNotifier {
   AccountSyncState? accountSyncStateInternal;
   bool accountBusyInternal = false;
   String accountStatusInternal = 'Signed out';
+  bool accountStatusIsErrorInternal = false;
   String pendingAccountMfaTicketInternal = '';
   String pendingAccountBaseUrlInternal = '';
 

@@ -184,10 +184,26 @@ class AccountRuntimeClient {
         const Duration(seconds: 6),
       );
       final rawBody = await utf8.decoder.bind(response).join();
-      final decoded = rawBody.trim().isEmpty
-          ? const <String, dynamic>{}
-          : _asMap(jsonDecode(rawBody));
-      if (response.statusCode < 200 || response.statusCode >= 300) {
+      final isSuccess =
+          response.statusCode >= 200 && response.statusCode < 300;
+      final Map<String, dynamic> decoded;
+      try {
+        decoded = rawBody.trim().isEmpty
+            ? const <String, dynamic>{}
+            : _asMap(jsonDecode(rawBody));
+      } on FormatException {
+        // A proxy or captive portal answered with HTML instead of JSON. Report
+        // it against the real status code rather than leaking a parser error.
+        throw AccountRuntimeException(
+          statusCode: response.statusCode,
+          errorCode: 'invalid_response',
+          message: isSuccess
+              ? 'The service returned a non-JSON response.'
+              : 'The service returned a non-JSON error response '
+                    '(HTTP ${response.statusCode}).',
+        );
+      }
+      if (!isSuccess) {
         throw AccountRuntimeException(
           statusCode: response.statusCode,
           errorCode: _stringValue(decoded['error']).isNotEmpty

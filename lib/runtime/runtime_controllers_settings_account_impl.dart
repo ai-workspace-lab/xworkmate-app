@@ -1,6 +1,66 @@
+import 'dart:async';
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
+
 import 'account_runtime_client.dart';
 import 'runtime_controllers_settings.dart';
 import 'runtime_models.dart';
+
+/// Records a failure message so the connector panels can render it as an error.
+void _failAccountStatus(SettingsController controller, String message) {
+  final trimmed = message.trim();
+  controller.accountStatusInternal = trimmed.isEmpty
+      ? 'Connection failed. Please try again.'
+      : trimmed;
+  controller.accountStatusIsErrorInternal = true;
+}
+
+/// Records a progress or steady-state message (signing in, signed out, ...).
+void _progressAccountStatus(SettingsController controller, String message) {
+  controller.accountStatusInternal = message;
+  controller.accountStatusIsErrorInternal = false;
+}
+
+/// Turns any transport or protocol failure into a message a user can act on.
+///
+/// [AccountRuntimeClient] only wraps non-2xx responses; socket, TLS, timeout
+/// and malformed-body failures arrive here as raw exceptions and must not be
+/// surfaced as a bare `toString()`.
+String describeAccountFailureInternal(Object error, {String endpoint = ''}) {
+  final target = endpoint.trim();
+  final suffix = target.isEmpty ? '' : ' ($target)';
+  if (error is AccountRuntimeException) {
+    final message = error.message.trim();
+    if (message.isNotEmpty) {
+      return message;
+    }
+    return switch (error.statusCode) {
+      401 => 'Incorrect email or password.',
+      403 => 'This account is not allowed to sign in.',
+      404 => 'Sign-in endpoint not found$suffix. Check the service URL.',
+      429 => 'Too many attempts. Please wait and try again.',
+      >= 500 => 'The service is unavailable (HTTP ${error.statusCode}).',
+      _ => 'Sign-in failed (HTTP ${error.statusCode}).',
+    };
+  }
+  if (error is TimeoutException) {
+    return 'The service did not respond in time$suffix.';
+  }
+  if (error is TlsException) {
+    return 'TLS handshake with the service failed$suffix.';
+  }
+  if (error is SocketException) {
+    final reason = error.osError?.message.trim() ?? '';
+    return reason.isEmpty
+        ? 'Cannot reach the service$suffix.'
+        : 'Cannot reach the service$suffix: $reason';
+  }
+  if (error is FormatException) {
+    return 'The service returned an unexpected response$suffix.';
+  }
+  return 'Sign-in failed$suffix: $error';
+}
 
 Future<void> loginAccountSettingsInternal(
   SettingsController controller, {
@@ -13,18 +73,18 @@ Future<void> loginAccountSettingsInternal(
     fallback: controller.snapshotInternal.accountBaseUrl,
   );
   if (normalizedBaseUrl.isEmpty) {
-    controller.accountStatusInternal = 'Account base URL is required';
+    _failAccountStatus(controller, 'Account base URL is required');
     controller.notifyListeners();
     return;
   }
   if (identifier.trim().isEmpty || password.isEmpty) {
-    controller.accountStatusInternal = 'Email and password are required';
+    _failAccountStatus(controller, 'Email and password are required');
     controller.notifyListeners();
     return;
   }
 
   controller.accountBusyInternal = true;
-  controller.accountStatusInternal = 'Signing in...';
+  _progressAccountStatus(controller, 'Signing in...');
   controller.pendingAccountMfaTicketInternal = '';
   controller.pendingAccountBaseUrlInternal = '';
   controller.notifyListeners();
@@ -43,7 +103,7 @@ Future<void> loginAccountSettingsInternal(
           ? _stringValue(payload['mfaToken'])
           : _stringValue(payload['mfaTicket']);
       controller.pendingAccountBaseUrlInternal = normalizedBaseUrl;
-      controller.accountStatusInternal = 'MFA required';
+      _progressAccountStatus(controller, 'MFA required');
       return;
     }
 
@@ -54,7 +114,16 @@ Future<void> loginAccountSettingsInternal(
       identifier: identifier.trim(),
     );
   } on AccountRuntimeException catch (error) {
-    controller.accountStatusInternal = error.message;
+    _failAccountStatus(
+      controller,
+      describeAccountFailureInternal(error, endpoint: normalizedBaseUrl),
+    );
+  } catch (error, stackTrace) {
+    debugPrint('Account login failed: $error\n$stackTrace');
+    _failAccountStatus(
+      controller,
+      describeAccountFailureInternal(error, endpoint: normalizedBaseUrl),
+    );
   } finally {
     controller.accountBusyInternal = false;
     controller.notifyListeners();
@@ -73,23 +142,23 @@ Future<void> verifyAccountMfaSettingsInternal(
         : controller.snapshotInternal.accountBaseUrl,
   );
   if (normalizedBaseUrl.isEmpty) {
-    controller.accountStatusInternal = 'Account base URL is required';
+    _failAccountStatus(controller, 'Account base URL is required');
     controller.notifyListeners();
     return;
   }
   if (controller.pendingAccountMfaTicketInternal.trim().isEmpty) {
-    controller.accountStatusInternal = 'MFA ticket is missing';
+    _failAccountStatus(controller, 'MFA ticket is missing');
     controller.notifyListeners();
     return;
   }
   if (code.trim().isEmpty) {
-    controller.accountStatusInternal = 'MFA code is required';
+    _failAccountStatus(controller, 'MFA code is required');
     controller.notifyListeners();
     return;
   }
 
   controller.accountBusyInternal = true;
-  controller.accountStatusInternal = 'Verifying MFA...';
+  _progressAccountStatus(controller, 'Verifying MFA...');
   controller.notifyListeners();
 
   try {
@@ -111,7 +180,16 @@ Future<void> verifyAccountMfaSettingsInternal(
       identifier: identifier,
     );
   } on AccountRuntimeException catch (error) {
-    controller.accountStatusInternal = error.message;
+    _failAccountStatus(
+      controller,
+      describeAccountFailureInternal(error, endpoint: normalizedBaseUrl),
+    );
+  } catch (error, stackTrace) {
+    debugPrint('Account MFA verification failed: $error\n$stackTrace');
+    _failAccountStatus(
+      controller,
+      describeAccountFailureInternal(error, endpoint: normalizedBaseUrl),
+    );
   } finally {
     controller.accountBusyInternal = false;
     controller.notifyListeners();
@@ -128,7 +206,7 @@ Future<void> completeAccountSignInSettingsInternal(
       ? _stringValue(payload['token'])
       : _stringValue(payload['access_token']);
   if (token.isEmpty) {
-    controller.accountStatusInternal = 'Account session token is missing';
+    _failAccountStatus(controller, 'Account session token is missing');
     return;
   }
   final user = _asMap(payload['user']);
@@ -152,9 +230,10 @@ Future<void> completeAccountSignInSettingsInternal(
   );
   await controller.reloadDerivedStateInternal();
   final email = controller.accountSessionInternal?.email.trim() ?? '';
-  controller.accountStatusInternal = email.isEmpty
-      ? 'Signed in'
-      : 'Signed in as $email';
+  _progressAccountStatus(
+    controller,
+    email.isEmpty ? 'Signed in' : 'Signed in as $email',
+  );
 }
 
 Future<void> restoreAccountSessionSettingsInternal(
@@ -174,7 +253,7 @@ Future<void> restoreAccountSessionSettingsInternal(
 
   if (!quiet) {
     controller.accountBusyInternal = true;
-    controller.accountStatusInternal = 'Restoring account session...';
+    _progressAccountStatus(controller, 'Restoring account session...');
     controller.notifyListeners();
   }
 
@@ -196,9 +275,12 @@ Future<void> restoreAccountSessionSettingsInternal(
     if (identifier.isNotEmpty) {
       await controller.storeInternal.saveAccountSessionIdentifier(identifier);
     }
-    controller.accountStatusInternal = session.email.trim().isEmpty
-        ? 'Signed in'
-        : 'Signed in as ${session.email.trim()}';
+    _progressAccountStatus(
+      controller,
+      session.email.trim().isEmpty
+          ? 'Signed in'
+          : 'Signed in as ${session.email.trim()}',
+    );
     await syncAccountSettingsInternal(
       controller,
       baseUrl: normalizedBaseUrl,
@@ -213,8 +295,11 @@ Future<void> restoreAccountSessionSettingsInternal(
         quiet: true,
       );
     } else {
-      controller.accountStatusInternal =
-          'Session restore failed: ${error.message}';
+      _failAccountStatus(
+        controller,
+        'Session restore failed: '
+        '${describeAccountFailureInternal(error, endpoint: normalizedBaseUrl)}',
+      );
     }
   } finally {
     if (!quiet) {
@@ -247,7 +332,7 @@ Future<AccountSyncResult> syncAccountSettingsInternal(
 
   if (!quiet) {
     controller.accountBusyInternal = true;
-    controller.accountStatusInternal = 'Syncing bridge access...';
+    _progressAccountStatus(controller, 'Syncing bridge access...');
     controller.notifyListeners();
   }
 
@@ -358,13 +443,20 @@ Future<AccountSyncResult> syncAccountSettingsInternal(
   } on AccountRuntimeException catch (error) {
     return _persistAccountSyncContractFailureInternal(
       controller,
-      message: error.message,
+      message: describeAccountFailureInternal(
+        error,
+        endpoint: normalizedBaseUrl,
+      ),
       quiet: quiet,
     );
-  } catch (error) {
+  } catch (error, stackTrace) {
+    debugPrint('Account sync failed: $error\n$stackTrace');
     return _persistAccountSyncContractFailureInternal(
       controller,
-      message: error.toString(),
+      message: describeAccountFailureInternal(
+        error,
+        endpoint: normalizedBaseUrl,
+      ),
       quiet: quiet,
     );
   }
@@ -416,7 +508,7 @@ Future<void> logoutAccountSettingsInternal(
           .copyWith(cloudSynced: clearedCloudSync),
     ),
   );
-  controller.accountStatusInternal = statusMessage;
+  _progressAccountStatus(controller, statusMessage);
   if (!quiet) {
     controller.accountBusyInternal = false;
     controller.notifyListeners();
@@ -436,7 +528,7 @@ Future<AccountSyncResult> markAccountBridgeRuntimeUnavailableInternal(
     profileScope: 'bridge',
   );
   await _persistAccountSyncStateInternal(controller, nextState);
-  controller.accountStatusInternal = message;
+  _failAccountStatus(controller, message);
   controller.notifyListeners();
   return AccountSyncResult(state: 'blocked', message: message);
 }
@@ -447,7 +539,7 @@ Future<void> cancelAccountMfaChallengeSettingsInternal(
   controller.pendingAccountMfaTicketInternal = '';
   controller.pendingAccountBaseUrlInternal = '';
   if (!controller.accountSignedIn) {
-    controller.accountStatusInternal = 'Signed out';
+    _progressAccountStatus(controller, 'Signed out');
   }
   controller.notifyListeners();
 }
@@ -555,7 +647,7 @@ Future<AccountSyncResult> _persistAccountSyncFailureInternal(
       profileScope: 'bridge',
     ),
   );
-  controller.accountStatusInternal = message;
+  _failAccountStatus(controller, message);
   if (!quiet) {
     controller.accountBusyInternal = false;
     controller.notifyListeners();

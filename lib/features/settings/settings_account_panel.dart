@@ -12,6 +12,7 @@ class SettingsAccountPanel extends StatefulWidget {
     required this.accountState,
     required this.accountBusy,
     this.accountStatus = '',
+    this.accountStatusIsError = false,
     required this.accountSignedIn,
     required this.accountMfaRequired,
     this.gitHubRepositoryEnabled = true,
@@ -36,6 +37,7 @@ class SettingsAccountPanel extends StatefulWidget {
   final AccountSyncState? accountState;
   final bool accountBusy;
   final String accountStatus;
+  final bool accountStatusIsError;
   final bool accountSignedIn;
   final bool accountMfaRequired;
   final bool gitHubRepositoryEnabled;
@@ -93,6 +95,8 @@ class _SettingsAccountPanelState extends State<SettingsAccountPanel> {
         !isManualBridgeConfigured) {
       return _AvailableConnectorsPanel(
         accountBusy: widget.accountBusy,
+        accountStatus: widget.accountStatus,
+        accountStatusIsError: widget.accountStatusIsError,
         accountBaseUrlController: widget.accountBaseUrlController,
         accountIdentifierController: widget.accountIdentifierController,
         accountPasswordController: widget.accountPasswordController,
@@ -105,6 +109,8 @@ class _SettingsAccountPanelState extends State<SettingsAccountPanel> {
     if (widget.accountMfaRequired) {
       return _PendingMfaAccountPanel(
         accountBusy: widget.accountBusy,
+        accountStatus: widget.accountStatus,
+        accountStatusIsError: widget.accountStatusIsError,
         accountBaseUrlController: widget.accountBaseUrlController,
         accountIdentifierController: widget.accountIdentifierController,
         accountMfaCodeController: widget.accountMfaCodeController,
@@ -222,6 +228,8 @@ enum _ConnectorSelection { svcPlus, selfHosted }
 class _AvailableConnectorsPanel extends StatefulWidget {
   const _AvailableConnectorsPanel({
     required this.accountBusy,
+    required this.accountStatus,
+    required this.accountStatusIsError,
     required this.accountBaseUrlController,
     required this.accountIdentifierController,
     required this.accountPasswordController,
@@ -232,6 +240,8 @@ class _AvailableConnectorsPanel extends StatefulWidget {
   });
 
   final bool accountBusy;
+  final String accountStatus;
+  final bool accountStatusIsError;
   final TextEditingController accountBaseUrlController;
   final TextEditingController accountIdentifierController;
   final TextEditingController accountPasswordController;
@@ -308,6 +318,8 @@ class _AvailableConnectorsPanelState extends State<_AvailableConnectorsPanel> {
             child: _selection == _ConnectorSelection.svcPlus
                 ? _SignedOutAccountPanel(
                     accountBusy: widget.accountBusy,
+                    accountStatus: widget.accountStatus,
+                    accountStatusIsError: widget.accountStatusIsError,
                     accountBaseUrlController: widget.accountBaseUrlController,
                     accountIdentifierController:
                         widget.accountIdentifierController,
@@ -316,8 +328,9 @@ class _AvailableConnectorsPanelState extends State<_AvailableConnectorsPanel> {
                     onLogin: widget.onLogin,
                   )
                 : _ManualBridgePanel(
-                    settings: SettingsSnapshot.defaults(),
                     accountBusy: widget.accountBusy,
+                    accountStatus: widget.accountStatus,
+                    accountStatusIsError: widget.accountStatusIsError,
                     bridgeUrlController: widget.bridgeUrlController,
                     bridgeTokenController: widget.bridgeTokenController,
                     onSaveAccountProfile: widget.onSaveAccountProfile,
@@ -469,6 +482,77 @@ class _LocalGitRepositoryPanelState extends State<_LocalGitRepositoryPanel> {
   );
 }
 
+/// Surfaces the connector connection status inside a not-yet-connected panel.
+///
+/// Without this the controller's failure messages (bad credentials, unreachable
+/// host, missing service URL) were written to `accountStatus` and never shown,
+/// so pressing "连接" looked like nothing happened whether or not the
+/// credentials were correct.
+class _ConnectorStatusBanner extends StatelessWidget {
+  const _ConnectorStatusBanner({
+    required this.status,
+    required this.isError,
+    required this.busy,
+  });
+
+  final String status;
+  final bool isError;
+  final bool busy;
+
+  /// Steady states carry no information while a connection form is open.
+  static const Set<String> _mutedStatuses = <String>{'signed out', 'idle', ''};
+
+  @override
+  Widget build(BuildContext context) {
+    final message = status.trim();
+    if (!busy && _mutedStatuses.contains(message.toLowerCase())) {
+      return const SizedBox.shrink();
+    }
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final showError = isError && !busy;
+    final foreground = showError ? scheme.onErrorContainer : scheme.onSurface;
+    final background = showError
+        ? scheme.errorContainer
+        : scheme.surfaceContainerHighest;
+    return Container(
+      key: const ValueKey('settings-connector-status-banner'),
+      width: double.infinity,
+      margin: const EdgeInsets.only(top: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (busy)
+            const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          else
+            Icon(
+              showError ? Icons.error_outline_rounded : Icons.info_outline,
+              size: 18,
+              color: foreground,
+            ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              message.isEmpty ? appText('连接中…', 'Connecting…') : message,
+              key: const ValueKey('settings-connector-status-message'),
+              style: theme.textTheme.bodySmall?.copyWith(color: foreground),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _ConnectorConfiguration extends StatelessWidget {
   const _ConnectorConfiguration({
     required this.title,
@@ -560,15 +644,17 @@ class _ConnectorCard extends StatelessWidget {
 
 class _ManualBridgePanel extends StatelessWidget {
   const _ManualBridgePanel({
-    required this.settings,
     required this.accountBusy,
+    required this.accountStatus,
+    required this.accountStatusIsError,
     required this.bridgeUrlController,
     required this.bridgeTokenController,
     required this.onSaveAccountProfile,
   });
 
-  final SettingsSnapshot settings;
   final bool accountBusy;
+  final String accountStatus;
+  final bool accountStatusIsError;
   final TextEditingController bridgeUrlController;
   final TextEditingController bridgeTokenController;
   final Future<void> Function({required bool isManualBridge})
@@ -643,6 +729,11 @@ class _ManualBridgePanel extends StatelessWidget {
                 child: Text(appText('连接', 'Connect')),
               ),
             ),
+            _ConnectorStatusBanner(
+              status: accountStatus,
+              isError: accountStatusIsError,
+              busy: accountBusy,
+            ),
           ],
         ),
       ),
@@ -653,6 +744,8 @@ class _ManualBridgePanel extends StatelessWidget {
 class _SignedOutAccountPanel extends StatelessWidget {
   const _SignedOutAccountPanel({
     required this.accountBusy,
+    required this.accountStatus,
+    required this.accountStatusIsError,
     required this.accountBaseUrlController,
     required this.accountIdentifierController,
     required this.accountPasswordController,
@@ -661,6 +754,8 @@ class _SignedOutAccountPanel extends StatelessWidget {
   });
 
   final bool accountBusy;
+  final String accountStatus;
+  final bool accountStatusIsError;
   final TextEditingController accountBaseUrlController;
   final TextEditingController accountIdentifierController;
   final TextEditingController accountPasswordController;
@@ -709,7 +804,9 @@ class _SignedOutAccountPanel extends StatelessWidget {
               decoration: InputDecoration(
                 labelText: appText('服务地址', 'Service URL'),
                 prefixIcon: const Icon(Icons.dns_outlined),
+                hintText: 'https://accounts.svc.plus',
               ),
+              keyboardType: TextInputType.url,
               onFieldSubmitted: (_) =>
                   onSaveAccountProfile(isManualBridge: false),
             ),
@@ -741,8 +838,26 @@ class _SignedOutAccountPanel extends StatelessWidget {
               child: FilledButton(
                 key: const ValueKey('settings-account-login-button'),
                 onPressed: accountBusy ? null : () => onLogin(),
-                child: Text(appText('连接', 'Connect')),
+                child: accountBusy
+                    ? Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(appText('连接中…', 'Connecting…')),
+                        ],
+                      )
+                    : Text(appText('连接', 'Connect')),
               ),
+            ),
+            _ConnectorStatusBanner(
+              status: accountStatus,
+              isError: accountStatusIsError,
+              busy: accountBusy,
             ),
           ],
         ),
@@ -754,6 +869,8 @@ class _SignedOutAccountPanel extends StatelessWidget {
 class _PendingMfaAccountPanel extends StatelessWidget {
   const _PendingMfaAccountPanel({
     required this.accountBusy,
+    required this.accountStatus,
+    required this.accountStatusIsError,
     required this.accountBaseUrlController,
     required this.accountIdentifierController,
     required this.accountMfaCodeController,
@@ -762,6 +879,8 @@ class _PendingMfaAccountPanel extends StatelessWidget {
   });
 
   final bool accountBusy;
+  final String accountStatus;
+  final bool accountStatusIsError;
   final TextEditingController accountBaseUrlController;
   final TextEditingController accountIdentifierController;
   final TextEditingController accountMfaCodeController;
@@ -849,6 +968,11 @@ class _PendingMfaAccountPanel extends StatelessWidget {
                   child: Text(appText('返回编辑', 'Back to Edit')),
                 ),
               ],
+            ),
+            _ConnectorStatusBanner(
+              status: accountStatus,
+              isError: accountStatusIsError,
+              busy: accountBusy,
             ),
           ],
         ),

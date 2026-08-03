@@ -231,6 +231,157 @@ void main() {
       expect(savedBridgeToken, 'typed-manual-token');
     });
 
+    testWidgets('renders the failure reason on the svc.plus sign-in form', (
+      tester,
+    ) async {
+      final controllers = _TestControllers();
+      addTearDown(controllers.dispose);
+
+      await tester.pumpWidget(
+        _buildTestApp(
+          child: SettingsAccountPanel(
+            settings: SettingsSnapshot.defaults(),
+            accountSession: null,
+            accountState: null,
+            accountBusy: false,
+            accountStatus: 'Incorrect email or password.',
+            accountStatusIsError: true,
+            accountSignedIn: false,
+            accountMfaRequired: false,
+            accountBaseUrlController: controllers.baseUrl,
+            accountIdentifierController: controllers.identifier,
+            accountPasswordController: controllers.password,
+            accountMfaCodeController: controllers.mfaCode,
+            bridgeUrlController: controllers.bridgeUrl,
+            bridgeTokenController: controllers.bridgeToken,
+            onSaveAccountProfile: ({required bool isManualBridge}) async {},
+            onLogin: () async {},
+            onVerifyMfa: () async {},
+            onCancelMfa: () async {},
+            onSync: () async {},
+            onResetManualBridge: () async {},
+            onLogout: () async {},
+          ),
+        ),
+      );
+
+      expect(
+        find.byKey(const ValueKey('settings-connector-status-banner')),
+        findsNothing,
+      );
+
+      await tester.tap(
+        find.byKey(
+          const ValueKey('settings-connector-action-svc-plus-workspace'),
+        ),
+      );
+      await tester.pump();
+
+      final banner = find.byKey(
+        const ValueKey('settings-connector-status-banner'),
+      );
+      await tester.ensureVisible(banner);
+      expect(banner, findsOneWidget);
+      expect(find.text('Incorrect email or password.'), findsOneWidget);
+    });
+
+    testWidgets('hides the steady "Signed out" status on the sign-in form', (
+      tester,
+    ) async {
+      final controllers = _TestControllers();
+      addTearDown(controllers.dispose);
+
+      await tester.pumpWidget(
+        _buildTestApp(
+          child: SettingsAccountPanel(
+            settings: SettingsSnapshot.defaults(),
+            accountSession: null,
+            accountState: null,
+            accountBusy: false,
+            accountStatus: 'Signed out',
+            accountSignedIn: false,
+            accountMfaRequired: false,
+            accountBaseUrlController: controllers.baseUrl,
+            accountIdentifierController: controllers.identifier,
+            accountPasswordController: controllers.password,
+            accountMfaCodeController: controllers.mfaCode,
+            bridgeUrlController: controllers.bridgeUrl,
+            bridgeTokenController: controllers.bridgeToken,
+            onSaveAccountProfile: ({required bool isManualBridge}) async {},
+            onLogin: () async {},
+            onVerifyMfa: () async {},
+            onCancelMfa: () async {},
+            onSync: () async {},
+            onResetManualBridge: () async {},
+            onLogout: () async {},
+          ),
+        ),
+      );
+
+      await tester.tap(
+        find.byKey(
+          const ValueKey('settings-connector-action-svc-plus-workspace'),
+        ),
+      );
+      await tester.pump();
+
+      expect(
+        find.byKey(const ValueKey('settings-connector-status-banner')),
+        findsNothing,
+      );
+    });
+
+    testWidgets('shows progress while a connection attempt is in flight', (
+      tester,
+    ) async {
+      final controllers = _TestControllers();
+      addTearDown(controllers.dispose);
+
+      await tester.pumpWidget(
+        _buildTestApp(
+          child: SettingsAccountPanel(
+            settings: SettingsSnapshot.defaults(),
+            accountSession: null,
+            accountState: null,
+            accountBusy: true,
+            accountStatus: 'Signing in...',
+            accountSignedIn: false,
+            accountMfaRequired: false,
+            accountBaseUrlController: controllers.baseUrl,
+            accountIdentifierController: controllers.identifier,
+            accountPasswordController: controllers.password,
+            accountMfaCodeController: controllers.mfaCode,
+            bridgeUrlController: controllers.bridgeUrl,
+            bridgeTokenController: controllers.bridgeToken,
+            onSaveAccountProfile: ({required bool isManualBridge}) async {},
+            onLogin: () async {},
+            onVerifyMfa: () async {},
+            onCancelMfa: () async {},
+            onSync: () async {},
+            onResetManualBridge: () async {},
+            onLogout: () async {},
+          ),
+        ),
+      );
+
+      await tester.tap(
+        find.byKey(
+          const ValueKey('settings-connector-action-svc-plus-workspace'),
+        ),
+      );
+      await tester.pump();
+
+      expect(
+        find.byKey(const ValueKey('settings-connector-status-banner')),
+        findsOneWidget,
+      );
+      expect(find.text('Signing in...'), findsOneWidget);
+      final loginButton = tester.widget<FilledButton>(
+        find.byKey(const ValueKey('settings-account-login-button')),
+      );
+      expect(loginButton.onPressed, isNull);
+    });
+
     testWidgets('switching to manual bridge tab does not save draft values', (
       tester,
     ) async {

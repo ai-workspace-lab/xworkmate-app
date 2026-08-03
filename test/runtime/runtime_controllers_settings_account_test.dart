@@ -1,4 +1,5 @@
 import "../mock_plugins.dart";
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -1130,7 +1131,164 @@ void main() {
         expect(persisted, isNull);
       },
     );
+
+    test('login reports rejected credentials as an error status', () async {
+      final controller = await _buildAccountController(
+        accountClientFactory: (_) => _ThrowingAccountRuntimeClient(
+          const AccountRuntimeException(
+            statusCode: 401,
+            errorCode: 'invalid_credentials',
+            message: '',
+          ),
+        ),
+      );
+
+      await controller.loginAccount(
+        baseUrl: 'https://accounts.svc.plus',
+        identifier: 'review@svc.plus',
+        password: 'wrong-password',
+      );
+
+      expect(controller.accountSignedIn, isFalse);
+      expect(controller.accountBusy, isFalse);
+      expect(controller.accountStatusIsError, isTrue);
+      expect(controller.accountStatus, 'Incorrect email or password.');
+    });
+
+    test('login reports an unreachable service instead of throwing', () async {
+      final controller = await _buildAccountController(
+        accountClientFactory: (_) => _ThrowingAccountRuntimeClient(
+          const SocketException(
+            'Connection refused',
+            osError: OSError('Connection refused', 61),
+          ),
+        ),
+      );
+
+      await controller.loginAccount(
+        baseUrl: 'https://accounts.svc.plus',
+        identifier: 'review@svc.plus',
+        password: 'password',
+      );
+
+      expect(controller.accountBusy, isFalse);
+      expect(controller.accountStatusIsError, isTrue);
+      expect(controller.accountStatus, contains('Cannot reach the service'));
+      expect(controller.accountStatus, contains('accounts.svc.plus'));
+    });
+
+    test('login reports a timeout instead of staying in progress', () async {
+      final controller = await _buildAccountController(
+        accountClientFactory: (_) =>
+            _ThrowingAccountRuntimeClient(TimeoutException('no response')),
+      );
+
+      await controller.loginAccount(
+        baseUrl: 'https://accounts.svc.plus',
+        identifier: 'review@svc.plus',
+        password: 'password',
+      );
+
+      expect(controller.accountBusy, isFalse);
+      expect(controller.accountStatusIsError, isTrue);
+      expect(controller.accountStatus, contains('did not respond in time'));
+    });
+
+    test('a missing service URL is reported as an error status', () async {
+      final controller = await _buildAccountController(
+        snapshot: SettingsSnapshot.defaults().copyWith(accountBaseUrl: ''),
+      );
+
+      await controller.loginAccount(
+        baseUrl: '',
+        identifier: 'review@svc.plus',
+        password: 'password',
+      );
+
+      expect(controller.accountStatusIsError, isTrue);
+      expect(controller.accountStatus, 'Account base URL is required');
+    });
+
+    test('a successful login clears the error status', () async {
+      final controller = await _buildAccountController(
+        accountClientFactory: (_) => _FakeAccountRuntimeClient(
+          loginPayload: <String, dynamic>{
+            'token': 'session-token',
+            'user': <String, dynamic>{
+              'id': 'user-1',
+              'email': 'review@svc.plus',
+            },
+          },
+          syncPayload: const <String, dynamic>{
+            'BRIDGE_AUTH_TOKEN': 'bridge-token-from-sync',
+            'BRIDGE_SERVER_URL': 'https://xworkmate-bridge.svc.plus',
+          },
+        ),
+      );
+
+      await controller.loginAccount(
+        baseUrl: 'https://accounts.svc.plus',
+        identifier: 'review@svc.plus',
+        password: 'password',
+      );
+
+      expect(controller.accountSignedIn, isTrue);
+      expect(controller.accountStatusIsError, isFalse);
+      expect(controller.accountStatus, 'Signed in as review@svc.plus');
+    });
   });
+}
+
+/// Builds a controller backed by a throwaway on-disk store.
+Future<SettingsController> _buildAccountController({
+  AccountRuntimeClient Function(String baseUrl)? accountClientFactory,
+  SettingsSnapshot? snapshot,
+}) async {
+  final storeRoot = await Directory.systemTemp.createTemp(
+    'xworkmate-account-failure-',
+  );
+  addTearDown(() async {
+    if (await storeRoot.exists()) {
+      await storeRoot.delete(recursive: true);
+    }
+  });
+
+  final store = SecureConfigStore(
+    secretRootPathResolver: () async => '${storeRoot.path}/secrets',
+    appDataRootPathResolver: () async => '${storeRoot.path}/app-data',
+    supportRootPathResolver: () async => '${storeRoot.path}/support',
+    enableSecureStorage: false,
+  );
+  await store.initialize();
+  await store.saveSettingsSnapshot(
+    snapshot ??
+        SettingsSnapshot.defaults().copyWith(
+          accountBaseUrl: 'https://accounts.svc.plus',
+        ),
+  );
+
+  final controller = SettingsController(
+    store,
+    accountClientFactory: accountClientFactory,
+  );
+  addTearDown(controller.dispose);
+  await controller.initialize();
+  return controller;
+}
+
+class _ThrowingAccountRuntimeClient extends AccountRuntimeClient {
+  _ThrowingAccountRuntimeClient(this.error)
+    : super(baseUrl: 'https://accounts.svc.plus');
+
+  final Object error;
+
+  @override
+  Future<Map<String, dynamic>> login({
+    required String identifier,
+    required String password,
+  }) async {
+    throw error;
+  }
 }
 
 class _FakeAccountRuntimeClient extends AccountRuntimeClient {
