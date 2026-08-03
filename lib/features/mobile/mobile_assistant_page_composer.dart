@@ -363,24 +363,44 @@ class MobileAssistantComposer extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(height: 12),
-                          Wrap(
-                            spacing: 8,
-                            runSpacing: 8,
-                            children: [
-                              for (final plugin
-                                  in BuiltinPluginCatalog.firstBatch)
-                                MobileBuiltinPluginChoiceChip(
-                                  key: ValueKey(
-                                    'mobile-assistant-plugin-chip-${plugin.id}',
-                                  ),
-                                  plugin: plugin,
-                                  selected: selectedPluginIds.contains(
-                                    plugin.id,
-                                  ),
-                                  onSelected: (_) => togglePlugin(plugin.id),
+                          for (final group
+                              in BuiltinPluginCatalog.groups) ...[
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 6),
+                              child: Text(
+                                group.label,
+                                key: ValueKey(
+                                  'mobile-assistant-plugin-group-'
+                                  '${group.name}',
                                 ),
-                            ],
-                          ),
+                                style: TextStyle(
+                                  color: palette.textMuted,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                            Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: [
+                                for (final plugin
+                                    in BuiltinPluginCatalog.byGroup(group))
+                                  MobileBuiltinPluginChoiceChip(
+                                    key: ValueKey(
+                                      'mobile-assistant-plugin-chip-'
+                                      '${plugin.id}',
+                                    ),
+                                    plugin: plugin,
+                                    selected: selectedPluginIds.contains(
+                                      plugin.id,
+                                    ),
+                                    onSelected: (_) => togglePlugin(plugin.id),
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                          ],
                         ],
                         if (activeTabIndex == 2) ...[
                           const SizedBox(height: 14),

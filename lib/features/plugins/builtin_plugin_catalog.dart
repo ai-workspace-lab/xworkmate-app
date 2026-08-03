@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../i18n/app_language.dart';
+import 'builtin_plugin_input_slot.dart';
 import 'builtin_plugin_runtime.dart';
 import 'builtin_plugin_workflow.dart';
 
@@ -8,6 +9,40 @@ import 'builtin_plugin_workflow.dart';
 ///
 /// See docs/plans/2026-07-04-builtin-plugins-batch-1.md for the full plan.
 enum BuiltinPluginKind { document, spreadsheet, presentation, image, video }
+
+/// Business grouping of the catalog — a second axis, orthogonal to
+/// [BuiltinPluginKind].
+///
+/// [BuiltinPluginKind] answers "what artifact comes out" (a deck, an image, a
+/// video). That axis alone cannot host a scenario pack: the three e-commerce
+/// plugins produce images and video, so on the kind axis they would collide
+/// with the generic Images and Video plugins. The group axis answers "which
+/// job is this for", letting a scenario ship as a coherent set.
+///
+/// See docs/plans/2026-08-03-ecommerce-plugin-group.md.
+enum BuiltinPluginGroup { general, ecommerce }
+
+extension BuiltinPluginGroupCopy on BuiltinPluginGroup {
+  String get label => switch (this) {
+    BuiltinPluginGroup.general => appText('通用', 'General'),
+    BuiltinPluginGroup.ecommerce => appText('电商', 'E-commerce'),
+  };
+
+  String get descriptionZh => switch (this) {
+    BuiltinPluginGroup.general => '把对话内容转成文档、表格、幻灯片、图片与视频。',
+    BuiltinPluginGroup.ecommerce => '商品素材生产：头图、详情页与短视频，支持多参考图指定。',
+  };
+
+  String get descriptionEn => switch (this) {
+    BuiltinPluginGroup.general =>
+      'Turn conversations into documents, sheets, decks, images, and video.',
+    BuiltinPluginGroup.ecommerce =>
+      'Product asset production: hero images, detail pages, and short video, '
+          'driven by typed reference images.',
+  };
+
+  String get description => appText(descriptionZh, descriptionEn);
+}
 
 /// Rollout status of a built-in plugin.
 enum BuiltinPluginStatus { preview, beta, stable }
@@ -42,12 +77,16 @@ class BuiltinPluginDescriptor {
     required this.descriptionZh,
     required this.descriptionEn,
     required this.workflow,
+    this.group = BuiltinPluginGroup.general,
     this.runtime = BuiltinPluginRuntimeBinding.builtinDart,
     this.status = BuiltinPluginStatus.preview,
   });
 
   final String id;
   final BuiltinPluginKind kind;
+
+  /// Which scenario pack this plugin belongs to.
+  final BuiltinPluginGroup group;
   final IconData icon;
   final String nameZh;
   final String nameEn;
@@ -75,6 +114,9 @@ class BuiltinPluginDescriptor {
 
   /// Skill packages / plugins this pipeline depends on (gateway workspace).
   List<String> get requiredSkills => workflow.requiredSkills;
+
+  /// Typed inputs this plugin declares (reference images, copy, choices).
+  List<BuiltinPluginInputSlot> get inputSlots => workflow.inputSlots;
 
   /// Human-readable pipeline steps, surfaced in the settings plugins panel.
   List<String> get pipelineStepsZh => workflow.pipelineTitlesZh;
@@ -120,6 +162,10 @@ abstract final class BuiltinPluginCatalog {
   static const String presentationId = 'builtin.presentation';
   static const String imageId = 'builtin.image';
   static const String videoId = 'builtin.video';
+
+  static const String ecommerceHeroId = 'builtin.ecommerce.hero';
+  static const String ecommerceDetailId = 'builtin.ecommerce.detail';
+  static const String ecommerceVideoId = 'builtin.ecommerce.video';
 
   static const List<BuiltinPluginDescriptor> firstBatch =
       <BuiltinPluginDescriptor>[
@@ -447,9 +493,529 @@ abstract final class BuiltinPluginCatalog {
         ),
       ];
 
+  /// E-commerce scenario pack.
+  ///
+  /// These three share one shape: the conversation alone is not enough input,
+  /// so each declares typed slots. The product shot is always required; the
+  /// styling references (model, scene, lighting, print, colorway) are optional
+  /// and each carries exactly one attribute across — that constraint is what
+  /// [BuiltinPluginInputSlot.roleZh] encodes.
+  static const List<BuiltinPluginDescriptor> ecommerceGroup =
+      <BuiltinPluginDescriptor>[
+        BuiltinPluginDescriptor(
+          id: ecommerceHeroId,
+          kind: BuiltinPluginKind.image,
+          group: BuiltinPluginGroup.ecommerce,
+          icon: Icons.photo_size_select_actual_outlined,
+          nameZh: '电商头图',
+          nameEn: 'Hero Images',
+          descriptionZh: '按模特、场景、光影、印花、配色分别指定参考图，批量产出多视角头图。',
+          descriptionEn:
+              'Generate hero images from separately specified model, scene, '
+              'lighting, print, and colorway references, in batch.',
+          workflow: BuiltinPluginWorkflow(
+            goalZh: '请为该商品制作一组电商头图：',
+            goalEn: 'Produce a set of e-commerce hero images for this product:',
+            inputPromptZh: '商品信息与本次头图的额外要求：',
+            inputPromptEn: 'Product details and extra requirements:',
+            inputSlots: <BuiltinPluginInputSlot>[
+              BuiltinPluginInputSlot(
+                id: 'product',
+                labelZh: '商品图',
+                labelEn: 'Product shot',
+                type: BuiltinPluginSlotType.referenceImage,
+                required: true,
+                maxCount: 4,
+                roleZh: '商品本体的唯一事实来源。版型、材质纹理、五金与比例必须与它一致，不得美化或改形',
+                roleEn:
+                    'the single source of truth for the product itself — cut, '
+                    'material texture, hardware, and proportions must match it '
+                    'exactly; do not beautify or reshape',
+              ),
+              BuiltinPluginInputSlot(
+                id: 'model',
+                labelZh: '模特参考',
+                labelEn: 'Model reference',
+                type: BuiltinPluginSlotType.referenceImage,
+                roleZh: '只取人物姿态、身形比例与镜头取景；不要沿用其服装、妆容与面部特征',
+                roleEn:
+                    'take pose, body proportion, and framing only; do not '
+                    'carry over its clothing, makeup, or facial identity',
+              ),
+              BuiltinPluginInputSlot(
+                id: 'scene',
+                labelZh: '场景参考',
+                labelEn: 'Scene reference',
+                type: BuiltinPluginSlotType.referenceImage,
+                roleZh: '只取环境、陈设与空间纵深；商品不得被场景元素遮挡',
+                roleEn:
+                    'take environment, props, and spatial depth only; the '
+                    'product must never be occluded by scene elements',
+              ),
+              BuiltinPluginInputSlot(
+                id: 'lighting',
+                labelZh: '光影参考',
+                labelEn: 'Lighting reference',
+                type: BuiltinPluginSlotType.referenceImage,
+                roleZh: '只取光源方向、色温、明暗对比与阴影硬度；不要沿用其构图与物体',
+                roleEn:
+                    'take light direction, colour temperature, contrast, and '
+                    'shadow hardness only; ignore its composition and objects',
+              ),
+              BuiltinPluginInputSlot(
+                id: 'print',
+                labelZh: '印花图案',
+                labelEn: 'Print pattern',
+                type: BuiltinPluginSlotType.referenceImage,
+                maxCount: 3,
+                roleZh: '只取图案母题与循环单元，贴合到商品面料上并跟随褶皱与透视形变；不要把参考图本身画进画面',
+                roleEn:
+                    'take the motif and repeat unit only, mapped onto the '
+                    'fabric so it follows folds and perspective; never render '
+                    'the reference image itself into the frame',
+              ),
+              BuiltinPluginInputSlot(
+                id: 'colorway',
+                labelZh: 'B 版配色',
+                labelEn: 'Alternate colorway',
+                type: BuiltinPluginSlotType.referenceImage,
+                maxCount: 4,
+                roleZh: '只取色板。每个配色单独出一版，版型、构图、光影与 A 版严格一致，仅颜色不同',
+                roleEn:
+                    'take the palette only. Render one variant per colorway '
+                    'with cut, composition, and lighting identical to the base '
+                    'version — colour is the only difference',
+              ),
+              BuiltinPluginInputSlot(
+                id: 'views',
+                labelZh: '视角',
+                labelEn: 'Views',
+                type: BuiltinPluginSlotType.choice,
+                roleZh: '需要产出的机位。每个视角一张，同一套光影与场景下保持连续',
+                roleEn:
+                    'camera setups to produce — one image each, kept '
+                    'consistent under the same lighting and scene',
+                choices: <String>['正面', '45°侧', '侧面', '背面', '细节特写', '平铺'],
+              ),
+              BuiltinPluginInputSlot(
+                id: 'ratio',
+                labelZh: '画幅比例',
+                labelEn: 'Aspect ratio',
+                type: BuiltinPluginSlotType.choice,
+                roleZh: '输出画幅。主图默认 1:1，竖版种草图用 3:4',
+                roleEn:
+                    'output framing — 1:1 for the main listing image, 3:4 for '
+                    'vertical social placements',
+                choices: <String>['1:1', '3:4', '4:5', '9:16', '16:9'],
+              ),
+            ],
+            steps: <BuiltinPluginWorkflowStep>[
+              BuiltinPluginWorkflowStep(
+                id: 'resolve-slots',
+                titleZh: '核对参考图槽位，缺项按缺省处理不臆造',
+                titleEn: 'Resolve reference slots; never invent missing ones',
+                instructionZh:
+                    '先逐条核对上面的参考输入：说明每张图将贡献什么、忽略什么；'
+                    '未提供的槽位直接留空，不要用想象补全',
+                instructionEn:
+                    'first walk the reference inputs above: state what each '
+                    'image contributes and what is ignored; leave unprovided '
+                    'slots empty instead of inventing them',
+              ),
+              BuiltinPluginWorkflowStep(
+                id: 'base-shot',
+                titleZh: '先出一张 A 版基准图并等我确认',
+                titleEn: 'Produce one base image and wait for confirmation',
+                instructionZh:
+                    '先只生成一张 A 版基准图，确认商品形态、光影与构图无误后再继续，'
+                    '避免整批返工',
+                instructionEn:
+                    'generate a single base image first and confirm product '
+                    'shape, lighting, and composition before continuing, so a '
+                    'whole batch is never wasted',
+                outputFormats: <String>['png'],
+                requiredSkills: <String>['image'],
+              ),
+              BuiltinPluginWorkflowStep(
+                id: 'multi-view',
+                titleZh: '按视角槽位扩展多机位，保持同一套光影',
+                titleEn: 'Expand to the requested views under one lighting set',
+                instructionZh:
+                    '以基准图为锚，按「视角」槽位逐个机位出图，'
+                    '保持商品、光影与场景连续一致',
+                instructionEn:
+                    'anchored on the base image, render each requested view, '
+                    'keeping product, lighting, and scene consistent',
+                outputFormats: <String>['png'],
+                requiredSkills: <String>['image'],
+                maxRetries: 2,
+                fallbackZh: '某个视角连续失败时跳过该机位并在结果中标注，不阻塞其余视角',
+                fallbackEn:
+                    'skip a view that keeps failing, flag it in the result, '
+                    'and continue with the rest',
+              ),
+              BuiltinPluginWorkflowStep(
+                id: 'colorway-batch',
+                titleZh: '按 B 版配色批量复制，仅换色不改版',
+                titleEn: 'Batch the colorways — recolour only',
+                instructionZh:
+                    '对每个 B 版配色重复上述机位，仅替换颜色，'
+                    '版型、构图与光影必须与 A 版逐像素级对齐',
+                instructionEn:
+                    'repeat the views for each colorway, changing colour only; '
+                    'cut, composition, and lighting must stay aligned with the '
+                    'base version',
+                outputFormats: <String>['png'],
+                requiredSkills: <String>['image'],
+              ),
+              BuiltinPluginWorkflowStep(
+                id: 'copy-layer',
+                titleZh: '文案用矢量层叠加，不画进图里',
+                titleEn: 'Overlay copy as a vector layer, never painted in',
+                instructionZh:
+                    '标题与角标一律用 SVG 文字层叠加后导出，'
+                    '不要让生图模型把中文直接画进画面',
+                instructionEn:
+                    'overlay titles and badges as an SVG text layer before '
+                    'export; never let the image model paint the copy in',
+                outputFormats: <String>['png'],
+                requiredSkills: <String>['image-svg-pptx-pro-skill'],
+              ),
+              BuiltinPluginWorkflowStep(
+                id: 'review',
+                titleZh: '边栏网格预览，可指定单张局部重做',
+                titleEn: 'Sidebar grid preview with per-image local redo',
+                instructionZh: '全部产出后在右侧边栏网格预览，之后我会指定某张图的局部继续修改',
+                instructionEn:
+                    'preview everything as a sidebar grid; I will then point '
+                    'at individual images for local edits',
+              ),
+            ],
+          ),
+        ),
+        BuiltinPluginDescriptor(
+          id: ecommerceDetailId,
+          kind: BuiltinPluginKind.image,
+          group: BuiltinPluginGroup.ecommerce,
+          icon: Icons.view_day_outlined,
+          nameZh: '商品详情页',
+          nameEn: 'Detail Pages',
+          descriptionZh: '模块化生成详情页长图：生图只做产品与背景，文字与版式走矢量层，拼接无缝。',
+          descriptionEn:
+              'Modular detail-page long image: generation handles product and '
+              'backdrop, copy and layout ride a vector layer, seams aligned.',
+          workflow: BuiltinPluginWorkflow(
+            goalZh: '请制作一张商品详情页长图：',
+            goalEn: 'Build a product detail-page long image:',
+            inputPromptZh: '商品卖点与本次详情页的额外要求：',
+            inputPromptEn: 'Selling points and extra requirements:',
+            inputSlots: <BuiltinPluginInputSlot>[
+              BuiltinPluginInputSlot(
+                id: 'product',
+                labelZh: '商品图',
+                labelEn: 'Product shot',
+                type: BuiltinPluginSlotType.referenceImage,
+                required: true,
+                maxCount: 8,
+                roleZh: '商品本体的唯一事实来源，含结构与细节特写。形态不得改动',
+                roleEn:
+                    'the single source of truth for the product, including '
+                    'structure and detail shots; its form must not be altered',
+              ),
+              BuiltinPluginInputSlot(
+                id: 'selling-points',
+                labelZh: '卖点文案',
+                labelEn: 'Selling points',
+                type: BuiltinPluginSlotType.text,
+                required: true,
+                roleZh: '每个卖点一行，作为各模块的主标题与副标题来源。文字必须逐字使用，不得改写',
+                roleEn:
+                    'one selling point per line, used verbatim as each module '
+                    'headline and subhead — never paraphrased',
+              ),
+              BuiltinPluginInputSlot(
+                id: 'brand-color',
+                labelZh: '品牌色',
+                labelEn: 'Brand colour',
+                type: BuiltinPluginSlotType.text,
+                roleZh: '十六进制色值。用于标题、图标与分区底色，全页统一',
+                roleEn:
+                    'hex value used for headings, icons, and section fills, '
+                    'applied consistently across the page',
+              ),
+              BuiltinPluginInputSlot(
+                id: 'modules',
+                labelZh: '模块编排',
+                labelEn: 'Module layout',
+                type: BuiltinPluginSlotType.choice,
+                roleZh: '按顺序编排的内容模块，每个模块一屏',
+                roleEn: 'content modules in order, one screen each',
+                choices: <String>[
+                  '场景主图',
+                  '卖点罗列',
+                  '结构分区图',
+                  '材质特写',
+                  '工艺流程',
+                  '参数对比',
+                  '尺码表',
+                  '洗护说明',
+                ],
+              ),
+              BuiltinPluginInputSlot(
+                id: 'style',
+                labelZh: '版式风格',
+                labelEn: 'Layout style',
+                type: BuiltinPluginSlotType.choice,
+                roleZh: '整页的排版调性，决定留白、字重与分割线处理',
+                roleEn:
+                    'page-wide typographic tone driving whitespace, weights, '
+                    'and dividers',
+                choices: <String>['极简留白', '杂志编辑', '科技参数', '自然温和'],
+              ),
+            ],
+            steps: <BuiltinPluginWorkflowStep>[
+              BuiltinPluginWorkflowStep(
+                id: 'module-plan',
+                titleZh: '把卖点映射成模块清单，定死每屏尺寸',
+                titleEn: 'Map selling points to modules with fixed screen size',
+                instructionZh:
+                    '先把卖点映射成模块清单：每个模块的标题、正文、配图类型与像素高度；'
+                    '全页统一宽度 750px，这样各屏才能无缝拼接',
+                instructionEn:
+                    'map the selling points into a module list first — per '
+                    'module headline, body, image type, and pixel height; fix '
+                    'page width at 750px so screens stitch seamlessly',
+              ),
+              BuiltinPluginWorkflowStep(
+                id: 'backdrops',
+                titleZh: '生图只产出产品与背景，画面内不含任何文字',
+                titleEn: 'Generate product and backdrop only — no text in-frame',
+                instructionZh:
+                    '逐模块生成产品图与背景。画面里不允许出现任何文字、标签或水印，'
+                    '文字一律留给下一步的矢量层',
+                instructionEn:
+                    'generate product and backdrop per module. No text, label, '
+                    'or watermark may appear in the rendered frame — copy is '
+                    'the next step\'s job',
+                outputFormats: <String>['png'],
+                requiredSkills: <String>['image'],
+              ),
+              BuiltinPluginWorkflowStep(
+                id: 'text-layer',
+                titleZh: '文字与图示走 SVG 矢量层，保证逐字准确',
+                titleEn: 'Copy and diagrams as an SVG layer, character-exact',
+                instructionZh:
+                    '标题、正文、参数表、分区标注与图标全部用 SVG 排版后叠加，'
+                    '文案逐字对应输入，不得由模型改写或臆造',
+                instructionEn:
+                    'lay out headings, body, spec tables, callouts, and icons '
+                    'as SVG and composite them on top; copy must match the '
+                    'input character for character',
+                outputFormats: <String>['svg'],
+                requiredSkills: <String>['image-svg-pptx-pro-skill'],
+              ),
+              BuiltinPluginWorkflowStep(
+                id: 'compose',
+                titleZh: '合成各模块并纵向拼成整页长图',
+                titleEn: 'Composite modules and stitch the full-page long image',
+                instructionZh:
+                    '把背景层与文字层合成为单模块图，再按模块顺序纵向拼接成整页长图；'
+                    '相邻模块的底色与留白必须对齐，不能出现接缝色差',
+                instructionEn:
+                    'composite backdrop and text layers per module, then stack '
+                    'the modules into one long image; adjacent fills and '
+                    'margins must align so no seam is visible',
+                outputFormats: <String>['png'],
+                maxRetries: 2,
+                fallbackZh: '整页拼接失败时改为逐模块单图交付，并附拼接顺序说明',
+                fallbackEn:
+                    'if stitching fails, deliver per-module images plus the '
+                    'intended stacking order',
+              ),
+              BuiltinPluginWorkflowStep(
+                id: 'proof',
+                titleZh: '逐模块回读文案与透视自检',
+                titleEn: 'Proofread copy and sanity-check perspective',
+                instructionZh:
+                    '交付前逐模块自检：文案是否与输入逐字一致、'
+                    '产品透视与投影方向是否统一、模块高度是否符合规划',
+                instructionEn:
+                    'before delivery check each module: copy matches the input '
+                    'verbatim, product perspective and shadow direction are '
+                    'consistent, and module heights match the plan',
+              ),
+            ],
+          ),
+        ),
+        BuiltinPluginDescriptor(
+          id: ecommerceVideoId,
+          kind: BuiltinPluginKind.video,
+          group: BuiltinPluginGroup.ecommerce,
+          icon: Icons.auto_awesome_motion_outlined,
+          nameZh: '爆款视频复刻',
+          nameEn: 'Viral Video Remake',
+          descriptionZh: '拆解 TikTok / 抖音爆款的脚本与高光节点，换成自家商品重新生成短视频。',
+          descriptionEn:
+              'Deconstruct a TikTok / Douyin hit into script and beat sheet, '
+              'then regenerate it around your own product.',
+          workflow: BuiltinPluginWorkflow(
+            goalZh: '请参考这条爆款视频，为我的商品复刻一条短视频：',
+            goalEn:
+                'Remake a short video for my product, referencing this hit:',
+            inputPromptZh: '商品信息与本次视频的额外要求：',
+            inputPromptEn: 'Product details and extra requirements:',
+            inputSlots: <BuiltinPluginInputSlot>[
+              BuiltinPluginInputSlot(
+                id: 'source',
+                labelZh: '爆款视频链接',
+                labelEn: 'Source video link',
+                type: BuiltinPluginSlotType.url,
+                required: true,
+                roleZh: 'TikTok / 抖音链接。只复刻其节奏结构、镜头语言与叙事顺序，不得复制其画面内容或音轨',
+                roleEn:
+                    'TikTok / Douyin link. Reproduce its pacing, camera '
+                    'grammar, and narrative order only — never its footage or '
+                    'audio track',
+              ),
+              BuiltinPluginInputSlot(
+                id: 'product',
+                labelZh: '商品图',
+                labelEn: 'Product shot',
+                type: BuiltinPluginSlotType.referenceImage,
+                required: true,
+                maxCount: 6,
+                roleZh: '出镜商品的唯一事实来源，替换掉原片中的商品',
+                roleEn:
+                    'the single source of truth for the on-screen product, '
+                    'replacing whatever the source video featured',
+              ),
+              BuiltinPluginInputSlot(
+                id: 'hook',
+                labelZh: '开场钩子文案',
+                labelEn: 'Hook line',
+                type: BuiltinPluginSlotType.text,
+                roleZh: '前三秒的字幕与口播。留空则按原片钩子的结构重写一条',
+                roleEn:
+                    'first-three-seconds subtitle and voiceover; leave empty '
+                    'to rewrite one following the source hook\'s structure',
+              ),
+              BuiltinPluginInputSlot(
+                id: 'duration',
+                labelZh: '目标时长',
+                labelEn: 'Target duration',
+                type: BuiltinPluginSlotType.choice,
+                roleZh: '成片时长，决定高光节点的取舍密度',
+                roleEn:
+                    'final runtime, which decides how densely the beats are '
+                    'kept or dropped',
+                choices: <String>['15s', '30s', '45s', '60s'],
+              ),
+            ],
+            steps: <BuiltinPluginWorkflowStep>[
+              BuiltinPluginWorkflowStep(
+                id: 'ingest',
+                titleZh: '拉取源视频并逐镜理解画面',
+                titleEn: 'Fetch the source and read it shot by shot',
+                instructionZh:
+                    '拉取链接对应的视频，逐镜识别画面内容、镜头运动、转场方式与音画节奏',
+                instructionEn:
+                    'fetch the linked video and read it shot by shot: on-screen '
+                    'content, camera movement, transitions, and audio-visual '
+                    'rhythm',
+                requiredSkills: <String>['video-understanding'],
+                maxRetries: 2,
+                fallbackZh: '拉取失败时要求我改为直接上传视频文件，不要凭标题猜测内容',
+                fallbackEn:
+                    'if the fetch fails, ask me to upload the file directly '
+                    'rather than guessing the content from the title',
+              ),
+              BuiltinPluginWorkflowStep(
+                id: 'beat-sheet',
+                titleZh: '拆出脚本与高光节点时间轴',
+                titleEn: 'Extract the script and beat sheet',
+                instructionZh:
+                    '输出原片的脚本与高光节点时间轴：钩子、痛点、卖点展示、'
+                    '转折、行动号召各落在第几秒，以及每个节点起作用的原因',
+                instructionEn:
+                    'output the source script and beat sheet: at which second '
+                    'the hook, pain point, feature reveal, turn, and CTA land, '
+                    'and why each beat works',
+                outputFormats: <String>['md'],
+              ),
+              BuiltinPluginWorkflowStep(
+                id: 'rewrite',
+                titleZh: '按节点结构改写成我的商品脚本',
+                titleEn: 'Rewrite the beats around my product',
+                instructionZh:
+                    '保留节点结构与时长分配，把内容整体换成我的商品：'
+                    '重写口播与字幕，逐镜给出画面描述。不要照搬原片台词',
+                instructionEn:
+                    'keep the beat structure and timing, swap the content to '
+                    'my product: rewrite voiceover and subtitles, and describe '
+                    'each shot. Never copy the source script verbatim',
+                outputFormats: <String>['md'],
+              ),
+              BuiltinPluginWorkflowStep(
+                id: 'frames',
+                titleZh: '按分镜生成画面，商品形态锁定',
+                titleEn: 'Generate frames with the product locked',
+                instructionZh:
+                    '按分镜逐镜生成画面，商品形态严格锁定在商品图上，跨镜头保持一致',
+                instructionEn:
+                    'generate each shot, locking product form to the supplied '
+                    'product images and keeping it consistent across shots',
+                outputFormats: <String>['png'],
+                requiredSkills: <String>['image'],
+              ),
+              BuiltinPluginWorkflowStep(
+                id: 'compose',
+                titleZh: '合成 mp4：字幕 + 口播 + BGM',
+                titleEn: 'Compose the mp4: subtitles + voiceover + BGM',
+                instructionZh:
+                    '调用 hyperframe 合成 mp4，带字幕与口播；背景音乐自动生成，'
+                    '不要使用原片音轨',
+                instructionEn:
+                    'compose the mp4 via hyperframe with subtitles and '
+                    'voiceover; auto-generate background music and never reuse '
+                    'the source audio track',
+                outputFormats: <String>['mp4'],
+                requiredSkills: <String>['hyperframe'],
+              ),
+              BuiltinPluginWorkflowStep(
+                id: 'compare',
+                titleZh: '与原片节点对照，标出偏差供我按镜修改',
+                titleEn: 'Diff against the source beats for per-shot revision',
+                instructionZh:
+                    '交付时附上与原片的节点对照表，标出时长与节奏偏差；'
+                    '之后我会按镜头提出修改',
+                instructionEn:
+                    'deliver with a beat-by-beat comparison against the source, '
+                    'flagging timing and pacing drift; I will then revise per '
+                    'shot',
+              ),
+            ],
+          ),
+        ),
+      ];
+
+  /// Every built-in plugin, general group first.
+  static const List<BuiltinPluginDescriptor> all = <BuiltinPluginDescriptor>[
+    ...firstBatch,
+    ...ecommerceGroup,
+  ];
+
+  /// Groups that actually have plugins, in display order.
+  static List<BuiltinPluginGroup> get groups => BuiltinPluginGroup.values
+      .where((group) => byGroup(group).isNotEmpty)
+      .toList(growable: false);
+
+  static List<BuiltinPluginDescriptor> byGroup(BuiltinPluginGroup group) => all
+      .where((plugin) => plugin.group == group)
+      .toList(growable: false);
+
   static BuiltinPluginDescriptor? byId(String id) {
     final normalized = id.trim();
-    for (final plugin in firstBatch) {
+    for (final plugin in all) {
       if (plugin.id == normalized) {
         return plugin;
       }

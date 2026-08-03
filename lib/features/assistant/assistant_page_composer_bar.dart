@@ -457,19 +457,22 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
                     ),
                     onSelected: toggleBuiltinPluginInternal,
                     itemBuilder: (context) => [
-                      PopupMenuItem<String>(
-                        enabled: false,
-                        height: 30,
-                        child: Text(
-                          appText('插件', 'Plugins'),
-                          style: Theme.of(context).textTheme.labelSmall
-                              ?.copyWith(
-                                color: palette.textMuted,
-                                fontWeight: FontWeight.w600,
-                              ),
+                      for (final group in BuiltinPluginCatalog.groups) ...[
+                        PopupMenuItem<String>(
+                          enabled: false,
+                          height: 30,
+                          child: Text(
+                            group.label,
+                            style: Theme.of(context).textTheme.labelSmall
+                                ?.copyWith(
+                                  color: palette.textMuted,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                          ),
                         ),
-                      ),
-                      for (final plugin in BuiltinPluginCatalog.firstBatch)
+                        for (final plugin in BuiltinPluginCatalog.byGroup(
+                          group,
+                        ))
                         PopupMenuItem<String>(
                           key: Key(
                             'assistant-builtin-plugin-item-${plugin.id}',
@@ -508,6 +511,7 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
                             ],
                           ),
                         ),
+                      ],
                     ],
                     child: const ComposerIconButtonInternal(
                       icon: Icons.extension_rounded,

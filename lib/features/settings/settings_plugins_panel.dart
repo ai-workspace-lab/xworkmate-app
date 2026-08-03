@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../i18n/app_language.dart';
 import '../../theme/app_palette.dart';
 import '../plugins/builtin_plugin_catalog.dart';
+import '../plugins/builtin_plugin_input_slot.dart';
 import '../plugins/builtin_plugin_visuals.dart';
 
 /// Settings panel listing the first batch of built-in plugins.
@@ -19,7 +20,10 @@ class SettingsPluginsPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final palette = context.palette;
-    final items = plugins ?? BuiltinPluginCatalog.firstBatch;
+    final items = plugins ?? BuiltinPluginCatalog.all;
+    final groups = BuiltinPluginGroup.values
+        .where((group) => items.any((plugin) => plugin.group == group))
+        .toList(growable: false);
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 24, 24, 28),
       child: Column(
@@ -45,33 +49,74 @@ class SettingsPluginsPanel extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 18),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              const spacing = 16.0;
-              final columns = constraints.maxWidth >= 720 ? 2 : 1;
-              final cardWidth = columns == 1
-                  ? constraints.maxWidth
-                  : (constraints.maxWidth - spacing * (columns - 1)) / columns;
-              return Wrap(
-                spacing: spacing,
-                runSpacing: spacing,
-                children: [
-                  for (final plugin in items)
-                    SizedBox(
-                      width: cardWidth,
-                      child: _BuiltinPluginCard(
-                        key: ValueKey<String>(
-                          'settings-plugin-card-${plugin.id}',
+          for (final group in groups) ...[
+            _PluginGroupHeader(
+              key: ValueKey<String>('settings-plugin-group-${group.name}'),
+              group: group,
+            ),
+            const SizedBox(height: 12),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                const spacing = 16.0;
+                final columns = constraints.maxWidth >= 720 ? 2 : 1;
+                final cardWidth = columns == 1
+                    ? constraints.maxWidth
+                    : (constraints.maxWidth - spacing * (columns - 1)) /
+                          columns;
+                return Wrap(
+                  spacing: spacing,
+                  runSpacing: spacing,
+                  children: [
+                    for (final plugin in items.where(
+                      (plugin) => plugin.group == group,
+                    ))
+                      SizedBox(
+                        width: cardWidth,
+                        child: _BuiltinPluginCard(
+                          key: ValueKey<String>(
+                            'settings-plugin-card-${plugin.id}',
+                          ),
+                          plugin: plugin,
                         ),
-                        plugin: plugin,
                       ),
-                    ),
-                ],
-              );
-            },
-          ),
+                  ],
+                );
+              },
+            ),
+            if (group != groups.last) const SizedBox(height: 24),
+          ],
         ],
       ),
+    );
+  }
+}
+
+class _PluginGroupHeader extends StatelessWidget {
+  const _PluginGroupHeader({super.key, required this.group});
+
+  final BuiltinPluginGroup group;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final palette = context.palette;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          group.label,
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          group.description,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: palette.textSecondary,
+          ),
+        ),
+      ],
     );
   }
 }
@@ -148,6 +193,37 @@ class _BuiltinPluginCard extends StatelessWidget {
                   _PluginTag(label: skill, icon: Icons.key_rounded),
               ],
             ),
+            if (plugin.inputSlots.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              Text(
+                appText('参考输入', 'Reference inputs'),
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: palette.textSecondary,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: [
+                  for (final slot in plugin.inputSlots)
+                    _PluginTag(
+                      label: slot.required ? '${slot.label} *' : slot.label,
+                      icon: switch (slot.type) {
+                        BuiltinPluginSlotType.referenceImage =>
+                          Icons.image_outlined,
+                        BuiltinPluginSlotType.url => Icons.link_rounded,
+                        BuiltinPluginSlotType.choice =>
+                          Icons.tune_rounded,
+                        BuiltinPluginSlotType.text =>
+                          Icons.notes_rounded,
+                      },
+                      emphasized: slot.required,
+                    ),
+                ],
+              ),
+            ],
             if (plugin.pipelineStepsZh.isNotEmpty) ...[
               const SizedBox(height: 12),
               for (var i = 0; i < plugin.pipelineStepsZh.length; i++)
