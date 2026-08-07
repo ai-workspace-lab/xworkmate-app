@@ -97,6 +97,7 @@ Widget buildSkillPickerOverlayForInternal(
           onQueryChanged: state.setSkillPickerQueryInternal,
           onToggleSkill: (skillKey) => state.widget.onToggleSkill(skillKey),
           onRetry: () => state.widget.controller.skillsController.refresh(),
+          onDismiss: state.hideSkillPickerInternal,
         ),
       ),
     ],
