@@ -100,12 +100,11 @@ class SidebarNavigation extends StatelessWidget {
       curve: Curves.easeOutCubic,
       width: isCollapsed ? AppSizes.sidebarCollapsedWidth : expandedWidth,
       height: double.infinity,
-      margin: marginOverride ?? const EdgeInsets.fromLTRB(4, 4, 4, 0),
-      decoration: BoxDecoration(
-        color: palette.chromeSurface,
-        borderRadius: BorderRadius.circular(AppRadius.sidebar),
-        border: Border.all(color: palette.strokeSoft),
-      ),
+      margin: marginOverride ?? EdgeInsets.zero,
+      // The pane is not a card: no radius, no border. It sits flush against the
+      // content pane and is separated from it by the overlaid 1px boundary in
+      // the shell. Radius and stroke belong to the content cards inside.
+      decoration: BoxDecoration(color: palette.sidebar),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
         child: Column(

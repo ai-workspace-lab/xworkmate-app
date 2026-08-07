@@ -12,6 +12,7 @@ import '../../i18n/app_language.dart';
 import '../../models/app_models.dart';
 import '../../runtime/runtime_controllers.dart';
 import '../../runtime/runtime_models.dart';
+import '../../theme/app_theme.dart';
 import '../../widgets/settings_page_shell.dart';
 import '../../widgets/surface_card.dart';
 import 'settings_account_panel.dart';
@@ -510,7 +511,12 @@ class _SettingsPageState extends State<SettingsPage> {
             .availableSettingsTabs;
 
         return SettingsPageBodyShell(
-          padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.paneContent,
+            AppSpacing.paneContent,
+            AppSpacing.paneContent,
+            0,
+          ),
           breadcrumbs: buildSettingsBreadcrumbs(controller, tab: currentTab),
           title: appText('设置', 'Settings'),
           subtitle: appText(

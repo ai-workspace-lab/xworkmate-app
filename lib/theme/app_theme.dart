@@ -33,6 +33,14 @@ class SimpleSpacing {
   static const double md = section;
   static const double lg = section;
   static const double xl = 12.0;
+
+  /// Inset between a pane's edge and its content. Every page that fills a pane
+  /// reads its outer padding from here, so the assistant surface and the
+  /// settings surface keep the same rhythm.
+  static const double paneContent = 16.0;
+
+  /// Vertical gap between top-level sections inside a pane.
+  static const double sectionGap = 16.0;
 }
 
 class SimpleRadius {
@@ -111,6 +119,8 @@ class AppSpacing {
   static const double md = SimpleSpacing.md;
   static const double lg = SimpleSpacing.lg;
   static const double xl = SimpleSpacing.xl;
+  static const double paneContent = SimpleSpacing.paneContent;
+  static const double sectionGap = SimpleSpacing.sectionGap;
 }
 
 class AppRadius {

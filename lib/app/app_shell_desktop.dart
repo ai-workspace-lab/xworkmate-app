@@ -5,6 +5,7 @@ import '../i18n/app_language.dart';
 import '../models/app_models.dart';
 import '../runtime/runtime_models.dart';
 import '../theme/app_palette.dart';
+import '../theme/app_theme.dart';
 import '../widgets/detail_drawer.dart';
 import '../widgets/pane_resize_handle.dart';
 import '../widgets/sidebar_navigation.dart';
@@ -347,12 +348,7 @@ class _AppShellState extends State<AppShell> {
                                       sidebarState == AppSidebarState.expanded
                                       ? expandedSidebarWidth
                                       : null,
-                                  marginOverride: const EdgeInsets.fromLTRB(
-                                    4,
-                                    4,
-                                    4,
-                                    0,
-                                  ),
+                                  marginOverride: EdgeInsets.zero,
                                   favoriteDestinations: controller
                                       .assistantNavigationDestinations
                                       .toSet(),
@@ -399,47 +395,55 @@ class _AppShellState extends State<AppShell> {
                                         title,
                                       ),
                                 ),
-                              if (sidebarState == AppSidebarState.expanded)
-                                PaneResizeHandle(
-                                  axis: Axis.horizontal,
-                                  extent: 8,
-                                  onDelta: (delta) {
-                                    setState(() {
-                                      _sidebarExpandedWidth =
-                                          _clampSidebarWidth(
-                                            expandedSidebarWidth + delta,
-                                            constraints.maxWidth,
-                                          );
-                                    });
-                                  },
-                                ),
                               Expanded(
-                                child: Padding(
-                                  padding: const EdgeInsets.fromLTRB(
-                                    0,
-                                    4,
-                                    4,
-                                    0,
+                                child: AnimatedPadding(
+                                  duration: const Duration(milliseconds: 220),
+                                  curve: Curves.easeOutCubic,
+                                  padding: EdgeInsets.only(
+                                    right: showPinnedDetail ? 336 : 0,
                                   ),
-                                  child: AnimatedPadding(
-                                    duration: const Duration(milliseconds: 220),
-                                    curve: Curves.easeOutCubic,
-                                    padding: EdgeInsets.only(
-                                      right: showPinnedDetail ? 336 : 0,
+                                  child: DecoratedBox(
+                                    decoration: BoxDecoration(
+                                      color: palette.surfacePrimary,
                                     ),
-                                    child: DecoratedBox(
-                                      decoration: BoxDecoration(
-                                        color: palette.canvas,
-                                      ),
-                                      child: _buildCurrentPage(
-                                        controller.openDetail,
-                                      ),
+                                    child: _buildCurrentPage(
+                                      controller.openDetail,
                                     ),
                                   ),
                                 ),
                               ),
                             ],
                           ),
+                          // The sidebar and the content pane sit flush against
+                          // each other; the seam is drawn — and dragged — by an
+                          // overlay so no layout gutter is needed. Collapsed
+                          // sidebar keeps the line but drops the grab area.
+                          if (showSidebar)
+                            Positioned(
+                              left:
+                                  (sidebarState == AppSidebarState.collapsed
+                                      ? AppSizes.sidebarCollapsedWidth
+                                      : expandedSidebarWidth) -
+                                  PaneResizeHandle.defaultHitExtent / 2,
+                              top: 0,
+                              bottom: 0,
+                              width: PaneResizeHandle.defaultHitExtent,
+                              child: PaneResizeHandle(
+                                axis: Axis.horizontal,
+                                onDelta:
+                                    sidebarState == AppSidebarState.expanded
+                                    ? (delta) {
+                                        setState(() {
+                                          _sidebarExpandedWidth =
+                                              _clampSidebarWidth(
+                                                expandedSidebarWidth + delta,
+                                                constraints.maxWidth,
+                                              );
+                                        });
+                                      }
+                                    : null,
+                              ),
+                            ),
                           if (controller.detailPanel != null &&
                               !showPinnedDetail)
                             Positioned.fill(
