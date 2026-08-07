@@ -241,6 +241,7 @@ jobs:
         id: vault_obs
         if: ${{ matrix.platform == 'linux' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
         uses: hashicorp/vault-action@v4
+        continue-on-error: true
         with:
           url: ${{ env.VAULT_ADDR }}
           method: jwt
