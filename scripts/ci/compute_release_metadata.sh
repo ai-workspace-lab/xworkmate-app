@@ -35,4 +35,5 @@ fi
   echo "release_tag=${release_tag}"
   echo "release_title=${release_title}"
   echo "release_notes=${release_notes}"
+  echo "display_version=${DISPLAY_VERSION}"
 } >> "$GITHUB_OUTPUT"

@@ -68,6 +68,7 @@ jobs:
       release_tag: ${{ steps.meta.outputs.release_tag }}
       release_title: ${{ steps.meta.outputs.release_title }}
       release_notes: ${{ steps.meta.outputs.release_notes }}
+      display_version: ${{ steps.meta.outputs.display_version }}
       should_release: ${{ steps.flags.outputs.should_release }}
       testflight_enabled: ${{ steps.flags.outputs.testflight_enabled }}
       github_release_enabled: ${{ steps.flags.outputs.github_release_enabled }}
@@ -236,24 +237,6 @@ jobs:
             kv/data/github-actions/xworkmate-app ANDROID_KEY_ALIAS | ANDROID_KEY_ALIAS ;
             kv/data/github-actions/xworkmate-app ANDROID_KEY_PASSWORD | ANDROID_KEY_PASSWORD
 
-<<<<<<< HEAD
-      - name: Load Vault secrets (Linux OBS & PPA)
-        id: vault_linux
-        if: ${{ matrix.platform == 'linux' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
-        uses: hashicorp/vault-action@v4
-        with:
-          url: ${{ env.VAULT_ADDR }}
-          method: jwt
-          role: github-actions-xworkmate-app
-          jwtGithubAudience: vault
-          ignoreNotFound: true
-          secrets: |
-            kv/data/CICD OBS_TOKEN | OBS_TOKEN ;
-            kv/data/CICD GPG_PRIVATE_KEY | GPG_PRIVATE_KEY ;
-            kv/data/CICD GPG_KEY_ID | GPG_KEY_ID
-
-=======
->>>>>>> 364b8d2 (feat(ci): integrate OBS Token loading from Vault and automated RPM build trigger)
       - name: Load Vault secrets (OBS)
         id: vault_obs
         if: ${{ matrix.platform == 'linux' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
@@ -265,7 +248,7 @@ jobs:
           jwtGithubAudience: vault
           ignoreNotFound: true
           secrets: |
-            kv/data/CICD OBS_TOKEN | OBS_TOKEN
+            kv/data/github-actions/xworkmate-app OBS_TOKEN | OBS_TOKEN
 
       - name: Export signing secrets
         shell: bash
@@ -453,6 +436,7 @@ jobs:
           RELEASE_TAG: ${{ needs.prepare.outputs.release_tag }}
           RELEASE_TITLE: ${{ needs.prepare.outputs.release_title }}
           RELEASE_NOTES: ${{ needs.prepare.outputs.release_notes }}
+          DISPLAY_VERSION: ${{ needs.prepare.outputs.display_version }}
 
       - name: Download TestFlight artifact
         if: ${{ (matrix.target == 'testflight_ios' || matrix.target == 'testflight_macos') && needs.prepare.outputs.testflight_enabled == 'true' }}
