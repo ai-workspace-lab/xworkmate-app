@@ -196,8 +196,10 @@ extension AssistantPageStateClosureInternal on AssistantPageStateInternal {
                       }
                     : null,
               ),
+              // The strip carries the pane colour so the seam reads as a
+              // hairline rather than as a gap between two floating blocks.
               ColoredBox(
-                color: palette.canvas,
+                color: palette.surfacePrimary,
                 child: SizedBox(
                   key: const Key('assistant-workspace-resize-handle'),
                   height: assistantVerticalResizeHandleHeightInternal,
@@ -308,7 +310,6 @@ extension AssistantPageStateClosureInternal on AssistantPageStateInternal {
   }) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final palette = context.palette;
         final maxPaneWidth = math.min(
           560.0,
           math.max(
@@ -329,28 +330,6 @@ extension AssistantPageStateClosureInternal on AssistantPageStateInternal {
           children: [
             Expanded(child: child),
             if (!artifactPaneCollapsedInternal) ...[
-              DecoratedBox(
-                decoration: BoxDecoration(color: palette.chromeBackground),
-                child: SizedBox(
-                  key: const Key('assistant-artifact-pane-resize-handle'),
-                  width: assistantHorizontalResizeHandleWidthInternal,
-                  child: PaneResizeHandle(
-                    axis: Axis.horizontal,
-                    onDelta: (delta) {
-                      setState(() {
-                        artifactPaneWidthInternal =
-                            (artifactPaneWidthInternal - delta)
-                                .clamp(
-                                  assistantArtifactPaneMinWidthInternal,
-                                  maxPaneWidth,
-                                )
-                                .toDouble();
-                      });
-                    },
-                  ),
-                ),
-              ),
-              const SizedBox(width: assistantHorizontalPaneGapInternal),
               SizedBox(
                 width: paneWidth,
                 child: AssistantArtifactSidebar(
@@ -436,6 +415,28 @@ extension AssistantPageStateClosureInternal on AssistantPageStateInternal {
         return Stack(
           children: [
             Positioned.fill(child: panel),
+            if (!artifactPaneCollapsedInternal)
+              Positioned(
+                key: const Key('assistant-artifact-pane-resize-handle'),
+                right: paneWidth - PaneResizeHandle.defaultHitExtent / 2,
+                top: 0,
+                bottom: 0,
+                width: PaneResizeHandle.defaultHitExtent,
+                child: PaneResizeHandle(
+                  axis: Axis.horizontal,
+                  onDelta: (delta) {
+                    setState(() {
+                      artifactPaneWidthInternal =
+                          (artifactPaneWidthInternal - delta)
+                              .clamp(
+                                assistantArtifactPaneMinWidthInternal,
+                                maxPaneWidth,
+                              )
+                              .toDouble();
+                    });
+                  },
+                ),
+              ),
             if (artifactPaneCollapsedInternal)
               Positioned(
                 right: 10,

@@ -986,8 +986,7 @@ extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
         viewportWidth -
         AssistantPageStateInternal.mainWorkspaceMinWidthInternal -
         AssistantPageStateInternal.sidePaneViewportPaddingInternal -
-        assistantHorizontalResizeHandleWidthInternal -
-        assistantHorizontalPaneGapInternal;
+        assistantHorizontalPaneGutterInternal;
     return maxWidthByViewport
         .clamp(
           AssistantPageStateInternal.sidePaneMinWidthInternal,

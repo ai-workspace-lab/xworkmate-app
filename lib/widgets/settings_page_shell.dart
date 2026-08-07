@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../theme/app_theme.dart';
 import 'top_bar.dart';
 
 class SettingsPageBodyShell extends StatefulWidget {
@@ -54,10 +55,10 @@ class _SettingsPageBodyShellState extends State<SettingsPageBodyShell> {
                 ],
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: AppSpacing.sectionGap),
             if (widget.globalApplyBar != null) ...[
               widget.globalApplyBar!,
-              const SizedBox(height: 16),
+              const SizedBox(height: AppSpacing.xl),
             ],
           ] else ...[
             Row(
@@ -72,7 +73,7 @@ class _SettingsPageBodyShellState extends State<SettingsPageBodyShell> {
                 ),
               ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: AppSpacing.xl),
           ],
           ...widget.bodyChildren,
         ],

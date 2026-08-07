@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_palette.dart';
 import '../theme/app_theme.dart';
+import 'app_pane_shell.dart';
 import 'top_bar.dart';
 
 class DesktopWorkspaceScaffold extends StatelessWidget {
@@ -13,7 +14,7 @@ class DesktopWorkspaceScaffold extends StatelessWidget {
     this.title,
     this.subtitle,
     this.toolbar,
-    this.padding = const EdgeInsets.fromLTRB(6, 6, 6, 0),
+    this.padding = EdgeInsets.zero,
   });
 
   final Widget child;
@@ -40,7 +41,12 @@ class DesktopWorkspaceScaffold extends StatelessWidget {
         children: [
           if (hasHeader)
             Padding(
-              padding: const EdgeInsets.fromLTRB(2, 0, 2, 8),
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.paneContent,
+                AppSpacing.paneContent,
+                AppSpacing.paneContent,
+                AppSpacing.xl,
+              ),
               child: LayoutBuilder(
                 builder: (context, constraints) {
                   final compact = constraints.maxWidth < 920;
@@ -103,19 +109,10 @@ class DesktopWorkspaceScaffold extends StatelessWidget {
                 },
               ),
             ),
-          Expanded(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: palette.chromeSurface,
-                borderRadius: BorderRadius.circular(AppRadius.card),
-                border: Border.all(color: palette.strokeSoft),
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(AppRadius.card),
-                child: child,
-              ),
-            ),
-          ),
+          // The work surface is a pane, not a card: it fills its column edge to
+          // edge with no radius and no border. Boundaries between panes are
+          // drawn by the overlaid PaneResizeHandle in the shell.
+          Expanded(child: AppPaneShell(padding: EdgeInsets.zero, child: child)),
         ],
       ),
     );

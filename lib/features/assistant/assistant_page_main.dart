@@ -39,9 +39,13 @@ import 'assistant_page_state_actions.dart';
 const double assistantComposerDefaultInputHeightInternal = 40;
 const double assistantWorkspaceMinConversationHeightInternal = 180;
 const double assistantWorkspaceMinLowerPaneHeightInternal = 160;
-const double assistantHorizontalResizeHandleWidthInternal = 6;
-const double assistantHorizontalPaneGapInternal = 2;
-const double assistantVerticalResizeHandleHeightInternal = 10;
+/// Horizontal pane boundaries are overlaid on the seam (see [PaneResizeHandle]),
+/// so neighbouring panes sit flush and reserve no layout width between them.
+const double assistantHorizontalPaneGutterInternal = 0;
+
+/// The composer boundary still occupies its row in the column, but the strip
+/// carries the surrounding pane colour so only the hairline reads as a seam.
+const double assistantVerticalResizeHandleHeightInternal = 8;
 const double assistantArtifactPaneMinWidthInternal = 280;
 const double assistantArtifactPaneDefaultWidthInternal = 360;
 const double assistantCollapsedArtifactToggleClearanceInternal = 56;
@@ -224,36 +228,52 @@ class AssistantPageStateInternal extends State<AssistantPage> {
                   .clamp(sidePaneMinWidthInternal, maxThreadRailWidth)
                   .toDouble();
 
-              return Row(
+              return Stack(
                 children: [
-                  SizedBox(
-                    width: threadRailWidth,
-                    child: AssistantTaskRailInternal(
-                      key: const Key('assistant-task-rail'),
-                      controller: controller,
-                      tasks: visibleTasks,
-                      query: threadQueryInternal,
-                      searchController: threadSearchControllerInternal,
-                      onQueryChanged: (value) {
-                        setState(() {
-                          threadQueryInternal = value.trim();
-                        });
-                      },
-                      onClearQuery: () {
-                        threadSearchControllerInternal.clear();
-                        setState(() {
-                          threadQueryInternal = '';
-                        });
-                      },
-                      onRefreshTasks: refreshTasksWithRetryInternal,
-                      onCreateTask: createNewThreadInternal,
-                      onSelectTask: switchSessionWithRetryInternal,
-                      onArchiveTask: archiveTaskInternal,
-                      onRenameTask: renameTaskInternal,
+                  // Positioned.fill so the stack takes its height from the
+                  // surrounding constraints rather than from whatever intrinsic
+                  // height the rail happens to have.
+                  Positioned.fill(
+                    child: Row(
+                      children: [
+                        SizedBox(
+                          width: threadRailWidth,
+                          child: AssistantTaskRailInternal(
+                            key: const Key('assistant-task-rail'),
+                            controller: controller,
+                            tasks: visibleTasks,
+                            query: threadQueryInternal,
+                            searchController: threadSearchControllerInternal,
+                            onQueryChanged: (value) {
+                              setState(() {
+                                threadQueryInternal = value.trim();
+                              });
+                            },
+                            onClearQuery: () {
+                              threadSearchControllerInternal.clear();
+                              setState(() {
+                                threadQueryInternal = '';
+                              });
+                            },
+                            onRefreshTasks: refreshTasksWithRetryInternal,
+                            onCreateTask: createNewThreadInternal,
+                            onSelectTask: switchSessionWithRetryInternal,
+                            onArchiveTask: archiveTaskInternal,
+                            onRenameTask: renameTaskInternal,
+                          ),
+                        ),
+                        Expanded(child: workspaceWithArtifacts),
+                      ],
                     ),
                   ),
-                  SizedBox(
-                    width: assistantHorizontalResizeHandleWidthInternal,
+                  Positioned(
+                    key: const Key('assistant-task-rail-resize-handle'),
+                    left:
+                        threadRailWidth -
+                        PaneResizeHandle.defaultHitExtent / 2,
+                    top: 0,
+                    bottom: 0,
+                    width: PaneResizeHandle.defaultHitExtent,
                     child: PaneResizeHandle(
                       axis: Axis.horizontal,
                       onDelta: (delta) {
@@ -269,8 +289,6 @@ class AssistantPageStateInternal extends State<AssistantPage> {
                       },
                     ),
                   ),
-                  const SizedBox(width: assistantHorizontalPaneGapInternal),
-                  Expanded(child: workspaceWithArtifacts),
                 ],
               );
             },
