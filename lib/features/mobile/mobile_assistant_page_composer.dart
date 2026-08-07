@@ -513,9 +513,16 @@ class MobileAssistantComposer extends StatelessWidget {
                           controller: inputController,
                           focusNode: focusNode,
                           minLines: 1,
-                          maxLines: 1,
-                          textInputAction: TextInputAction.send,
-                          onSubmitted: (_) => onSend(),
+                          // Grows with the draft up to 5 lines, then scrolls.
+                          // Was locked to 1: the desktop composer accepted
+                          // multi-line drafts while mobile silently could not,
+                          // so the same request had to be written differently
+                          // on each surface.
+                          maxLines: 5,
+                          keyboardType: TextInputType.multiline,
+                          // newline keeps the return key inserting a line break;
+                          // sending is the send button (and Enter on desktop).
+                          textInputAction: TextInputAction.newline,
                           decoration: const InputDecoration(
                             hintText: '',
                             border: InputBorder.none,

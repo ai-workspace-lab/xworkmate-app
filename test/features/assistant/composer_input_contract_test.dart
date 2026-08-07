@@ -1,0 +1,183 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:xworkmate/app/app_controller.dart';
+import 'package:xworkmate/features/assistant/assistant_page_composer_clipboard.dart';
+import 'package:xworkmate/features/assistant/assistant_page_composer_skill_picker.dart';
+import 'package:xworkmate/features/assistant/assistant_page_main.dart';
+import 'package:xworkmate/theme/app_theme.dart';
+import 'package:xworkmate/widgets/surface_card.dart';
+
+/// The desktop composer's key contract. Before this, the field was multiline
+/// (`maxLines: null`), so its `onSubmitted` never fired and Enter did nothing —
+/// clicking Submit was the only way to send.
+void main() {
+  group('composer input contract', () {
+    testWidgets('Enter sends the draft', (tester) async {
+      final controller = _controller(tester);
+      final input = TextEditingController(text: 'ship it');
+      var sends = 0;
+
+      await tester.pumpWidget(
+        _app(
+          _lowerPane(
+            controller: controller,
+            inputController: input,
+            onSend: () async => sends++,
+          ),
+        ),
+      );
+      await tester.pump();
+
+      await tester.tap(find.byKey(const Key('assistant-input-field')));
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pump();
+
+      expect(sends, 1);
+    });
+
+    testWidgets('Shift+Enter inserts a newline instead of sending', (
+      tester,
+    ) async {
+      final controller = _controller(tester);
+      final input = TextEditingController(text: 'line one');
+      var sends = 0;
+
+      await tester.pumpWidget(
+        _app(
+          _lowerPane(
+            controller: controller,
+            inputController: input,
+            onSend: () async => sends++,
+          ),
+        ),
+      );
+      await tester.pump();
+
+      await tester.tap(find.byKey(const Key('assistant-input-field')));
+      await tester.pump();
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+      await tester.pump();
+
+      expect(sends, 0, reason: 'Shift+Enter must not send');
+    });
+
+    testWidgets('Cmd+Enter also sends', (tester) async {
+      final controller = _controller(tester);
+      final input = TextEditingController(text: 'ship it');
+      var sends = 0;
+
+      await tester.pumpWidget(
+        _app(
+          _lowerPane(
+            controller: controller,
+            inputController: input,
+            onSend: () async => sends++,
+          ),
+        ),
+      );
+      await tester.pump();
+
+      await tester.tap(find.byKey(const Key('assistant-input-field')));
+      await tester.pump();
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.metaLeft);
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.metaLeft);
+      await tester.pump();
+
+      expect(sends, 1);
+    });
+
+    testWidgets('an empty draft cannot be sent, by key or by button', (
+      tester,
+    ) async {
+      final controller = _controller(tester);
+      final input = TextEditingController(text: '   ');
+      var sends = 0;
+
+      await tester.pumpWidget(
+        _app(
+          _lowerPane(
+            controller: controller,
+            inputController: input,
+            onSend: () async => sends++,
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final button = tester.widget<FilledButton>(
+        find.byKey(const Key('assistant-send-button')),
+      );
+      expect(button.onPressed, isNull, reason: 'whitespace is not a draft');
+
+      await tester.tap(find.byKey(const Key('assistant-input-field')));
+      await tester.pump();
+      await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+      await tester.pump();
+
+      expect(sends, 0);
+    });
+
+    testWidgets('a non-empty draft enables the send button', (tester) async {
+      final controller = _controller(tester);
+      final input = TextEditingController(text: 'ship it');
+
+      await tester.pumpWidget(
+        _app(_lowerPane(controller: controller, inputController: input)),
+      );
+      await tester.pump();
+
+      final button = tester.widget<FilledButton>(
+        find.byKey(const Key('assistant-send-button')),
+      );
+      expect(button.onPressed, isNotNull);
+    });
+  });
+}
+
+AppController _controller(WidgetTester tester) {
+  final controller = AppController(environmentOverride: const <String, String>{});
+  addTearDown(controller.dispose);
+  return controller;
+}
+
+Widget _app(Widget child) => MaterialApp(
+  theme: AppTheme.light(platform: TargetPlatform.macOS),
+  home: Scaffold(body: child),
+);
+
+Widget _lowerPane({
+  required AppController controller,
+  required TextEditingController inputController,
+  Future<void> Function()? onSend,
+}) {
+  return SurfaceCard(
+    child: AssistantLowerPaneInternal(
+      bottomContentInset: 0,
+      controller: controller,
+      inputController: inputController,
+      focusNode: FocusNode(),
+      thinkingLabel: 'medium',
+      showModelControl: false,
+      modelLabel: 'gpt-5.4',
+      modelOptions: const <String>[],
+      attachments: const <ComposerAttachmentInternal>[],
+      availableSkills: const <ComposerSkillOptionInternal>[],
+      selectedSkillKeys: const <String>[],
+      onRemoveAttachment: (_) {},
+      onToggleSkill: (_) {},
+      onThinkingChanged: (_) {},
+      onModelChanged: (_) async {},
+      onPickAttachments: () {},
+      onAddAttachment: (_) {},
+      onPasteImageAttachment: () async => null,
+      onComposerContentHeightChanged: (_) {},
+      onComposerInputHeightChanged: (_) {},
+      onSend: onSend ?? () async {},
+    ),
+  );
+}
