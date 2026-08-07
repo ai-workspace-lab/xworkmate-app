@@ -91,12 +91,21 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
   static const double defaultInputHeightInternal =
       assistantComposerDefaultInputHeightInternal;
   static const double maxInputHeightInternal = 220;
-  static const Map<ShortcutActivator, Intent> pasteShortcutsInternal =
+  /// Composer key contract. Enter sends; Shift+Enter is intentionally absent so
+  /// the field inserts a newline itself; Cmd/Ctrl+Enter also sends (matches Kun
+  /// and the habit users bring from other agent clients).
+  static const Map<ShortcutActivator, Intent> composerShortcutsInternal =
       <ShortcutActivator, Intent>{
         SingleActivator(LogicalKeyboardKey.keyV, meta: true):
             AssistantPasteIntent(),
         SingleActivator(LogicalKeyboardKey.keyV, control: true):
             AssistantPasteIntent(),
+        SingleActivator(LogicalKeyboardKey.enter): AssistantSendIntent(),
+        SingleActivator(LogicalKeyboardKey.enter, meta: true):
+            AssistantSendIntent(),
+        SingleActivator(LogicalKeyboardKey.enter, control: true):
+            AssistantSendIntent(),
+        SingleActivator(LogicalKeyboardKey.escape): AssistantAbortIntent(),
       };
 
   late double inputHeightInternal;
@@ -370,6 +379,19 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
     );
   }
 
+  /// True while the active session has a turn in flight. Stopping it lives in
+  /// the progress bar above the composer, not here — the composer only reflects
+  /// the state so the send key cannot queue a second turn by accident.
+  bool get runInFlightInternal => widget.controller
+      .assistantSessionHasPendingRun(widget.controller.currentSessionKey);
+
+  /// A draft is sendable when it has non-whitespace text (or an attachment) and
+  /// nothing is already running.
+  bool get canSendInternal =>
+      !runInFlightInternal &&
+      (widget.inputController.text.trim().isNotEmpty ||
+          widget.attachments.isNotEmpty);
+
   Future<void> handleSendInternal() async {
     applySelectedBuiltinPluginsToInputInternal();
     await widget.onSend();
@@ -397,7 +419,19 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
     final selectedSkills = widget.availableSkills
         .where((skill) => widget.selectedSkillKeys.contains(skill.key))
         .toList(growable: false);
-    final submitLabel = appText('提交', 'Submit');
+    final submitLabel = runInFlightInternal
+        ? appText('运行中', 'Running')
+        : appText('提交', 'Submit');
+    // The tooltip carries the key hint, and when the button is disabled, the
+    // reason — a dead control with no explanation is worse than none.
+    final submitTooltip = runInFlightInternal
+        ? appText(
+            '任务运行中，可在上方进度条停止。',
+            'Task running — stop it from the progress bar above.',
+          )
+        : canSendInternal
+        ? appText('提交（Enter）', 'Submit (Enter)')
+        : appText('先输入内容或添加附件', 'Type something or add an attachment first');
 
     reportContentHeightInternal();
 
@@ -589,12 +623,32 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
               key: const Key('assistant-composer-input-area'),
               height: inputHeightInternal,
               child: Shortcuts(
-                shortcuts: pasteShortcutsInternal,
+                shortcuts: composerShortcutsInternal,
                 child: Actions(
                   actions: <Type, Action<Intent>>{
                     AssistantPasteIntent: CallbackAction<AssistantPasteIntent>(
                       onInvoke: (_) {
                         unawaited(handlePasteShortcutInternal());
+                        return null;
+                      },
+                    ),
+                    AssistantSendIntent: CallbackAction<AssistantSendIntent>(
+                      onInvoke: (_) {
+                        if (canSendInternal) {
+                          unawaited(handleSendInternal());
+                        }
+                        return null;
+                      },
+                    ),
+                    AssistantAbortIntent: CallbackAction<AssistantAbortIntent>(
+                      onInvoke: (_) {
+                        if (skillPickerPortalControllerInternal.isShowing) {
+                          hideSkillPickerInternal();
+                          return null;
+                        }
+                        if (runInFlightInternal) {
+                          unawaited(widget.controller.abortRun());
+                        }
                         return null;
                       },
                     ),
@@ -620,7 +674,8 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
                         'Describe the task or add context. XWorkmate keeps the current task context.',
                       ),
                     ),
-                    onSubmitted: (_) => handleSendInternal(),
+                    // No onSubmitted: the field is multiline, so it never
+                    // fires. Enter is handled by composerShortcutsInternal.
                   ),
                 ),
               ),
@@ -766,10 +821,12 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
                 ),
                 const SizedBox(width: 8),
                 Tooltip(
-                  message: submitLabel,
+                  message: submitTooltip,
                   child: FilledButton(
                     key: const Key('assistant-send-button'),
-                    onPressed: handleSendInternal,
+                    onPressed: canSendInternal
+                        ? () => unawaited(handleSendInternal())
+                        : null,
                     style: FilledButton.styleFrom(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 10,
@@ -783,7 +840,14 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Icon(Icons.arrow_upward_rounded, size: 18),
+                        if (runInFlightInternal)
+                          const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        else
+                          const Icon(Icons.arrow_upward_rounded, size: 18),
                         const SizedBox(width: 4),
                         Text(submitLabel),
                       ],

@@ -81,6 +81,19 @@ class AssistantPasteIntent extends Intent {
   const AssistantPasteIntent();
 }
 
+/// Send the composer draft. Bound to Enter and Cmd/Ctrl+Enter; Shift+Enter is
+/// deliberately left unbound so it falls through to the field as a newline.
+class AssistantSendIntent extends Intent {
+  const AssistantSendIntent();
+}
+
+/// Stop the run in flight. Bound to Escape, and routed to the same
+/// `controller.abortRun()` the progress bar's Stop button uses — "can I stop
+/// this" must not have two sources of truth.
+class AssistantAbortIntent extends Intent {
+  const AssistantAbortIntent();
+}
+
 Future<XFile?> readClipboardImageAsXFileInternal() async {
   // pasteboard normalizes clipboard images to PNG bytes across platforms.
   Uint8List? bytes;

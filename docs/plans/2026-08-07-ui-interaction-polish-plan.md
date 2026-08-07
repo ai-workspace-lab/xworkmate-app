@@ -89,13 +89,16 @@ Flutter 中 `maxLines: null` 会把输入框切为多行语义，Enter 插入换
 
 与桌面端形成反向割裂：**桌面能多行不能回车发送，移动能回车发送不能多行**。同一产品的两个形态，输入契约相反。
 
-### 2.3 发送按钮无状态机、无中断入口 — P0
+### 2.3 发送按钮无状态机 — P0
 
-`assistant_page_composer_bar.dart:400,772`：`submitLabel` 恒为「提交」，`onPressed: handleSendInternal` 无条件绑定。缺三件事：
+`assistant_page_composer_bar.dart:400,772`：`submitLabel` 恒为「提交」，`onPressed: handleSendInternal` 无条件绑定。缺两件事：
 
 - 输入为空时的 disabled 态；
-- 运行中的 busy 态；
-- 运行中的**停止**入口。全仓检索 `interrupt` 只命中后端生命周期状态（`app_controller_desktop_runtime_helpers.dart` 等），**没有任何用户可点的中断控件**。任务跑飞只能等超时。
+- 运行中的 busy 态。
+
+**更正（2026-08-07 实施时发现）**：本节初稿曾断言「没有任何用户可点的中断控件」，**该结论是错的**。`assistant_task_progress_bar.dart:109-118` 有一个带文字的「停止」按钮，在 `state.running` 时显示，接在 `assistant_page_state_closure.dart:182` 的 `controller.abortRun()` 上，旁边还有 `recoverable` 态的「继续」。初稿检索 `interrupt`/`停止` 时漏了 `onStop`/`abortRun`。
+
+因此**不要**在组合器里再放一个停止按钮——那会让「运行中能否停止」这一事实有两个来源，正是本规划引用 openworker 时推崇的反面。组合器只需在运行中把发送键置为 busy，停止仍归进度条。
 
 ### 2.4 键盘可达性近乎为零 — P0
 
@@ -171,8 +174,8 @@ StatusTone.danger  => (palette.surfacePrimary, palette.danger),
 |---|---|---|
 | 1.1 | 桌面组合器接入 `Shortcuts`/`Actions`：Enter 发送、Shift+Enter 换行、Cmd/Ctrl+Enter 发送；删除失效的 `onSubmitted` | `assistant_page_composer_bar.dart:591-625` |
 | 1.2 | 移动组合器改 `minLines: 1, maxLines: 5`，`textInputAction` 保持 `send`，Shift+Enter 换行 | `mobile_assistant_page_composer.dart:514-518` |
-| 1.3 | 发送按钮三态：空输入 disabled、运行中切「停止」（`Icons.stop_rounded` + danger 描边）、其余可发 | `assistant_page_composer_bar.dart:400,769-792` |
-| 1.4 | 接入中断动作：controller 暴露 `interruptCurrentRun()`，Esc 与停止按钮共用 | `app_controller_desktop_thread_actions.dart` + 组合器 |
+| 1.3 | 发送按钮三态：空输入 disabled、运行中 busy（不重复放停止，见 2.3 更正）、其余可发 | `assistant_page_composer_bar.dart:400,769-792` |
+| 1.4 | Esc 走**已有的** `controller.abortRun()` 通路（进度条已在用），不新增 controller API | 组合器 + `app_shell_desktop.dart` |
 | 1.5 | 技能选择器弹层键盘导航：↑↓ 移动高亮、Enter 选中、Esc 关闭、Tab 循环 | `assistant_page_composer_skill_picker.dart` |
 | 1.6 | 全局 Esc 契约：优先关最上层弹层 → 其次收起技能选择器 → 最后中断运行 | `app_shell_desktop.dart` |
 
