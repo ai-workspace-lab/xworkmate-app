@@ -18,6 +18,7 @@ class PaneResizeHandle extends StatefulWidget {
     super.key,
     required this.axis,
     this.onDelta,
+    this.onDragEnd,
     this.extent,
   });
 
@@ -26,6 +27,11 @@ class PaneResizeHandle extends StatefulWidget {
   /// Drag callback. When null the boundary renders as a static divider and
   /// lets pointer events through to the panes underneath.
   final ValueChanged<double>? onDelta;
+
+  /// Fired once when a drag gesture finishes. Use this to persist the new
+  /// size: [onDelta] fires on every pointer move, so writing from there would
+  /// hammer the store for a single drag.
+  final VoidCallback? onDragEnd;
 
   /// Thickness of the grab area — not of the visible line.
   final double? extent;
@@ -78,8 +84,14 @@ class _PaneResizeHandleState extends State<PaneResizeHandle> {
       child: GestureDetector(
         behavior: HitTestBehavior.opaque,
         onPanStart: (_) => setState(() => _dragging = true),
-        onPanEnd: (_) => setState(() => _dragging = false),
-        onPanCancel: () => setState(() => _dragging = false),
+        onPanEnd: (_) {
+          setState(() => _dragging = false);
+          widget.onDragEnd?.call();
+        },
+        onPanCancel: () {
+          setState(() => _dragging = false);
+          widget.onDragEnd?.call();
+        },
         onPanUpdate: (details) =>
             onDelta(isHorizontalDrag ? details.delta.dx : details.delta.dy),
         child: boundary,

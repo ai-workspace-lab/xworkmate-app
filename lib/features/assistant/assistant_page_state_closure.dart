@@ -289,7 +289,17 @@ extension AssistantPageStateClosureInternal on AssistantPageStateInternal {
                 height: PaneResizeHandle.defaultHitExtent,
                 child: PaneResizeHandle(
                   axis: Axis.vertical,
+                  // Persist once the gesture settles, not on every move.
+                  onDragEnd: () => unawaited(
+                    controller.saveAssistantComposerHeightAdjustment(
+                      workspaceLowerPaneHeightAdjustmentInternal,
+                    ),
+                  ),
                   onDelta: (delta) {
+                    // Capture before the layout changes: whether the reader was
+                    // at the newest message decides whether the transcript
+                    // follows the composer or holds its place.
+                    final wasAtBottom = conversationIsAtBottomInternal;
                     setState(() {
                       final nextComposerHeight = (composerHeight - delta)
                           .clamp(
@@ -300,6 +310,9 @@ extension AssistantPageStateClosureInternal on AssistantPageStateInternal {
                       workspaceLowerPaneHeightAdjustmentInternal =
                           nextComposerHeight - defaultComposerHeight;
                     });
+                    if (wasAtBottom) {
+                      pinConversationToBottomInternal();
+                    }
                   },
                 ),
               ),

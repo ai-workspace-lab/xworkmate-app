@@ -107,6 +107,9 @@ class AssistantPageStateInternal extends State<AssistantPage> {
       const <ComposerAttachmentInternal>[];
   String? lastAutoAgentLabelInternal;
   String lastConversationScrollSignatureInternal = '';
+
+  /// Restored from persisted UI state in [initState] so a dragged composer
+  /// survives a restart; written back on drag end.
   double workspaceLowerPaneHeightAdjustmentInternal = 0;
   bool artifactPaneCollapsedInternal = true;
   bool publishingConversationInternal = false;
@@ -122,6 +125,8 @@ class AssistantPageStateInternal extends State<AssistantPage> {
     conversationControllerInternal = ScrollController();
     composerFocusNodeInternal = FocusNode();
     sidePaneCollapsedInternal = widget.unifiedPaneStartsCollapsed;
+    workspaceLowerPaneHeightAdjustmentInternal =
+        widget.controller.appUiState.assistantComposerHeightAdjustment;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) {
         return;
@@ -138,7 +143,35 @@ class AssistantPageStateInternal extends State<AssistantPage> {
     if (oldWidget.unifiedPaneStartsCollapsed !=
         widget.unifiedPaneStartsCollapsed) {
       sidePaneCollapsedInternal = widget.unifiedPaneStartsCollapsed;
+      workspaceLowerPaneHeightAdjustmentInternal =
+          widget.controller.appUiState.assistantComposerHeightAdjustment;
     }
+  }
+
+  /// True when the transcript is parked at (or within a line of) its newest
+  /// message. Resizing the composer must not silently scroll that message out
+  /// of view, so the two panes stay anchored to the same content.
+  bool get conversationIsAtBottomInternal {
+    if (!conversationControllerInternal.hasClients) {
+      return true;
+    }
+    final position = conversationControllerInternal.position;
+    return position.pixels >= position.maxScrollExtent - 24;
+  }
+
+  /// Re-pin the transcript to its newest message after the composer takes or
+  /// gives back height. Jumps rather than animates: this runs mid-drag, and an
+  /// animation would fight the pointer.
+  void pinConversationToBottomInternal() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !conversationControllerInternal.hasClients) {
+        return;
+      }
+      final position = conversationControllerInternal.position;
+      if (position.pixels != position.maxScrollExtent) {
+        conversationControllerInternal.jumpTo(position.maxScrollExtent);
+      }
+    });
   }
 
   @override

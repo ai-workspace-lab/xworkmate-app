@@ -171,6 +171,19 @@ extension AppControllerDesktopSettingsRuntime on AppController {
     );
   }
 
+  /// Persist how far the user dragged the composer boundary. Called once per
+  /// drag gesture, not per pointer move.
+  Future<void> saveAssistantComposerHeightAdjustment(double adjustment) async {
+    final normalized = normalizeComposerHeightAdjustment(adjustment);
+    if (normalized == appUiState.assistantComposerHeightAdjustment) {
+      return;
+    }
+    await saveAppUiStateInternal(
+      appUiState.copyWith(assistantComposerHeightAdjustment: normalized),
+      notify: false,
+    );
+  }
+
   Future<void> toggleAccountWorkspaceFollowed() async {
     await AppControllerDesktopSettings(this).saveSettings(
       settings.copyWith(
