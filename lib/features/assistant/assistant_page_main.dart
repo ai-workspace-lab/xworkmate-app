@@ -39,13 +39,11 @@ import 'assistant_page_state_actions.dart';
 const double assistantComposerDefaultInputHeightInternal = 40;
 const double assistantWorkspaceMinConversationHeightInternal = 180;
 const double assistantWorkspaceMinLowerPaneHeightInternal = 160;
+
 /// Horizontal pane boundaries are overlaid on the seam (see [PaneResizeHandle]),
 /// so neighbouring panes sit flush and reserve no layout width between them.
 const double assistantHorizontalPaneGutterInternal = 0;
 
-/// The composer boundary still occupies its row in the column, but the strip
-/// carries the surrounding pane colour so only the hairline reads as a seam.
-const double assistantVerticalResizeHandleHeightInternal = 8;
 const double assistantArtifactPaneMinWidthInternal = 280;
 const double assistantArtifactPaneDefaultWidthInternal = 360;
 const double assistantCollapsedArtifactToggleClearanceInternal = 56;
@@ -109,9 +107,9 @@ class AssistantPageStateInternal extends State<AssistantPage> {
       const <ComposerAttachmentInternal>[];
   String? lastAutoAgentLabelInternal;
   String lastConversationScrollSignatureInternal = '';
-  double composerInputHeightInternal =
-      assistantComposerDefaultInputHeightInternal;
-  double composerMeasuredContentHeightInternal = 0;
+
+  /// Restored from persisted UI state in [initState] so a dragged composer
+  /// survives a restart; written back on drag end.
   double workspaceLowerPaneHeightAdjustmentInternal = 0;
   bool artifactPaneCollapsedInternal = true;
   bool publishingConversationInternal = false;
@@ -127,6 +125,8 @@ class AssistantPageStateInternal extends State<AssistantPage> {
     conversationControllerInternal = ScrollController();
     composerFocusNodeInternal = FocusNode();
     sidePaneCollapsedInternal = widget.unifiedPaneStartsCollapsed;
+    workspaceLowerPaneHeightAdjustmentInternal =
+        widget.controller.appUiState.assistantComposerHeightAdjustment;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) {
         return;
@@ -143,18 +143,34 @@ class AssistantPageStateInternal extends State<AssistantPage> {
     if (oldWidget.unifiedPaneStartsCollapsed !=
         widget.unifiedPaneStartsCollapsed) {
       sidePaneCollapsedInternal = widget.unifiedPaneStartsCollapsed;
+      workspaceLowerPaneHeightAdjustmentInternal =
+          widget.controller.appUiState.assistantComposerHeightAdjustment;
     }
   }
 
-  void handleComposerContentHeightChangedInternal(double value) {
-    if (!mounted || !value.isFinite || value <= 0) {
-      return;
+  /// True when the transcript is parked at (or within a line of) its newest
+  /// message. Resizing the composer must not silently scroll that message out
+  /// of view, so the two panes stay anchored to the same content.
+  bool get conversationIsAtBottomInternal {
+    if (!conversationControllerInternal.hasClients) {
+      return true;
     }
-    if ((composerMeasuredContentHeightInternal - value).abs() < 0.5) {
-      return;
-    }
-    setState(() {
-      composerMeasuredContentHeightInternal = value;
+    final position = conversationControllerInternal.position;
+    return position.pixels >= position.maxScrollExtent - 24;
+  }
+
+  /// Re-pin the transcript to its newest message after the composer takes or
+  /// gives back height. Jumps rather than animates: this runs mid-drag, and an
+  /// animation would fight the pointer.
+  void pinConversationToBottomInternal() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !conversationControllerInternal.hasClients) {
+        return;
+      }
+      final position = conversationControllerInternal.position;
+      if (position.pixels != position.maxScrollExtent) {
+        conversationControllerInternal.jumpTo(position.maxScrollExtent);
+      }
     });
   }
 
@@ -269,8 +285,7 @@ class AssistantPageStateInternal extends State<AssistantPage> {
                   Positioned(
                     key: const Key('assistant-task-rail-resize-handle'),
                     left:
-                        threadRailWidth -
-                        PaneResizeHandle.defaultHitExtent / 2,
+                        threadRailWidth - PaneResizeHandle.defaultHitExtent / 2,
                     top: 0,
                     bottom: 0,
                     width: PaneResizeHandle.defaultHitExtent,
@@ -633,8 +648,6 @@ class AssistantLowerPaneInternal extends StatelessWidget {
     required this.onPickAttachments,
     required this.onAddAttachment,
     required this.onPasteImageAttachment,
-    required this.onComposerContentHeightChanged,
-    required this.onComposerInputHeightChanged,
     required this.onSend,
   });
 
@@ -656,8 +669,6 @@ class AssistantLowerPaneInternal extends StatelessWidget {
   final VoidCallback onPickAttachments;
   final ValueChanged<ComposerAttachmentInternal> onAddAttachment;
   final AssistantClipboardImageReader onPasteImageAttachment;
-  final ValueChanged<double> onComposerContentHeightChanged;
-  final ValueChanged<double> onComposerInputHeightChanged;
   final Future<void> Function() onSend;
 
   @override
@@ -669,32 +680,52 @@ class AssistantLowerPaneInternal extends StatelessWidget {
       child: ClipRect(
         child: Padding(
           padding: EdgeInsets.only(bottom: bottomContentInset),
-          child: OverflowBox(
-            alignment: Alignment.bottomCenter,
-            minHeight: 0,
-            maxHeight: double.infinity,
-            child: ComposerBarInternal(
-              controller: controller,
-              inputController: inputController,
-              focusNode: focusNode,
-              thinkingLabel: thinkingLabel,
-              showModelControl: showModelControl,
-              modelLabel: modelLabel,
-              modelOptions: modelOptions,
-              attachments: attachments,
-              availableSkills: availableSkills,
-              selectedSkillKeys: selectedSkillKeys,
-              onRemoveAttachment: onRemoveAttachment,
-              onToggleSkill: onToggleSkill,
-              onThinkingChanged: onThinkingChanged,
-              onModelChanged: onModelChanged,
-              onPickAttachments: onPickAttachments,
-              onAddAttachment: onAddAttachment,
-              onPasteImageAttachment: onPasteImageAttachment,
-              onContentHeightChanged: onComposerContentHeightChanged,
-              onInputHeightChanged: onComposerInputHeightChanged,
-              onSend: onSend,
-            ),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              // The composer is given a tight height so its writing area can
+              // flex. Normally that is the pane's own height, so dragging the
+              // pane taller grows the writing area instead of stranding the
+              // card above a dead gap.
+              //
+              // Below the composer's own minimum the pane can no longer hold
+              // it. Rather than squeezing the rows, we keep rendering at the
+              // minimum and bottom-align it, letting the ClipRect above trim
+              // the toolbar off the top — the submit row is the last thing to
+              // go, never the first.
+              final paneHeight = constraints.maxHeight;
+              final composerHeight = paneHeight.isFinite
+                  ? math.max(
+                      paneHeight,
+                      assistantComposerBaseHeightCompactInternal,
+                    )
+                  : assistantComposerBaseHeightCompactInternal;
+
+              return OverflowBox(
+                alignment: Alignment.bottomCenter,
+                minHeight: composerHeight,
+                maxHeight: composerHeight,
+                child: ComposerBarInternal(
+                  controller: controller,
+                  inputController: inputController,
+                  focusNode: focusNode,
+                  thinkingLabel: thinkingLabel,
+                  showModelControl: showModelControl,
+                  modelLabel: modelLabel,
+                  modelOptions: modelOptions,
+                  attachments: attachments,
+                  availableSkills: availableSkills,
+                  selectedSkillKeys: selectedSkillKeys,
+                  onRemoveAttachment: onRemoveAttachment,
+                  onToggleSkill: onToggleSkill,
+                  onThinkingChanged: onThinkingChanged,
+                  onModelChanged: onModelChanged,
+                  onPickAttachments: onPickAttachments,
+                  onAddAttachment: onAddAttachment,
+                  onPasteImageAttachment: onPasteImageAttachment,
+                  onSend: onSend,
+                ),
+              );
+            },
           ),
         ),
       ),

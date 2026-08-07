@@ -781,8 +781,6 @@ Widget _buildLowerPane({
       onPickAttachments: () {},
       onAddAttachment: (_) {},
       onPasteImageAttachment: () async => null,
-      onComposerContentHeightChanged: (_) {},
-      onComposerInputHeightChanged: (_) {},
       onSend: onSend ?? () async {},
     ),
   );

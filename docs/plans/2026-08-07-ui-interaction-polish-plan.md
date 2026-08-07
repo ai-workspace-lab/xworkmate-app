@@ -100,6 +100,21 @@ Flutter 中 `maxLines: null` 会把输入框切为多行语义，Enter 插入换
 
 因此**不要**在组合器里再放一个停止按钮——那会让「运行中能否停止」这一事实有两个来源，正是本规划引用 openworker 时推崇的反面。组合器只需在运行中把发送键置为 busy，停止仍归进度条。
 
+### 2.3.1 组合器高度有两个互不相通的控件 — P0（用户实测报告，2026-08-07）
+
+拖动下窗格的分隔线把窗格拉高后，组合器卡片**保持原有高度并贴底**，上方留出一大片灰色死区。
+
+三层原因叠加：
+
+1. `assistant_page_main.dart` 的 `AssistantLowerPaneInternal` 用 `OverflowBox(minHeight: 0, maxHeight: infinity, alignment: bottomCenter)` 包住组合器——组合器按**固有高度**渲染并贴底，外层 `ClipRect` 负责裁切。窗格变高时它不会跟着长。
+2. `assistant_page_composer_bar.dart` 的卡片 `Column` 是 `MainAxisSize.min` + `MainAxisAlignment.end`，输入区是**固定** `SizedBox(height: inputHeightInternal)`。
+3. 存在**第二个**高度控件 `ComposerResizeHandleInternal`，只改 `inputHeightInternal`，与窗格分隔线各管各的。
+
+**注意两个坑**（实施时踩到）：
+
+- 直接让卡片填满会形成**反馈环**：`reportContentHeightInternal` 把测得高度回喂给 `composerMeasuredContentHeightInternal` → `defaultComposerHeight` → 窗格高度 → 测得高度……每帧增长。必须改成**计算**最小高度，不再回喂测量值。
+- `OverflowBox` 不是冗余的：`assistant_lower_pane_test.dart` 有一条用例在 112px 窗格下断言**提交按钮仍可见**。它靠的正是「固有高度 + 贴底 + 从顶部裁切」。改成填满后这条会挂。正确解法是给组合器一个**紧约束**高度 `max(窗格高, 组合器最小高)`：够高就填满，不够就按最小高贴底、从顶部裁掉工具栏——提交行永远是最后被牺牲的。
+
 ### 2.4 键盘可达性近乎为零 — P0
 
 全仓 `Shortcuts`/`LogicalKeyboardKey` 绑定只有组合器里的 `Cmd/Ctrl+V` 粘贴（`:96-98`）。技能选择器是 `OverlayPortal` 弹层（`:190+`），**无 ↑↓ 选择、无 Enter 确认、无 Esc 关闭**，只能用鼠标。

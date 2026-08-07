@@ -44,58 +44,6 @@ class ComposerIconButtonInternal extends StatefulWidget {
       ComposerIconButtonStateInternal();
 }
 
-class ComposerResizeHandleInternal extends StatefulWidget {
-  const ComposerResizeHandleInternal({super.key, required this.onDelta});
-
-  final ValueChanged<double> onDelta;
-
-  @override
-  State<ComposerResizeHandleInternal> createState() =>
-      ComposerResizeHandleStateInternal();
-}
-
-class ComposerResizeHandleStateInternal
-    extends State<ComposerResizeHandleInternal> {
-  bool hoveredInternal = false;
-  bool draggingInternal = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.palette;
-    final highlight = hoveredInternal || draggingInternal;
-
-    return MouseRegion(
-      cursor: SystemMouseCursors.resizeRow,
-      onEnter: (_) => setState(() => hoveredInternal = true),
-      onExit: (_) => setState(() => hoveredInternal = false),
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onVerticalDragStart: (_) => setState(() => draggingInternal = true),
-        onVerticalDragEnd: (_) => setState(() => draggingInternal = false),
-        onVerticalDragCancel: () => setState(() => draggingInternal = false),
-        onVerticalDragUpdate: (details) => widget.onDelta(details.delta.dy),
-        child: SizedBox(
-          height: 12,
-          width: double.infinity,
-          child: Center(
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 140),
-              width: 42,
-              height: 2,
-              decoration: BoxDecoration(
-                color: highlight
-                    ? palette.accent.withValues(alpha: 0.72)
-                    : palette.strokeSoft,
-                borderRadius: BorderRadius.circular(999),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class ComposerIconButtonStateInternal
     extends State<ComposerIconButtonInternal> {
   bool hoveredInternal = false;
