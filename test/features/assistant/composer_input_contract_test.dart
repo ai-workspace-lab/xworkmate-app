@@ -20,10 +20,13 @@ void main() {
 
       await tester.pumpWidget(
         _app(
-          _lowerPane(
-            controller: controller,
-            inputController: input,
-            onSend: () async => sends++,
+          SizedBox(
+            height: 320,
+            child: _lowerPane(
+              controller: controller,
+              inputController: input,
+              onSend: () async => sends++,
+            ),
           ),
         ),
       );
@@ -46,10 +49,13 @@ void main() {
 
       await tester.pumpWidget(
         _app(
-          _lowerPane(
-            controller: controller,
-            inputController: input,
-            onSend: () async => sends++,
+          SizedBox(
+            height: 320,
+            child: _lowerPane(
+              controller: controller,
+              inputController: input,
+              onSend: () async => sends++,
+            ),
           ),
         ),
       );
@@ -72,10 +78,13 @@ void main() {
 
       await tester.pumpWidget(
         _app(
-          _lowerPane(
-            controller: controller,
-            inputController: input,
-            onSend: () async => sends++,
+          SizedBox(
+            height: 320,
+            child: _lowerPane(
+              controller: controller,
+              inputController: input,
+              onSend: () async => sends++,
+            ),
           ),
         ),
       );
@@ -100,10 +109,13 @@ void main() {
 
       await tester.pumpWidget(
         _app(
-          _lowerPane(
-            controller: controller,
-            inputController: input,
-            onSend: () async => sends++,
+          SizedBox(
+            height: 320,
+            child: _lowerPane(
+              controller: controller,
+              inputController: input,
+              onSend: () async => sends++,
+            ),
           ),
         ),
       );
@@ -122,12 +134,74 @@ void main() {
       expect(sends, 0);
     });
 
+    // The card fills the pane it is given, so dragging the lower pane taller
+    // grows the writing area instead of stranding the card at the bottom of an
+    // empty gap. Regression guard for the height-linkage report.
+    for (final paneHeight in <double>[240, 360, 520]) {
+      testWidgets('the composer fills a ${paneHeight.toInt()}px pane', (
+        tester,
+      ) async {
+        final controller = _controller(tester);
+        final input = TextEditingController();
+
+        await tester.pumpWidget(
+          _app(
+            SizedBox(
+              height: paneHeight,
+              child: _lowerPane(controller: controller, inputController: input),
+            ),
+          ),
+        );
+        await tester.pump();
+
+        // No leftover gap: the card reaches the bottom of its pane.
+        final pane = tester.getRect(find.byType(SurfaceCard));
+        final card = tester.getRect(
+          find.byKey(const Key('assistant-composer-input-area')),
+        );
+        expect(
+          card.height,
+          greaterThan(0),
+          reason: 'the writing area must absorb the pane slack',
+        );
+        expect(pane.height, closeTo(paneHeight, 0.5));
+        expect(tester.takeException(), isNull);
+      });
+    }
+
+    testWidgets('the second, redundant resize handle is gone', (tester) async {
+      final controller = _controller(tester);
+      await tester.pumpWidget(
+        _app(
+          SizedBox(
+            height: 320,
+            child: _lowerPane(
+              controller: controller,
+              inputController: TextEditingController(),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      // Height is owned by the lower pane's handle alone.
+      expect(
+        find.byKey(const Key('assistant-composer-resize-handle')),
+        findsNothing,
+      );
+    });
+
     testWidgets('a non-empty draft enables the send button', (tester) async {
       final controller = _controller(tester);
       final input = TextEditingController(text: 'ship it');
 
       await tester.pumpWidget(
-        _app(_lowerPane(controller: controller, inputController: input)),
+        _app(
+          SizedBox(
+            height: 320,
+            child: _lowerPane(controller: controller, inputController: input),
+          ),
+        ),
       );
       await tester.pump();
 
@@ -140,14 +214,20 @@ void main() {
 }
 
 AppController _controller(WidgetTester tester) {
-  final controller = AppController(environmentOverride: const <String, String>{});
+  final controller = AppController(
+    environmentOverride: const <String, String>{},
+  );
   addTearDown(controller.dispose);
   return controller;
 }
 
+// The composer always receives a bounded height in the app (the lower pane is
+// a SizedBox of the computed pane height), so the harness gives it one too.
 Widget _app(Widget child) => MaterialApp(
   theme: AppTheme.light(platform: TargetPlatform.macOS),
-  home: Scaffold(body: child),
+  home: Scaffold(
+    body: Align(alignment: Alignment.bottomCenter, child: child),
+  ),
 );
 
 Widget _lowerPane({
@@ -175,8 +255,6 @@ Widget _lowerPane({
       onPickAttachments: () {},
       onAddAttachment: (_) {},
       onPasteImageAttachment: () async => null,
-      onComposerContentHeightChanged: (_) {},
-      onComposerInputHeightChanged: (_) {},
       onSend: onSend ?? () async {},
     ),
   );

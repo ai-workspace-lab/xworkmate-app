@@ -56,8 +56,6 @@ class ComposerBarInternal extends StatefulWidget {
     required this.onPickAttachments,
     required this.onAddAttachment,
     required this.onPasteImageAttachment,
-    required this.onContentHeightChanged,
-    required this.onInputHeightChanged,
     required this.onSend,
   });
 
@@ -78,8 +76,6 @@ class ComposerBarInternal extends StatefulWidget {
   final VoidCallback onPickAttachments;
   final ValueChanged<ComposerAttachmentInternal> onAddAttachment;
   final AssistantClipboardImageReader onPasteImageAttachment;
-  final ValueChanged<double> onContentHeightChanged;
-  final ValueChanged<double> onInputHeightChanged;
   final Future<void> Function() onSend;
 
   @override
@@ -87,10 +83,6 @@ class ComposerBarInternal extends StatefulWidget {
 }
 
 class ComposerBarStateInternal extends State<ComposerBarInternal> {
-  static const double minInputHeightInternal = 40;
-  static const double defaultInputHeightInternal =
-      assistantComposerDefaultInputHeightInternal;
-  static const double maxInputHeightInternal = 220;
   /// Composer key contract. Enter sends; Shift+Enter is intentionally absent so
   /// the field inserts a newline itself; Cmd/Ctrl+Enter also sends (matches Kun
   /// and the habit users bring from other agent clients).
@@ -108,12 +100,8 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
         SingleActivator(LogicalKeyboardKey.escape): AssistantAbortIntent(),
       };
 
-  late double inputHeightInternal;
   final GlobalKey skillPickerTargetKeyInternal = GlobalKey(
     debugLabel: 'assistant-skill-picker-target',
-  );
-  final GlobalKey contentKeyInternal = GlobalKey(
-    debugLabel: 'assistant-composer-bar',
   );
   final LayerLink skillPickerLayerLinkInternal = LayerLink();
   final OverlayPortalController skillPickerPortalControllerInternal =
@@ -140,17 +128,9 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
   @override
   void initState() {
     super.initState();
-    inputHeightInternal = defaultInputHeightInternal;
     skillPickerSearchControllerInternal = TextEditingController();
     skillPickerSearchFocusNodeInternal = FocusNode();
     widget.controller.addListener(handleControllerChangedInternal);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) {
-        return;
-      }
-      widget.onInputHeightChanged(inputHeightInternal);
-      reportContentHeightInternal();
-    });
   }
 
   @override
@@ -160,7 +140,6 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
       oldWidget.controller.removeListener(handleControllerChangedInternal);
       widget.controller.addListener(handleControllerChangedInternal);
     }
-    reportContentHeightInternal();
   }
 
   List<ComposerSkillOptionInternal> activeSkillOptionsInternal() =>
@@ -243,32 +222,6 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
     setState(() {});
   }
 
-  void reportContentHeightInternal() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) {
-        return;
-      }
-      final height = contentKeyInternal.currentContext?.size?.height;
-      if (height == null || !height.isFinite || height <= 0) {
-        return;
-      }
-      widget.onContentHeightChanged(height);
-    });
-  }
-
-  void resizeInputInternal(double delta) {
-    final nextHeight = (inputHeightInternal + delta).clamp(
-      minInputHeightInternal,
-      maxInputHeightInternal,
-    );
-    if (nextHeight == inputHeightInternal) {
-      return;
-    }
-    setState(() {
-      inputHeightInternal = nextHeight;
-    });
-    widget.onInputHeightChanged(inputHeightInternal);
-  }
 
   Future<void> handlePasteShortcutInternal() async {
     if (handlingPasteShortcutInternal) {
@@ -433,10 +386,7 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
         ? appText('提交（Enter）', 'Submit (Enter)')
         : appText('先输入内容或添加附件', 'Type something or add an attachment first');
 
-    reportContentHeightInternal();
-
     return Padding(
-      key: contentKeyInternal,
       padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
       child: Container(
         padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
@@ -445,9 +395,12 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
           border: Border.all(color: palette.strokeSoft),
           borderRadius: BorderRadius.circular(AppRadius.card),
         ),
+        // Fills the pane it is given. The lower pane's own resize handle is the
+        // single height control; the text area below absorbs the slack, so
+        // dragging the pane taller grows the writing area instead of stranding
+        // the card at the bottom of an empty gap.
         child: Column(
-          mainAxisSize: MainAxisSize.min,
-          mainAxisAlignment: MainAxisAlignment.end,
+          mainAxisSize: MainAxisSize.max,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
@@ -619,9 +572,10 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
               ),
               const SizedBox(height: 6),
             ],
-            SizedBox(
+            // Expanded, not a fixed height: the writing area is whatever the
+            // pane has left after the toolbars and chips.
+            Expanded(
               key: const Key('assistant-composer-input-area'),
-              height: inputHeightInternal,
               child: Shortcuts(
                 shortcuts: composerShortcutsInternal,
                 child: Actions(
@@ -679,10 +633,6 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
                   ),
                 ),
               ),
-            ),
-            ComposerResizeHandleInternal(
-              key: const Key('assistant-composer-resize-handle'),
-              onDelta: resizeInputInternal,
             ),
             if (selectedSkills.isNotEmpty ||
                 selectedBuiltinPluginIdsInternal.isNotEmpty) ...[

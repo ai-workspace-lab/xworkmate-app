@@ -78,21 +78,15 @@ extension AssistantPageStateClosureInternal on AssistantPageStateInternal {
               availableWidth: composerContentWidth,
               averageChipWidth: 132,
             );
-        final fallbackComposerContentHeight =
-            baseComposerHeight +
-            math.max(
-              0.0,
-              composerInputHeightInternal -
-                  assistantComposerDefaultInputHeightInternal,
-            ) +
-            attachmentExtraHeight +
-            selectedSkillExtraHeight;
-        final composerContentHeight = composerMeasuredContentHeightInternal > 0
-            ? composerMeasuredContentHeightInternal
-            : fallbackComposerContentHeight;
+        // The composer's minimum: toolbars, chips and a one-line writing area.
+        // This is computed, never measured back from the rendered card — the
+        // card now fills the pane, so measuring it would feed the pane's own
+        // height into the height that sizes the pane, growing it every frame.
+        final minComposerContentHeight =
+            baseComposerHeight + attachmentExtraHeight + selectedSkillExtraHeight;
         final defaultComposerHeight = math.min(
           availableWorkspaceHeight,
-          composerContentHeight + composerBottomSpacing,
+          minComposerContentHeight + composerBottomSpacing,
         );
         final composerHeightUpperBound = math.min(
           availableWorkspaceHeight,
@@ -104,7 +98,11 @@ extension AssistantPageStateClosureInternal on AssistantPageStateInternal {
           ),
         );
         final composerHeightLowerBound = math.min(
-          assistantWorkspaceMinLowerPaneHeightInternal + composerBottomSpacing,
+          math.max(
+            assistantWorkspaceMinLowerPaneHeightInternal,
+            minComposerContentHeight,
+          ) +
+              composerBottomSpacing,
           composerHeightUpperBound,
         );
         final composerHeight =
@@ -287,10 +285,6 @@ extension AssistantPageStateClosureInternal on AssistantPageStateInternal {
                   onPasteImageAttachment:
                       widget.clipboardImageReader ??
                       readClipboardImageAsXFileInternal,
-                  onComposerContentHeightChanged:
-                      handleComposerContentHeightChangedInternal,
-                  onComposerInputHeightChanged:
-                      handleComposerInputHeightChangedInternal,
                   onSend: AssistantPageStateActionsInternal(
                     this,
                   ).submitPromptInternal,
@@ -458,15 +452,6 @@ extension AssistantPageStateClosureInternal on AssistantPageStateInternal {
         );
       },
     );
-  }
-
-  void handleComposerInputHeightChangedInternal(double value) {
-    if (!mounted || value == composerInputHeightInternal) {
-      return;
-    }
-    setState(() {
-      composerInputHeightInternal = value;
-    });
   }
 
   List<TimelineItemInternal> buildTimelineItemsInternal(
