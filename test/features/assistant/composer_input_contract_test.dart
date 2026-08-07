@@ -6,6 +6,7 @@ import 'package:xworkmate/features/assistant/assistant_page_composer_clipboard.d
 import 'package:xworkmate/features/assistant/assistant_page_composer_skill_picker.dart';
 import 'package:xworkmate/features/assistant/assistant_page_main.dart';
 import 'package:xworkmate/theme/app_theme.dart';
+import 'package:xworkmate/widgets/pane_resize_handle.dart';
 import 'package:xworkmate/widgets/surface_card.dart';
 
 /// The desktop composer's key contract. Before this, the field was multiline
@@ -168,6 +169,65 @@ void main() {
         expect(tester.takeException(), isNull);
       });
     }
+
+    // Every pane boundary in the app uses the same grammar: a 1px line
+    // overlaid on the seam with a wider grab area, costing no layout space.
+    // The transcript/composer divider used to be the odd one out — a colored
+    // strip that ate 8px of the workspace.
+    testWidgets('the composer boundary reserves no layout height', (
+      tester,
+    ) async {
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: AppTheme.light(platform: TargetPlatform.macOS),
+          home: Scaffold(
+            body: SizedBox(
+              height: 400,
+              child: Stack(
+                children: [
+                  Positioned.fill(
+                    child: Column(
+                      children: const [
+                        Expanded(child: SizedBox()),
+                        SizedBox(height: 160),
+                      ],
+                    ),
+                  ),
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 160 - PaneResizeHandle.defaultHitExtent / 2,
+                    height: PaneResizeHandle.defaultHitExtent,
+                    child: PaneResizeHandle(
+                      axis: Axis.vertical,
+                      onDelta: (_) {},
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      // The visible line is a hairline; the grab area is wider and overlaid.
+      final line = tester.widget<AnimatedContainer>(
+        find.byType(AnimatedContainer),
+      );
+      expect(line.constraints?.maxHeight, 1);
+      expect(
+        tester
+            .getSize(
+              find.descendant(
+                of: find.byType(PaneResizeHandle),
+                matching: find.byType(SizedBox),
+              ),
+            )
+            .height,
+        PaneResizeHandle.defaultHitExtent,
+      );
+    });
 
     testWidgets('the second, redundant resize handle is gone', (tester) async {
       final controller = _controller(tester);

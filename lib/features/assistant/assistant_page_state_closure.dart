@@ -47,7 +47,6 @@ extension AssistantPageStateClosureInternal on AssistantPageStateInternal {
   }) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final palette = context.palette;
         final mediaQuery = MediaQuery.of(context);
         final composerBottomInset = math.max(
           mediaQuery.viewPadding.bottom,
@@ -60,10 +59,9 @@ extension AssistantPageStateClosureInternal on AssistantPageStateInternal {
             ? assistantComposerBaseHeightTallInternal
             : assistantComposerBaseHeightCompactInternal;
         final composerContentWidth = math.max(240.0, constraints.maxWidth - 32);
-        final availableWorkspaceHeight = math.max(
-          0.0,
-          constraints.maxHeight - assistantVerticalResizeHandleHeightInternal,
-        );
+        // The transcript/composer boundary is overlaid on the seam like every
+        // other pane boundary, so it reserves no height of its own.
+        final availableWorkspaceHeight = math.max(0.0, constraints.maxHeight);
         final attachmentExtraHeight =
             estimatedComposerWrapSectionHeightInternal(
               itemCount: attachmentsInternal.length,
@@ -83,7 +81,9 @@ extension AssistantPageStateClosureInternal on AssistantPageStateInternal {
         // card now fills the pane, so measuring it would feed the pane's own
         // height into the height that sizes the pane, growing it every frame.
         final minComposerContentHeight =
-            baseComposerHeight + attachmentExtraHeight + selectedSkillExtraHeight;
+            baseComposerHeight +
+            attachmentExtraHeight +
+            selectedSkillExtraHeight;
         final defaultComposerHeight = math.min(
           availableWorkspaceHeight,
           minComposerContentHeight + composerBottomSpacing,
@@ -99,9 +99,9 @@ extension AssistantPageStateClosureInternal on AssistantPageStateInternal {
         );
         final composerHeightLowerBound = math.min(
           math.max(
-            assistantWorkspaceMinLowerPaneHeightInternal,
-            minComposerContentHeight,
-          ) +
+                assistantWorkspaceMinLowerPaneHeightInternal,
+                minComposerContentHeight,
+              ) +
               composerBottomSpacing,
           composerHeightUpperBound,
         );
@@ -126,168 +126,181 @@ extension AssistantPageStateClosureInternal on AssistantPageStateInternal {
           borderRadius: 0,
           padding: EdgeInsets.zero,
           tone: SurfaceCardTone.chrome,
-          child: Column(
+          child: Stack(
             children: [
-              Expanded(
-                child: KeyedSubtree(
-                  key: const Key('assistant-conversation-shell'),
-                  child: ConversationAreaInternal(
-                    controller: controller,
-                    currentTask: currentTask,
-                    items: timelineItems,
-                    messageViewMode: controller
-                        .assistantMessageViewModeForSession(activeSessionKey),
-                    bottomContentInset: composerBottomSpacing,
-                    topTrailingInset: artifactPaneCollapsedInternal
-                        ? assistantCollapsedArtifactToggleClearanceInternal
-                        : 0,
-                    scrollController: conversationControllerInternal,
-                    onOpenDetail: widget.onOpenDetail,
-                    onFocusComposer: AssistantPageStateActionsInternal(
-                      this,
-                    ).focusComposerInternal,
-                    onOpenGateway: AssistantPageStateActionsInternal(
-                      this,
-                    ).openGatewaySettingsInternal,
-                    onOpenAiGatewaySettings: AssistantPageStateActionsInternal(
-                      this,
-                    ).openAiGatewaySettingsInternal,
-                    onReconnectGateway: AssistantPageStateActionsInternal(
-                      this,
-                    ).connectFromSavedSettingsOrShowDialogInternal,
-                    onMessageViewModeChanged:
-                        controller.setAssistantMessageViewMode,
-                    onRecallUserMessage: AssistantPageStateActionsInternal(
-                      this,
-                    ).recallUserMessageInternal,
-                    onEditUserMessage: AssistantPageStateActionsInternal(
-                      this,
-                    ).editUserMessageInternal,
-                    onRunConversationWorkflow:
-                        AssistantPageStateActionsInternal(
+              Positioned.fill(
+                child: Column(
+                  children: [
+                    Expanded(
+                      child: KeyedSubtree(
+                        key: const Key('assistant-conversation-shell'),
+                        child: ConversationAreaInternal(
+                          controller: controller,
+                          currentTask: currentTask,
+                          items: timelineItems,
+                          messageViewMode: controller
+                              .assistantMessageViewModeForSession(
+                                activeSessionKey,
+                              ),
+                          bottomContentInset: composerBottomSpacing,
+                          topTrailingInset: artifactPaneCollapsedInternal
+                              ? assistantCollapsedArtifactToggleClearanceInternal
+                              : 0,
+                          scrollController: conversationControllerInternal,
+                          onOpenDetail: widget.onOpenDetail,
+                          onFocusComposer: AssistantPageStateActionsInternal(
+                            this,
+                          ).focusComposerInternal,
+                          onOpenGateway: AssistantPageStateActionsInternal(
+                            this,
+                          ).openGatewaySettingsInternal,
+                          onOpenAiGatewaySettings:
+                              AssistantPageStateActionsInternal(
+                                this,
+                              ).openAiGatewaySettingsInternal,
+                          onReconnectGateway: AssistantPageStateActionsInternal(
+                            this,
+                          ).connectFromSavedSettingsOrShowDialogInternal,
+                          onMessageViewModeChanged:
+                              controller.setAssistantMessageViewMode,
+                          onRecallUserMessage:
+                              AssistantPageStateActionsInternal(
+                                this,
+                              ).recallUserMessageInternal,
+                          onEditUserMessage: AssistantPageStateActionsInternal(
+                            this,
+                          ).editUserMessageInternal,
+                          onRunConversationWorkflow:
+                              AssistantPageStateActionsInternal(
+                                this,
+                              ).runConversationWorkflowInternal,
+                          workflowSupported: controller
+                              .featuresFor(
+                                resolveUiFeaturePlatformFromContext(context),
+                              )
+                              .supportsGitHubRepository,
+                          workflowEnabled:
+                              controller.canRunConversationWorkflow,
+                          workflowRunning: publishingConversationInternal,
+                        ),
+                      ),
+                    ),
+                    AssistantTaskProgressBar(
+                      state: progressState,
+                      onStop: progressState.running
+                          ? () {
+                              unawaited(controller.abortRun());
+                            }
+                          : null,
+                      onContinue: progressState.recoverable
+                          ? () {
+                              unawaited(
+                                AssistantPageStateActionsInternal(
+                                  this,
+                                ).continueCurrentTaskInternal(activeSessionKey),
+                              );
+                            }
+                          : null,
+                    ),
+                    SizedBox(
+                      key: const Key('assistant-composer-shell'),
+                      height: composerHeight,
+                      child: AssistantLowerPaneInternal(
+                        bottomContentInset: composerBottomSpacing,
+                        inputController: inputControllerInternal,
+                        focusNode: composerFocusNodeInternal,
+                        thinkingLabel: thinkingLabelInternal,
+                        showModelControl: true,
+                        modelLabel: controller.assistantDisplayModelForSession(
+                          activeSessionKey,
+                        ),
+                        modelOptions: controller.assistantModelChoices,
+                        attachments: attachmentsInternal,
+                        availableSkills: AssistantPageStateActionsInternal(
                           this,
-                        ).runConversationWorkflowInternal,
-                    workflowSupported: controller
-                        .featuresFor(
-                          resolveUiFeaturePlatformFromContext(context),
-                        )
-                        .supportsGitHubRepository,
-                    workflowEnabled: controller.canRunConversationWorkflow,
-                    workflowRunning: publishingConversationInternal,
-                  ),
-                ),
-              ),
-              AssistantTaskProgressBar(
-                state: progressState,
-                onStop: progressState.running
-                    ? () {
-                        unawaited(controller.abortRun());
-                      }
-                    : null,
-                onContinue: progressState.recoverable
-                    ? () {
-                        unawaited(
+                        ).availableSkillOptionsInternal(controller),
+                        selectedSkillKeys: AssistantPageStateActionsInternal(
+                          this,
+                        ).selectedSkillKeysForInternal(controller),
+                        controller: controller,
+                        onRemoveAttachment: (attachment) {
+                          setState(() {
+                            attachmentsInternal = attachmentsInternal
+                                .where((item) => item.path != attachment.path)
+                                .toList(growable: false);
+                            saveComposerAttachmentsForSessionInternal(
+                              activeSessionKey,
+                            );
+                          });
+                        },
+                        onToggleSkill: (key) {
+                          unawaited(
+                            controller.toggleAssistantSkillForSession(
+                              activeSessionKey,
+                              key,
+                            ),
+                          );
                           AssistantPageStateActionsInternal(
                             this,
-                          ).continueCurrentTaskInternal(activeSessionKey),
-                        );
-                      }
-                    : null,
-              ),
-              // The strip carries the pane colour so the seam reads as a
-              // hairline rather than as a gap between two floating blocks.
-              ColoredBox(
-                color: palette.surfacePrimary,
-                child: SizedBox(
-                  key: const Key('assistant-workspace-resize-handle'),
-                  height: assistantVerticalResizeHandleHeightInternal,
-                  child: PaneResizeHandle(
-                    axis: Axis.vertical,
-                    onDelta: (delta) {
-                      setState(() {
-                        final nextComposerHeight = (composerHeight - delta)
-                            .clamp(
-                              composerHeightLowerBound,
-                              composerHeightUpperBound,
-                            )
-                            .toDouble();
-                        workspaceLowerPaneHeightAdjustmentInternal =
-                            nextComposerHeight - defaultComposerHeight;
-                      });
-                    },
-                  ),
+                          ).focusComposerInternal();
+                        },
+                        onThinkingChanged: (value) {
+                          setState(() => thinkingLabelInternal = value);
+                        },
+                        onModelChanged: (modelId) =>
+                            controller.selectAssistantModelForSession(
+                              activeSessionKey,
+                              modelId,
+                            ),
+                        onPickAttachments: AssistantPageStateActionsInternal(
+                          this,
+                        ).pickAttachmentsInternal,
+                        onAddAttachment: (attachment) {
+                          setState(() {
+                            attachmentsInternal = [
+                              ...attachmentsInternal,
+                              attachment,
+                            ];
+                            saveComposerAttachmentsForSessionInternal(
+                              activeSessionKey,
+                            );
+                          });
+                        },
+                        onPasteImageAttachment:
+                            widget.clipboardImageReader ??
+                            readClipboardImageAsXFileInternal,
+                        onSend: AssistantPageStateActionsInternal(
+                          this,
+                        ).submitPromptInternal,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              SizedBox(
-                key: const Key('assistant-composer-shell'),
-                height: composerHeight,
-                child: AssistantLowerPaneInternal(
-                  bottomContentInset: composerBottomSpacing,
-                  inputController: inputControllerInternal,
-                  focusNode: composerFocusNodeInternal,
-                  thinkingLabel: thinkingLabelInternal,
-                  showModelControl: true,
-                  modelLabel: controller.assistantDisplayModelForSession(
-                    activeSessionKey,
-                  ),
-                  modelOptions: controller.assistantModelChoices,
-                  attachments: attachmentsInternal,
-                  availableSkills: AssistantPageStateActionsInternal(
-                    this,
-                  ).availableSkillOptionsInternal(controller),
-                  selectedSkillKeys: AssistantPageStateActionsInternal(
-                    this,
-                  ).selectedSkillKeysForInternal(controller),
-                  controller: controller,
-                  onRemoveAttachment: (attachment) {
+              // Same grammar as every other pane boundary: overlaid on the
+              // seam, so the transcript and the composer stay flush and the
+              // divider costs no layout height. Dragging it is the single
+              // control over the composer's height.
+              Positioned(
+                key: const Key('assistant-workspace-resize-handle'),
+                left: 0,
+                right: 0,
+                bottom: composerHeight - PaneResizeHandle.defaultHitExtent / 2,
+                height: PaneResizeHandle.defaultHitExtent,
+                child: PaneResizeHandle(
+                  axis: Axis.vertical,
+                  onDelta: (delta) {
                     setState(() {
-                      attachmentsInternal = attachmentsInternal
-                          .where((item) => item.path != attachment.path)
-                          .toList(growable: false);
-                      saveComposerAttachmentsForSessionInternal(
-                        activeSessionKey,
-                      );
+                      final nextComposerHeight = (composerHeight - delta)
+                          .clamp(
+                            composerHeightLowerBound,
+                            composerHeightUpperBound,
+                          )
+                          .toDouble();
+                      workspaceLowerPaneHeightAdjustmentInternal =
+                          nextComposerHeight - defaultComposerHeight;
                     });
                   },
-                  onToggleSkill: (key) {
-                    unawaited(
-                      controller.toggleAssistantSkillForSession(
-                        activeSessionKey,
-                        key,
-                      ),
-                    );
-                    AssistantPageStateActionsInternal(
-                      this,
-                    ).focusComposerInternal();
-                  },
-                  onThinkingChanged: (value) {
-                    setState(() => thinkingLabelInternal = value);
-                  },
-                  onModelChanged: (modelId) =>
-                      controller.selectAssistantModelForSession(
-                        activeSessionKey,
-                        modelId,
-                      ),
-                  onPickAttachments: AssistantPageStateActionsInternal(
-                    this,
-                  ).pickAttachmentsInternal,
-                  onAddAttachment: (attachment) {
-                    setState(() {
-                      attachmentsInternal = [
-                        ...attachmentsInternal,
-                        attachment,
-                      ];
-                      saveComposerAttachmentsForSessionInternal(
-                        activeSessionKey,
-                      );
-                    });
-                  },
-                  onPasteImageAttachment:
-                      widget.clipboardImageReader ??
-                      readClipboardImageAsXFileInternal,
-                  onSend: AssistantPageStateActionsInternal(
-                    this,
-                  ).submitPromptInternal,
                 ),
               ),
             ],

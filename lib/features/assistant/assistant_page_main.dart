@@ -44,9 +44,6 @@ const double assistantWorkspaceMinLowerPaneHeightInternal = 160;
 /// so neighbouring panes sit flush and reserve no layout width between them.
 const double assistantHorizontalPaneGutterInternal = 0;
 
-/// The composer boundary still occupies its row in the column, but the strip
-/// carries the surrounding pane colour so only the hairline reads as a seam.
-const double assistantVerticalResizeHandleHeightInternal = 8;
 const double assistantArtifactPaneMinWidthInternal = 280;
 const double assistantArtifactPaneDefaultWidthInternal = 360;
 const double assistantCollapsedArtifactToggleClearanceInternal = 56;
