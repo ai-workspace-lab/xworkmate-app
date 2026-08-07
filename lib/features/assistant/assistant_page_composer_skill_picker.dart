@@ -100,7 +100,24 @@ class ComposerSelectedSkillChipInternal extends StatelessWidget {
   }
 }
 
-class SkillPickerPopoverInternal extends StatelessWidget {
+/// Intents for the picker's keyboard contract. The popup is reachable by
+/// keyboard alone: type to filter, arrows to move, Enter to toggle, Escape to
+/// close — the search field keeps focus throughout.
+class SkillPickerMoveIntent extends Intent {
+  const SkillPickerMoveIntent(this.delta);
+
+  final int delta;
+}
+
+class SkillPickerToggleIntent extends Intent {
+  const SkillPickerToggleIntent();
+}
+
+class SkillPickerDismissIntent extends Intent {
+  const SkillPickerDismissIntent();
+}
+
+class SkillPickerPopoverInternal extends StatefulWidget {
   const SkillPickerPopoverInternal({
     super.key,
     required this.maxHeight,
@@ -114,6 +131,7 @@ class SkillPickerPopoverInternal extends StatelessWidget {
     required this.onQueryChanged,
     required this.onToggleSkill,
     this.onRetry,
+    this.onDismiss,
   });
 
   final double maxHeight;
@@ -127,166 +145,291 @@ class SkillPickerPopoverInternal extends StatelessWidget {
   final ValueChanged<String> onQueryChanged;
   final ValueChanged<String> onToggleSkill;
   final VoidCallback? onRetry;
+  final VoidCallback? onDismiss;
+
+  @override
+  State<SkillPickerPopoverInternal> createState() =>
+      SkillPickerPopoverStateInternal();
+}
+
+class SkillPickerPopoverStateInternal
+    extends State<SkillPickerPopoverInternal> {
+  /// Index into the *skill* list, not into the rendered rows — group headers
+  /// are not landing spots.
+  int highlightedIndexInternal = 0;
+  final Map<String, GlobalKey> rowKeysInternal = <String, GlobalKey>{};
+
+  @override
+  void didUpdateWidget(covariant SkillPickerPopoverInternal oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Filtering changes the candidate set; start again from the top rather
+    // than leaving the highlight on whatever now occupies that slot.
+    if (oldWidget.filteredSkills.length != widget.filteredSkills.length) {
+      highlightedIndexInternal = 0;
+    } else if (highlightedIndexInternal >= widget.filteredSkills.length) {
+      highlightedIndexInternal = 0;
+    }
+  }
+
+  void moveHighlightInternal(int delta) {
+    final count = widget.filteredSkills.length;
+    if (count == 0) {
+      return;
+    }
+    setState(() {
+      highlightedIndexInternal = (highlightedIndexInternal + delta) % count;
+      if (highlightedIndexInternal < 0) {
+        highlightedIndexInternal += count;
+      }
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted ||
+          highlightedIndexInternal >= widget.filteredSkills.length) {
+        return;
+      }
+      final key =
+          rowKeysInternal[widget.filteredSkills[highlightedIndexInternal].key];
+      final context = key?.currentContext;
+      if (context != null) {
+        unawaited(
+          Scrollable.ensureVisible(
+            context,
+            alignment: 0.5,
+            duration: const Duration(milliseconds: 120),
+          ),
+        );
+      }
+    });
+  }
+
+  void toggleHighlightedInternal() {
+    if (highlightedIndexInternal >= widget.filteredSkills.length) {
+      return;
+    }
+    widget.onToggleSkill(widget.filteredSkills[highlightedIndexInternal].key);
+  }
 
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
     final theme = Theme.of(context);
+    final maxHeight = widget.maxHeight;
+    final searchController = widget.searchController;
+    final searchFocusNode = widget.searchFocusNode;
+    final selectedSkillKeys = widget.selectedSkillKeys;
+    final filteredSkills = widget.filteredSkills;
+    final isLoading = widget.isLoading;
+    final errorText = widget.errorText;
+    final hasQuery = widget.hasQuery;
+    final onQueryChanged = widget.onQueryChanged;
+    final onToggleSkill = widget.onToggleSkill;
+    final onRetry = widget.onRetry;
     final groupedSkills = skillPickerSectionsInternal(filteredSkills);
     final hasError = !isLoading && (errorText?.trim().isNotEmpty ?? false);
-    return Material(
-      key: const Key('assistant-skill-picker-popover'),
-      color: Colors.transparent,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          minWidth: 360,
-          maxWidth: 480,
-          maxHeight: maxHeight,
-        ),
-        child: Container(
-          decoration: BoxDecoration(
-            color: palette.surfacePrimary,
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: palette.strokeSoft),
-            boxShadow: [palette.chromeShadowAmbient],
+    return Shortcuts(
+      shortcuts: const <ShortcutActivator, Intent>{
+        SingleActivator(LogicalKeyboardKey.arrowDown): SkillPickerMoveIntent(1),
+        SingleActivator(LogicalKeyboardKey.arrowUp): SkillPickerMoveIntent(-1),
+        SingleActivator(LogicalKeyboardKey.enter): SkillPickerToggleIntent(),
+        SingleActivator(LogicalKeyboardKey.escape): SkillPickerDismissIntent(),
+      },
+      child: Actions(
+        actions: <Type, Action<Intent>>{
+          SkillPickerMoveIntent: CallbackAction<SkillPickerMoveIntent>(
+            onInvoke: (intent) {
+              moveHighlightInternal(intent.delta);
+              return null;
+            },
           ),
-          child: Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
-                child: TextField(
-                  key: const Key('assistant-skill-picker-search'),
-                  controller: searchController,
-                  focusNode: searchFocusNode,
-                  autofocus: true,
-                  onChanged: onQueryChanged,
-                  decoration: InputDecoration(
-                    hintText: appText('搜索技能', 'Search skills'),
-                    prefixIcon: const Icon(Icons.search_rounded),
-                    suffixIcon: searchController.text.trim().isEmpty
-                        ? null
-                        : IconButton(
-                            tooltip: appText('清除', 'Clear'),
-                            onPressed: () {
-                              searchController.clear();
-                              onQueryChanged('');
+          SkillPickerToggleIntent: CallbackAction<SkillPickerToggleIntent>(
+            onInvoke: (_) {
+              toggleHighlightedInternal();
+              return null;
+            },
+          ),
+          SkillPickerDismissIntent: CallbackAction<SkillPickerDismissIntent>(
+            onInvoke: (_) {
+              widget.onDismiss?.call();
+              return null;
+            },
+          ),
+        },
+        child: Material(
+          key: const Key('assistant-skill-picker-popover'),
+          color: Colors.transparent,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              minWidth: 360,
+              maxWidth: 480,
+              maxHeight: maxHeight,
+            ),
+            child: Container(
+              decoration: BoxDecoration(
+                color: palette.surfacePrimary,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: palette.strokeSoft),
+                boxShadow: [palette.chromeShadowAmbient],
+              ),
+              child: Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+                    child: TextField(
+                      key: const Key('assistant-skill-picker-search'),
+                      controller: searchController,
+                      focusNode: searchFocusNode,
+                      autofocus: true,
+                      onChanged: onQueryChanged,
+                      decoration: InputDecoration(
+                        hintText: appText('搜索技能', 'Search skills'),
+                        prefixIcon: const Icon(Icons.search_rounded),
+                        suffixIcon: searchController.text.trim().isEmpty
+                            ? null
+                            : IconButton(
+                                tooltip: appText('清除', 'Clear'),
+                                onPressed: () {
+                                  searchController.clear();
+                                  onQueryChanged('');
+                                },
+                                icon: const Icon(Icons.close_rounded),
+                              ),
+                      ),
+                    ),
+                  ),
+                  Container(height: 1, color: palette.strokeSoft),
+                  Expanded(
+                    child: filteredSkills.isEmpty
+                        ? Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(24),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (isLoading) ...[
+                                    SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: palette.textSecondary,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 12),
+                                  ],
+                                  Text(
+                                    isLoading
+                                        ? appText('正在加载技能…', 'Loading skills…')
+                                        : hasError
+                                        ? appText(
+                                            '技能列表加载失败，请稍后重试。',
+                                            'Could not load skills. Please try again.',
+                                          )
+                                        : hasQuery
+                                        ? appText(
+                                            '没有匹配的技能。',
+                                            'No matching skills.',
+                                          )
+                                        : appText(
+                                            '当前没有已加载技能。',
+                                            'No skills are loaded yet.',
+                                          ),
+                                    textAlign: TextAlign.center,
+                                    style: theme.textTheme.bodyMedium?.copyWith(
+                                      color: palette.textSecondary,
+                                    ),
+                                  ),
+                                  if (hasError) ...[
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      errorText!.trim(),
+                                      textAlign: TextAlign.center,
+                                      maxLines: 3,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: theme.textTheme.bodySmall
+                                          ?.copyWith(color: palette.textMuted),
+                                    ),
+                                  ],
+                                  if (!hasError && !isLoading && !hasQuery) ...[
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      appText(
+                                        '技能来源于 Gateway 工作区。请确认 OpenClaw'
+                                            ' Gateway 已连接且安装了技能包。',
+                                        'Skills come from the Gateway workspace.'
+                                            ' Make sure OpenClaw Gateway is connected'
+                                            ' and skills are installed.',
+                                      ),
+                                      textAlign: TextAlign.center,
+                                      style: theme.textTheme.bodySmall
+                                          ?.copyWith(color: palette.textMuted),
+                                    ),
+                                  ],
+                                  if ((hasError || (!isLoading && !hasQuery)) &&
+                                      onRetry != null) ...[
+                                    const SizedBox(height: 12),
+                                    TextButton.icon(
+                                      onPressed: onRetry,
+                                      icon: const Icon(
+                                        Icons.refresh_rounded,
+                                        size: 16,
+                                      ),
+                                      label: Text(appText('重试', 'Retry')),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          )
+                        : ListView.builder(
+                            padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+                            itemCount: groupedSkills.length,
+                            itemBuilder: (context, index) {
+                              final row = groupedSkills[index];
+                              if (row.headerLabel != null) {
+                                return SkillPickerGroupHeaderInternal(
+                                  key: ValueKey<String>(
+                                    'assistant-skill-group-${row.headerLabel}',
+                                  ),
+                                  label: row.headerLabel!,
+                                );
+                              }
+                              final skill = row.skill!;
+                              final skillIndex = filteredSkills.indexOf(skill);
+                              final rowKey = rowKeysInternal.putIfAbsent(
+                                skill.key,
+                                GlobalKey.new,
+                              );
+                              return Padding(
+                                key: rowKey,
+                                padding: EdgeInsets.only(
+                                  bottom: index == groupedSkills.length - 1
+                                      ? 0
+                                      : 8,
+                                ),
+                                child: SkillPickerTileInternal(
+                                  key: ValueKey<String>(
+                                    'assistant-skill-option-${skill.key}',
+                                  ),
+                                  option: skill,
+                                  selected: selectedSkillKeys.contains(
+                                    skill.key,
+                                  ),
+                                  highlighted:
+                                      skillIndex == highlightedIndexInternal,
+                                  onTap: () {
+                                    setState(() {
+                                      highlightedIndexInternal = skillIndex;
+                                    });
+                                    onToggleSkill(skill.key);
+                                  },
+                                ),
+                              );
                             },
-                            icon: const Icon(Icons.close_rounded),
                           ),
                   ),
-                ),
+                ],
               ),
-              Container(height: 1, color: palette.strokeSoft),
-              Expanded(
-                child: filteredSkills.isEmpty
-                    ? Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(24),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if (isLoading) ...[
-                                SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: palette.textSecondary,
-                                  ),
-                                ),
-                                const SizedBox(height: 12),
-                              ],
-                              Text(
-                                isLoading
-                                    ? appText('正在加载技能…', 'Loading skills…')
-                                    : hasError
-                                    ? appText(
-                                        '技能列表加载失败，请稍后重试。',
-                                        'Could not load skills. Please try again.',
-                                      )
-                                    : hasQuery
-                                    ? appText('没有匹配的技能。', 'No matching skills.')
-                                    : appText(
-                                        '当前没有已加载技能。',
-                                        'No skills are loaded yet.',
-                                      ),
-                                textAlign: TextAlign.center,
-                                style: theme.textTheme.bodyMedium?.copyWith(
-                                  color: palette.textSecondary,
-                                ),
-                              ),
-                              if (hasError) ...[
-                                const SizedBox(height: 8),
-                                Text(
-                                  errorText!.trim(),
-                                  textAlign: TextAlign.center,
-                                  maxLines: 3,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    color: palette.textMuted,
-                                  ),
-                                ),
-                              ],
-                              if (!hasError && !isLoading && !hasQuery) ...[
-                                const SizedBox(height: 8),
-                                Text(
-                                  appText(
-                                    '技能来源于 Gateway 工作区。请确认 OpenClaw'
-                                    ' Gateway 已连接且安装了技能包。',
-                                    'Skills come from the Gateway workspace.'
-                                    ' Make sure OpenClaw Gateway is connected'
-                                    ' and skills are installed.',
-                                  ),
-                                  textAlign: TextAlign.center,
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    color: palette.textMuted,
-                                  ),
-                                ),
-                              ],
-                              if ((hasError || (!isLoading && !hasQuery)) &&
-                                  onRetry != null) ...[
-                                const SizedBox(height: 12),
-                                TextButton.icon(
-                                  onPressed: onRetry,
-                                  icon: const Icon(Icons.refresh_rounded, size: 16),
-                                  label: Text(appText('重试', 'Retry')),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                      )
-                    : ListView.builder(
-                        padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
-                        itemCount: groupedSkills.length,
-                        itemBuilder: (context, index) {
-                          final row = groupedSkills[index];
-                          if (row.headerLabel != null) {
-                            return SkillPickerGroupHeaderInternal(
-                              key: ValueKey<String>(
-                                'assistant-skill-group-${row.headerLabel}',
-                              ),
-                              label: row.headerLabel!,
-                            );
-                          }
-                          final skill = row.skill!;
-                          return Padding(
-                            padding: EdgeInsets.only(
-                              bottom: index == groupedSkills.length - 1 ? 0 : 8,
-                            ),
-                            child: SkillPickerTileInternal(
-                              key: ValueKey<String>(
-                                'assistant-skill-option-${skill.key}',
-                              ),
-                              option: skill,
-                              selected: selectedSkillKeys.contains(skill.key),
-                              onTap: () => onToggleSkill(skill.key),
-                            ),
-                          );
-                        },
-                      ),
-              ),
-            ],
+            ),
           ),
         ),
       ),
@@ -362,11 +505,16 @@ class SkillPickerTileInternal extends StatelessWidget {
     required this.option,
     required this.selected,
     required this.onTap,
+    this.highlighted = false,
   });
 
   final ComposerSkillOptionInternal option;
   final bool selected;
   final VoidCallback onTap;
+
+  /// Keyboard cursor. Distinct from [selected]: highlight is where Enter would
+  /// land, selection is what the composer will actually send.
+  final bool highlighted;
 
   @override
   Widget build(BuildContext context) {
@@ -386,9 +534,14 @@ class SkillPickerTileInternal extends StatelessWidget {
             decoration: BoxDecoration(
               color: selected
                   ? palette.surfaceSecondary
+                  : highlighted
+                  ? palette.hover
                   : palette.surfacePrimary,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: palette.strokeSoft),
+              border: Border.all(
+                color: highlighted ? palette.accent : palette.strokeSoft,
+                width: highlighted ? 1.5 : 1,
+              ),
             ),
             child: Row(
               children: [
