@@ -10,6 +10,13 @@ override_dh_auto_build:
 		echo "flutter SDK missing, skipping build"; \
 	fi
 
+override_dh_auto_test:
+	@if command -v flutter >/dev/null 2>&1; then \
+		flutter test; \
+	else \
+		echo "flutter SDK missing, skipping test"; \
+	fi
+
 override_dh_auto_install:
 	mkdir -p debian/xworkmate/opt/xworkmate
 	if [ -d build/linux/x64/release/bundle ]; then \
