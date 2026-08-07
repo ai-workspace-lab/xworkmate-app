@@ -1,5 +1,113 @@
 # Changelog
 
+## 1.2.0 — 2026-08-08
+
+发版分支：`release/v1.2` · Tag：`v1.2.0` · `pubspec.yaml`: `1.2.0+1`
+
+本版是一轮桌面端 UI 交互细节整改，参照 Kun 与 openworker 的交互契约与设计纪律。
+详见 [`docs/plans/2026-08-07-ui-interaction-polish-plan.md`](docs/plans/2026-08-07-ui-interaction-polish-plan.md)。
+
+### Highlights
+
+- **三栏零间隙**：面板之间累计 36px 的留白沟被移除。面板不再各自浮成圆角卡片，改为贴合排布、以 1px 发丝线分隔、靠底色分层区分（#243）。
+- **输入契约统一**：桌面端 Enter 可发送、Shift+Enter 换行、Cmd/Ctrl+Enter 发送；移动端解除单行限制，可写多行。此前桌面端输入框是多行语义，`onSubmitted` 从不触发，只能点按钮发送（#245）。
+- **发送键状态化**：空草稿禁用、运行中显示忙碌态，避免误排第二轮任务。停止仍归进度条，不在组合器重复（#245）。
+- **组合器高度联动**：卡片填满所在窗格，不再固守固有高度贴底而在上方留出灰条；组合器内多余的第二个拖动手柄移除，分隔线成为唯一的高度控件（#246）。
+- **技能选择器可键盘操作**：↑↓ 移动、Enter 选中、Esc 关闭，搜索框全程保持焦点（#248）。
+- **组合器高度持久化**：拖动后的高度写入 UI 状态并在重启后恢复；调整高度时保持会话贴底（#249）。
+
+### Fixes
+
+- 工作台洞察栏在窗口高度低于约 790px 时溢出，现改为滚动（#247）。
+- Launchpad PPA 构建环境补 `override_dh_auto_test` 守卫（#244）。
+
+### Design system
+
+- 新增 [`docs/design/pane-layout-pattern.md`](docs/design/pane-layout-pattern.md)：面板与卡片的边界、叠加式分隔线、一个面板只有一个尺寸控件、不得把渲染尺寸回喂给决定该尺寸的值、压缩时从远端降级。含合并前检查表。
+- 新增 `AppPaneShell` 与 `AppSpacing.paneContent`：会话页与设置页此前有三套各自硬编码的外框内边距（0 / 24 / 6），现统一为一个令牌。
+
+### Known Issues
+
+- `flutter test` 仍有 6 个既有失败（`mobile_assistant_home_golden_test` 2 个、`mobile_assistant_page_test` 4 个），与本版改动无关，在 `main` 上同样存在。
+- `PR Layered Tests` 门禁因上述基线长期为红，实际不提供信号，待单独治理。
+- 组合器高度持久化未做端到端验证：现有测试只覆盖 JSON 模型读写，未覆盖「拖动 → 落盘 → 重启读回」链路。
+
+---
+
+> **记录断层说明**：`0.7.0`（2026-03-24）与本版之间的 `1.1.0`–`1.1.10` 共 11 个版本当时未写入本文件。
+> 以下条目为 2026-08-08 依据 `pubspec.yaml` 版本变更点与其间的提交历史**事后重建**，
+> 仅保留可从 git 核实的要点，不等同于当时的原始发版说明；各版的验证结论与已知问题已无法追溯。
+> 生成式的 `docs/releases/xworkmate-changelog.md` 由 `tool/render_release_docs.dart` 从 git 引用渲染，与本文件相互独立。
+
+## 1.1.10 — 2026-07-28
+
+- 制品预览选择范围收敛到工作区内。
+- CI：接入 Vault 读取 OBS Token 并自动触发 RPM 构建；接入 Launchpad PPA GPG key 与 dput 发布步骤。
+- 工作台保持三栏布局可见。
+
+## 1.1.9 — 2026-07-21
+
+- 移动端抽屉加入语言与主题切换。
+- macOS：Runner target 的 deployment target 对齐 Podfile 已强制的 15.6 下限。
+- CI：修复导致分支方向门禁失效的非法 permissions 值。
+
+## 1.1.8 — 2026-07-20
+
+- 移动端持久化迁移到 SharedPreferences，清理死代码。
+- 修复 iOS 重启后数据被清空的问题。
+- 安全：iOS secrets 迁入 Keychain，重装即登出。
+- 存储：线程持久化拆分为按会话独立文件。
+
+## 1.1.7 — 2026-07-15
+
+- 移动端附件逻辑补齐。
+- 移动端加入紧凑版插件与技能选择器；iOS 任务体验改版。
+- 修复 `ListTile` 的 `DecoratedBox` 断言。
+- 网关任务提示词中把 Execution 上下文提到 User request 之外。
+
+## 1.1.6 — 2026-07-08
+
+- 制品匹配支持目录级与递归收集。
+- 插件工作流状态机第二批：状态迁移、运行追踪、多语言运行时脚手架。
+- 组合器按任务会话持久化已选插件。
+
+## 1.1.5 — 2026-06-30
+
+- 以 `pasteboard` 替换 `super_clipboard`，移除 cargokit / Rust 依赖。
+- 安装器：断点续传、安全卸载已挂载 DMG、经 API 下载发布产物。
+
+## 1.1.4 — 2026-06-03
+
+- 远程桌面 UI 与客户端 WebRTC 接入。
+- Bridge 响应中断后保留制品。
+- OpenClaw：制品同步与忽略策略；经 Bridge 控制面重新关联任务。
+
+## 1.1.3 — 2026-05-28
+
+- 修复技能选择器加载。
+- 新增任务批量归档。
+- 修复 main 分支的 Apple preflight。
+
+## 1.1.2 — 2026-05-24
+
+- 移除移动端审批界面。
+- 任务选中顺序保持稳定。
+- 网关技能分组显示。
+
+## 1.1.1 — 2026-05-19
+
+- 排队任务反馈可见。
+- 支持 OpenClaw 排队任务提交。
+- 测试线程工作区相互隔离。
+
+## 1.1.0 — 2026-04-08
+
+- 桌面端 ACP 切换为直连 Go stdio bridge。
+- 移除 ACP bypass 兜底路径与过期架构文档。
+- 单 Agent 任务流统一到 ACP。
+- 网关状态与 ACP endpoint 诊断信息规范化。
+
+
 ## 0.7.0 — 2026-03-24
 
 ### Highlights
