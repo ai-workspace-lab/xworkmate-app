@@ -1,5 +1,25 @@
 part of 'sidebar_navigation.dart';
 
+/// Height of one footer row, matching the control inside it.
+const double sidebarFooterRowHeight = 40;
+
+/// Gap between the section divider and the first row. Sized so the whole
+/// footer block reaches [sidebarFooterBlockHeight]; it is not a free choice.
+const double sidebarFooterDividerGap = 19;
+
+/// Distance from the sidebar pane's bottom to the last row. The pane's own
+/// 4pt padding brings the total to the composer's 16pt.
+const double sidebarFooterBottomInset = 12;
+
+/// Total height of the footer block: divider + gap + three rows.
+/// Must equal the composer card's minimum height so the shell's two bottom
+/// blocks line up. Locked by sidebar_footer_baseline_test.dart.
+const double sidebarFooterBlockHeight =
+    1 +
+    sidebarFooterDividerGap +
+    sidebarFooterRowHeight * 3 +
+    AppSpacing.xs * 2;
+
 class SidebarFooter extends StatelessWidget {
   const SidebarFooter({
     super.key,
@@ -91,20 +111,35 @@ class SidebarFooter extends StatelessWidget {
         ),
     ];
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          height: 1,
-          color: palette.chromeStroke.withValues(alpha: 0.9),
-        ),
-        const SizedBox(height: AppSpacing.xs),
-        for (var index = 0; index < actions.length; index++) ...[
-          actions[index],
-          if (index != actions.length - 1) const SizedBox(height: AppSpacing.xs),
+    // The footer and the composer card are the shell's two bottom blocks, and
+    // they sit side by side across the whole window — so they share a baseline
+    // and a height, or the mismatch reads as a misalignment.
+    //
+    // The composer at its minimum is 152pt tall and floats 16pt above the pane
+    // bottom (8pt safe-area inset + 8pt card padding). The sidebar's own pane
+    // padding already supplies 4pt of that, so the footer adds the remaining
+    // 12pt below and pads the divider gap out until the block reaches 152pt.
+    // `sidebarFooterBlockHeight` is asserted against the composer's minimum in
+    // sidebar_footer_baseline_test.dart, so the two cannot drift apart
+    // unnoticed.
+    return Padding(
+      padding: const EdgeInsets.only(bottom: sidebarFooterBottomInset),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            height: 1,
+            color: palette.chromeStroke.withValues(alpha: 0.9),
+          ),
+          const SizedBox(height: sidebarFooterDividerGap),
+          for (var index = 0; index < actions.length; index++) ...[
+            actions[index],
+            if (index != actions.length - 1)
+              const SizedBox(height: AppSpacing.xs),
+          ],
         ],
-      ],
+      ),
     );
   }
 
@@ -214,7 +249,7 @@ class _SidebarFooterButtonState extends State<_SidebarFooterButton> {
               borderRadius: BorderRadius.circular(AppRadius.button),
               onTap: widget.onTap,
               child: SizedBox(
-                height: 40,
+                height: sidebarFooterRowHeight,
                 child: widget.collapsed
                     ? Center(
                         child: Icon(
