@@ -76,6 +76,10 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
                           : constraints.maxWidth >= 1200
                           ? 360
                           : 320,
+                      // Fill the row's height so the rail can scroll its own
+                      // content. Without this the rail shrink-wraps three
+                      // fixed-height cards and overflows on a short window.
+                      height: double.infinity,
                       child: _WorkbenchRightRail(
                         projection: projection,
                         onSuggestionAction: _openAssistant,
@@ -1211,24 +1215,29 @@ class _WorkbenchRightRail extends StatelessWidget {
         ),
       );
     }
-    return Column(
-      children: [
-        Align(
-          alignment: Alignment.centerRight,
-          child: IconButton(
-            key: const Key('workbench-right-rail-collapse-button'),
-            tooltip: appText('收起侧栏', 'Collapse sidebar'),
-            onPressed: onToggleCollapsed,
-            icon: const Icon(Icons.chevron_right_rounded),
-            visualDensity: VisualDensity.compact,
+    // Scrollable: the three cards carry fixed-height content (a 235px chart
+    // among them), so on a short window they exceed the rail and used to
+    // overflow rather than scroll.
+    return SingleChildScrollView(
+      child: Column(
+        children: [
+          Align(
+            alignment: Alignment.centerRight,
+            child: IconButton(
+              key: const Key('workbench-right-rail-collapse-button'),
+              tooltip: appText('收起侧栏', 'Collapse sidebar'),
+              onPressed: onToggleCollapsed,
+              icon: const Icon(Icons.chevron_right_rounded),
+              visualDensity: VisualDensity.compact,
+            ),
           ),
-        ),
-        _InsightPanel(projection: projection),
-        const SizedBox(height: 12),
-        _WeeklyRhythmCard(projection: projection),
-        const SizedBox(height: 12),
-        _SuggestionPanel(projection: projection, onAction: onSuggestionAction),
-      ],
+          _InsightPanel(projection: projection),
+          const SizedBox(height: 12),
+          _WeeklyRhythmCard(projection: projection),
+          const SizedBox(height: 12),
+          _SuggestionPanel(projection: projection, onAction: onSuggestionAction),
+        ],
+      ),
     );
   }
 }
