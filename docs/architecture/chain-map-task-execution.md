@@ -15,6 +15,30 @@ Repo chain: xworkmate-app → xworkmate-bridge → openclaw.svc.plus → opencla
    lib/app/app_controller_openclaw_task_queue.dart
 ```
 
+## Shared-session API contract (not yet wired into AppController)
+
+The runtime client now defines the Bridge-hosted cloud-session boundary that
+will precede execution after the server routes are deployed:
+
+```
+POST /api/v1/namespaces/{namespaceId}/sessions
+GET  /api/v1/sessions/{sessionId}
+GET  /api/v1/sessions/{sessionId}/events?after_seq={cursor}&limit={n}
+POST /api/v1/sessions/{sessionId}/messages
+```
+
+`POST .../messages` sends `{clientRequestId, text, run?}` and receives the
+nested authoritative `{sessionId, namespaceId, snapshotVersion, event,
+taskRun}` result. The client takes an injected transport; authorization remains
+owned by the managed Bridge adapter and no token is stored in session binding
+records. The current `sendChatMessage()` execution path below is unchanged in
+this slice.
+
+Key files:
+
+- `lib/runtime/task_session_api_client.dart`
+- `lib/runtime/task_session_sync_service.dart`
+
 ## Call Flow
 
 ```
