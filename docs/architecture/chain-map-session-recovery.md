@@ -4,6 +4,43 @@ Repo chain: xworkmate-app → xworkmate-bridge
 
 ## Recovery Scenarios
 
+### S0: Shared cloud-session attach (runtime contract, controller wiring pending)
+
+The cloud-session MVP keeps the current TaskThread/UI identity local while a
+small durable binding points at the Bridge-hosted authoritative session:
+
+```
+TaskThread.threadId / sessionKey (local)
+  └─ TaskSessionBinding
+     ├─ cloudSessionId
+     ├─ namespaceId
+     ├─ lastEventSeq
+     └─ snapshotVersion
+        └─ Bridge /api/v1
+           ├─ GET /sessions/{sessionId}                 snapshot
+           └─ GET /sessions/{sessionId}/events
+                  ?after_seq={cursor}&limit={n}          ordered replay
+```
+
+`TaskSessionSyncService` always loads a server snapshot before replaying newer
+events. If the event sequence has a gap, the partial replay is discarded and a
+fresh snapshot + replay is attempted once. Session/namespace mismatches are
+rejected before the local cursor is persisted. Server events remain the source
+of truth; the binding is only an identity/cursor cache and contains no message,
+artifact, endpoint, or credential data.
+
+This slice does not switch `AppController` to the cloud path. The HTTP
+transport and authorization adapter remain injected so the existing managed
+Bridge endpoint/token resolver can be connected only after the Bridge routes
+are deployed, without changing widgets, navigation, or local execution.
+
+Key files:
+
+- `lib/runtime/task_session_api_client.dart`
+- `lib/runtime/task_session_binding.dart`
+- `lib/runtime/task_session_sync_service.dart`
+- `lib/runtime/session_sync_contract.dart`
+
 ### S1: App restart with running task
 
 ```
@@ -44,6 +81,16 @@ tasks/
   <base64url(threadId)>.json      one TaskThread per file
   *.invalid-<ts>.bak              pre-recovery byte backups (never read)
 ```
+
+The separate Desktop cloud-binding cache is stored one record per local key:
+
+```
+tasks/
+  session-bindings/
+    <base64url(localTaskThreadKey)>.json
+```
+
+It does not alter the existing TaskThread JSON schema or ordering index.
 
 Mobile — `PrefsTaskThreadStore` in SharedPreferences (iOS UserDefaults):
 
