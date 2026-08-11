@@ -684,10 +684,15 @@ String _extractBridgeServerUrlMetadata(Map<String, dynamic> payload) {
 }
 
 String _extractBridgeAuthTokenMetadata(Map<String, dynamic> payload) {
-  final aiWorkspaceToken = _stringValue(payload['AI_WORKSPACE_AUTH_TOKEN']);
-  if (aiWorkspaceToken.isNotEmpty) {
-    return aiWorkspaceToken;
+  // The Accounts sync contract returns a user-and-tenant-scoped credential.
+  // This value is persisted only in the secure managed-secret store.
+  final credential = _asMap(payload['bridgeCredential']);
+  final token = _stringValue(credential['token']);
+  if (token.isNotEmpty) {
+    return token;
   }
+  // Upgrade compatibility: pre-migration Accounts returns the same value in
+  // BRIDGE_AUTH_TOKEN. This branch is removed after the UAT cutover window.
   return _stringValue(payload['BRIDGE_AUTH_TOKEN']);
 }
 
