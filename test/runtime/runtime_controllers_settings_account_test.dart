@@ -289,11 +289,11 @@ void main() {
           await store.loadAccountManagedSecret(
             target: kAccountManagedSecretTargetBridgeAuthToken,
           ),
-          'ai-workspace-token-from-sync',
+          'bridge-token-from-sync',
         );
         expect(
           controller.snapshot.toJsonString().contains(
-            'ai-workspace-token-from-sync',
+            'bridge-token-from-sync',
           ),
           isFalse,
         );

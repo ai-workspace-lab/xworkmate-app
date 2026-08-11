@@ -7,7 +7,7 @@ This document is the canonical state model for:
 - `SettingsSnapshot`
 - `AccountSyncState`
 - `BRIDGE_SERVER_URL`
-- `BRIDGE_AUTH_TOKEN`
+- tenant-scoped bridge credential token
 
 The goal is to keep three ownership layers distinct:
 
@@ -23,7 +23,7 @@ flowchart TD
 
     B --> C["SettingsSnapshot\npersistent settings"]
     B --> D["AccountSyncState\nsync result + metadata"]
-    B --> E["Secure storage / managed secret\nBRIDGE_AUTH_TOKEN"]
+    B --> E["Secure storage / managed secret\nbridge credential token"]
 
     D --> D1["syncState / syncMessage / lastSyncAtMs / lastSyncError"]
     D --> D2["syncedDefaults.bridgeServerUrl\nmetadata only"]
@@ -87,7 +87,7 @@ flowchart LR
     A --> C["account sync metadata only"]
     A --> D["not runtime source of truth"]
 
-    E["BRIDGE_AUTH_TOKEN"] --> F["secure storage / managed secret"]
+    E["bridgeCredential.token"] --> F["secure storage / managed secret"]
     E --> G["never in SettingsSnapshot"]
     E --> H["runtime Authorization header"]
 ```
@@ -109,9 +109,9 @@ flowchart TD
 - `cloudSynced` wins when account sync is ready and the managed bridge token exists.
 - `selfHosted` wins only when cloud sync is not ready.
 - Signed-out state is disconnected for authorization decisions: runtime must not use a stale managed secret, gateway profile token, or loopback ACP endpoint.
-- Missing `BRIDGE_AUTH_TOKEN` is disconnected for the managed cloud-sync path.
+- Missing `bridgeCredential.token` is disconnected for the managed cloud-sync path.
 - `BRIDGE_SERVER_URL` may be retained in `AccountSyncState.syncedDefaults.bridgeServerUrl`, but it is metadata only.
-- `BRIDGE_AUTH_TOKEN` is written to secure storage only, never to normal settings.
+- `bridgeCredential.token` is written to secure storage only, never to normal settings.
 - Bridge runtime requests use `Authorization: Bearer <token>` from secure storage.
 - Capabilities, routing discovery, and assistant execution all use the bridge root `/acp/rpc`.
 
@@ -120,7 +120,7 @@ flowchart TD
 - `SettingsSnapshot`
   - stores user-facing configuration and bridge mode config
   - stores the effective `AcpBridgeServerModeConfig`
-  - must not store `BRIDGE_AUTH_TOKEN`
+  - must not store a bridge credential token
 
 - `AccountSyncState`
   - stores sync state, timestamps, sync error, and token availability flags
@@ -128,7 +128,7 @@ flowchart TD
   - can be persisted safely in secure storage because it contains no raw token
 
 - Secure storage / managed secret
-  - stores `BRIDGE_AUTH_TOKEN`
+  - stores `bridgeCredential.token`
   - is the only place that should hold the bridge authorization token
 
 ## Cross-References

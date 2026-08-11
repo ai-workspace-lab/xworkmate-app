@@ -76,7 +76,7 @@ xworkmate-app
 ───────────────────────────────────────────────────────────
 Protocol: ACP JSON-RPC 2.0 over WebSocket
 Path:     wss://xworkmate-bridge.svc.plus/acp
-Auth:     Bearer <BRIDGE_AUTH_TOKEN>
+Auth:     Bearer <tenant-scoped bridge credential token>
 ───────────────────────────────────────────────────────────
 
 xworkmate-bridge

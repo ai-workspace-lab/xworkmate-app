@@ -148,7 +148,7 @@ Public URLs are REJECTED for forwarding endpoints.
 
 Auth:
   - XWORKMATE_BRIDGE_TASK_FORWARD_TOKEN (env var)
-  - Falls back to BRIDGE_AUTH_TOKEN if not set
+  - No fallback to user credentials; missing token rejects task forwarding
 
 Hop limit:
   - X-XWorkmate-Forward-Hop: max 3
