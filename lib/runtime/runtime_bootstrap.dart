@@ -260,7 +260,7 @@ Directory? _resolveOpenClawRoot(
   if (workspaceRoot == null) {
     return null;
   }
-  final sibling = Directory('${workspaceRoot.parent.path}/openclaw.svc.plus');
+  final sibling = Directory('${workspaceRoot.parent.path}/openclaw');
   if (File('${sibling.path}/openclaw.mjs').existsSync()) {
     return sibling;
   }

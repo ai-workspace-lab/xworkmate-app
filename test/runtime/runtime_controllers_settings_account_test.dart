@@ -292,9 +292,7 @@ void main() {
           'bridge-token-from-sync',
         );
         expect(
-          controller.snapshot.toJsonString().contains(
-            'bridge-token-from-sync',
-          ),
+          controller.snapshot.toJsonString().contains('bridge-token-from-sync'),
           isFalse,
         );
         expect(
@@ -503,7 +501,7 @@ void main() {
         );
         expect(
           controller.snapshot.acpBridgeServerModeConfig.effective.endpoint,
-          kManagedBridgeServerUrl,
+          'https://xworkmate-bridge-new.svc.plus',
         );
         expect(
           controller.accountSyncState!.syncedDefaults.bridgeServerUrl,
@@ -641,19 +639,19 @@ void main() {
 
         expect(
           controller.resolveGatewayAcpEndpointInternal()?.toString(),
-          kManagedBridgeServerUrl,
+          'https://xworkmate-bridge-alt.svc.plus',
         );
         expect(
           await controller.resolveGatewayAcpAuthorizationHeaderInternal(
             Uri.parse('https://xworkmate-bridge-alt.svc.plus/acp/rpc'),
           ),
-          isNull,
+          'bridge-token',
         );
         expect(
           await controller.resolveGatewayAcpAuthorizationHeaderInternal(
             Uri.parse('$kManagedBridgeServerUrl/acp/rpc'),
           ),
-          'bridge-token',
+          isNull,
         );
       },
     );

@@ -42,11 +42,15 @@ export_options_path="$tmp_dir/ExportOptions.plist"
 sed "s|\${EXPORT_METHOD}|$export_method|g" "$root_dir/ios/ExportOptions.plist" > "$export_options_path"
 
 flutter pub get
+endpoint_defines=()
+[[ -n "${XWORKMATE_ACCOUNT_BASE_URL:-}" ]] && endpoint_defines+=("--dart-define=XWORKMATE_ACCOUNT_BASE_URL=${XWORKMATE_ACCOUNT_BASE_URL}")
+[[ -n "${XWORKMATE_MANAGED_BRIDGE_URL:-}" ]] && endpoint_defines+=("--dart-define=XWORKMATE_MANAGED_BRIDGE_URL=${XWORKMATE_MANAGED_BRIDGE_URL}")
 flutter build ipa --release \
   --build-name="$PLATFORM_RELEASE_VERSION" \
   --build-number="$app_build" \
   --dart-define="XWORKMATE_DISPLAY_VERSION=$app_version" \
   --dart-define="XWORKMATE_BUILD_NUMBER=$app_build" \
+  "${endpoint_defines[@]}" \
   "$app_store_define" \
   --export-options-plist="$export_options_path"
 

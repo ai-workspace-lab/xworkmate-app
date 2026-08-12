@@ -64,11 +64,15 @@ case "$platform" in
     fi
 
     if [[ "$build_unsigned_ios_bundle" -eq 1 ]]; then
+      endpoint_defines=()
+      [[ -n "${XWORKMATE_ACCOUNT_BASE_URL:-}" ]] && endpoint_defines+=("--dart-define=XWORKMATE_ACCOUNT_BASE_URL=${XWORKMATE_ACCOUNT_BASE_URL}")
+      [[ -n "${XWORKMATE_MANAGED_BRIDGE_URL:-}" ]] && endpoint_defines+=("--dart-define=XWORKMATE_MANAGED_BRIDGE_URL=${XWORKMATE_MANAGED_BRIDGE_URL}")
       flutter build ios --release --no-codesign \
         --build-name="$PLATFORM_RELEASE_VERSION" \
         --build-number="$BUILD_NUMBER" \
         --dart-define="XWORKMATE_DISPLAY_VERSION=$DISPLAY_VERSION" \
-        --dart-define="XWORKMATE_BUILD_NUMBER=$BUILD_NUMBER"
+        --dart-define="XWORKMATE_BUILD_NUMBER=$BUILD_NUMBER" \
+        "${endpoint_defines[@]}"
       mkdir -p dist/ios
       (
         cd build/ios/iphoneos

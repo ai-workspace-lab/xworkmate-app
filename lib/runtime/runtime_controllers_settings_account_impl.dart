@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'account_runtime_client.dart';
 import 'runtime_controllers_settings.dart';
 import 'runtime_models.dart';
+import 'runtime_endpoint_config.dart';
 
 /// Records a failure message so the connector panels can render it as an error.
 void _failAccountStatus(SettingsController controller, String message) {
@@ -701,13 +702,17 @@ AcpBridgeServerEffectiveConfig resolveAcpBridgeServerEffectiveConfigInternal(
   required AcpBridgeServerModeConfig config,
 }) {
   final accountSyncState = controller.accountSyncState;
+  final managedBridgeEndpoint = configuredManagedBridgeServerUrl(
+    remote: accountSyncState?.syncedDefaults.bridgeServerUrl ?? '',
+  );
   final managedBridgeReady =
       controller.accountSessionTokenInternal.trim().isNotEmpty &&
       accountSyncState?.syncState.trim().toLowerCase() == 'ready' &&
-      accountSyncState?.tokenConfigured.bridge == true;
+      accountSyncState?.tokenConfigured.bridge == true &&
+      managedBridgeEndpoint != null;
   if (managedBridgeReady) {
-    return const AcpBridgeServerEffectiveConfig(
-      endpoint: kManagedBridgeServerUrl,
+    return AcpBridgeServerEffectiveConfig(
+      endpoint: managedBridgeEndpoint,
       tokenRef: '',
       source: 'cloud',
       reason: 'Account sync is ready and the managed bridge token is available',

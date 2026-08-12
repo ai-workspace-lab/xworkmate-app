@@ -48,7 +48,7 @@ void main() {
 
         expect(find.text('连接器'), findsOneWidget);
         expect(find.text('已连接 · 1'), findsNothing);
-        expect(find.text('svc.plus Workspace'), findsOneWidget);
+        expect(find.text('托管工作空间'), findsOneWidget);
         expect(find.text('GitHub 仓库（API）'), findsOneWidget);
         expect(
           find.byKey(const ValueKey('settings-connector-local-git-repository')),
@@ -614,7 +614,7 @@ void main() {
         );
 
         expect(find.text('已连接的连接器'), findsOneWidget);
-        expect(find.text('svc.plus Workspace'), findsOneWidget);
+        expect(find.text('托管工作空间'), findsOneWidget);
         expect(find.textContaining('连接状态'), findsOneWidget);
         expect(
           find.byKey(const ValueKey('settings-account-sync-button')),

@@ -13,6 +13,7 @@ import 'device_identity_store.dart';
 import 'gateway_runtime_session_client.dart';
 import 'platform_environment.dart';
 import 'runtime_models.dart';
+import 'runtime_endpoint_config.dart';
 import 'secret_store.dart';
 import 'secure_config_store.dart';
 import 'gateway_runtime_protocol.dart';
@@ -87,8 +88,6 @@ class GatewayRuntime extends ChangeNotifier with GatewayRuntimeHelpersInternal {
     logsInternal.clear();
     notifyListeners();
   }
-
-
 
   bool get canConnectBridgeSession => sessionClientInternal != null;
 
@@ -531,12 +530,19 @@ class GatewayRuntime extends ChangeNotifier with GatewayRuntimeHelpersInternal {
     if (isConnected || sessionClientInternal == null) {
       return;
     }
+    final configuredEndpoint = configuredManagedBridgeServerUrl();
+    final endpoint = configuredEndpoint == null
+        ? null
+        : Uri.tryParse(configuredEndpoint);
+    if (endpoint == null || endpoint.host.trim().isEmpty) {
+      return;
+    }
     await connectProfile(
       GatewayConnectionProfile.defaultsGateway().copyWith(
         mode: RuntimeConnectionMode.remote,
-        host: Uri.parse(kManagedBridgeServerUrl).host,
-        port: 443,
-        tls: true,
+        host: endpoint.host,
+        port: endpoint.hasPort ? endpoint.port : 443,
+        tls: endpoint.scheme == 'https',
         selectedAgentId: selectedAgentId,
       ),
     );

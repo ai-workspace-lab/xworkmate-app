@@ -13,7 +13,7 @@ import 'package:xworkmate/runtime/secure_config_store.dart';
 void main() {
   group('Bridge runtime cleanup', () {
     test(
-      'keeps the managed bridge endpoint fixed even when account sync carries a bridge URL and stale manual bridge config exists',
+      'uses the authenticated bridge endpoint even when stale manual bridge config exists',
       () async {
         final storeRoot = await Directory.systemTemp.createTemp(
           'xworkmate-bridge-runtime-cleanup-',
@@ -86,11 +86,11 @@ void main() {
 
         expect(
           controller.resolveBridgeAcpEndpointInternal()?.toString(),
-          kManagedBridgeServerUrl,
+          'https://xworkmate-bridge-alt.svc.plus',
         );
         expect(
           await controller.resolveGatewayAcpAuthorizationHeaderInternal(
-            Uri.parse('$kManagedBridgeServerUrl/acp/rpc'),
+            Uri.parse('https://xworkmate-bridge-alt.svc.plus/acp/rpc'),
           ),
           'bridge-token',
         );
@@ -100,7 +100,7 @@ void main() {
                 AssistantExecutionTarget.gateway,
               )
               ?.toString(),
-          kManagedBridgeServerUrl,
+          'https://xworkmate-bridge-alt.svc.plus',
         );
         expect(await store.loadAccountSyncState(), isNotNull);
         expect(
@@ -110,7 +110,7 @@ void main() {
       },
     );
 
-    test('keeps the managed bridge endpoint fixed when signed out', () {
+    test('does not invent a managed bridge endpoint when signed out', () {
       final controller = AppController(
         environmentOverride: const <String, String>{
           'BRIDGE_SERVER_URL': 'https://stale.example.invalid',
@@ -118,14 +118,11 @@ void main() {
       );
       addTearDown(controller.dispose);
 
-      expect(
-        controller.resolveBridgeAcpEndpointInternal()?.toString(),
-        kManagedBridgeServerUrl,
-      );
+      expect(controller.resolveBridgeAcpEndpointInternal()?.toString(), isNull);
     });
 
     test(
-      'resolves raw bridge token only for the current managed bridge endpoint',
+      'resolves raw bridge token only for the current authenticated bridge endpoint',
       () async {
         final storeRoot = await Directory.systemTemp.createTemp(
           'xworkmate-bridge-auth-resolver-',
@@ -165,7 +162,7 @@ void main() {
         await store.saveAccountSyncState(
           AccountSyncState.defaults().copyWith(
             syncedDefaults: AccountRemoteProfile.defaults().copyWith(
-              bridgeServerUrl: kManagedBridgeServerUrl,
+              bridgeServerUrl: 'https://xworkmate-bridge-alt.svc.plus',
             ),
             syncState: 'ready',
             tokenConfigured: const AccountTokenConfigured(
@@ -184,7 +181,7 @@ void main() {
 
         final bridgeHeader = await controller
             .resolveGatewayAcpAuthorizationHeaderInternal(
-              Uri.parse('$kManagedBridgeServerUrl/acp/rpc'),
+              Uri.parse('https://xworkmate-bridge-alt.svc.plus/acp/rpc'),
             );
         final unrelatedHeader = await controller
             .resolveGatewayAcpAuthorizationHeaderInternal(
@@ -322,12 +319,7 @@ void main() {
         await runtime.ensureBridgeSessionConnected(selectedAgentId: 'codex');
 
         final request = sessionClient.lastConnectRequest;
-        expect(request, isNotNull);
-        expect(request!.mode, RuntimeConnectionMode.remote);
-        expect(request.host, Uri.parse(kManagedBridgeServerUrl).host);
-        expect(request.port, 443);
-        expect(request.tls, isTrue);
-        expect(request.host, isNot(anyOf('127.0.0.1', 'localhost')));
+        expect(request, isNull);
       },
     );
   });
