@@ -45,7 +45,10 @@ const double assistantWorkspaceMinLowerPaneHeightInternal = 160;
 const double assistantHorizontalPaneGutterInternal = 0;
 
 const double assistantArtifactPaneMinWidthInternal = 280;
-const double assistantArtifactPaneDefaultWidthInternal = 360;
+// Match the desktop navigation's 336px default track so the two expanded
+// sidebars frame the conversation column symmetrically. The pane remains
+// user-resizable within its existing min/max bounds.
+const double assistantArtifactPaneDefaultWidthInternal = 336;
 const double assistantFocusedComposerLeftInsetInternal = 336;
 const double assistantFocusedComposerRightInsetInternal =
     assistantArtifactPaneDefaultWidthInternal;
