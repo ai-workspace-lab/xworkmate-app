@@ -36,6 +36,15 @@ void main() {
     expect(find.text('工作洞察'), findsOneWidget);
     expect(find.text('本周节奏'), findsOneWidget);
     expect(find.text('AI 整理建议'), findsOneWidget);
+    expect(
+      find.byKey(const Key('workbench-metric-TaskThreads')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('workbench-activity-heatmap')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('workbench-activity-window-1')));
+    await tester.pump();
+    expect(find.text('过去 30 天'), findsOneWidget);
 
     await tester.tap(
       find.byKey(const Key('workbench-right-rail-collapse-button')),
@@ -70,5 +79,32 @@ void main() {
     await tester.tap(find.byKey(const Key('workbench-tab-3')));
     await tester.pump();
     expect(find.byKey(const Key('workbench-inbox-page')), findsOneWidget);
+  });
+
+  testWidgets('workbench overview matches the desktop visual baseline', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(1440, 960);
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final controller = AppController(
+      environmentOverride: const <String, String>{},
+    );
+    addTearDown(controller.dispose);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.light().copyWith(platform: TargetPlatform.macOS),
+        home: Scaffold(body: WorkbenchPage(controller: controller)),
+      ),
+    );
+    await tester.pump();
+
+    await expectLater(
+      find.byType(Scaffold),
+      matchesGoldenFile('goldens/workbench_overview.png'),
+    );
   });
 }
