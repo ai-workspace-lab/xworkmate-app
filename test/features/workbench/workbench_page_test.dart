@@ -5,7 +5,7 @@ import 'package:xworkmate/features/workbench/workbench_page.dart';
 import 'package:xworkmate/theme/app_theme.dart';
 
 void main() {
-  testWidgets('workbench exposes the reviewed Issue 213 structure', (
+  testWidgets('workbench exposes the selected analytics structure', (
     tester,
   ) async {
     tester.view.devicePixelRatio = 1;
@@ -26,57 +26,41 @@ void main() {
     );
     await tester.pump();
 
-    expect(find.text('工作台'), findsOneWidget);
-    expect(find.text('总览'), findsOneWidget);
+    expect(find.text('数据总览'), findsOneWidget);
+    expect(find.text('模型分析'), findsOneWidget);
     expect(find.text('我的待办'), findsOneWidget);
     expect(find.text('项目 / 专项'), findsOneWidget);
     expect(find.text('收件箱'), findsOneWidget);
-    expect(find.text('需要你处理'), findsOneWidget);
-    expect(find.text('正在推进的专项'), findsOneWidget);
-    expect(find.text('工作洞察'), findsOneWidget);
-    expect(find.text('本周节奏'), findsOneWidget);
-    expect(find.text('AI 整理建议'), findsOneWidget);
+    expect(find.text('最近 TaskThreads'), findsOneWidget);
     expect(
       find.byKey(const Key('workbench-metric-TaskThreads')),
       findsOneWidget,
     );
     expect(find.byKey(const Key('workbench-activity-heatmap')), findsOneWidget);
+    expect(find.byKey(const Key('workbench-overview-table')), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('workbench-activity-window-1')));
     await tester.pump();
-    expect(find.text('过去 30 天'), findsOneWidget);
-
-    await tester.tap(
-      find.byKey(const Key('workbench-right-rail-collapse-button')),
-    );
-    await tester.pump();
     expect(
-      find.byKey(const Key('workbench-right-rail-expand-button')),
+      find.byKey(const Key('workbench-activity-window-1-selected')),
       findsOneWidget,
     );
-    expect(find.text('工作洞察'), findsNothing);
-
-    await tester.tap(
-      find.byKey(const Key('workbench-right-rail-expand-button')),
-    );
-    await tester.pump();
-    expect(find.text('工作洞察'), findsOneWidget);
-
-    tester.view.physicalSize = const Size(900, 960);
-    await tester.pump();
-    expect(find.text('工作洞察'), findsOneWidget);
-    expect(find.text('本周节奏'), findsOneWidget);
-    expect(find.text('AI 整理建议'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('workbench-tab-1')));
     await tester.pump();
-    expect(find.byKey(const Key('workbench-todo-page')), findsOneWidget);
+    expect(find.byKey(const Key('workbench-model-analysis')), findsOneWidget);
+    expect(find.text('Tokens 使用趋势（按月）'), findsOneWidget);
+    expect(find.text('模型使用份额'), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('workbench-tab-2')));
     await tester.pump();
-    expect(find.byKey(const Key('workbench-projects-page')), findsOneWidget);
+    expect(find.byKey(const Key('workbench-todo-page')), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('workbench-tab-3')));
+    await tester.pump();
+    expect(find.byKey(const Key('workbench-projects-page')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('workbench-tab-4')));
     await tester.pump();
     expect(find.byKey(const Key('workbench-inbox-page')), findsOneWidget);
   });

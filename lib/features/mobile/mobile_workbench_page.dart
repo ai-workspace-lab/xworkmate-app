@@ -76,11 +76,12 @@ class _MobileWorkbenchPageState extends State<MobileWorkbenchPage> {
   }
 }
 
-enum _MobileWorkbenchTab { overview, todo, projects, inbox }
+enum _MobileWorkbenchTab { overview, models, todo, projects, inbox }
 
 extension on _MobileWorkbenchTab {
   String get label => switch (this) {
-    _MobileWorkbenchTab.overview => appText('总览', 'Overview'),
+    _MobileWorkbenchTab.overview => appText('数据总览', 'Overview'),
+    _MobileWorkbenchTab.models => appText('模型分析', 'Models'),
     _MobileWorkbenchTab.todo => appText('待办', 'To do'),
     _MobileWorkbenchTab.projects => appText('项目', 'Projects'),
     _MobileWorkbenchTab.inbox => appText('收件箱', 'Inbox'),
@@ -88,6 +89,7 @@ extension on _MobileWorkbenchTab {
 
   String get keyName => switch (this) {
     _MobileWorkbenchTab.overview => 'overview',
+    _MobileWorkbenchTab.models => 'models',
     _MobileWorkbenchTab.todo => 'todo',
     _MobileWorkbenchTab.projects => 'projects',
     _MobileWorkbenchTab.inbox => 'inbox',
@@ -222,6 +224,9 @@ class _MobileWorkbenchContent extends StatelessWidget {
         projection: projection,
         onOpenThread: onOpenThread,
       ),
+      _MobileWorkbenchTab.models => _MobileModelAnalysis(
+        projection: projection,
+      ),
       _MobileWorkbenchTab.todo => _MobileWorkbenchList(
         key: const Key('mobile-workbench-tab-content-todo'),
         title: appText('我的待办', 'My to do'),
@@ -301,6 +306,125 @@ class _MobileWorkbenchOverview extends StatelessWidget {
       ],
     );
   }
+}
+
+class _MobileModelAnalysis extends StatelessWidget {
+  const _MobileModelAnalysis({required this.projection});
+
+  final WorkbenchProjection projection;
+
+  @override
+  Widget build(BuildContext context) {
+    final byModel = <String, ({int input, int output, int sessions})>{};
+    for (final item in projection.items) {
+      final model = item.model.trim();
+      if (model.isEmpty) continue;
+      final current = byModel[model] ?? (input: 0, output: 0, sessions: 0);
+      byModel[model] = (
+        input: current.input + item.inputTokens,
+        output: current.output + item.outputTokens,
+        sessions: current.sessions + 1,
+      );
+    }
+    final models = byModel.entries.toList()
+      ..sort(
+        (left, right) => (right.value.input + right.value.output).compareTo(
+          left.value.input + left.value.output,
+        ),
+      );
+    final totalTokens = projection.items.fold<int>(
+      0,
+      (sum, item) => sum + item.totalTokens,
+    );
+    return Column(
+      key: const Key('mobile-workbench-tab-content-models'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            _SnapshotMetric(
+              label: 'Tokens',
+              value: _mobileFormatTokens(totalTokens),
+            ),
+            const SizedBox(width: 7),
+            _SnapshotMetric(
+              label: appText('模型', 'Models'),
+              value: '${models.length}',
+            ),
+          ],
+        ),
+        const SizedBox(height: 18),
+        _MobileSection(
+          title: appText('模型使用份额', 'Model usage share'),
+          subtitle: appText('服务端会话用量', 'Server session usage'),
+          child: MobileWorkbenchSurface(
+            child: models.isEmpty
+                ? Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Center(
+                      child: Text(
+                        appText('暂无模型用量数据', 'No model usage data'),
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: context.palette.textMuted,
+                        ),
+                      ),
+                    ),
+                  )
+                : Column(
+                    children: [
+                      for (var index = 0; index < models.length; index++) ...[
+                        Padding(
+                          padding: const EdgeInsets.all(14),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 10,
+                                height: 10,
+                                decoration: BoxDecoration(
+                                  color: Color.lerp(
+                                    context.palette.accent,
+                                    context.palette.accentMuted,
+                                    index / models.length,
+                                  ),
+                                  borderRadius: BorderRadius.circular(3),
+                                ),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  models[index].key,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: Theme.of(context).textTheme.bodyMedium
+                                      ?.copyWith(fontWeight: FontWeight.w700),
+                                ),
+                              ),
+                              Text(
+                                '${_mobileFormatTokens(models[index].value.input)} / ${_mobileFormatTokens(models[index].value.output)}',
+                                style: Theme.of(context).textTheme.bodySmall
+                                    ?.copyWith(
+                                      color: context.palette.textSecondary,
+                                    ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        if (index < models.length - 1)
+                          Divider(height: 1, color: context.palette.strokeSoft),
+                      ],
+                    ],
+                  ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+String _mobileFormatTokens(int value) {
+  if (value >= 1000000) return '${(value / 1000000).toStringAsFixed(1)}M';
+  if (value >= 1000) return '${(value / 1000).toStringAsFixed(1)}k';
+  return '$value';
 }
 
 class _MobileSnapshot extends StatelessWidget {

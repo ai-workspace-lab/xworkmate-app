@@ -34,13 +34,23 @@ void main() {
     final controller = await pumpMobileWorkbench(tester);
 
     expect(find.byKey(const Key('mobile-workbench-page')), findsOneWidget);
-    expect(find.text('工作台'), findsOneWidget);
+    expect(find.text('数据总览'), findsOneWidget);
+    expect(find.text('模型分析'), findsOneWidget);
     expect(
       find.byKey(const Key('mobile-workbench-quick-record')),
       findsOneWidget,
     );
-    expect(find.text('需要你处理'), findsOneWidget);
-    expect(find.text('正在推进的专项'), findsOneWidget);
+    expect(
+      find.byKey(const Key('mobile-workbench-overview-summary')),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.byKey(const Key('mobile-workbench-tab-models')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('mobile-workbench-tab-content-models')),
+      findsOneWidget,
+    );
 
     await tester.tap(find.byKey(const Key('mobile-workbench-tab-todo')));
     await tester.pumpAndSettle();
@@ -56,6 +66,8 @@ void main() {
       findsOneWidget,
     );
 
+    await tester.drag(find.byType(ListView).first, const Offset(-220, 0));
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('mobile-workbench-tab-inbox')));
     await tester.pumpAndSettle();
     expect(
