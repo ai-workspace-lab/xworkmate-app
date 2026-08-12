@@ -459,18 +459,15 @@ extension AssistantPageStateClosureInternal on AssistantPageStateInternal {
               ),
             if (artifactPaneCollapsedInternal)
               Positioned(
-                right: 10,
-                top: 10,
+                right: 12,
+                top: 12,
                 child: SizedBox(
-                  height: 40,
-                  child: Center(
-                    child: AssistantArtifactSidebarRevealButton(
-                      onTap: () {
-                        setState(() {
-                          artifactPaneCollapsedInternal = false;
-                        });
-                      },
-                    ),
+                  child: AssistantArtifactSidebarRevealButton(
+                    onTap: () {
+                      setState(() {
+                        artifactPaneCollapsedInternal = false;
+                      });
+                    },
                   ),
                 ),
               ),

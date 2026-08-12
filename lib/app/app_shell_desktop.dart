@@ -7,6 +7,7 @@ import '../runtime/runtime_models.dart';
 import '../theme/app_palette.dart';
 import '../theme/app_theme.dart';
 import '../widgets/detail_drawer.dart';
+import '../widgets/collapsed_pane_reveal_button.dart';
 import '../widgets/pane_resize_handle.dart';
 import '../widgets/sidebar_navigation.dart';
 import 'app_controller.dart';
@@ -464,8 +465,8 @@ class _AppShellState extends State<AppShell> {
                             ),
                           if (!showSidebar)
                             Positioned(
-                              left: 8,
-                              top: 8,
+                              left: 12,
+                              top: 12,
                               child: _SidebarRevealRail(
                                 onExpand: () =>
                                     _toggleSidebarVisibility(controller),
@@ -518,45 +519,18 @@ class _AppShellState extends State<AppShell> {
   }
 }
 
-class _SidebarRevealRail extends StatefulWidget {
+class _SidebarRevealRail extends StatelessWidget {
   const _SidebarRevealRail({required this.onExpand});
 
   final VoidCallback onExpand;
 
   @override
-  State<_SidebarRevealRail> createState() => _SidebarRevealRailState();
-}
-
-class _SidebarRevealRailState extends State<_SidebarRevealRail> {
-  bool _hovered = false;
-
-  @override
   Widget build(BuildContext context) {
-    final palette = context.palette;
-
-    return MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      child: Tooltip(
-        message: appText('展开导航', 'Expand sidebar'),
-        child: GestureDetector(
-          onTap: widget.onExpand,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
-            width: _hovered ? 40 : 32,
-            height: _hovered ? 40 : 32,
-            decoration: BoxDecoration(
-              color: _hovered ? palette.surfacePrimary : palette.chromeSurface,
-              borderRadius: BorderRadius.circular(999),
-            ),
-            child: Icon(
-              Icons.keyboard_double_arrow_right_rounded,
-              size: 18,
-              color: palette.textSecondary,
-            ),
-          ),
-        ),
-      ),
+    return CollapsedPaneRevealButton(
+      buttonKey: const Key('sidebar-reveal-button'),
+      tooltip: appText('展开导航', 'Expand sidebar'),
+      icon: Icons.keyboard_double_arrow_right_rounded,
+      onTap: onExpand,
     );
   }
 }
