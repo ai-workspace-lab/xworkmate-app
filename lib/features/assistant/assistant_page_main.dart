@@ -46,6 +46,10 @@ const double assistantHorizontalPaneGutterInternal = 0;
 
 const double assistantArtifactPaneMinWidthInternal = 280;
 const double assistantArtifactPaneDefaultWidthInternal = 360;
+const double assistantFocusedComposerLeftInsetInternal = 336;
+const double assistantFocusedComposerRightInsetInternal =
+    assistantArtifactPaneDefaultWidthInternal;
+const double assistantFocusedComposerMinWidthInternal = 620;
 const double assistantCollapsedArtifactToggleClearanceInternal = 56;
 const double assistantComposerSafeAreaGapInternal = 8;
 const double assistantComposerBaseHeightCompactInternal = 168;
@@ -631,6 +635,7 @@ class AssistantLowerPaneInternal extends StatelessWidget {
   const AssistantLowerPaneInternal({
     super.key,
     required this.bottomContentInset,
+    this.horizontalContentInsets = EdgeInsets.zero,
     required this.controller,
     required this.inputController,
     required this.focusNode,
@@ -652,6 +657,7 @@ class AssistantLowerPaneInternal extends StatelessWidget {
   });
 
   final double bottomContentInset;
+  final EdgeInsetsGeometry horizontalContentInsets;
   final AppController controller;
   final TextEditingController inputController;
   final FocusNode focusNode;
@@ -679,7 +685,9 @@ class AssistantLowerPaneInternal extends StatelessWidget {
       color: palette.canvas,
       child: ClipRect(
         child: Padding(
-          padding: EdgeInsets.only(bottom: bottomContentInset),
+          padding: horizontalContentInsets.add(
+            EdgeInsets.only(bottom: bottomContentInset),
+          ),
           child: LayoutBuilder(
             builder: (context, constraints) {
               // The composer is given a tight height so its writing area can
@@ -702,6 +710,8 @@ class AssistantLowerPaneInternal extends StatelessWidget {
 
               return OverflowBox(
                 alignment: Alignment.bottomCenter,
+                minWidth: constraints.maxWidth,
+                maxWidth: constraints.maxWidth,
                 minHeight: composerHeight,
                 maxHeight: composerHeight,
                 child: ComposerBarInternal(

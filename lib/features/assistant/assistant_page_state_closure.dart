@@ -109,6 +109,23 @@ extension AssistantPageStateClosureInternal on AssistantPageStateInternal {
             (defaultComposerHeight + workspaceLowerPaneHeightAdjustmentInternal)
                 .clamp(composerHeightLowerBound, composerHeightUpperBound)
                 .toDouble();
+        // In focused mode the conversation canvas becomes full-width, but the
+        // composer keeps the same work-column geometry it has with the global
+        // navigation (336px) and artifact pane (360px) open. This prevents the
+        // input surface from jumping wide when both sidebars are hidden.
+        final useFocusedComposerGeometry =
+            controller.sidebarState == AppSidebarState.hidden &&
+            artifactPaneCollapsedInternal &&
+            constraints.maxWidth >=
+                assistantFocusedComposerLeftInsetInternal +
+                    assistantFocusedComposerRightInsetInternal +
+                    assistantFocusedComposerMinWidthInternal;
+        final composerHorizontalInsets = useFocusedComposerGeometry
+            ? const EdgeInsets.only(
+                left: assistantFocusedComposerLeftInsetInternal,
+                right: assistantFocusedComposerRightInsetInternal,
+              )
+            : EdgeInsets.zero;
         final activeSessionKey = currentTask.sessionKey.trim().isEmpty
             ? controller.currentSessionKey
             : currentTask.sessionKey.trim();
@@ -207,6 +224,7 @@ extension AssistantPageStateClosureInternal on AssistantPageStateInternal {
                       height: composerHeight,
                       child: AssistantLowerPaneInternal(
                         bottomContentInset: composerBottomSpacing,
+                        horizontalContentInsets: composerHorizontalInsets,
                         inputController: inputControllerInternal,
                         focusNode: composerFocusNodeInternal,
                         thinkingLabel: thinkingLabelInternal,
