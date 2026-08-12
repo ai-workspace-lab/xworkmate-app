@@ -402,9 +402,22 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Future<SettingsAboutSnapshot> _loadAboutSnapshot() async {
-    final bridgeEndpoint =
-        widget.controller.resolveGatewayAcpEndpointInternal() ??
-        Uri.parse(kManagedBridgeServerUrl);
+    final bridgeEndpoint = widget.controller
+        .resolveGatewayAcpEndpointInternal();
+    if (bridgeEndpoint == null) {
+      return SettingsAboutSnapshot(
+        appVersion: kAppVersion,
+        appBuildNumber: kAppBuildNumber,
+        appBuildDate: kAppBuildDate,
+        appCommit: kAppBuildCommit,
+        bridgeEndpoint: '',
+        bridgeStatus: 'not configured',
+        bridgeVersion: '',
+        bridgeBuildDate: '',
+        bridgeCommit: '',
+        bridgeImage: '',
+      );
+    }
     final bridgeMetadata = await _loadBridgeMetadata(bridgeEndpoint);
     return SettingsAboutSnapshot(
       appVersion: kAppVersion,
@@ -433,9 +446,12 @@ class _SettingsPageState extends State<SettingsPage> {
       await _refreshAboutSnapshot();
       return;
     }
-    final bridgeEndpoint =
-        widget.controller.resolveGatewayAcpEndpointInternal() ??
-        Uri.parse(kManagedBridgeServerUrl);
+    final bridgeEndpoint = widget.controller
+        .resolveGatewayAcpEndpointInternal();
+    if (bridgeEndpoint == null) {
+      await _refreshAboutSnapshot();
+      return;
+    }
     final bridgeMetadata = await _loadBridgeMetadata(bridgeEndpoint);
     final status = _stringValue(bridgeMetadata['status']).toLowerCase();
     if (status == 'ok') {

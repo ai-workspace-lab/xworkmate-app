@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'runtime_endpoint_config.dart';
+
 class AccountSessionSummary {
   const AccountSessionSummary({
     required this.userId,
@@ -592,7 +594,9 @@ class AccountSyncResult {
   final String message;
 }
 
-const String kManagedBridgeServerUrl = 'https://xworkmate-bridge.svc.plus';
+/// Optional build-time fallback. Authenticated Accounts profile data takes
+/// precedence and supplies the environment-specific Bridge endpoint.
+const String kManagedBridgeServerUrl = kConfiguredManagedBridgeServerUrl;
 const String kAccountManagedSecretTargetBridgeAuthToken = 'bridge.auth_token';
 const String kAccountManagedSecretTargetAIGatewayAccessToken =
     'ai_gateway.access_token';

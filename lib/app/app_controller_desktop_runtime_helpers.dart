@@ -20,6 +20,7 @@ import '../runtime/desktop_platform_service.dart';
 import '../runtime/gateway_runtime.dart';
 import '../runtime/runtime_controllers.dart';
 import '../runtime/runtime_models.dart';
+import '../runtime/runtime_endpoint_config.dart';
 import '../runtime/secure_config_store.dart';
 import '../runtime/embedded_agent_launch_policy.dart';
 import '../runtime/runtime_coordinator.dart';
@@ -1412,14 +1413,18 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
 
   Uri? resolveBridgeAcpEndpointInternal() {
     final accountSyncState = settingsControllerInternal.accountSyncState;
+    final managedBridgeEndpoint = configuredManagedBridgeServerUrl(
+      remote: accountSyncState?.syncedDefaults.bridgeServerUrl ?? '',
+    );
     final managedBridgeReady =
         settingsControllerInternal.accountSessionTokenInternal
             .trim()
             .isNotEmpty &&
         accountSyncState?.syncState.trim().toLowerCase() == 'ready' &&
-        accountSyncState?.tokenConfigured.bridge == true;
+        accountSyncState?.tokenConfigured.bridge == true &&
+        managedBridgeEndpoint != null;
     if (managedBridgeReady) {
-      return Uri.parse(kManagedBridgeServerUrl);
+      return Uri.tryParse(managedBridgeEndpoint);
     }
 
     final selfHosted = settingsControllerInternal
@@ -1434,7 +1439,8 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
       }
     }
 
-    return Uri.parse(kManagedBridgeServerUrl);
+    final configured = configuredManagedBridgeServerUrl();
+    return configured == null ? null : Uri.tryParse(configured);
   }
 
   Uri? resolveExternalAcpEndpointForTargetInternal(AssistantExecutionTarget _) {

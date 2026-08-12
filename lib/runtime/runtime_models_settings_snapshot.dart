@@ -7,6 +7,7 @@ import '../features/settings/local_git_repository_connection.dart';
 import '../i18n/app_language.dart';
 import '../models/app_models.dart';
 import 'runtime_models_account.dart';
+import 'runtime_endpoint_config.dart';
 import 'runtime_models_connection.dart';
 import 'runtime_models_profiles.dart';
 import 'runtime_models_configs.dart';
@@ -113,7 +114,7 @@ class SettingsSnapshot {
       experimentalCanvas: false,
       experimentalBridge: false,
       experimentalDebug: false,
-      accountBaseUrl: 'https://accounts.svc.plus',
+      accountBaseUrl: kConfiguredAccountBaseUrl,
       accountUsername: '',
       accountWorkspace: 'Default Workspace',
       accountWorkspaceFollowed: false,

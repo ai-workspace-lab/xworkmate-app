@@ -52,7 +52,16 @@ Future<String> loadAiGatewayApiKeyThreadSessionInternal(
 Future<void> openOnlineWorkspaceThreadSessionInternal(
   AppController controller,
 ) async {
-  const url = 'https://www.svc.plus/Xworkmate';
+  final baseUrl = controller.settingsControllerInternal.snapshot.accountBaseUrl
+      .trim();
+  if (baseUrl.isEmpty) {
+    return;
+  }
+  final parsed = Uri.tryParse(baseUrl);
+  if (parsed == null || !parsed.hasScheme || parsed.host.trim().isEmpty) {
+    return;
+  }
+  final url = parsed.replace(path: '/panel').toString();
   try {
     if (Platform.isMacOS) {
       await Process.run('open', [url]);

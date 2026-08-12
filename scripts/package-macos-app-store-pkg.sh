@@ -69,6 +69,9 @@ export_options_path="$tmp_dir/ExportOptions.plist"
 sed "s|\${EXPORT_METHOD}|app-store|g" "$ROOT_DIR/ios/ExportOptions.plist" > "$export_options_path"
 
 flutter pub get
+endpoint_defines=()
+[[ -n "${XWORKMATE_ACCOUNT_BASE_URL:-}" ]] && endpoint_defines+=("--dart-define=XWORKMATE_ACCOUNT_BASE_URL=${XWORKMATE_ACCOUNT_BASE_URL}")
+[[ -n "${XWORKMATE_MANAGED_BRIDGE_URL:-}" ]] && endpoint_defines+=("--dart-define=XWORKMATE_MANAGED_BRIDGE_URL=${XWORKMATE_MANAGED_BRIDGE_URL}")
 flutter build macos --release \
   --build-name="$PLATFORM_RELEASE_VERSION" \
   --build-number="$app_build" \
@@ -76,6 +79,7 @@ flutter build macos --release \
   --dart-define="XWORKMATE_BUILD_NUMBER=$app_build" \
   --dart-define="XWORKMATE_BUILD_DATE=$app_build_date" \
   --dart-define="XWORKMATE_BUILD_COMMIT=$app_build_commit" \
+  "${endpoint_defines[@]}" \
   "$APP_STORE_DEFINE"
 
 xcodebuild archive \

@@ -286,7 +286,7 @@ class _AvailableConnectorsPanelState extends State<_AvailableConnectorsPanel> {
         _ConnectorCard(
           connectorId: 'svc-plus-workspace',
           icon: Icons.cloud_outlined,
-          title: 'svc.plus Workspace',
+          title: appText('托管工作空间', 'Managed Workspace'),
           subtitle: appText(
             '连接你已有的工作空间配置。',
             'Connect an existing workspace configuration.',
@@ -312,7 +312,7 @@ class _AvailableConnectorsPanelState extends State<_AvailableConnectorsPanel> {
           const SizedBox(height: 20),
           _ConnectorConfiguration(
             title: _selection == _ConnectorSelection.svcPlus
-                ? 'svc.plus Workspace'
+                ? appText('托管工作空间', 'Managed Workspace')
                 : appText('自托管工作空间', 'Self-hosted Workspace'),
             onClose: () => setState(() => _selection = null),
             child: _selection == _ConnectorSelection.svcPlus
@@ -701,7 +701,7 @@ class _ManualBridgePanel extends StatelessWidget {
               decoration: InputDecoration(
                 labelText: appText('服务地址', 'Service URL'),
                 prefixIcon: const Icon(Icons.dns_outlined),
-                hintText: 'https://xworkmate-bridge.svc.plus',
+                hintText: 'https://bridge.example.com',
               ),
               onFieldSubmitted: (_) =>
                   onSaveAccountProfile(isManualBridge: true),
@@ -780,7 +780,7 @@ class _SignedOutAccountPanel extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             Text(
-              appText('连接 svc.plus Workspace', 'Connect svc.plus Workspace'),
+              appText('连接托管工作空间', 'Connect Managed Workspace'),
               style: theme.textTheme.headlineMedium,
               textAlign: TextAlign.center,
             ),
@@ -804,7 +804,7 @@ class _SignedOutAccountPanel extends StatelessWidget {
               decoration: InputDecoration(
                 labelText: appText('服务地址', 'Service URL'),
                 prefixIcon: const Icon(Icons.dns_outlined),
-                hintText: 'https://accounts.svc.plus',
+                hintText: 'https://accounts.example.com',
               ),
               keyboardType: TextInputType.url,
               onFieldSubmitted: (_) =>
@@ -1045,7 +1045,7 @@ class _SignedInAccountPanel extends StatelessWidget {
         ? Icons.cloud_outlined
         : Icons.link_outlined;
     final modeTitle = isAccountSyncMode
-        ? 'svc.plus Workspace'
+        ? appText('托管工作空间', 'Managed Workspace')
         : appText('自托管工作空间', 'Self-hosted Workspace');
     final primaryActionLabel = isAccountSyncMode
         ? appText('刷新连接', 'Refresh connection')
@@ -1331,7 +1331,7 @@ String _connectionSourceLabel(
     accountState: accountState,
   );
   return mode == _SignedInAccountMode.accountSync
-      ? 'svc.plus Workspace'
+      ? appText('托管工作空间', 'Managed Workspace')
       : appText('自托管工作空间', 'Self-hosted Workspace');
 }
 

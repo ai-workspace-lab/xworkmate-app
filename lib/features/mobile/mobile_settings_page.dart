@@ -238,7 +238,7 @@ class _MobileSettingsPageState extends State<MobileSettingsPage> {
       );
   }
 
-  /// 清空手动 Bridge 配置，回到「可以走 svc.plus 登录」的状态。
+  /// 清空手动 Bridge 配置，回到托管工作空间登录状态。
   /// 手动 Bridge 一旦配置生效，账号登录卡片就不再显示；没有这个出口的话
   /// 用户会被困在手动模式里，既退不出也换不回托管登录。
   Future<void> resetManualBridge() async {
@@ -663,7 +663,9 @@ class _AccountSection extends StatelessWidget {
               icon: accountSyncing
                   ? Icons.sync_rounded
                   : Icons.cloud_done_outlined,
-              title: email.isEmpty ? 'svc.plus Workspace' : email,
+              title: email.isEmpty
+                  ? appText('托管工作空间', 'Managed Workspace')
+                  : email,
               subtitle: accountSyncing
                   ? appText('正在更新连接信息…', 'Updating connection information…')
                   : status.isEmpty
@@ -673,7 +675,13 @@ class _AccountSection extends StatelessWidget {
                 MobileSettingsMetaRowInternal(
                   icon: Icons.hub_outlined,
                   label: appText('服务地址', 'Service URL'),
-                  value: kManagedBridgeServerUrl,
+                  value:
+                      accountState?.syncedDefaults.bridgeServerUrl
+                              .trim()
+                              .isNotEmpty ==
+                          true
+                      ? accountState!.syncedDefaults.bridgeServerUrl
+                      : kManagedBridgeServerUrl,
                 ),
                 const SizedBox(height: 8),
                 MobileSettingsMetaRowInternal(
@@ -759,7 +767,7 @@ class _AccountSection extends StatelessWidget {
           MobileSettingsCardInternal(
             key: const Key('mobile-settings-account-login-card'),
             icon: Icons.cloud_outlined,
-            title: 'svc.plus Workspace',
+            title: appText('托管工作空间', 'Managed Workspace'),
             subtitle: appText(
               '连接你已有的工作空间配置。',
               'Connect an existing workspace configuration.',
@@ -894,7 +902,7 @@ class _ConnectorsLayout extends StatelessWidget {
 
 /// 手动 Bridge 生效后的「已连接视图」，与账号登录成功后的卡片对称：
 /// 展示当前入口与状态，并提供「编辑配置」与「退出」两个出口——退出后
-/// svc.plus 登录与手动 Bridge 两张卡片会重新一起显示。
+/// 托管工作空间登录与手动 Bridge 两张卡片会重新一起显示。
 class _ManualBridgeConnectedCard extends StatelessWidget {
   const _ManualBridgeConnectedCard({
     required this.accountBusy,
