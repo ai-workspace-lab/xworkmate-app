@@ -311,34 +311,84 @@ class _MobileSnapshot extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
-    final totalProgress = projection.items.isEmpty
-        ? 0.0
-        : projection.items.fold<double>(0, (sum, item) => sum + item.progress) /
-              projection.items.length;
+    final activityMaximum = projection.workloadSeries.fold<double>(
+      1,
+      (maximum, value) => value > maximum ? value : maximum,
+    );
     return Container(
-      padding: const EdgeInsets.all(14),
+      key: const Key('mobile-workbench-overview-summary'),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: palette.accentMuted,
-        borderRadius: BorderRadius.circular(18),
+        color: palette.surfaceSecondary,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: palette.strokeSoft),
       ),
-      child: Row(
+      child: Column(
         children: [
-          _SnapshotMetric(
-            label: appText('待处理', 'To do'),
-            value: '${projection.todos.length}',
-            color: palette.accent,
+          Row(
+            children: [
+              _SnapshotMetric(
+                label: appText('TaskThreads', 'TaskThreads'),
+                value: '${projection.items.length}',
+              ),
+              const SizedBox(width: 7),
+              _SnapshotMetric(
+                label: appText('待处理', 'To do'),
+                value: '${projection.todos.length}',
+              ),
+              const SizedBox(width: 7),
+              _SnapshotMetric(
+                label: appText('专项', 'Projects'),
+                value: '${projection.projects.length}',
+              ),
+            ],
           ),
-          _SnapshotDivider(color: palette.strokeSoft),
-          _SnapshotMetric(
-            label: appText('项目', 'Projects'),
-            value: '${projection.projects.length}',
-            color: palette.success,
-          ),
-          _SnapshotDivider(color: palette.strokeSoft),
-          _SnapshotMetric(
-            label: appText('进度', 'Progress'),
-            value: '${(totalProgress * 100).round()}%',
-            color: palette.warning,
+          const SizedBox(height: 10),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+            decoration: BoxDecoration(
+              color: palette.surfacePrimary.withValues(alpha: 0.56),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  appText('工作活跃度 · 过去 7 天', 'Work activity · past 7 days'),
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: palette.textSecondary,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 7),
+                Row(
+                  children: List.generate(7, (index) {
+                    final value = index < projection.workloadSeries.length
+                        ? projection.workloadSeries[index]
+                        : 0.0;
+                    final color = value == 0
+                        ? palette.surfaceTertiary
+                        : Color.lerp(
+                            palette.accentMuted,
+                            palette.accent,
+                            0.36 + (value / activityMaximum) * 0.64,
+                          )!;
+                    return Expanded(
+                      child: Container(
+                        key: Key('mobile-workbench-activity-$index'),
+                        height: 20,
+                        margin: EdgeInsets.only(right: index == 6 ? 0 : 5),
+                        decoration: BoxDecoration(
+                          color: color,
+                          borderRadius: BorderRadius.circular(5),
+                        ),
+                      ),
+                    );
+                  }),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -347,50 +397,45 @@ class _MobileSnapshot extends StatelessWidget {
 }
 
 class _SnapshotMetric extends StatelessWidget {
-  const _SnapshotMetric({
-    required this.label,
-    required this.value,
-    required this.color,
-  });
+  const _SnapshotMetric({required this.label, required this.value});
 
   final String label;
   final String value;
-  final Color color;
 
   @override
   Widget build(BuildContext context) {
+    final palette = context.palette;
     return Expanded(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Text(
-            value,
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              color: color,
-              fontWeight: FontWeight.w800,
+      child: Container(
+        height: 65,
+        padding: const EdgeInsets.fromLTRB(9, 8, 9, 7),
+        decoration: BoxDecoration(
+          color: palette.surfacePrimary.withValues(alpha: 0.62),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(
+                context,
+              ).textTheme.labelSmall?.copyWith(color: palette.textSecondary),
             ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: context.palette.textSecondary,
+            const Spacer(),
+            Text(
+              value,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                color: palette.textPrimary,
+                fontWeight: FontWeight.w800,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
-  }
-}
-
-class _SnapshotDivider extends StatelessWidget {
-  const _SnapshotDivider({required this.color});
-
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(width: 1, height: 32, color: color);
   }
 }
 
