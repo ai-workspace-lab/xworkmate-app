@@ -15,6 +15,10 @@ class WorkbenchItem {
     required this.attachmentNames,
     required this.messageCount,
     required this.thread,
+    this.model = '',
+    this.inputTokens = 0,
+    this.outputTokens = 0,
+    this.totalTokens = 0,
   });
 
   final String sessionKey;
@@ -28,6 +32,10 @@ class WorkbenchItem {
   final List<String> attachmentNames;
   final int messageCount;
   final TaskThread? thread;
+  final String model;
+  final int inputTokens;
+  final int outputTokens;
+  final int totalTokens;
 
   bool get isCompleted => state == WorkbenchItemState.completed;
 
@@ -150,6 +158,16 @@ WorkbenchProjection buildWorkbenchProjection({
                   const <String>[],
               messageCount: thread?.messages.length ?? 0,
               thread: thread,
+              model: _firstNonEmpty([
+                session.model,
+                thread?.latestResolvedRuntimeModel,
+                thread?.assistantModelId,
+              ]),
+              inputTokens: session.inputTokens ?? 0,
+              outputTokens: session.outputTokens ?? 0,
+              totalTokens:
+                  session.totalTokens ??
+                  (session.inputTokens ?? 0) + (session.outputTokens ?? 0),
             );
           })
           .toList(growable: false)

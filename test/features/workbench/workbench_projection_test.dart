@@ -32,6 +32,10 @@ void main() {
 
       expect(projection.items, hasLength(1));
       expect(projection.items.single.state, WorkbenchItemState.running);
+      expect(projection.items.single.model, 'Opus 4.8');
+      expect(projection.items.single.inputTokens, 120);
+      expect(projection.items.single.outputTokens, 300);
+      expect(projection.items.single.totalTokens, 420);
       expect(projection.projects.single.label, 'xworkmate-app');
       expect(projection.projects.single.artifactCount, 1);
       expect(
@@ -131,10 +135,10 @@ GatewaySessionSummary _session(String key, String title) {
     abortedLastRun: false,
     thinkingLevel: null,
     verboseLevel: null,
-    inputTokens: 0,
-    outputTokens: 0,
-    totalTokens: 0,
-    model: null,
+    inputTokens: 120,
+    outputTokens: 300,
+    totalTokens: 420,
+    model: 'Opus 4.8',
     contextTokens: 0,
     derivedTitle: title,
     lastMessagePreview: '',
