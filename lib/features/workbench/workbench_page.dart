@@ -127,8 +127,11 @@ class _WorkbenchMain extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _WorkbenchHero(onQuickRecord: onQuickRecord),
-        const SizedBox(height: 12),
+        _WorkbenchDashboardHeader(
+          projection: projection,
+          onQuickRecord: onQuickRecord,
+        ),
+        const SizedBox(height: 14),
         _WorkbenchTabs(index: tabIndex, onChanged: onTabChanged),
         const SizedBox(height: 12),
         Expanded(
@@ -159,62 +162,292 @@ class _WorkbenchMain extends StatelessWidget {
   }
 }
 
-class _WorkbenchHero extends StatelessWidget {
-  const _WorkbenchHero({required this.onQuickRecord});
+class _WorkbenchDashboardHeader extends StatefulWidget {
+  const _WorkbenchDashboardHeader({
+    required this.projection,
+    required this.onQuickRecord,
+  });
 
+  final WorkbenchProjection projection;
   final VoidCallback onQuickRecord;
+
+  @override
+  State<_WorkbenchDashboardHeader> createState() =>
+      _WorkbenchDashboardHeaderState();
+}
+
+class _WorkbenchDashboardHeaderState extends State<_WorkbenchDashboardHeader> {
+  var _activityWindow = 0;
 
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
-    final theme = Theme.of(context);
+    final projection = widget.projection;
+    final metrics = <({String label, String value, Color valueColor})>[
+      (
+        label: appText('TaskThreads', 'TaskThreads'),
+        value: '${projection.items.length}',
+        valueColor: palette.textPrimary,
+      ),
+      (
+        label: appText('待处理', 'Needs attention'),
+        value: '${projection.todos.length}',
+        valueColor: projection.blockedCount > 0
+            ? palette.danger
+            : palette.textPrimary,
+      ),
+      (
+        label: appText('推进中专项', 'Active projects'),
+        value: '${projection.projects.length}',
+        valueColor: palette.textPrimary,
+      ),
+      (
+        label: appText('已归档产物', 'Artifacts'),
+        value: '${projection.artifactCount}',
+        valueColor: palette.textPrimary,
+      ),
+    ];
     return Container(
       width: double.infinity,
-      constraints: const BoxConstraints(minHeight: 104),
-      padding: const EdgeInsets.fromLTRB(22, 18, 20, 18),
+      padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
       decoration: BoxDecoration(
-        color: palette.surfacePrimary,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: palette.strokeSoft),
-        boxShadow: [palette.chromeShadowAmbient],
+        color: palette.surfaceSecondary,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: palette.strokeSoft.withValues(alpha: 0.7)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(
+                appText('工作台', 'Workbench'),
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.35,
+                ),
+              ),
+              const Spacer(),
+              _ActivityWindowPicker(
+                value: _activityWindow,
+                onChanged: (value) => setState(() => _activityWindow = value),
+              ),
+              const SizedBox(width: 8),
+              Tooltip(
+                message: appText('快速记录', 'Quick record'),
+                child: IconButton(
+                  key: const Key('workbench-quick-record-button'),
+                  onPressed: widget.onQuickRecord,
+                  icon: const Icon(Icons.add_rounded),
+                  style: IconButton.styleFrom(
+                    backgroundColor: palette.textPrimary,
+                    foregroundColor: palette.surfacePrimary,
+                    minimumSize: const Size(32, 32),
+                    padding: EdgeInsets.zero,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 15),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final columns = constraints.maxWidth >= 720 ? 4 : 2;
+              final width =
+                  (constraints.maxWidth - (columns - 1) * 8) / columns;
+              return Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final metric in metrics)
+                    SizedBox(
+                      width: width,
+                      child: _WorkbenchMetricTile(
+                        label: metric.label,
+                        value: metric.value,
+                        valueColor: metric.valueColor,
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
+          const SizedBox(height: 12),
+          _WorkbenchActivityHeatmap(
+            series: projection.workloadSeries,
+            window: _activityWindow,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ActivityWindowPicker extends StatelessWidget {
+  const _ActivityWindowPicker({required this.value, required this.onChanged});
+
+  final int value;
+  final ValueChanged<int> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final labels = <String>[
+      appText('7日', '7d'),
+      appText('30日', '30d'),
+      appText('全部', 'All'),
+    ];
+    return Container(
+      decoration: BoxDecoration(
+        color: palette.surfacePrimary.withValues(alpha: 0.58),
+        borderRadius: BorderRadius.circular(9),
       ),
       child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  appText('工作台', 'Workbench'),
-                  style: theme.textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -0.4,
-                  ),
+        mainAxisSize: MainAxisSize.min,
+        children: List.generate(labels.length, (index) {
+          final selected = value == index;
+          return InkWell(
+            key: Key('workbench-activity-window-$index'),
+            onTap: () => onChanged(index),
+            borderRadius: BorderRadius.circular(8),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+              decoration: BoxDecoration(
+                color: selected ? palette.surfacePrimary : Colors.transparent,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Text(
+                labels[index],
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: selected ? palette.textPrimary : palette.textSecondary,
+                  fontWeight: selected ? FontWeight.w700 : FontWeight.w600,
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  appText(
-                    '把零碎进展沉淀为清晰工作',
-                    'Turn fragmented progress into clear work.',
-                  ),
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: palette.textSecondary,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          FilledButton.icon(
-            key: const Key('workbench-quick-record-button'),
-            onPressed: onQuickRecord,
-            icon: const Icon(Icons.edit_note_rounded, size: 20),
-            label: Text(appText('快速记录', 'Quick record')),
-            style: FilledButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
               ),
             ),
+          );
+        }),
+      ),
+    );
+  }
+}
+
+class _WorkbenchMetricTile extends StatelessWidget {
+  const _WorkbenchMetricTile({
+    required this.label,
+    required this.value,
+    required this.valueColor,
+  });
+
+  final String label;
+  final String value;
+  final Color valueColor;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    return Container(
+      key: Key('workbench-metric-$label'),
+      height: 76,
+      padding: const EdgeInsets.fromLTRB(11, 10, 11, 8),
+      decoration: BoxDecoration(
+        color: palette.surfacePrimary.withValues(alpha: 0.62),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: palette.textSecondary,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const Spacer(),
+          Text(
+            value,
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+              color: valueColor,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.3,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _WorkbenchActivityHeatmap extends StatelessWidget {
+  const _WorkbenchActivityHeatmap({required this.series, required this.window});
+
+  final List<double> series;
+  final int window;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final windowLabel = switch (window) {
+      0 => appText('过去 7 天', 'Past 7 days'),
+      1 => appText('过去 30 天', 'Past 30 days'),
+      _ => appText('全部记录', 'All records'),
+    };
+    final maxValue = math.max(1.0, series.fold<double>(0, math.max));
+    return Container(
+      key: const Key('workbench-activity-heatmap'),
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(11, 10, 11, 11),
+      decoration: BoxDecoration(
+        color: palette.surfacePrimary.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(
+                appText('工作活跃度', 'Work activity'),
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: palette.textSecondary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                windowLabel,
+                style: Theme.of(
+                  context,
+                ).textTheme.labelSmall?.copyWith(color: palette.textMuted),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: List.generate(7, (index) {
+              final value = index < series.length ? series[index] : 0.0;
+              final intensity = value / maxValue;
+              final color = value == 0
+                  ? palette.surfaceTertiary
+                  : Color.lerp(
+                      palette.accentMuted,
+                      palette.accent,
+                      0.32 + intensity * 0.68,
+                    )!;
+              return Expanded(
+                child: Container(
+                  height: 24,
+                  margin: EdgeInsets.only(right: index == 6 ? 0 : 6),
+                  decoration: BoxDecoration(
+                    color: color,
+                    borderRadius: BorderRadius.circular(5),
+                  ),
+                ),
+              );
+            }),
           ),
         ],
       ),
@@ -504,12 +737,11 @@ class _WorkbenchSectionCard extends StatelessWidget {
     final palette = context.palette;
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+      padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
       decoration: BoxDecoration(
         color: palette.surfacePrimary,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(color: palette.strokeSoft),
-        boxShadow: [palette.chromeShadowAmbient],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -520,7 +752,7 @@ class _WorkbenchSectionCard extends StatelessWidget {
               context,
             ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
           Divider(height: 1, color: palette.strokeSoft),
           child,
           if (footer != null) ...[
@@ -1235,7 +1467,10 @@ class _WorkbenchRightRail extends StatelessWidget {
           const SizedBox(height: 12),
           _WeeklyRhythmCard(projection: projection),
           const SizedBox(height: 12),
-          _SuggestionPanel(projection: projection, onAction: onSuggestionAction),
+          _SuggestionPanel(
+            projection: projection,
+            onAction: onSuggestionAction,
+          ),
         ],
       ),
     );
@@ -1639,7 +1874,7 @@ class _EmptyState extends StatelessWidget {
   Widget build(BuildContext context) {
     final palette = context.palette;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 28),
+      padding: const EdgeInsets.symmetric(vertical: 48),
       child: Center(
         child: Column(
           children: [
