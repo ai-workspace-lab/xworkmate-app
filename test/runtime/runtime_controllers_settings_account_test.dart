@@ -213,6 +213,72 @@ void main() {
     );
 
     test(
+      'clears the account session when refresh receives an Accounts 401',
+      () async {
+        final storeRoot = await Directory.systemTemp.createTemp(
+          'xworkmate-account-session-expired-',
+        );
+        addTearDown(() async {
+          if (await storeRoot.exists()) {
+            await storeRoot.delete(recursive: true);
+          }
+        });
+
+        final store = SecureConfigStore(
+          secretRootPathResolver: () async => '${storeRoot.path}/secrets',
+          appDataRootPathResolver: () async => '${storeRoot.path}/app-data',
+          supportRootPathResolver: () async => '${storeRoot.path}/support',
+          enableSecureStorage: false,
+        );
+        await store.initialize();
+        await store.saveSettingsSnapshot(
+          SettingsSnapshot.defaults().copyWith(
+            accountBaseUrl: 'https://accounts-uat.onwalk.net',
+          ),
+        );
+        await store.saveAccountSessionToken('expired-session-token');
+        await store.saveAccountSessionSummary(
+          const AccountSessionSummary(
+            userId: 'user-1',
+            email: 'admin@svc.plus',
+            name: 'Admin',
+            role: 'admin',
+            mfaEnabled: false,
+          ),
+        );
+
+        final controller = SettingsController(
+          store,
+          accountClientFactory: (_) => _FakeAccountRuntimeClient(
+            loginPayload: const <String, dynamic>{},
+            sessionPayload: const <String, dynamic>{},
+            syncError: const AccountRuntimeException(
+              statusCode: 401,
+              errorCode: 'invalid_session',
+              message: 'token could not be validated as JWT or session',
+            ),
+          ),
+        );
+        addTearDown(controller.dispose);
+        await controller.initialize();
+
+        final result = await controller.syncAccountSettings(
+          baseUrl: 'https://accounts-uat.onwalk.net',
+        );
+
+        expect(result.state, 'blocked');
+        expect(result.message, 'Session expired. Please sign in again.');
+        expect(controller.accountSignedIn, isFalse);
+        expect(
+          controller.accountStatus,
+          'Session expired. Please sign in again.',
+        );
+        expect(await store.loadAccountSessionToken(), isNull);
+        expect(await store.loadAccountSessionSummary(), isNull);
+      },
+    );
+
+    test(
       'login sync stores managed bridge contract from protected profile sync',
       () async {
         final storeRoot = await Directory.systemTemp.createTemp(
@@ -1294,11 +1360,13 @@ class _FakeAccountRuntimeClient extends AccountRuntimeClient {
     required this.loginPayload,
     this.sessionPayload = const <String, dynamic>{},
     this.syncPayload = const <String, dynamic>{},
+    this.syncError,
   }) : super(baseUrl: 'https://accounts.svc.plus');
 
   final Map<String, dynamic> loginPayload;
   final Map<String, dynamic> sessionPayload;
   final Map<String, dynamic> syncPayload;
+  final Object? syncError;
   int loadProfileCallCount = 0;
   int loadXWorkmateProfileSyncCallCount = 0;
 
@@ -1321,6 +1389,9 @@ class _FakeAccountRuntimeClient extends AccountRuntimeClient {
     required String token,
   }) async {
     loadXWorkmateProfileSyncCallCount += 1;
+    if (syncError != null) {
+      throw syncError!;
+    }
     return syncPayload;
   }
 }

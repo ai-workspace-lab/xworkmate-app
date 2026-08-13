@@ -292,7 +292,7 @@ Future<void> restoreAccountSessionSettingsInternal(
     if (error.statusCode == 401) {
       await logoutAccountSettingsInternal(
         controller,
-        statusMessage: 'Session expired',
+        statusMessage: 'Session expired. Please sign in again.',
         quiet: true,
       );
     } else {
@@ -442,6 +442,19 @@ Future<AccountSyncResult> syncAccountSettingsInternal(
       message: 'Bridge access synced',
     );
   } on AccountRuntimeException catch (error) {
+    if (error.statusCode == 401) {
+      await logoutAccountSettingsInternal(
+        controller,
+        statusMessage: 'Session expired. Please sign in again.',
+        quiet: true,
+      );
+      return _persistAccountSyncFailureInternal(
+        controller,
+        state: 'blocked',
+        message: 'Session expired. Please sign in again.',
+        quiet: quiet,
+      );
+    }
     return _persistAccountSyncContractFailureInternal(
       controller,
       message: describeAccountFailureInternal(

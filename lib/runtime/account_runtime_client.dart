@@ -184,8 +184,7 @@ class AccountRuntimeClient {
         const Duration(seconds: 6),
       );
       final rawBody = await utf8.decoder.bind(response).join();
-      final isSuccess =
-          response.statusCode >= 200 && response.statusCode < 300;
+      final isSuccess = response.statusCode >= 200 && response.statusCode < 300;
       final Map<String, dynamic> decoded;
       try {
         decoded = rawBody.trim().isEmpty
@@ -204,13 +203,17 @@ class AccountRuntimeClient {
         );
       }
       if (!isSuccess) {
+        final detail = _stringValue(decoded['detail']);
+        final message = _stringValue(decoded['message']);
         throw AccountRuntimeException(
           statusCode: response.statusCode,
           errorCode: _stringValue(decoded['error']).isNotEmpty
               ? _stringValue(decoded['error'])
               : 'request_failed',
-          message: _stringValue(decoded['message']).isNotEmpty
-              ? _stringValue(decoded['message'])
+          message: message.isNotEmpty
+              ? message
+              : detail.isNotEmpty
+              ? detail
               : rawBody.trim(),
         );
       }
