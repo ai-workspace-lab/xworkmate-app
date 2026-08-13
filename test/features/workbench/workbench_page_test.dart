@@ -38,6 +38,27 @@ void main() {
     );
     expect(find.byKey(const Key('workbench-activity-heatmap')), findsOneWidget);
     expect(find.byKey(const Key('workbench-overview-table')), findsOneWidget);
+    expect(find.byKey(const Key('workbench-insight-sidebar')), findsOneWidget);
+    expect(find.byKey(const Key('workbench-workload-trend')), findsOneWidget);
+    expect(find.byKey(const Key('workbench-rhythm-progress')), findsOneWidget);
+    expect(
+      find.byKey(const Key('workbench-ai-recommendations')),
+      findsOneWidget,
+    );
+
+    await tester.tap(
+      find.byKey(const Key('workbench-insights-collapse-button')),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('workbench-insight-sidebar-collapsed')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('workbench-workload-trend')), findsNothing);
+
+    await tester.tap(find.byKey(const Key('workbench-insights-expand-button')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('workbench-insight-sidebar')), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('workbench-activity-window-1')));
     await tester.pump();
