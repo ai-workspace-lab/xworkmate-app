@@ -1,3 +1,5 @@
+import 'dart:io';
+
 /// Build-time endpoint configuration for managed deployments.
 ///
 /// Deployment pipelines provide these values with `--dart-define`. An empty
@@ -13,9 +15,25 @@ const String kConfiguredManagedBridgeServerUrl = String.fromEnvironment(
   defaultValue: '',
 );
 
-String? configuredManagedBridgeServerUrl({String remote = ''}) {
+/// Process environment variable that overrides the baked-in Bridge endpoint.
+///
+/// Packaging scripts read the same name to build the `--dart-define`, so a
+/// self-managed host can point an already-built app at its own Bridge without
+/// rebuilding it.
+const String kManagedBridgeServerUrlEnvKey = 'XWORKMATE_MANAGED_BRIDGE_URL';
+
+/// Resolves the managed Bridge endpoint, most specific source first:
+/// the authenticated Accounts profile, then the process environment, then the
+/// build-time `--dart-define`. Returns null when no source carries a usable
+/// absolute URL.
+String? configuredManagedBridgeServerUrl({
+  String remote = '',
+  Map<String, String>? environment,
+}) {
+  final env = environment ?? Platform.environment;
   final candidates = <String>[
     remote.trim(),
+    env[kManagedBridgeServerUrlEnvKey]?.trim() ?? '',
     kConfiguredManagedBridgeServerUrl.trim(),
   ];
   for (final candidate in candidates) {
