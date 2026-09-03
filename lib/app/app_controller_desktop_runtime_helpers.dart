@@ -1415,6 +1415,7 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
     final accountSyncState = settingsControllerInternal.accountSyncState;
     final managedBridgeEndpoint = configuredManagedBridgeServerUrl(
       remote: accountSyncState?.syncedDefaults.bridgeServerUrl ?? '',
+      environment: environmentOverrideInternal,
     );
     final managedBridgeReady =
         settingsControllerInternal.accountSessionTokenInternal
@@ -1439,7 +1440,9 @@ extension AppControllerDesktopRuntimeHelpers on AppController {
       }
     }
 
-    final configured = configuredManagedBridgeServerUrl();
+    final configured = configuredManagedBridgeServerUrl(
+      environment: environmentOverrideInternal,
+    );
     return configured == null ? null : Uri.tryParse(configured);
   }
 

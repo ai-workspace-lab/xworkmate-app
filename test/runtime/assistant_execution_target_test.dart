@@ -27,6 +27,12 @@ const List<String> _openClawE2ECanonicalPrompts = <String>[
 ];
 const Duration _openClawE2ESubmitTimeout = Duration(seconds: 10);
 
+/// Bridge endpoint the "connected" fixtures advertise. Nothing dials it — the
+/// controllers under test run against injected fakes — but the connector is
+/// only considered configured once an endpoint is resolvable, so the fixtures
+/// have to supply one the way a managed deployment would.
+const String _sandboxBridgeServerUrl = 'https://bridge.invalid';
+
 void main() {
   group('AssistantExecutionTarget', () {
     test('maps agent and gateway values without collapsing them', () {
@@ -1097,7 +1103,7 @@ void main() {
     test(
       'sendChatMessage surfaces managed bridge auth failure before agent provider dispatch',
       () async {
-        final capture = await _startEmptyCapabilityServer();
+        final capture = await _startUnauthorizedCapabilityServer();
         addTearDown(capture.close);
 
         final fakeGoTaskService = _RecordingGoTaskServiceClient();
@@ -1199,17 +1205,17 @@ void main() {
             isA<StateError>().having(
               (error) => error.message,
               'message',
-              anyOf(contains('ACP_HTTP_401'), contains('请在连接器中选择一个工作空间')),
+              contains('ACP_HTTP_401'),
             ),
           ),
         );
 
         expect(fakeGoTaskService.executeCount, 0);
-        expect(capture.requestCount, 0);
+        expect(capture.lastAuthorizationHeader, 'Bearer bridge-token');
         if (controller.chatMessages.isNotEmpty) {
           expect(
             controller.chatMessages.last.text,
-            anyOf(contains('ACP_HTTP_401'), contains('请在连接器中选择一个工作空间')),
+            contains('ACP_HTTP_401'),
           );
         }
       },
@@ -4807,7 +4813,7 @@ Future<void> _waitForLastChatMessageText(
   );
 }
 
-Future<_CapabilityServerCapture> _startEmptyCapabilityServer() async {
+Future<_CapabilityServerCapture> _startUnauthorizedCapabilityServer() async {
   final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
   final capture = _CapabilityServerCapture._(
     server,
@@ -4818,18 +4824,11 @@ Future<_CapabilityServerCapture> _startEmptyCapabilityServer() async {
     capture.lastAuthorizationHeader =
         request.headers.value(HttpHeaders.authorizationHeader) ?? '';
     await utf8.decoder.bind(request).join();
+    request.response.statusCode = HttpStatus.unauthorized;
     request.response.headers.contentType = ContentType.json;
     request.response.write(
       jsonEncode(<String, dynamic>{
-        'jsonrpc': '2.0',
-        'id': 'capabilities',
-        'result': <String, dynamic>{
-          'singleAgent': false,
-          'multiAgent': true,
-          'availableExecutionTargets': const <String>[],
-          'providerCatalog': const <Map<String, dynamic>>[],
-          'gatewayProviders': const <Map<String, dynamic>>[],
-        },
+        'error': <String, dynamic>{'message': 'bridge authorization rejected'},
       }),
     );
     await request.response.close();
@@ -4972,6 +4971,7 @@ AppController _connectedController(
     uiFeatureManifest: _defaultDesktopManifest(),
     environmentOverride: const <String, String>{
       'BRIDGE_AUTH_TOKEN': 'bridge-token',
+      'XWORKMATE_MANAGED_BRIDGE_URL': _sandboxBridgeServerUrl,
     },
     initialBridgeProviderCatalog: const <SingleAgentProvider>[
       SingleAgentProvider.codex,
@@ -4992,6 +4992,7 @@ AppController _connectedGatewayController(
     uiFeatureManifest: _defaultDesktopManifest(),
     environmentOverride: const <String, String>{
       'BRIDGE_AUTH_TOKEN': 'bridge-token',
+      'XWORKMATE_MANAGED_BRIDGE_URL': _sandboxBridgeServerUrl,
     },
     initialBridgeProviderCatalog: const <SingleAgentProvider>[
       SingleAgentProvider.codex,
