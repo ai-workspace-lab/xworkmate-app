@@ -31,8 +31,11 @@ cleanup() {
 trap cleanup EXIT
 
 echo "==> [ppa-signing] Generating a throwaway signing key..."
-gpg --batch --quick-generate-key \
-  "XWorkmate CI Signing Check <ci@example.invalid>" ed25519 sign never >/dev/null 2>&1
+# --passphrase '' plus loopback pinentry keeps gpg from reaching for a pinentry
+# prompt that no CI runner can answer, and leaves the key unprotected so it can
+# be exported and re-imported the way the real one is.
+gpg --batch --pinentry-mode loopback --passphrase '' --quick-generate-key \
+  "XWorkmate CI Signing Check <ci@example.invalid>" ed25519 sign never
 
 key_id="$(gpg --list-secret-keys --with-colons | awk -F: '/^sec:/ {print $5}' | sed -n '1p')"
 if [[ -z "$key_id" ]]; then
