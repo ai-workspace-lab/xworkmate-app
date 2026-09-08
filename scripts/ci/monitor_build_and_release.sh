@@ -27,6 +27,7 @@ require_file "$repo_root/scripts/ci/setup_platform_deps.sh"
 require_file "$repo_root/scripts/ci/compute_release_metadata.sh"
 require_file "$repo_root/scripts/ci/build_linux_source_packages.sh"
 require_file "$repo_root/scripts/ci/publish_launchpad_ppa.sh"
+require_file "$repo_root/scripts/ci/verify_ppa_signing.sh"
 require_file "$repo_root/scripts/ci/publish_obs_package.sh"
 require_file "$repo_root/scripts/package-linux-payload.sh"
 require_file "$repo_root/scripts/package-debian-source.sh"
@@ -40,6 +41,7 @@ require_exec "$repo_root/scripts/ci/setup_platform_deps.sh"
 require_exec "$repo_root/scripts/ci/compute_release_metadata.sh"
 require_exec "$repo_root/scripts/ci/build_linux_source_packages.sh"
 require_exec "$repo_root/scripts/ci/publish_launchpad_ppa.sh"
+require_exec "$repo_root/scripts/ci/verify_ppa_signing.sh"
 require_exec "$repo_root/scripts/ci/publish_obs_package.sh"
 require_exec "$repo_root/scripts/package-linux-payload.sh"
 require_exec "$repo_root/scripts/package-debian-source.sh"
@@ -84,6 +86,7 @@ required_snippets = [
   'actions/upload-artifact',
   'actions/download-artifact',
   'bash ./scripts/ci/build_linux_source_packages.sh',
+  'bash ./scripts/ci/verify_ppa_signing.sh',
   './.github/actions/publish-launchpad-ppa',
   './.github/actions/publish-obs-package'
 ]

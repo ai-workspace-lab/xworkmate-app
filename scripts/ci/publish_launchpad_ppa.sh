@@ -19,6 +19,10 @@ source_dir="${PPA_SOURCE_DIR:-$repo_root/dist/ppa}"
 # When publishing is explicitly requested, missing credentials are a failure:
 # silently uploading nothing is how a release lane rots unnoticed.
 require_upload="${PPA_REQUIRE_UPLOAD:-true}"
+# Signs and verifies without uploading, so CI can exercise the signing path
+# against an ephemeral key. Only verify_ppa_signing.sh sets this; the publish
+# action never passes it.
+dry_run="${PPA_DRY_RUN:-false}"
 
 fail_or_skip() {
   local message="$1"
@@ -38,7 +42,12 @@ if [[ -z "$gpg_key_id" ]]; then
   fail_or_skip "No GPG key id available; cannot select a signing key."
 fi
 
-for tool in gpg debsign dput; do
+required_tools=(gpg debsign)
+if [[ "$dry_run" != "true" ]]; then
+  required_tools+=(dput)
+fi
+
+for tool in "${required_tools[@]}"; do
   if ! command -v "$tool" >/dev/null 2>&1; then
     echo "==> [PPA] Required tool '$tool' is not installed." >&2
     echo "          On Ubuntu: sudo apt-get install -y gnupg devscripts dput" >&2
@@ -102,8 +111,18 @@ for changes_file in "${changes_files[@]}"; do
     exit 1
   }
 
+  if [[ "$dry_run" == "true" ]]; then
+    echo "==> [PPA] DRY RUN: signed and verified, not uploading."
+    continue
+  fi
+
   dput --force "$ppa_target" "$changes_file"
 done
+
+if [[ "$dry_run" == "true" ]]; then
+  echo "==> [PPA] DRY RUN complete: ${#changes_files[@]} source package(s) signed and verified, none uploaded."
+  exit 0
+fi
 
 echo "==> [PPA] Uploaded ${#changes_files[@]} source package(s) to $ppa_target."
 ppa_path="${ppa_target#ppa:}"

@@ -299,6 +299,13 @@ jobs:
         shell: bash
         run: bash ./scripts/ci/build_linux_source_packages.sh
 
+      # Signs a copy with a throwaway key. Without this the signing code would
+      # only ever run against the live archive with the real key.
+      - name: Verify Launchpad signing path
+        if: ${{ matrix.platform == 'linux' && steps.preflight.outputs.should_build_platform == 'true' }}
+        shell: bash
+        run: bash ./scripts/ci/verify_ppa_signing.sh
+
       - name: Upload build artifacts
         if: ${{ steps.preflight.outputs.should_build_platform == 'true' && (matrix.release_only != 'true' || env.SHOULD_RELEASE == 'true') && (matrix.package != 'app-store-pkg' || needs.prepare.outputs.testflight_enabled == 'true') }}
         uses: actions/upload-artifact@v7
