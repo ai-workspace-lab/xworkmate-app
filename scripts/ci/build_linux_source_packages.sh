@@ -143,4 +143,41 @@ if ! grep -q "payload/opt/${app_name}/${app_name}\$" "$obs_listing"; then
 fi
 echo "==> [verify] $(basename "$obs_tarball"): payload present."
 
+# The OBS analogue of the binary build above: OBS rebuilds from this tarball and
+# spec, so run rpmbuild here and confirm the package it produces carries the
+# payload rather than an empty tree.
+if command -v rpmbuild >/dev/null 2>&1; then
+  echo "==> [verify] Building a binary RPM from $(basename "$obs_tarball")..."
+  rpm_root="$verify_root/rpmbuild"
+  mkdir -p "$rpm_root"/{BUILD,RPMS,SOURCES,SPECS,SRPMS}
+  cp "$obs_tarball" "$rpm_root/SOURCES/"
+  cp "$repo_root/dist/obs/${app_name}-rpmlintrc" "$rpm_root/SOURCES/"
+  cp "$repo_root/dist/obs/${app_name}.spec" "$rpm_root/SPECS/"
+  rpmbuild --define "_topdir $rpm_root" -bb "$rpm_root/SPECS/${app_name}.spec"
+
+  mapfile -t built_rpms < <(find "$rpm_root/RPMS" -name '*.rpm' | sort)
+  if [[ "${#built_rpms[@]}" -eq 0 ]]; then
+    echo "==> [verify] The spec did not produce an RPM." >&2
+    exit 1
+  fi
+
+  rpm_listing="$verify_root/rpm-contents.list"
+  rpm -qlp "${built_rpms[0]}" > "$rpm_listing"
+  rpm_required=(
+    "^/opt/${app_name}/${app_name}\$"
+    "^/usr/bin/${app_name}\$"
+    "^/usr/share/applications/${app_name}\.desktop\$"
+    "^/usr/share/icons/hicolor/scalable/apps/${app_name}\.svg\$"
+  )
+  for required in "${rpm_required[@]}"; do
+    if ! grep -q "$required" "$rpm_listing"; then
+      echo "==> [verify] $(basename "${built_rpms[0]}") has nothing matching '$required'." >&2
+      exit 1
+    fi
+  done
+  echo "==> [verify] $(basename "${built_rpms[0]}") installs the payload."
+else
+  echo "==> [verify] rpmbuild unavailable; skipping the RPM build check."
+fi
+
 echo "==> [verify] Linux source packages are ready to publish."

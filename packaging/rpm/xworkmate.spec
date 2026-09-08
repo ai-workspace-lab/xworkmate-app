@@ -30,6 +30,7 @@ Requires:       libgio-2.0.so.0()(64bit)
 Requires:       libX11.so.6()(64bit)
 Requires:       libstdc++.so.6()(64bit)
 Requires:       NetworkManager
+Requires:       hicolor-icon-theme
 
 %description
 XWorkmate is a Linux desktop workspace shell providing workspace management,
