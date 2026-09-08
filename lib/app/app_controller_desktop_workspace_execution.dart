@@ -98,6 +98,9 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
       resolvedTarget,
       sessionKey: sessionsControllerInternal.currentSessionKey,
       persistDefaultSelection: true,
+      // Picking a mode must not refresh the provider catalog; sendChatMessage
+      // refreshes it when it is empty and a run actually needs it.
+      refreshAcpCapabilities: false,
     );
     if (bindingError != null) {
       debugPrint('setAssistantExecutionTarget binding fallback: $bindingError');
@@ -196,6 +199,7 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
     required String sessionKey,
     required bool persistDefaultSelection,
     bool preserveGatewayHistoryForSelectedThread = true,
+    bool refreshAcpCapabilities = true,
   }) async {
     final resolvedTarget = sanitizePersistedExecutionTargetInternal(target);
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
@@ -237,6 +241,7 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
         profileIndex: gatewayProfileIndexForExecutionTargetInternal(
           resolvedTarget,
         ),
+        refreshAcpCapabilities: refreshAcpCapabilities,
       );
     } catch (e, stackTrace) { debugPrint('Error: $e\n$stackTrace');
       // Keep the selected execution target even when the immediate reconnect
