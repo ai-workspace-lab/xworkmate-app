@@ -10,18 +10,27 @@ Launchpad PPA.
 Launchpad builds every upload from source inside a clean chroot that has **no
 Flutter SDK and no network access**. XWorkmate cannot be compiled there.
 
-So the source package carries the already-compiled release bundle under
-`payload/`, and `debian/rules` only copies that tree into place:
+So the source package carries the already-compiled release bundle as
+`payload.tar.gz`, and `debian/rules` only unpacks it into place:
 
 ```
-payload/opt/xworkmate/…                                  Flutter release bundle
-payload/usr/share/applications/xworkmate.desktop         desktop entry
-payload/usr/share/icons/hicolor/scalable/apps/…          icon
-payload/usr/share/xworkmate/autostart/xworkmate.desktop  autostart entry
+opt/xworkmate/…                                  Flutter release bundle
+usr/share/applications/xworkmate.desktop         desktop entry
+usr/share/icons/hicolor/scalable/apps/…          icon
+usr/share/xworkmate/autostart/xworkmate.desktop  autostart entry
 ```
 
 `scripts/package-linux-payload.sh` stages that tree from
 `build/linux/x64/release/bundle`, which the Linux build leg has already produced.
+
+It ships as an **archive rather than a loose tree** for a reason worth
+remembering: `dpkg-source` applies default tar-ignore patterns when it builds
+the source tarball, and those patterns cover `*.so`, `*.a`, and `*.o`. A loose
+tree loses every shared library in the bundle — `libapp.so` and
+`libflutter_linux_gtk.so` included — with no warning, producing a package that
+installs an executable with no engine and no application code.
+`scripts/ci/build_linux_source_packages.sh` compares the payload's round trip
+file by file so that cannot reach an archive.
 
 Consequences worth knowing:
 

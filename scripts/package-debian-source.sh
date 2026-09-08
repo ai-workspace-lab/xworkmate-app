@@ -61,16 +61,23 @@ for entry in $series_spec; do
   echo "==> [deb-source] Staging ${app_name} ${deb_version} for ${series}..."
   mkdir -p "$stage_dir"
   cp -R "$repo_root/debian" "$stage_dir/debian"
-  cp -R "$payload_dir" "$stage_dir/payload"
   cp "$repo_root/LICENSE" "$stage_dir/LICENSE"
   cp "$repo_root/README.md" "$stage_dir/README.md"
+
+  # The payload ships as one archive rather than a loose tree: dpkg-source
+  # applies default tar-ignore patterns when it builds the source tarball, and
+  # those cover *.so, *.a and *.o -- which is most of a Flutter bundle,
+  # including libapp.so and the engine. A loose tree loses them silently.
+  tar -czf "$stage_dir/payload.tar.gz" -C "$payload_dir" ." 
 
   cat > "$stage_dir/SOURCE.md" <<EOF
 # XWorkmate source package contents
 
 This package installs a prebuilt XWorkmate release bundle. Distribution build
 chroots have no Flutter SDK and no network access, so the compiled bundle is
-shipped under \`payload/\` and \`debian/rules\` only copies it into place.
+shipped as \`payload.tar.gz\` and \`debian/rules\` only unpacks it into place.
+It is an archive rather than a loose tree because dpkg-source's default
+tar-ignore patterns would drop the bundle's shared libraries.
 
 The complete application source, along with the packaging scripts that produced
 this archive, lives at:

@@ -2,10 +2,12 @@
 #
 # XWorkmate ships to Launchpad as a prebuilt payload: distribution build
 # chroots have neither the Flutter SDK nor network access, so the source
-# package carries the compiled bundle under payload/ and this file only
-# installs it. Regenerate the payload with scripts/package-linux-payload.sh.
+# package carries the compiled bundle as payload.tar.gz and this file only
+# unpacks it. It is an archive rather than a loose tree because dpkg-source's
+# default tar-ignore patterns (*.so, *.a, *.o) would drop most of a Flutter
+# bundle. Regenerate it with scripts/package-linux-payload.sh.
 
-PAYLOAD := payload
+PAYLOAD_ARCHIVE := payload.tar.gz
 
 %:
 	dh $@
@@ -16,13 +18,15 @@ override_dh_auto_test:
 override_dh_auto_clean:
 
 override_dh_auto_install:
-	@if [ ! -x "$(PAYLOAD)/opt/xworkmate/xworkmate" ]; then \
-		echo "ERROR: $(PAYLOAD)/opt/xworkmate/xworkmate is missing." >&2; \
+	@if [ ! -f "$(PAYLOAD_ARCHIVE)" ]; then \
+		echo "ERROR: $(PAYLOAD_ARCHIVE) is missing." >&2; \
 		echo "       Run scripts/package-linux-payload.sh before building this source package." >&2; \
 		exit 1; \
 	fi
 	mkdir -p debian/xworkmate
-	cp -a $(PAYLOAD)/. debian/xworkmate/
+	tar -xzf $(PAYLOAD_ARCHIVE) -C debian/xworkmate
+	@test -x debian/xworkmate/opt/xworkmate/xworkmate \
+		|| { echo "ERROR: $(PAYLOAD_ARCHIVE) does not carry opt/xworkmate/xworkmate." >&2; exit 1; }
 	mkdir -p debian/xworkmate/usr/bin
 	ln -sf /opt/xworkmate/xworkmate debian/xworkmate/usr/bin/xworkmate
 

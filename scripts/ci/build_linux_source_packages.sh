@@ -54,17 +54,20 @@ for dsc in "${dsc_files[@]}"; do
   extract_dir="$verify_root/$name"
   dpkg-source --no-check -x "$dsc" "$extract_dir" >/dev/null
 
-  if [[ ! -x "$extract_dir/payload/opt/$app_name/$app_name" ]]; then
-    echo "==> [verify] $name unpacks without payload/opt/$app_name/$app_name." >&2
+  if [[ ! -f "$extract_dir/payload.tar.gz" ]]; then
+    echo "==> [verify] $name unpacks without payload.tar.gz." >&2
     exit 1
   fi
 
-  # dpkg-source applies default tar-ignore patterns when it builds the tarball,
-  # and those patterns cover exactly the kind of files a prebuilt bundle is made
-  # of (*.so, *.a, *.o). A dropped library would still unpack into a
-  # plausible-looking tree, so compare the round trip file by file.
+  # dpkg-source applies default tar-ignore patterns when it builds the source
+  # tarball, and those cover exactly what a prebuilt Flutter bundle is made of
+  # (*.so, *.a, *.o) -- libapp.so and the engine included. The payload therefore
+  # ships as one archive, and this compares the round trip file by file so a
+  # silently dropped library cannot reach an archive.
   (cd "$payload_dir" && find . \( -type f -o -type l \) | sort) > "$verify_root/staged.list"
-  (cd "$extract_dir/payload" && find . \( -type f -o -type l \) | sort) > "$verify_root/unpacked.list"
+  # awk rather than `grep -v`: an empty result would exit non-zero and abort
+  # under `set -e` with no explanation, instead of reporting the real diff.
+  tar -tzf "$extract_dir/payload.tar.gz" | awk '!/\/$/' | sort > "$verify_root/unpacked.list"
   if ! diff -u "$verify_root/staged.list" "$verify_root/unpacked.list" > "$verify_root/payload.diff"; then
     echo "==> [verify] $name does not round-trip the staged payload:" >&2
     head -n 40 "$verify_root/payload.diff" >&2
