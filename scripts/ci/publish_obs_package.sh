@@ -124,7 +124,9 @@ trigger_with_token() {
     -H "Authorization: Token ${obs_token}" \
     "${trigger_url}?project=${obs_project}&package=${obs_package}")"
 
-  if [[ "$http_code" -ge 400 ]]; then
+  # curl reports 000 when it never got a response, which is a failure even
+  # though it does not compare as one.
+  if [[ ! "$http_code" =~ ^2[0-9][0-9]$ ]]; then
     echo "==> [OBS] Trigger failed with HTTP ${http_code}:" >&2
     cat "$response_body" >&2
     echo "          A token can only re-run source services that are already" >&2

@@ -13,6 +13,8 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 app_name="xworkmate"
 cd "$repo_root"
 
+payload_dir="${PAYLOAD_DIR:-$repo_root/dist/linux/payload}"
+
 bash ./scripts/package-linux-payload.sh
 bash ./scripts/package-debian-source.sh
 bash ./scripts/package-rpm-source.sh
@@ -54,6 +56,18 @@ for dsc in "${dsc_files[@]}"; do
 
   if [[ ! -x "$extract_dir/payload/opt/$app_name/$app_name" ]]; then
     echo "==> [verify] $name unpacks without payload/opt/$app_name/$app_name." >&2
+    exit 1
+  fi
+
+  # dpkg-source applies default tar-ignore patterns when it builds the tarball,
+  # and those patterns cover exactly the kind of files a prebuilt bundle is made
+  # of (*.so, *.a, *.o). A dropped library would still unpack into a
+  # plausible-looking tree, so compare the round trip file by file.
+  (cd "$payload_dir" && find . \( -type f -o -type l \) | sort) > "$verify_root/staged.list"
+  (cd "$extract_dir/payload" && find . \( -type f -o -type l \) | sort) > "$verify_root/unpacked.list"
+  if ! diff -u "$verify_root/staged.list" "$verify_root/unpacked.list" > "$verify_root/payload.diff"; then
+    echo "==> [verify] $name does not round-trip the staged payload:" >&2
+    head -n 40 "$verify_root/payload.diff" >&2
     exit 1
   fi
   if [[ ! -x "$extract_dir/debian/rules" ]]; then
