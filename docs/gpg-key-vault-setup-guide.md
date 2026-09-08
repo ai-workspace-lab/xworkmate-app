@@ -1,120 +1,145 @@
-# GPG Key Generation, Launchpad Import, and Vault Provisioning Guide
+# Signing Key & Vault Provisioning Guide
 
-This guide provides step-by-step instructions for generating GPG keys, uploading public keys to Ubuntu keyserver and Launchpad, exporting Base64-encoded private keys, and storing `GPG_PRIVATE_KEY` and `GPG_KEY_ID` into HashiCorp Vault (`kv/data/CICD`) for automated GitHub Actions PPA releases.
+Everything the Linux publishing lanes read out of HashiCorp Vault, and how to
+put it there.
 
 ---
 
-## 1. Overview of GPG Key Secrets
+## 1. The secret path
 
-| Secret Key Name | Format / Example | Description |
+`.github/workflows/build-and-release.yml` authenticates to Vault with the JWT
+method (role `github-actions-xworkmate-app`) and reads every field from:
+
+```
+kv/data/github-actions/xworkmate-app
+```
+
+| Field | Used by | Required |
 | :--- | :--- | :--- |
-| `GPG_KEY_ID` | `3AA45C1A2B3C4D5E` | 16-character hexadecimal GPG key identifier |
-| `GPG_PRIVATE_KEY` | `LS0tLS1CRUdJTiBQR1...` | Base64-encoded ASCII-armored GPG private key |
+| `GPG_PRIVATE_KEY` | Launchpad PPA | Yes, to publish to the PPA |
+| `GPG_KEY_ID` | Launchpad PPA | Yes, to publish to the PPA |
+| `GPG_PASSPHRASE` | Launchpad PPA | Only if the signing key is passphrase-protected |
+| `OBS_USERNAME` | Open Build Service | Yes, to upload new sources to OBS |
+| `OBS_PASSWORD` | Open Build Service | Yes, to upload new sources to OBS |
+| `OBS_TOKEN` | Open Build Service | Only for the trigger-only fallback |
+
+Missing optional fields are tolerated (`ignoreNotFound: true`). Missing
+*required* fields fail the publishing job rather than silently skipping it.
 
 ---
 
-## 2. Step 1: Generate or Locate GPG Key
+## 2. Generating the Launchpad signing key
 
-### Option A: Check for an existing GPG key
+Check for an existing key first:
+
 ```bash
 gpg --list-secret-keys --keyid-format LONG
 ```
-Output example:
+
 ```text
 sec   rsa4096/3AA45C1A2B3C4D5E 2026-07-22 [SC]
       8E419B2D1C3A5F7E9B0C1D2E3AA45C1A2B3C4D5E
 uid                 [ultimate] Haitao Pan <haitaopanhq@gmail.com>
 ```
-In this example:
-- **`GPG_KEY_ID`**: `3AA45C1A2B3C4D5E`
-- **Fingerprint**: `8E419B2D1C3A5F7E9B0C1D2E3AA45C1A2B3C4D5E`
 
-### Option B: Generate a new 4096-bit RSA GPG Key
-If you do not have a GPG key:
+Here `GPG_KEY_ID` is `3AA45C1A2B3C4D5E` and the fingerprint is the long hex
+string. To create one instead:
+
 ```bash
-gpg --full-generate-key
+gpg --full-generate-key   # RSA and RSA, 4096 bits, no expiry
 ```
-Select:
-1. Key type: **(1) RSA and RSA**
-2. Key size: **4096**
-3. Expiration: **0** (does not expire)
-4. Name: Your Name (e.g., `Haitao Pan`)
-5. Email: Must match the email address registered on your Launchpad account!
+
+The email **must** be an address registered on the Launchpad account that
+uploads to the PPA.
 
 ---
 
-## 3. Step 2: Publish Public Key to Ubuntu Keyserver & Launchpad
+## 3. Registering the key with Launchpad
 
-Launchpad requires public GPG keys to be registered on the official Ubuntu keyserver and validated on your Launchpad profile:
-
-### 1. Send Public Key to Ubuntu Keyserver
 ```bash
 gpg --keyserver keyserver.ubuntu.com --send-keys <GPG_KEY_ID>
 ```
 
-### 2. Import Fingerprint into Launchpad
-1. Visit `https://launchpad.net/~<your-username>/+editpgpkeys`.
-2. Copy and paste your full **Fingerprint** (e.g. `8E419B2D1C3A5F7E9B0C1D2E3AA45C1A2B3C4D5E`).
-3. Click **Import Key**.
-4. Launchpad will send an encrypted verification email to your address.
-5. Decrypt the email payload in your terminal:
-   ```bash
-   gpg --decrypt verification_email.txt
-   ```
-6. Open the confirmation link contained in the decrypted email to complete activation.
+1. Open `https://launchpad.net/~<your-username>/+editpgpkeys`.
+2. Paste the full fingerprint and click **Import Key**.
+3. Launchpad emails an encrypted confirmation; decrypt it with
+   `gpg --decrypt verification_email.txt` and open the link inside.
+4. Confirm that account has upload rights to `ppa:ai-workspace-lab/ppa`.
+
+Launchpad rejects any upload signed by a key it does not know, so this step is
+what makes the PPA lane work at all.
 
 ---
 
-## 4. Step 3: Export Private Key for Vault
-
-Export the ASCII-armored private key and convert it to a single-line Base64 string for Vault:
+## 4. Exporting the key for Vault
 
 ```bash
-# Export and Base64-encode private key
-export GPG_PRIVATE_KEY_BASE64=$(gpg --export-secret-keys --armor <GPG_KEY_ID> | base64 | tr -d '\n')
-
-# Verify the Base64 output is non-empty
-echo "$GPG_PRIVATE_KEY_BASE64" | head -c 50
+export GPG_PRIVATE_KEY_BASE64="$(gpg --export-secret-keys --armor <GPG_KEY_ID> | base64 | tr -d '\n')"
 ```
 
+`publish_launchpad_ppa.sh` imports this into a throwaway `GNUPGHOME`, marks it
+ultimately trusted, and deletes it when the job ends. A passphrase-protected key
+works as long as `GPG_PASSPHRASE` is also provisioned; the script configures
+loopback pinentry so `debsign` never blocks on a prompt.
+
 ---
 
-## 5. Step 4: Provision Secrets into HashiCorp Vault
+## 5. Writing the secret
 
-Store `GPG_PRIVATE_KEY` and `GPG_KEY_ID` under the `kv` mount at path `CICD` (`/v1/kv/data/CICD`):
+`vault kv put` replaces the whole secret, so pass every field you want to keep:
 
 ```bash
-# Using Vault CLI (preserving existing OBS_TOKEN)
-vault kv put -mount="kv" CICD \
-  OBS_TOKEN="<your_obs_token>" \
+vault kv put -mount="kv" github-actions/xworkmate-app \
   GPG_KEY_ID="<GPG_KEY_ID>" \
-  GPG_PRIVATE_KEY="$GPG_PRIVATE_KEY_BASE64"
+  GPG_PRIVATE_KEY="$GPG_PRIVATE_KEY_BASE64" \
+  GPG_PASSPHRASE="<passphrase or omit>" \
+  OBS_USERNAME="<obs user>" \
+  OBS_PASSWORD="<obs password>" \
+  OBS_TOKEN="<obs token, optional>"
 ```
 
-### Verification in Vault:
+To add fields without disturbing the Apple/Windows/Android signing material that
+lives at the same path, use `vault kv patch` instead:
+
 ```bash
-vault kv get -mount="kv" CICD
+vault kv patch -mount="kv" github-actions/xworkmate-app \
+  OBS_USERNAME="<obs user>" OBS_PASSWORD="<obs password>"
+```
+
+Verify:
+
+```bash
+vault kv get -mount="kv" github-actions/xworkmate-app
 ```
 
 ---
 
-## 6. How GitHub Actions Consumes the Secrets
-
-In `.github/workflows/build-and-release.yml`, the workflow uses `hashicorp/vault-action@v4` with JWT mode to fetch these secrets:
+## 6. How the workflow consumes them
 
 ```yaml
-      - name: Load Vault secrets (Linux OBS & PPA)
-        id: vault_linux
+      - name: Load Vault secrets (Linux PPA GPG)
+        id: vault_gpg
         uses: hashicorp/vault-action@v4
         with:
           url: ${{ env.VAULT_ADDR }}
           method: jwt
           role: github-actions-xworkmate-app
+          jwtGithubAudience: vault
+          ignoreNotFound: true
           secrets: |
-            kv/data/CICD OBS_TOKEN | OBS_TOKEN ;
-            kv/data/CICD GPG_PRIVATE_KEY | GPG_PRIVATE_KEY ;
-            kv/data/CICD GPG_KEY_ID | GPG_KEY_ID
+            kv/data/github-actions/xworkmate-app GPG_PRIVATE_KEY | GPG_PRIVATE_KEY ;
+            kv/data/github-actions/xworkmate-app GPG_KEY_ID | GPG_KEY_ID ;
+            kv/data/github-actions/xworkmate-app GPG_PASSPHRASE | GPG_PASSPHRASE
 
       - name: Publish to Launchpad PPA
-        run: bash ./scripts/ci/publish_launchpad_ppa.sh "${{ steps.vault_linux.outputs.GPG_PRIVATE_KEY }}" "${{ steps.vault_linux.outputs.GPG_KEY_ID }}" "ppa:ai-workspace-lab/ppa"
+        uses: ./.github/actions/publish-launchpad-ppa
+        with:
+          gpg-private-key: ${{ steps.vault_gpg.outputs.GPG_PRIVATE_KEY }}
+          gpg-key-id: ${{ steps.vault_gpg.outputs.GPG_KEY_ID }}
+          gpg-passphrase: ${{ steps.vault_gpg.outputs.GPG_PASSPHRASE }}
+          ppa-target: "ppa:ai-workspace-lab/ppa"
+          source-dir: dist/ppa
 ```
+
+See the [Launchpad PPA guide](launchpad-ppa-guide.md) and the
+[OBS guide](obs-rpm-guide.md) for what each lane does with these secrets.

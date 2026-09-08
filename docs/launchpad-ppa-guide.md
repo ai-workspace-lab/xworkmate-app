@@ -1,107 +1,142 @@
 # Launchpad PPA & Debian (.deb) Packaging Guide
 
-This guide describes how the **AI Workspace Lab** team packages and releases **XWorkmate** (`xworkmate`) to Launchpad PPA and Debian/Ubuntu distributions.
+How **XWorkmate** (`xworkmate`) is packaged and published to the AI Workspace Lab
+Launchpad PPA.
 
 ---
 
-## 1. Launchpad Infrastructure Architecture
+## 1. Why the source package ships a prebuilt bundle
 
-| Property | Value | Description |
-| :--- | :--- | :--- |
-| **Team / Organization** | `ai-workspace-lab` | Launchpad Team owning the PPA (`https://launchpad.net/~ai-workspace-lab`) |
-| **Membership Policy** | `Restricted` or `Closed` | Mandatory for creating PPAs on Launchpad |
-| **PPA Identifier** | `ppa:ai-workspace-lab/ppa` | Official Ubuntu PPA repository |
-| **Application Project** | `xworkmate-app` | Launchpad Project (`https://launchpad.net/xworkmate-app`) |
-| **GitHub Source** | `https://github.com/ai-workspace-lab/xworkmate-app.git` | Imported Git repository |
-| **Debian Package Name** | `xworkmate` | Package name installed via `apt install xworkmate` |
+Launchpad builds every upload from source inside a clean chroot that has **no
+Flutter SDK and no network access**. XWorkmate cannot be compiled there.
 
----
+So the source package carries the already-compiled release bundle under
+`payload/`, and `debian/rules` only copies that tree into place:
 
-## 2. Launchpad Setup Steps
-
-### Step 1: Create Team
-1. Visit `https://launchpad.net/people/+newteam`.
-2. Name: `ai-workspace-lab`
-3. Display Name: `AI Workspace Lab`
-
-### Step 2: Configure Membership Policy (Required for PPA)
-1. Go to `https://launchpad.net/~ai-workspace-lab/+edit`.
-2. Set **Membership policy** (or Subscription policy) to **Restricted** or **Closed**.
-3. Save changes. *(Open or Delegated teams cannot create PPAs on Launchpad).*
-
-### Step 3: Create Team PPA
-1. Go to `https://launchpad.net/~ai-workspace-lab`.
-2. Click **Create a new PPA**.
-3. PPA Name: `ppa` (Full identifier: `ppa:ai-workspace-lab/ppa`).
-4. Display Name: `AI Workspace Lab PPA`.
-
-### Step 4: Import Git Repository
-1. Go to `https://launchpad.net/projects/+new` and create project `xworkmate-app` owned by `ai-workspace-lab`.
-2. Go to `https://code.launchpad.net/xworkmate-app` and click **Import a Git repository**.
-3. Source URL: `https://github.com/ai-workspace-lab/xworkmate-app.git`
-4. Target Launchpad repository: `https://git.launchpad.net/~ai-workspace-lab/xworkmate-app`.
-
----
-
-## 3. Repository Packaging Files (`debian/`)
-
-The repository contains standard Debian packaging metadata in the `debian/` directory:
-
-* `debian/control`: Package metadata, build dependencies (`debhelper-compat (= 13)`, `cmake`, `clang`, etc.), runtime dependencies (`network-manager`, `libgtk-3-0`, `libglib2.0-0`), maintainer, homepage.
-* `debian/rules`: Executable dh build rules invoking `flutter build linux --release` and staging output binaries to `/opt/xworkmate/` and `/usr/share/`.
-* `debian/changelog`: Version history adhering to Debian standard changelog format.
-* `debian/copyright`: DEP-5 machine-readable license file.
-* `debian/source/format`: Set to `3.0 (native)`.
-* `debian/postinst`: Post-installation script refreshing desktop database and GTK icon cache.
-* `debian/postrm`: Post-removal script refreshing desktop database and GTK icon cache.
-
----
-
-## 4. Building Debian Source Packages Locally
-
-To generate Debian source packages ready for Launchpad PPA upload, run:
-
-```bash
-make package-deb-source
-# or
-bash scripts/package-debian-source.sh
+```
+payload/opt/xworkmate/…                                  Flutter release bundle
+payload/usr/share/applications/xworkmate.desktop         desktop entry
+payload/usr/share/icons/hicolor/scalable/apps/…          icon
+payload/usr/share/xworkmate/autostart/xworkmate.desktop  autostart entry
 ```
 
-This script will:
-1. Extract the current release version from `pubspec.yaml`.
-2. Stage the clean source tree into `dist/debian/xworkmate-<version>`.
-3. If `dpkg-buildpackage` is available (Ubuntu/Debian environment), run `dpkg-buildpackage -S -us -uc` to produce `.dsc`, `.tar.xz`, and `_source.changes` files under `dist/debian/`.
+`scripts/package-linux-payload.sh` stages that tree from
+`build/linux/x64/release/bundle`, which the Linux build leg has already produced.
+
+Consequences worth knowing:
+
+* The package is `Architecture: amd64` only. The payload is an x86-64 build.
+* `dh_shlibdeps`, `dh_strip`, and `dh_makeshlibs` are disabled — they would
+  either rewrite the vendored binaries or derive dependencies on the bundle's
+  own private sonames. Runtime dependencies are declared explicitly in
+  `debian/control`, using alternatives (`libgtk-3-0 | libgtk-3-0t64`) so the
+  same package resolves on both jammy and noble.
 
 ---
 
-## 5. Uploading to Launchpad PPA via `dput`
+## 2. Infrastructure
 
-1. Generate GPG Key and import into Launchpad account (`https://launchpad.net/~your-username/+editpgpkeys`). For complete details on GPG generation and Vault secret provisioning (`GPG_PRIVATE_KEY` and `GPG_KEY_ID`), see the [GPG Key & Vault Setup Guide](file:///Users/shenlan/workspaces/ai-workspace-lab/xworkmate-app/docs/gpg-key-vault-setup-guide.md).
-2. Build the signed source package:
-   ```bash
-   cd dist/debian/xworkmate-<version>
-   dpkg-buildpackage -S -k<YOUR-GPG-KEY-ID>
-   ```
-3. Upload the resulting `.changes` file to the Launchpad PPA:
-   ```bash
-   dput ppa:ai-workspace-lab/ppa dist/debian/xworkmate_<version>_source.changes
-   ```
-4. Monitor the build progress on `https://launchpad.net/~ai-workspace-lab/+archive/ubuntu/ppa`.
+| Property | Value |
+| :--- | :--- |
+| Launchpad team | [`ai-workspace-lab`](https://launchpad.net/~ai-workspace-lab) |
+| PPA | `ppa:ai-workspace-lab/ppa` |
+| Debian package name | `xworkmate` |
+| Target series | `jammy` (22.04), `noble` (24.04) |
 
+One-time setup:
+
+1. Create the Launchpad team `ai-workspace-lab` and set its membership policy to
+   **Restricted** or **Closed** — open teams cannot own a PPA.
+2. Create the PPA named `ppa` under that team.
+3. Register the signing GPG key on the Launchpad account that uploads, and make
+   sure that account has upload rights to the PPA. See
+   [GPG Key & Vault Setup Guide](gpg-key-vault-setup-guide.md).
 
 ---
 
-## 6. End-User Installation Guide
+## 3. Versioning
 
-Once the PPA build finishes on Launchpad, Ubuntu/Debian users can install XWorkmate using standard `apt`:
+Launchpad accepts a given version **once**, and each series needs its own
+upload, so every source package gets a distinct version:
+
+| Build | Version |
+| :--- | :--- |
+| Tagged release, jammy | `1.2.0~ubuntu22.04.1` |
+| Tagged release, noble | `1.2.0~ubuntu24.04.1` |
+| Untagged CI build, jammy | `1.2.0~ci417~ubuntu22.04.1` |
+
+The `~ciN` marker sorts *below* the plain release, so a CI build of `1.2.0` never
+shadows the eventual `1.2.0` release; `~ubuntu22.04.1` sorts below
+`~ubuntu24.04.1`, so a release upgrade keeps moving forward.
+`scripts/ci/build_linux_source_packages.sh` asserts both orderings with
+`dpkg --compare-versions` on every build.
+
+Override the trailing `.1` with `PPA_PACKAGE_REVISION` when a packaging-only fix
+has to be re-uploaded for an unchanged upstream version. Override the series list
+with `PPA_SERIES="jammy:22.04 noble:24.04"`.
+
+---
+
+## 4. What CI does
+
+In `.github/workflows/build-and-release.yml`:
+
+1. **build (linux leg)** compiles the app, then runs
+   `scripts/ci/build_linux_source_packages.sh`, which stages the payload, builds
+   one unsigned source package per series, and verifies each one unpacks with the
+   payload and packaging intact and targets a real Ubuntu series. This runs on
+   every build, pull requests included, so packaging breaks surface here rather
+   than against the live archive. The results upload as the
+   `linux-source-packages` artifact.
+2. **release (`launchpad_ppa` leg)** downloads that artifact, pulls
+   `GPG_PRIVATE_KEY` / `GPG_KEY_ID` / `GPG_PASSPHRASE` from Vault, then runs
+   `scripts/ci/publish_launchpad_ppa.sh`, which signs each `.changes` with
+   `debsign`, verifies the signature, and uploads with `dput`.
+
+If publishing is enabled and the credentials are missing, the job **fails**.
+Set `PPA_REQUIRE_UPLOAD=false` (the `require-upload` action input) to downgrade
+that to a skip.
+
+Disable the lane for a manual run with the `publish_ppa_package` input of
+**Run workflow**.
+
+---
+
+## 5. Building and uploading locally
 
 ```bash
-# 1. Add AI Workspace Lab PPA
+# Stage the payload and build one source package per series
+make package-deb-source
+
+# Inspect what would be uploaded
+ls dist/ppa/*/
+
+# Sign and upload (needs devscripts + dput, and a key with PPA upload rights)
+GPG_PRIVATE_KEY="$(gpg --export-secret-keys --armor <KEY_ID> | base64 | tr -d '\n')" \
+GPG_KEY_ID=<KEY_ID> \
+  bash scripts/ci/publish_launchpad_ppa.sh
+```
+
+`make package-deb-source` runs `flutter build linux --release` first if
+`build/linux/x64/release/bundle` is missing, so it must run on Linux.
+
+---
+
+## 6. Troubleshooting
+
+| Symptom | Cause |
+| :--- | :--- |
+| `Unable to find distroseries: unstable` | The changelog targets a Debian suite. Launchpad only accepts Ubuntu series names; `build_linux_source_packages.sh` rejects this before upload. |
+| `File xworkmate_… already exists` | That exact version was already accepted. Bump `PPA_PACKAGE_REVISION`. |
+| `GPG signature verification failed` | The key is not registered on the uploading Launchpad account, or `GPG_PASSPHRASE` is missing for a protected key. |
+| Package installs but does not start | The payload was staged from a stale `build/linux/x64/release/bundle`. Remove it and rebuild. |
+
+---
+
+## 7. End-user installation
+
+```bash
 sudo add-apt-repository ppa:ai-workspace-lab/ppa
-
-# 2. Update package index
 sudo apt update
-
-# 3. Install XWorkmate
 sudo apt install xworkmate
 ```

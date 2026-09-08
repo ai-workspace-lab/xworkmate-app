@@ -1,97 +1,130 @@
 # Open Build Service (OBS) & RPM Packaging Guide
 
-This guide describes how the **AI Workspace Lab** team packages and releases **XWorkmate** (`xworkmate`) to the **Open Build Service (OBS)** (`build.opensuse.org`) for Fedora, RHEL, openSUSE, and CentOS distributions.
+How **XWorkmate** (`xworkmate`) is packaged and published to
+[build.opensuse.org](https://build.opensuse.org) for openSUSE, Fedora, and
+RHEL/CentOS.
 
 ---
 
-## 1. OBS & RPM Architecture Overview
+## 1. Why the tarball ships a prebuilt bundle
 
-| Property | Value | Description |
+OBS workers build in a clean chroot with **no Flutter SDK and no network
+access**, exactly like Launchpad. The source tarball therefore carries the
+compiled release bundle under `payload/`, and `packaging/rpm/xworkmate.spec`
+only installs it — `%build` does nothing but assert the payload is present.
+
+That shapes the spec:
+
+* `%global __os_install_post %{nil}` and `%global debug_package %{nil}` stop RPM
+  from stripping the vendored binaries or trying to extract debuginfo from them.
+* `AutoReqProv: no` with explicit soname requirements
+  (`libgtk-3.so.0()(64bit)`, …) keeps dependency resolution portable across
+  openSUSE and Fedora, whose package names differ, and stops RPM from requiring
+  the bundle's own private sonames.
+* `ExclusiveArch: x86_64` — the payload is an x86-64 build.
+* `packaging/rpm/xworkmate-rpmlintrc` is uploaded alongside the spec. OBS treats
+  some rpmlint findings as fatal, and a vendor bundle under `/opt` trips several
+  that are inherent to shipping prebuilt output.
+
+---
+
+## 2. Infrastructure
+
+| Property | Value |
+| :--- | :--- |
+| API endpoint | `https://api.opensuse.org` |
+| Project | `home:haitaopanhq` (override with the `obs-project` action input) |
+| Package | `xworkmate` |
+| RPM package name | `xworkmate` |
+
+One-time setup: create the project on OBS and add the build targets you want
+(openSUSE Tumbleweed / Leap, Fedora, RHEL). The publishing script creates the
+*package* inside the project automatically if it does not exist yet; it does not
+create the project or choose its repositories.
+
+---
+
+## 3. Two publishing modes
+
+`scripts/ci/publish_obs_package.sh` picks a mode from the credentials it is
+given:
+
+| Mode | Credentials | What it does |
 | :--- | :--- | :--- |
-| **Build Service Platform** | Open Build Service (OBS) | `https://build.opensuse.org` |
-| **OBS Home / Org Project** | `home:ai-workspace-lab` | Primary project namespace |
-| **OBS Package Identifier** | `xworkmate-app` | Package entry inside OBS project |
-| **Target Distributions** | openSUSE Leap/Tumbleweed, Fedora, RHEL/CentOS | Multi-distro build matrix |
-| **RPM Spec File** | `packaging/rpm/xworkmate.spec` | Fedora / openSUSE packaging specification |
-| **RPM Package Name** | `xworkmate` | Executable package installed via `dnf` / `zypper` |
+| **osc** (preferred) | `OBS_USERNAME` + `OBS_PASSWORD` | Checks out the package, replaces the tarball / spec / rpmlintrc, and commits. This is what actually ships a new version. |
+| **token** (fallback) | `OBS_TOKEN` | `POST /trigger/runservice`, which only re-runs source services **already configured** on the OBS package. It cannot upload new sources. |
+
+A token alone is therefore not enough to publish a build produced in CI unless
+the OBS package has a `_service` that fetches the sources itself. Provision
+`OBS_USERNAME` and `OBS_PASSWORD` in Vault to use the osc mode — see the
+[GPG Key & Vault Setup Guide](gpg-key-vault-setup-guide.md) for the secret path.
+
+Either way, failures are reported: an HTTP error from the trigger endpoint fails
+the job instead of being swallowed.
 
 ---
 
-## 2. Setting Up OBS Project & SCM/CI Integration
+## 4. Versioning
 
-### Step 1: Create OBS Account & Home Project
-1. Visit `https://build.opensuse.org` and register or log in.
-2. Your primary home namespace is `home:<your-username>` or your team project `home:ai-workspace-lab`.
+| Build | Version-Release |
+| :--- | :--- |
+| Tagged release | `1.2.0-1` |
+| Untagged CI build | `1.2.0-0.ci417` |
 
-### Step 2: Create Package
-1. Under `home:ai-workspace-lab`, click **Add Package** (or **Create Package**).
-2. Name: `xworkmate-app`
-3. Title: `XWorkmate Desktop Shell`
-4. Description: `XWorkmate Linux desktop shell with GNOME/KDE proxy and tunnel integration.`
-
-### Step 3: Configure Target Repositories
-In the OBS project settings, add build target platforms:
-- **Fedora** (e.g. Fedora 40, Fedora 41)
-- **openSUSE** (openSUSE Tumbleweed, openSUSE Leap 15.6)
-- **RedHat / CentOS** (RHEL 9 / CentOS Stream)
-
-### Step 4: Configure GitHub SCM/CI Webhook Link
-OBS supports SCM/CI workflow links with GitHub:
-1. In OBS package view, add `_service` or use the OBS SCM/CI integration page.
-2. Link URL: `https://github.com/ai-workspace-lab/xworkmate-app.git`
-3. Branch: `main`
-4. When new commits are pushed to `main`, OBS automatically fetches updated sources, runs `rpmbuild`, and produces multi-distro RPMs.
+RPM compares the release field segment by segment, so `0.ci417` sorts below `1`
+and a CI build never shadows the tagged release of the same version.
 
 ---
 
-## 3. Building SRPM and Uploading via `osc` CLI
+## 5. What CI does
 
-You can build RPM source packages (`.src.rpm` / SRPM) locally and manage OBS packages using the `osc` CLI tool:
+1. **build (linux leg)** runs `scripts/ci/build_linux_source_packages.sh`, which
+   stages `dist/obs/` with the tarball, the version-synced spec, and the
+   rpmlintrc, then checks the tarball actually contains the payload. Uploaded as
+   the `linux-source-packages` artifact.
+2. **release (`obs_rpm` leg)** downloads that artifact, reads the OBS credentials
+   from Vault, and runs `scripts/ci/publish_obs_package.sh`.
 
-### 1. Generate SRPM locally
+If publishing is enabled and no credentials are available, the job **fails**.
+Set `OBS_REQUIRE_PUBLISH=false` (the `require-publish` action input) to downgrade
+that to a skip. Disable the lane for a manual run with the `publish_obs_package`
+input of **Run workflow**.
+
+---
+
+## 6. Building and publishing locally
+
 ```bash
+# Stage the payload, tarball, spec, and rpmlintrc into dist/obs/
 make package-rpm-source
-# or
-bash scripts/package-rpm-source.sh
+
+# Publish with osc
+OBS_USERNAME=<user> OBS_PASSWORD=<password> \
+  bash scripts/ci/publish_obs_package.sh
 ```
-This generates `xworkmate-<version>.tar.gz` and `xworkmate.spec` under `dist/rpm/`.
 
-### 2. Checkout & Commit to OBS using `osc`
-```bash
-# Install osc tool (openSUSE: zypper in osc | Fedora: dnf install osc | macOS: brew install osc)
-osc checkout home:ai-workspace-lab xworkmate-app
-cd home:ai-workspace-lab/xworkmate-app
-
-# Copy staged tarball and spec
-cp /path/to/xworkmate-app/dist/rpm/xworkmate-*.tar.gz .
-cp /path/to/xworkmate-app/dist/rpm/xworkmate.spec .
-
-# Stage and commit
-osc addremove
-osc commit -m "Release version 1.1.9"
-```
+`make package-rpm-source` runs `flutter build linux --release` first if
+`build/linux/x64/release/bundle` is missing, so it must run on Linux. If
+`rpmbuild` is installed it also produces a local `.src.rpm` for inspection; OBS
+rebuilds from the tarball and spec regardless.
 
 ---
 
-## 4. End-User Installation Guide
+## 7. End-user installation
 
-Once OBS completes building the RPMs, users can install XWorkmate using their native package managers:
+Replace `home:/haitaopanhq` below if the project was overridden.
 
-### Fedora / RHEL / CentOS Stream (`dnf`)
+### openSUSE (`zypper`)
+
 ```bash
-# 1. Add AI Workspace Lab OBS Repository
-sudo dnf config-manager --add-repo https://download.opensuse.org/repositories/home:/ai-workspace-lab/Fedora_40/home:ai-workspace-lab.repo
-
-# 2. Install XWorkmate
-sudo dnf install xworkmate
-```
-
-### openSUSE Tumbleweed / Leap (`zypper`)
-```bash
-# 1. Add repository
-sudo zypper addrepo https://download.opensuse.org/repositories/home:/ai-workspace-lab/openSUSE_Tumbleweed/home:ai-workspace-lab.repo
-
-# 2. Refresh and install
+sudo zypper addrepo https://download.opensuse.org/repositories/home:/haitaopanhq/openSUSE_Tumbleweed/home:haitaopanhq.repo
 sudo zypper refresh
 sudo zypper install xworkmate
+```
+
+### Fedora / RHEL / CentOS Stream (`dnf`)
+
+```bash
+sudo dnf config-manager --add-repo https://download.opensuse.org/repositories/home:/haitaopanhq/Fedora_40/home:haitaopanhq.repo
+sudo dnf install xworkmate
 ```
