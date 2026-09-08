@@ -92,6 +92,40 @@ for dsc in "${dsc_files[@]}"; do
   fi
 done
 
+# The closest available stand-in for a Launchpad build: unpack the source
+# package and run the same debhelper sequence a builder would, with the same
+# build-dependency check. Anything the packaging gets wrong about dh surfaces
+# here instead of in the archive.
+first_dsc="${dsc_files[0]}"
+first_extract="$verify_root/$(basename "$first_dsc" .dsc)"
+echo "==> [verify] Building a binary package from $(basename "$first_dsc")..."
+(cd "$first_extract" && dpkg-buildpackage -b -us -uc)
+
+mapfile -t built_debs < <(find "$verify_root" -maxdepth 1 -name '*.deb' | sort)
+if [[ "${#built_debs[@]}" -eq 0 ]]; then
+  echo "==> [verify] The source package did not produce a .deb." >&2
+  exit 1
+fi
+
+deb_listing="$verify_root/deb-contents.list"
+dpkg-deb -c "${built_debs[0]}" > "$deb_listing"
+# dpkg-deb prints paths as "./opt/...", and symlinks as "./usr/bin/x -> target",
+# so anchor on the leading "./" -- matching the bare path would let the symlink's
+# target stand in for the binary it points at.
+deb_required=(
+  "\./opt/${app_name}/${app_name}\$"
+  "\./usr/bin/${app_name} ->"
+  "\./usr/share/applications/${app_name}\.desktop\$"
+  "\./usr/share/icons/hicolor/scalable/apps/${app_name}\.svg\$"
+)
+for required in "${deb_required[@]}"; do
+  if ! grep -q "$required" "$deb_listing"; then
+    echo "==> [verify] $(basename "${built_debs[0]}") has nothing matching '$required'." >&2
+    exit 1
+  fi
+done
+echo "==> [verify] $(basename "${built_debs[0]}") installs the payload."
+
 echo "==> [verify] Checking the OBS upload set..."
 # Read pipelines fully rather than piping into an early-exiting reader: under
 # `set -o pipefail` the writer's SIGPIPE would surface as a failed check.
