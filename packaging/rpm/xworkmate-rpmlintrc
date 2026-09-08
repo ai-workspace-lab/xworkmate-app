@@ -1,0 +1,16 @@
+# XWorkmate installs an upstream Flutter bundle under /opt, which trips several
+# rpmlint checks that assume a distribution-compiled package. OBS treats some of
+# these as fatal badness, so they are filtered here rather than worked around by
+# repackaging the vendor bundle.
+addFilter(r"arch-dependent-file-in-opt")
+addFilter(r"binary-or-shlib-defines-rpath")
+addFilter(r"unstripped-binary-or-object")
+addFilter(r"no-soname")
+addFilter(r"shlib-policy-name-error")
+addFilter(r"shared-lib-calls-exit")
+addFilter(r"missing-call-to-setgroups-before-setuid")
+addFilter(r"no-manual-page-for-binary")
+addFilter(r"devel-file-in-non-devel-package")
+addFilter(r"zero-length")
+addFilter(r"file-not-in-%lang")
+addFilter(r"permissions-.*")

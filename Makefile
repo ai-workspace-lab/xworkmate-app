@@ -20,7 +20,7 @@ APP_DART_DEFINE_BUILD ?= --dart-define=XWORKMATE_BUILD_NUMBER=$(APP_BUILD_NUMBER
 APP_DART_DEFINE_BUILD_DATE ?= --dart-define=XWORKMATE_BUILD_DATE=$(APP_BUILD_DATE)
 APP_DART_DEFINE_BUILD_COMMIT ?= --dart-define=XWORKMATE_BUILD_COMMIT=$(APP_BUILD_COMMIT)
 
-.PHONY: help deps analyze test test-all test-flutter test-golden test-integration test-integration-macos test-patrol test-go test-ci check format run open-macos-xcode sync-version build-linux build-macos build-ios-sim ios-pods ios-pods-check build-ios-release-no-codesign verify-ios-release package-deb package-deb-source package-ppa package-rpm package-rpm-source package-obs package-linux package-mac install-mac clean render-release-docs docs-public-api check-export-compliance test-real-env-login-chain inspect-xworkmate-bridge-service test-api-contract test-api-scenario-contract check-api-external
+.PHONY: help deps analyze test test-all test-flutter test-golden test-integration test-integration-macos test-patrol test-go test-ci check format run open-macos-xcode sync-version build-linux build-macos build-ios-sim ios-pods ios-pods-check build-ios-release-no-codesign verify-ios-release package-deb package-linux-payload package-deb-source package-ppa package-rpm package-rpm-source package-obs package-linux package-mac install-mac clean render-release-docs docs-public-api check-export-compliance test-real-env-login-chain inspect-xworkmate-bridge-service test-api-contract test-api-scenario-contract check-api-external
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z0-9_.-]+:.*?## ' Makefile | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "%-18s %s\n", $$1, $$2}'
@@ -125,7 +125,10 @@ verify-ios-release: ios-pods-check build-ios-release-no-codesign analyze ## Rege
 package-deb: ## Create the Linux .deb package
 	bash scripts/package-linux-deb.sh
 
-package-deb-source: ## Create the Debian source package (.dsc / .changes) for Launchpad PPA
+package-linux-payload: ## Stage the prebuilt Linux install tree embedded in the distro source packages
+	bash scripts/package-linux-payload.sh
+
+package-deb-source: package-linux-payload ## Create the Debian source packages (.dsc / .changes) for Launchpad PPA
 	bash scripts/package-debian-source.sh
 
 package-ppa: package-deb-source ## Alias for package-deb-source
@@ -134,7 +137,7 @@ package-ppa: package-deb-source ## Alias for package-deb-source
 package-rpm: ## Create the Linux .rpm package
 	bash scripts/package-linux-rpm.sh
 
-package-rpm-source: ## Create the RPM source package (SRPM / .src.rpm) for Open Build Service (OBS)
+package-rpm-source: package-linux-payload ## Create the RPM source bundle (tarball / spec) for Open Build Service (OBS)
 	bash scripts/package-rpm-source.sh
 
 package-obs: package-rpm-source ## Alias for package-rpm-source

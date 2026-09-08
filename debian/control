@@ -2,15 +2,24 @@ Source: xworkmate
 Section: utils
 Priority: optional
 Maintainer: AI Workspace Lab <dev@ai-workspace-lab.org>
-Build-Depends: debhelper-compat (= 13), cmake, ninja-build, clang, pkg-config, libgtk-3-dev, libglib2.0-dev, liblzma-dev
+Build-Depends: debhelper-compat (= 13)
 Standards-Version: 4.6.2
+Rules-Requires-Root: no
 Homepage: https://launchpad.net/ai-workspace-lab
 Vcs-Git: https://github.com/ai-workspace-lab/xworkmate-app.git
 Vcs-Browser: https://github.com/ai-workspace-lab/xworkmate-app
 
 Package: xworkmate
-Architecture: amd64 arm64
-Depends: ${shlibs:Depends}, ${misc:Depends}, network-manager, libgtk-3-0, libglib2.0-0, libx11-6
+Architecture: amd64
+Depends: ${misc:Depends},
+         libgtk-3-0 | libgtk-3-0t64,
+         libglib2.0-0 | libglib2.0-0t64,
+         libx11-6,
+         libstdc++6,
+         network-manager
 Description: XWorkmate Linux desktop shell with GNOME/KDE proxy and tunnel integration
  XWorkmate is a Linux desktop workspace shell providing workspace management,
  proxy controls, and network tunnel integration.
+ .
+ The Flutter runtime and application assets ship prebuilt under /opt/xworkmate
+ because the Flutter SDK is not available inside distribution build chroots.

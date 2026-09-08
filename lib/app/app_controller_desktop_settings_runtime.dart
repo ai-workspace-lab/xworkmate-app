@@ -741,11 +741,6 @@ extension AppControllerDesktopSettingsRuntime on AppController {
         previous.acpBridgeServerModeConfig.toJsonString() !=
         current.acpBridgeServerModeConfig.toJsonString();
 
-    if (refreshAfterSave || bridgeChanged) {
-      // Re-trigger Bridge capability discovery if the mode or endpoint changed.
-      unawaited(refreshAcpCapabilitiesInternal());
-    }
-
     if (disposedInternal) {
       return;
     }
@@ -772,11 +767,17 @@ extension AppControllerDesktopSettingsRuntime on AppController {
     if (refreshAfterSave) {
       recomputeTasksInternal();
     }
-    unawaited(
-      refreshAcpCapabilitiesInternal(
-        persistMountTargets: true,
-      ).catchError((_) {}),
-    );
+    // Only saves that ask for a refresh, or that moved the bridge endpoint,
+    // re-run capability discovery. Saves that merely persist a selection --
+    // picking an execution target, for one -- must not pull the provider
+    // catalog behind the caller's back.
+    if (refreshAfterSave || bridgeChanged) {
+      unawaited(
+        refreshAcpCapabilitiesInternal(
+          persistMountTargets: true,
+        ).catchError((_) {}),
+      );
+    }
     notifyListeners();
   }
 

@@ -25,11 +25,28 @@ require_file "$repo_root/scripts/ci/run_code_analysis.sh"
 require_file "$repo_root/scripts/ci/build_matrix_artifacts.sh"
 require_file "$repo_root/scripts/ci/setup_platform_deps.sh"
 require_file "$repo_root/scripts/ci/compute_release_metadata.sh"
+require_file "$repo_root/scripts/ci/build_linux_source_packages.sh"
+require_file "$repo_root/scripts/ci/publish_launchpad_ppa.sh"
+require_file "$repo_root/scripts/ci/verify_ppa_signing.sh"
+require_file "$repo_root/scripts/ci/publish_obs_package.sh"
+require_file "$repo_root/scripts/package-linux-payload.sh"
+require_file "$repo_root/scripts/package-debian-source.sh"
+require_file "$repo_root/scripts/package-rpm-source.sh"
+require_file "$repo_root/debian/rules"
+require_file "$repo_root/packaging/rpm/xworkmate.spec"
 
 require_exec "$repo_root/scripts/ci/run_code_analysis.sh"
 require_exec "$repo_root/scripts/ci/build_matrix_artifacts.sh"
 require_exec "$repo_root/scripts/ci/setup_platform_deps.sh"
 require_exec "$repo_root/scripts/ci/compute_release_metadata.sh"
+require_exec "$repo_root/scripts/ci/build_linux_source_packages.sh"
+require_exec "$repo_root/scripts/ci/publish_launchpad_ppa.sh"
+require_exec "$repo_root/scripts/ci/verify_ppa_signing.sh"
+require_exec "$repo_root/scripts/ci/publish_obs_package.sh"
+require_exec "$repo_root/scripts/package-linux-payload.sh"
+require_exec "$repo_root/scripts/package-debian-source.sh"
+require_exec "$repo_root/scripts/package-rpm-source.sh"
+require_exec "$repo_root/debian/rules"
 
 ruby - "$workflow_file" <<'RUBY'
 require 'yaml'
@@ -41,8 +58,15 @@ expected_jobs = %w[prepare verify build release]
 missing_jobs = expected_jobs.reject { |job| data.fetch('jobs', {}).key?(job) }
 abort("Missing workflow jobs: #{missing_jobs.join(', ')}") unless missing_jobs.empty?
 
+# The main-branch release rule lives in the job condition and in the extracted
+# determine_release_mode.sh, not in an inline `run:` body.
 prepare_job = data.fetch('jobs').fetch('prepare')
-prepare_text = prepare_job.fetch('steps', []).map { |step| step['run'] }.compact.join("\n")
+prepare_text = [
+  prepare_job['if'],
+  *prepare_job.fetch('steps', []).map { |step| step['run'] }
+].compact.join("\n")
+release_mode_script = File.join(File.dirname(File.dirname(workflow_path)), 'scripts', 'determine_release_mode.sh')
+prepare_text += File.read(release_mode_script) if File.exist?(release_mode_script)
 abort('prepare job must release from main.') unless prepare_text.include?('refs/heads/main')
 
 build_job = data.fetch('jobs').fetch('build')
@@ -60,10 +84,21 @@ required_snippets = [
   'bash ./scripts/ci/compute_release_metadata.sh',
   'needs.prepare.outputs.should_release == \'true\'',
   'actions/upload-artifact',
-  'actions/download-artifact'
+  'actions/download-artifact',
+  'bash ./scripts/ci/build_linux_source_packages.sh',
+  'bash ./scripts/ci/verify_ppa_signing.sh',
+  './.github/actions/publish-launchpad-ppa',
+  './.github/actions/publish-obs-package'
 ]
 missing_snippets = required_snippets.reject { |snippet| text.include?(snippet) }
 abort("Missing workflow references: #{missing_snippets.join(', ')}") unless missing_snippets.empty?
+
+release_job = data.fetch('jobs').fetch('release')
+release_targets = release_job.fetch('strategy', {}).fetch('matrix', {}).fetch('include', [])
+                             .map { |entry| entry['target'] }.compact
+expected_targets = %w[github_release launchpad_ppa obs_rpm]
+missing_targets = expected_targets.reject { |target| release_targets.include?(target) }
+abort("Missing release targets: #{missing_targets.join(', ')}") unless missing_targets.empty?
 
 puts 'Workflow structure check passed.'
 RUBY

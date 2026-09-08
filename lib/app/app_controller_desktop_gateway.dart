@@ -205,6 +205,10 @@ extension AppControllerDesktopGateway on AppController {
     int? profileIndex,
     String authTokenOverride = '',
     String authPasswordOverride = '',
+    // Selecting an execution target reconnects to point at the right profile,
+    // but must not force a catalog refresh: the catalog is refreshed lazily at
+    // send time so toggling modes cannot hammer an unreachable bridge.
+    bool refreshAcpCapabilities = true,
   }) async {
     final resolvedProfileIndex =
         profileIndex ??
@@ -242,14 +246,16 @@ extension AppControllerDesktopGateway on AppController {
       devicesControllerInternal.refresh(quiet: true),
     ]);
     await settingsControllerInternal.refreshDerivedState();
-    try {
-      await refreshAcpCapabilitiesInternal(
-        forceRefresh: true,
-        persistMountTargets: true,
-      );
-    } catch (e, stackTrace) { debugPrint('Error: $e\n$stackTrace');
-      // Keep the Gateway connect flow usable even if ACP capability refresh
-      // trails the runtime handshake.
+    if (refreshAcpCapabilities) {
+      try {
+        await refreshAcpCapabilitiesInternal(
+          forceRefresh: true,
+          persistMountTargets: true,
+        );
+      } catch (e, stackTrace) { debugPrint('Error: $e\n$stackTrace');
+        // Keep the Gateway connect flow usable even if ACP capability refresh
+        // trails the runtime handshake.
+      }
     }
     await ensureCodexGatewayRegistrationInternal();
     recomputeTasksInternal();

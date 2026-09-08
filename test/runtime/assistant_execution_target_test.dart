@@ -957,7 +957,7 @@ void main() {
     test(
       'does not refresh agent provider catalog when agent mode is selected with an empty catalog',
       () async {
-        final capture = await _startCapabilityServer();
+        final capture = await _startFailingCapabilityServer();
         addTearDown(capture.close);
 
         final storeRoot = await Directory.systemTemp.createTemp(
@@ -1016,21 +1016,22 @@ void main() {
         await controller.sessionsController.switchSession(
           'unit-fixture-task-a',
         );
-        await Future<void>.delayed(const Duration(milliseconds: 200));
+        await _resetAfterQuietBridgeWindow(capture);
 
         expect(controller.assistantProviderCatalog, isEmpty);
-        final requestCountBefore = capture.requestCount;
 
         await controller.setAssistantExecutionTarget(
           AssistantExecutionTarget.agent,
         );
-        controller.bridgeCapabilitiesRefreshAttemptedInternal = true;
-        controller.bridgeCapabilitiesRefreshErrorInternal = '';
-        await Future<void>.delayed(const Duration(milliseconds: 200));
+        await _settleBridgeRequests(capture);
 
+        // Selecting a mode reconnects to the target profile, so bridge traffic
+        // is expected; what must not happen is another catalog pull.
+        // sendChatMessage refreshes the catalog when a run actually needs it,
+        // so a mode toggle cannot hammer an unreachable bridge.
+        expect(capture.capabilityRequestCount, 0);
         expect(controller.assistantProviderCatalog, isEmpty);
-        expect(capture.requestCount, lessThanOrEqualTo(requestCountBefore + 2));
-        if (capture.requestCount > requestCountBefore) {
+        if (capture.requestCount > 0) {
           expect(capture.lastAuthorizationHeader, 'Bearer bridge-token');
         }
       },
@@ -4751,7 +4752,9 @@ void main() {
   });
 }
 
-Future<_CapabilityServerCapture> _startCapabilityServer() async {
+/// Capability server that fails every request, leaving the provider catalog
+/// empty no matter how many refreshes the controller attempts.
+Future<_CapabilityServerCapture> _startFailingCapabilityServer() async {
   final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
   final capture = _CapabilityServerCapture._(
     server,
@@ -4761,38 +4764,78 @@ Future<_CapabilityServerCapture> _startCapabilityServer() async {
     capture.requestCount += 1;
     capture.lastAuthorizationHeader =
         request.headers.value(HttpHeaders.authorizationHeader) ?? '';
-    await utf8.decoder.bind(request).join();
-    if (capture.requestCount == 1) {
-      request.response.statusCode = HttpStatus.internalServerError;
-      request.response.headers.contentType = ContentType.json;
-      request.response.write(
-        jsonEncode(<String, dynamic>{
-          'error': <String, dynamic>{'message': 'startup refresh failed'},
-        }),
-      );
-      await request.response.close();
-      return;
+    final body = await utf8.decoder.bind(request).join();
+    if (body.contains('acp.capabilities')) {
+      capture.capabilityRequestCount += 1;
     }
-
+    request.response.statusCode = HttpStatus.internalServerError;
     request.response.headers.contentType = ContentType.json;
     request.response.write(
       jsonEncode(<String, dynamic>{
-        'jsonrpc': '2.0',
-        'id': 'capabilities',
-        'result': <String, dynamic>{
-          'singleAgent': true,
-          'multiAgent': true,
-          'providerCatalog': <Map<String, dynamic>>[
-            <String, dynamic>{'providerId': 'codex', 'label': 'Codex'},
-            <String, dynamic>{'providerId': 'opencode', 'label': 'OpenCode'},
-            <String, dynamic>{'providerId': 'gemini', 'label': 'Gemini'},
-          ],
-        },
+        'error': <String, dynamic>{'message': 'capability refresh failed'},
       }),
     );
     await request.response.close();
   });
   return capture;
+}
+
+/// Waits until the controller stops dialing the bridge.
+Future<void> _settleBridgeRequests(
+  _CapabilityServerCapture capture, {
+  Duration quietFor = const Duration(milliseconds: 400),
+  Duration timeout = const Duration(seconds: 10),
+}) async {
+  final deadline = DateTime.now().add(timeout);
+  var lastCount = -1;
+  var quietSince = DateTime.now();
+  while (DateTime.now().isBefore(deadline)) {
+    if (capture.requestCount != lastCount) {
+      lastCount = capture.requestCount;
+      quietSince = DateTime.now();
+    } else if (DateTime.now().difference(quietSince) >= quietFor) {
+      return;
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 25));
+  }
+}
+
+/// Waits for a window in which the bridge sees no traffic at all, then zeroes
+/// the counters so whatever arrives next is attributable to the step under
+/// test.
+///
+/// How much a controller dials during startup, and how soon, differs by host: a
+/// Linux CI runner reaches the fixture server, a developer macOS box running
+/// this test alone may never get that far, and a straggling startup refresh
+/// would otherwise be miscounted against the step being measured. Retrying
+/// until a window is genuinely quiet removes that guesswork.
+Future<void> _resetAfterQuietBridgeWindow(
+  _CapabilityServerCapture capture, {
+  Duration quietFor = const Duration(milliseconds: 400),
+  Duration timeout = const Duration(seconds: 15),
+}) async {
+  final deadline = DateTime.now().add(timeout);
+  while (true) {
+    capture.reset();
+    final windowEnd = DateTime.now().add(quietFor);
+    var quiet = true;
+    while (DateTime.now().isBefore(windowEnd)) {
+      await Future<void>.delayed(const Duration(milliseconds: 25));
+      if (capture.requestCount != 0) {
+        quiet = false;
+        break;
+      }
+    }
+    if (quiet) {
+      return;
+    }
+    if (!DateTime.now().isBefore(deadline)) {
+      fail(
+        'Bridge traffic never went quiet, so the assertions below could not '
+        'separate startup refreshes from the step under test.',
+      );
+    }
+  }
 }
 
 Future<void> _waitForLastChatMessageText(
@@ -4842,7 +4885,17 @@ class _CapabilityServerCapture {
   final HttpServer _server;
   final Uri baseEndpoint;
   int requestCount = 0;
+  /// Requests carrying the `acp.capabilities` JSON-RPC method. Reconnecting a
+  /// profile also refreshes health, agents, and sessions against this same
+  /// endpoint, so the total request count cannot tell whether the provider
+  /// catalog specifically was pulled.
+  int capabilityRequestCount = 0;
   String lastAuthorizationHeader = '';
+
+  void reset() {
+    requestCount = 0;
+    capabilityRequestCount = 0;
+  }
 
   Future<void> close() => _server.close(force: true);
 }

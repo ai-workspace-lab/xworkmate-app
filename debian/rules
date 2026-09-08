@@ -1,37 +1,40 @@
 #!/usr/bin/make -f
+#
+# XWorkmate ships to Launchpad as a prebuilt payload: distribution build
+# chroots have neither the Flutter SDK nor network access, so the source
+# package carries the compiled bundle as payload.tar.gz and this file only
+# unpacks it. It is an archive rather than a loose tree because dpkg-source's
+# default tar-ignore patterns (*.so, *.a, *.o) would drop most of a Flutter
+# bundle. Regenerate it with scripts/package-linux-payload.sh.
+
+PAYLOAD_ARCHIVE := payload.tar.gz
 
 %:
 	dh $@
 
+override_dh_auto_configure:
 override_dh_auto_build:
-	@if command -v flutter >/dev/null 2>&1; then \
-		flutter build linux --release; \
-	else \
-		echo "flutter SDK missing, skipping build"; \
-	fi
-
 override_dh_auto_test:
-	@if command -v flutter >/dev/null 2>&1; then \
-		flutter test; \
-	else \
-		echo "flutter SDK missing, skipping test"; \
-	fi
+override_dh_auto_clean:
 
 override_dh_auto_install:
-	mkdir -p debian/xworkmate/opt/xworkmate
-	if [ -d build/linux/x64/release/bundle ]; then \
-		cp -R build/linux/x64/release/bundle/* debian/xworkmate/opt/xworkmate/; \
-	elif [ -d build/linux/arm64/release/bundle ]; then \
-		cp -R build/linux/arm64/release/bundle/* debian/xworkmate/opt/xworkmate/; \
+	@if [ ! -f "$(PAYLOAD_ARCHIVE)" ]; then \
+		echo "ERROR: $(PAYLOAD_ARCHIVE) is missing." >&2; \
+		echo "       Run scripts/package-linux-payload.sh before building this source package." >&2; \
+		exit 1; \
 	fi
+	mkdir -p debian/xworkmate
+	tar -xzf $(PAYLOAD_ARCHIVE) -C debian/xworkmate
+	@test -x debian/xworkmate/opt/xworkmate/xworkmate \
+		|| { echo "ERROR: $(PAYLOAD_ARCHIVE) does not carry opt/xworkmate/xworkmate." >&2; exit 1; }
 	mkdir -p debian/xworkmate/usr/bin
 	ln -sf /opt/xworkmate/xworkmate debian/xworkmate/usr/bin/xworkmate
-	mkdir -p debian/xworkmate/usr/share/applications
-	cp linux/packaging/xworkmate.desktop debian/xworkmate/usr/share/applications/xworkmate.desktop
-	mkdir -p debian/xworkmate/usr/share/xworkmate/autostart
-	cp linux/packaging/xworkmate-autostart.desktop debian/xworkmate/usr/share/xworkmate/autostart/xworkmate.desktop
-	mkdir -p debian/xworkmate/usr/share/icons/hicolor/scalable/apps
-	cp linux/packaging/icons/xworkmate.svg debian/xworkmate/usr/share/icons/hicolor/scalable/apps/xworkmate.svg
 
+# The payload is a self-contained Flutter bundle with its own private
+# libraries; letting debhelper rewrite or introspect it would either strip the
+# shipped binaries or emit dependencies on the bundled sonames themselves.
 override_dh_shlibdeps:
-	dh_shlibdeps --exclude=/opt/xworkmate/lib
+override_dh_makeshlibs:
+override_dh_strip:
+override_dh_dwz:
+override_dh_strip_nondeterminism:
