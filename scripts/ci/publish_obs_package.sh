@@ -45,7 +45,10 @@ publish_with_osc() {
   fi
 
   local tarball spec rpmlintrc
-  tarball="$(find "$source_dir" -maxdepth 1 -name '*.tar.gz' | sort | head -n 1)"
+  local tarballs
+  # `find | head` would SIGPIPE find under `set -o pipefail`; read it fully.
+  mapfile -t tarballs < <(find "$source_dir" -maxdepth 1 -name '*.tar.gz' | sort)
+  tarball="${tarballs[0]:-}"
   spec="$source_dir/${obs_package}.spec"
   rpmlintrc="$source_dir/${obs_package}-rpmlintrc"
 
@@ -103,7 +106,8 @@ EOF
   (
     cd "$pkgdir"
     osc -A "$obs_api_url" addremove
-    if osc -A "$obs_api_url" status | grep -q .; then
+    status_output="$(osc -A "$obs_api_url" status)"
+    if [[ -n "$status_output" ]]; then
       osc -A "$obs_api_url" commit -m "Automated build of XWorkmate ${version} (${GITHUB_SHA:-local})"
     else
       echo "==> [OBS] Sources are already identical to the published version; nothing to commit."

@@ -81,7 +81,9 @@ if ! printf '%s' "$gpg_private_key" | base64 -d 2>/dev/null | gpg --import 2>&1;
   exit 1
 fi
 
-fingerprint="$(gpg --list-secret-keys --with-colons "$gpg_key_id" 2>/dev/null | awk -F: '/^fpr:/ {print $10; exit}')"
+# No stage exits early here: an `exit` in awk would SIGPIPE gpg, which under
+# `set -o pipefail` reads as "no such key".
+fingerprint="$(gpg --list-secret-keys --with-colons "$gpg_key_id" 2>/dev/null | awk -F: '/^fpr:/ {print $10}' | sed -n '1p')"
 if [[ -z "$fingerprint" ]]; then
   echo "==> [PPA] Imported keyring has no secret key matching '$gpg_key_id'." >&2
   gpg --list-secret-keys --keyid-format LONG >&2 || true

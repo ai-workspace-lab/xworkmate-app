@@ -93,12 +93,17 @@ for dsc in "${dsc_files[@]}"; do
 done
 
 echo "==> [verify] Checking the OBS upload set..."
-obs_tarball="$(find "$repo_root/dist/obs" -maxdepth 1 -name '*.tar.gz' | sort | head -n 1)"
+# Read pipelines fully rather than piping into an early-exiting reader: under
+# `set -o pipefail` the writer's SIGPIPE would surface as a failed check.
+mapfile -t obs_tarballs < <(find "$repo_root/dist/obs" -maxdepth 1 -name '*.tar.gz' | sort)
+obs_tarball="${obs_tarballs[0]:-}"
 if [[ -z "$obs_tarball" || ! -f "$repo_root/dist/obs/${app_name}.spec" ]]; then
   echo "==> [verify] dist/obs is missing a tarball or ${app_name}.spec." >&2
   exit 1
 fi
-if ! tar -tzf "$obs_tarball" | grep -q "payload/opt/${app_name}/${app_name}$"; then
+obs_listing="$verify_root/obs-tarball.list"
+tar -tzf "$obs_tarball" > "$obs_listing"
+if ! grep -q "payload/opt/${app_name}/${app_name}\$" "$obs_listing"; then
   echo "==> [verify] $obs_tarball does not contain payload/opt/${app_name}/${app_name}." >&2
   exit 1
 fi
