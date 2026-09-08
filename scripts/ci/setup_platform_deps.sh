@@ -19,8 +19,10 @@ case "$platform" in
       libgl1-mesa-dri \
       libayatana-appindicator3-dev \
       dpkg-dev \
+      debhelper \
       devscripts \
       dput \
+      lintian \
       rpm \
       imagemagick \
       xvfb

@@ -1,0 +1,56 @@
+name: "Publish to Open Build Service"
+description: "Commits the staged RPM sources to an OBS package, or triggers its source services when only a token is available"
+
+inputs:
+  obs-username:
+    description: "OBS account username (required to upload new sources)"
+    required: false
+    default: ""
+  obs-password:
+    description: "OBS account password (required to upload new sources)"
+    required: false
+    default: ""
+  obs-token:
+    description: "OBS trigger token; only re-runs services already configured on the package"
+    required: false
+    default: ""
+  obs-project:
+    description: "OBS project namespace"
+    required: false
+    default: "home:haitaopanhq"
+  obs-package:
+    description: "OBS package identifier"
+    required: false
+    default: "xworkmate"
+  obs-api-url:
+    description: "OBS API endpoint"
+    required: false
+    default: "https://api.opensuse.org"
+  source-dir:
+    description: "Directory holding the tarball, spec, and rpmlintrc to upload"
+    required: false
+    default: "dist/obs"
+  require-publish:
+    description: "Fail the job when credentials are missing instead of skipping"
+    required: false
+    default: "true"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Install osc
+      if: ${{ inputs.obs-username != '' && inputs.obs-password != '' }}
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends osc
+
+    - name: Publish RPM sources
+      shell: bash
+      env:
+        OBS_USERNAME: ${{ inputs.obs-username }}
+        OBS_PASSWORD: ${{ inputs.obs-password }}
+        OBS_API_URL: ${{ inputs.obs-api-url }}
+        OBS_SOURCE_DIR: ${{ inputs.source-dir }}
+        OBS_REQUIRE_PUBLISH: ${{ inputs.require-publish }}
+      run: bash ./scripts/ci/publish_obs_package.sh "${{ inputs.obs-token }}" "${{ inputs.obs-project }}" "${{ inputs.obs-package }}"

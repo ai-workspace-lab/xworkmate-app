@@ -44,7 +44,7 @@ on:
         type: boolean
         default: true
       publish_obs_package:
-        description: "Trigger Open Build Service (OBS) RPM build"
+        description: "Publish RPM sources to Open Build Service (OBS)"
         type: boolean
         default: true
 
@@ -73,7 +73,7 @@ jobs:
       testflight_enabled: ${{ steps.flags.outputs.testflight_enabled }}
       github_release_enabled: ${{ steps.flags.outputs.github_release_enabled }}
       ppa_publish_enabled: ${{ steps.flags.outputs.ppa_publish_enabled }}
-      obs_trigger_enabled: ${{ steps.flags.outputs.obs_trigger_enabled }}
+      obs_publish_enabled: ${{ steps.flags.outputs.obs_publish_enabled }}
 
     steps:
       - name: Checkout source
@@ -131,6 +131,7 @@ jobs:
             artifact_paths: |
               dist/linux/*.deb
               dist/linux/*.rpm
+              dist/linux/*.tar.gz
           - platform: windows
             arch: amd64
             package: msi
@@ -237,20 +238,6 @@ jobs:
             kv/data/github-actions/xworkmate-app ANDROID_KEY_ALIAS | ANDROID_KEY_ALIAS ;
             kv/data/github-actions/xworkmate-app ANDROID_KEY_PASSWORD | ANDROID_KEY_PASSWORD
 
-      - name: Load Vault secrets (OBS)
-        id: vault_obs
-        if: ${{ matrix.platform == 'linux' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
-        uses: hashicorp/vault-action@v4
-        continue-on-error: true
-        with:
-          url: ${{ env.VAULT_ADDR }}
-          method: jwt
-          role: github-actions-xworkmate-app
-          jwtGithubAudience: vault
-          ignoreNotFound: true
-          secrets: |
-            kv/data/github-actions/xworkmate-app OBS_TOKEN | OBS_TOKEN
-
       - name: Export signing secrets
         shell: bash
         env:
@@ -303,10 +290,14 @@ jobs:
         shell: bash
         run: bash ./scripts/ci/build_matrix_artifacts.sh "$PLATFORM" "$ARCH" "${{ matrix.package }}" "$SHOULD_RELEASE"
 
-      - name: Trigger OBS RPM build
-        if: ${{ matrix.platform == 'linux' && steps.preflight.outputs.should_build_platform == 'true' && env.SHOULD_RELEASE == 'true' }}
+      # Launchpad and OBS builders have no Flutter SDK and no network, so the
+      # source packages they consume embed the bundle compiled in the step
+      # above. Building them on every run (pull requests included) keeps the
+      # publishing lane honest without needing any credentials.
+      - name: Build Linux distro source packages
+        if: ${{ matrix.platform == 'linux' && steps.preflight.outputs.should_build_platform == 'true' }}
         shell: bash
-        run: bash ./scripts/ci/trigger_obs_build.sh "${{ steps.vault_obs.outputs.OBS_TOKEN }}"
+        run: bash ./scripts/ci/build_linux_source_packages.sh
 
       - name: Upload build artifacts
         if: ${{ steps.preflight.outputs.should_build_platform == 'true' && (matrix.release_only != 'true' || env.SHOULD_RELEASE == 'true') && (matrix.package != 'app-store-pkg' || needs.prepare.outputs.testflight_enabled == 'true') }}
@@ -314,6 +305,16 @@ jobs:
         with:
           name: ${{ matrix.artifact_name }}
           path: ${{ matrix.artifact_paths }}
+          if-no-files-found: error
+
+      - name: Upload Linux source packages
+        if: ${{ matrix.platform == 'linux' && steps.preflight.outputs.should_build_platform == 'true' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: linux-source-packages
+          path: |
+            dist/ppa
+            dist/obs
           if-no-files-found: error
 
 
@@ -374,11 +375,13 @@ jobs:
           APP_STORE_CONNECT_API_KEY_P8_BASE64: ${{ steps.vault_appstore.outputs.APP_STORE_CONNECT_API_KEY_P8_BASE64 }}
         run: bash ./.github/scripts/export_app_store_connect_secrets.sh
 
-      - name: Load Vault secret (Linux OBS)
+      # Vault outages must not masquerade as "nothing to publish", so these
+      # steps are not continue-on-error. ignoreNotFound only tolerates optional
+      # fields (passphrase, OBS account) being absent from the secret.
+      - name: Load Vault secrets (Linux OBS)
         id: vault_obs
-        if: ${{ matrix.target == 'obs_rpm' && needs.prepare.outputs.obs_trigger_enabled == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+        if: ${{ matrix.target == 'obs_rpm' && needs.prepare.outputs.obs_publish_enabled == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
         uses: hashicorp/vault-action@v4
-        continue-on-error: true
         with:
           url: ${{ env.VAULT_ADDR }}
           method: jwt
@@ -386,13 +389,14 @@ jobs:
           jwtGithubAudience: vault
           ignoreNotFound: true
           secrets: |
-            kv/data/github-actions/xworkmate-app OBS_TOKEN | OBS_TOKEN
+            kv/data/github-actions/xworkmate-app OBS_TOKEN | OBS_TOKEN ;
+            kv/data/github-actions/xworkmate-app OBS_USERNAME | OBS_USERNAME ;
+            kv/data/github-actions/xworkmate-app OBS_PASSWORD | OBS_PASSWORD
 
       - name: Load Vault secrets (Linux PPA GPG)
         id: vault_gpg
         if: ${{ matrix.target == 'launchpad_ppa' && needs.prepare.outputs.ppa_publish_enabled == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
         uses: hashicorp/vault-action@v4
-        continue-on-error: true
         with:
           url: ${{ env.VAULT_ADDR }}
           method: jwt
@@ -401,18 +405,15 @@ jobs:
           ignoreNotFound: true
           secrets: |
             kv/data/github-actions/xworkmate-app GPG_PRIVATE_KEY | GPG_PRIVATE_KEY ;
-            kv/data/github-actions/xworkmate-app GPG_KEY_ID | GPG_KEY_ID
+            kv/data/github-actions/xworkmate-app GPG_KEY_ID | GPG_KEY_ID ;
+            kv/data/github-actions/xworkmate-app GPG_PASSPHRASE | GPG_PASSPHRASE
 
-      - name: Install Linux packaging dependencies
-        if: ${{ matrix.target == 'launchpad_ppa' && needs.prepare.outputs.ppa_publish_enabled == 'true' }}
-        shell: bash
-        run: bash ./scripts/ci/setup_platform_deps.sh linux
-
-      - name: Trigger OBS RPM build
-        if: ${{ matrix.target == 'obs_rpm' && needs.prepare.outputs.obs_trigger_enabled == 'true' }}
-        uses: ./.github/actions/trigger-obs-build
+      - name: Download Linux source packages
+        if: ${{ (matrix.target == 'launchpad_ppa' && needs.prepare.outputs.ppa_publish_enabled == 'true') || (matrix.target == 'obs_rpm' && needs.prepare.outputs.obs_publish_enabled == 'true') }}
+        uses: actions/download-artifact@v8
         with:
-          obs-token: ${{ steps.vault_obs.outputs.OBS_TOKEN }}
+          name: linux-source-packages
+          path: dist
 
       - name: Publish to Launchpad PPA
         if: ${{ matrix.target == 'launchpad_ppa' && needs.prepare.outputs.ppa_publish_enabled == 'true' }}
@@ -420,12 +421,27 @@ jobs:
         with:
           gpg-private-key: ${{ steps.vault_gpg.outputs.GPG_PRIVATE_KEY }}
           gpg-key-id: ${{ steps.vault_gpg.outputs.GPG_KEY_ID }}
+          gpg-passphrase: ${{ steps.vault_gpg.outputs.GPG_PASSPHRASE }}
           ppa-target: "ppa:ai-workspace-lab/ppa"
+          source-dir: dist/ppa
 
+      - name: Publish to Open Build Service
+        if: ${{ matrix.target == 'obs_rpm' && needs.prepare.outputs.obs_publish_enabled == 'true' }}
+        uses: ./.github/actions/publish-obs-package
+        with:
+          obs-username: ${{ steps.vault_obs.outputs.OBS_USERNAME }}
+          obs-password: ${{ steps.vault_obs.outputs.OBS_PASSWORD }}
+          obs-token: ${{ steps.vault_obs.outputs.OBS_TOKEN }}
+          source-dir: dist/obs
+
+      # `build-*` keeps the distro source packages out of the GitHub Release:
+      # they are several hundred MB of the same bundle and belong in the PPA and
+      # OBS archives, not attached to every tag.
       - name: Download all artifacts
         if: ${{ matrix.target == 'github_release' && needs.prepare.outputs.github_release_enabled == 'true' }}
         uses: actions/download-artifact@v8
         with:
+          pattern: build-*
           path: release-artifacts
 
       - name: Upload assets to GitHub Release

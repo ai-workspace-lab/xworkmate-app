@@ -1,6 +1,7 @@
-xworkmate (1.1.9-1) unstable; urgency=medium
+xworkmate (1.1.9) jammy; urgency=medium
 
-  * Initial Debian and Launchpad PPA packaging release.
+  * Ship the prebuilt Linux bundle inside the source package so Launchpad
+    builders no longer need the Flutter SDK.
   * Desktop integration with GNOME/KDE proxy and autostart capabilities.
 
- -- AI Workspace Lab <dev@ai-workspace-lab.org>  Wed, 22 Jul 2026 10:55:00 +0800
+ -- AI Workspace Lab <dev@ai-workspace-lab.org>  Tue, 08 Sep 2026 12:00:00 +0800

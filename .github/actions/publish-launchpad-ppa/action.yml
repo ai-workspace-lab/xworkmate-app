@@ -1,5 +1,5 @@
 name: "Publish to Launchpad PPA"
-description: "Imports GPG key, packages Debian source, signs .changes, and uploads to Launchpad PPA using dput"
+description: "Signs the prebuilt Debian source packages and uploads them to a Launchpad PPA with dput"
 
 inputs:
   gpg-private-key:
@@ -10,14 +10,36 @@ inputs:
     description: "GPG key identifier for signing"
     required: false
     default: ""
+  gpg-passphrase:
+    description: "Passphrase for the signing key, when it is protected"
+    required: false
+    default: ""
   ppa-target:
     description: "Target Launchpad PPA repository"
     required: false
     default: "ppa:ai-workspace-lab/ppa"
+  source-dir:
+    description: "Directory holding the *_source.changes files to upload"
+    required: false
+    default: "dist/ppa"
+  require-upload:
+    description: "Fail the job when credentials are missing instead of skipping"
+    required: false
+    default: "true"
 
 runs:
   using: "composite"
   steps:
-    - name: Publish to Launchpad PPA
+    - name: Install Debian upload tooling
       shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends devscripts dput gnupg
+
+    - name: Sign and upload source packages
+      shell: bash
+      env:
+        GPG_PASSPHRASE: ${{ inputs.gpg-passphrase }}
+        PPA_SOURCE_DIR: ${{ inputs.source-dir }}
+        PPA_REQUIRE_UPLOAD: ${{ inputs.require-upload }}
       run: bash ./scripts/ci/publish_launchpad_ppa.sh "${{ inputs.gpg-private-key }}" "${{ inputs.gpg-key-id }}" "${{ inputs.ppa-target }}"
