@@ -68,7 +68,7 @@ for entry in $series_spec; do
   # applies default tar-ignore patterns when it builds the source tarball, and
   # those cover *.so, *.a and *.o -- which is most of a Flutter bundle,
   # including libapp.so and the engine. A loose tree loses them silently.
-  tar -czf "$stage_dir/payload.tar.gz" -C "$payload_dir" ." 
+  tar -czf "$stage_dir/payload.tar.gz" -C "$payload_dir" .
 
   cat > "$stage_dir/SOURCE.md" <<EOF
 # XWorkmate source package contents
