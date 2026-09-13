@@ -53,6 +53,7 @@ case "$platform" in
       fi
     done
 
+    endpoint_defines=()
     if [[ "${#ios_missing[@]}" -gt 0 ]]; then
       echo "Apple signing secrets unavailable (missing: ${ios_missing[*]}); building unsigned iOS app bundle."
       build_unsigned_ios_bundle=1
@@ -64,7 +65,6 @@ case "$platform" in
     fi
 
     if [[ "$build_unsigned_ios_bundle" -eq 1 ]]; then
-      endpoint_defines=()
       [[ -n "${XWORKMATE_ACCOUNT_BASE_URL:-}" ]] && endpoint_defines+=("--dart-define=XWORKMATE_ACCOUNT_BASE_URL=${XWORKMATE_ACCOUNT_BASE_URL}")
       [[ -n "${XWORKMATE_MANAGED_BRIDGE_URL:-}" ]] && endpoint_defines+=("--dart-define=XWORKMATE_MANAGED_BRIDGE_URL=${XWORKMATE_MANAGED_BRIDGE_URL}")
       flutter build ios --release --no-codesign \
