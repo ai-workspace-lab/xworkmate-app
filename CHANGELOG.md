@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Android release builds now publish both the APK and a Play Console-ready AAB.
+  Main, tag, and manual release lanes require the Vault-backed upload keystore;
+  pull request verification builds retain an explicit debug-signing fallback.
+
 ## 1.2.0 — 2026-08-08
 
 发版分支：`release/v1.2` · Tag：`v1.2.0` · `pubspec.yaml`: `1.2.0+1`

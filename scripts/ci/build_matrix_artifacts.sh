@@ -85,7 +85,7 @@ case "$platform" in
     fi
     ;;
   android)
-    bash ./scripts/package-android-apk.sh
+    bash ./scripts/package-android-apk.sh "$should_release"
     ;;
   *)
     echo "Unsupported platform: $platform" >&2
