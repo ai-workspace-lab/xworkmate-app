@@ -6,8 +6,8 @@ import 'package:xworkmate/models/app_models.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
 
 void main() {
-  group('Desktop feature manifest cleanup', () {
-    test('repo config only exposes assistant and settings on desktop', () {
+  group('Desktop feature manifest exposes remote workspace', () {
+    test('repo config exposes remote workspace on desktop', () {
       final raw = File('config/feature_flags.yaml').readAsStringSync();
       final manifest = UiFeatureManifest.fromYamlString(raw);
       final desktop = manifest.forPlatform(
@@ -29,12 +29,12 @@ void main() {
       );
       expect(
         desktop.availableSettingsTabs,
-        isNot(contains(SettingsTab.remoteDesktop)),
+        contains(SettingsTab.remoteDesktop),
       );
       expect(desktop.availableSettingsTabs, contains(SettingsTab.help));
       expect(
         desktop.sanitizeSettingsTab(SettingsTab.remoteDesktop),
-        SettingsTab.gateway,
+        SettingsTab.remoteDesktop,
       );
     });
   });
