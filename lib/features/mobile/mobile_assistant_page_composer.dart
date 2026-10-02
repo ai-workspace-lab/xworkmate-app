@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../assistant/assistant_bot_dialog.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
@@ -6,6 +7,7 @@ import 'package:flutter/cupertino.dart';
 import '../../app/app_controller.dart';
 import '../../i18n/app_language.dart';
 import '../../runtime/runtime_models.dart';
+import '../../models/app_models.dart';
 import '../../theme/app_palette.dart';
 import '../../theme/app_theme.dart';
 import 'mobile_builtin_plugin_choice_chip.dart';
@@ -211,6 +213,43 @@ class MobileAssistantComposer extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        Wrap(
+                          spacing: 8,
+                          children: [
+                            for (final mode in AssistantMode.values)
+                              ChoiceChip(
+                                key: Key(
+                                  'mobile-assistant-product-mode-${mode.name}',
+                                ),
+                                label: Text(mode.label),
+                                selected:
+                                    controller.assistantProductModeForSession(
+                                      controller.currentSessionKey,
+                                    ) ==
+                                    mode,
+                                onSelected: (_) async {
+                                  await controller.setAssistantProductMode(
+                                    mode,
+                                  );
+                                  if (sheetContext.mounted) {
+                                    setSheetState(() {});
+                                  }
+                                  onComposerStateChanged();
+                                },
+                              ),
+                          ],
+                        ),
+                        TextButton(
+                          key: const Key('mobile-assistant-bot-button'),
+                          onPressed: () {
+                            Navigator.pop(sheetContext);
+                            unawaited(
+                              showAssistantBotDialog(context, controller),
+                            );
+                          },
+                          child: const Text('Bot'),
+                        ),
+                        const SizedBox(height: 12),
                         Row(
                           children: [
                             Expanded(
@@ -363,8 +402,7 @@ class MobileAssistantComposer extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(height: 12),
-                          for (final group
-                              in BuiltinPluginCatalog.groups) ...[
+                          for (final group in BuiltinPluginCatalog.groups) ...[
                             Padding(
                               padding: const EdgeInsets.only(bottom: 6),
                               child: Text(
@@ -539,10 +577,7 @@ class MobileAssistantComposer extends StatelessWidget {
                                 return const SizedBox.shrink();
                               }
                               return Text(
-                                appText(
-                                  '询问 XWorkmate...',
-                                  'Ask XWorkmate...',
-                                ),
+                                appText('询问 XWorkmate...', 'Ask XWorkmate...'),
                                 textAlign: TextAlign.center,
                                 style: TextStyle(color: palette.textMuted),
                               );

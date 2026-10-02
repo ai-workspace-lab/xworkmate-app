@@ -389,6 +389,24 @@ extension AppControllerDesktopThreadActions on AppController {
       notifyIfActiveInternal();
       throw error;
     }
+    final productModel = currentTarget.isGateway
+        ? assistantModelForSession(normalizedSessionKey)
+        : '';
+    if (currentTarget.isGateway && productModel.isEmpty) {
+      final error = StateError(
+        appText(
+          '集中模型目录不可用，请连接 Gateway 并选择 xworkmate 模型。',
+          'The central model catalog is unavailable. Connect Gateway and select an xworkmate model.',
+        ),
+      );
+      appendAssistantThreadMessageInternal(
+        normalizedSessionKey,
+        assistantErrorMessageInternal(error.message),
+      );
+      await flushAssistantThreadPersistenceInternal();
+      notifyIfActiveInternal();
+      throw error;
+    }
     await ensureDesktopTaskThreadBindingInternal(
       normalizedSessionKey,
       executionTarget: currentTarget,
@@ -481,7 +499,12 @@ extension AppControllerDesktopThreadActions on AppController {
     );
     final taskMetadata = Map<String, dynamic>.unmodifiable(
       gatewayTaskMetadataWithArtifactContractInternal(
-        baseMetadata: dispatch.metadata,
+        baseMetadata: <String, dynamic>{
+          ...dispatch.metadata,
+          'xworkmateProductCapability': assistantProductModeForSession(
+            normalizedSessionKey,
+          ).toTaskMetadata(model: currentTarget.isGateway ? productModel : ''),
+        },
         sessionKey: normalizedSessionKey,
         userPrompt: message,
         localWorkingDirectory: workingDirectory,

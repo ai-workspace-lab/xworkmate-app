@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xworkmate/app/app_controller.dart';
 import 'package:xworkmate/features/assistant/assistant_page_composer_clipboard.dart';
+import 'package:xworkmate/features/assistant/assistant_bot_dialog.dart';
 import 'package:xworkmate/features/assistant/assistant_page_composer_skill_picker.dart';
 import 'package:xworkmate/features/assistant/assistant_page_main.dart';
 import 'package:xworkmate/theme/app_theme.dart';
@@ -14,6 +15,61 @@ import 'package:xworkmate/widgets/surface_card.dart';
 /// clicking Submit was the only way to send.
 void main() {
   group('composer input contract', () {
+    testWidgets(
+      'existing attachment menu exposes Chat Work Code without moving the composer',
+      (tester) async {
+        final controller = _controller(tester);
+        await tester.pumpWidget(
+          _app(
+            SizedBox(
+              height: 320,
+              child: _lowerPane(
+                controller: controller,
+                inputController: TextEditingController(),
+                onSend: () async {},
+              ),
+            ),
+          ),
+        );
+        await tester.pump();
+        final before = tester.getRect(
+          find.byKey(const Key('assistant-input-field')),
+        );
+        await tester.tap(
+          find.byKey(const Key('assistant-attachment-menu-button')),
+        );
+        await tester.pumpAndSettle();
+        for (final mode in ['chat', 'work', 'code']) {
+          expect(
+            find.byKey(Key('assistant-product-mode-$mode')),
+            findsOneWidget,
+          );
+        }
+        await tester.tapAt(const Offset(5, 5));
+        await tester.pumpAndSettle();
+        expect(
+          tester.getRect(find.byKey(const Key('assistant-input-field'))),
+          before,
+        );
+      },
+    );
+
+    testWidgets('Bot popup remains unavailable without authenticated Gateway', (
+      tester,
+    ) async {
+      final controller = _controller(tester);
+      await tester.pumpWidget(_app(AssistantBotDialog(controller: controller)));
+      await tester.pump();
+      expect(find.byKey(const Key('assistant-bot-dialog')), findsOneWidget);
+      expect(
+        tester
+            .widget<FilledButton>(find.byKey(const Key('assistant-bot-create')))
+            .onPressed,
+        isNull,
+      );
+      expect(find.text('请先连接 AI Workspace Gateway。'), findsOneWidget);
+    });
+
     testWidgets('Enter sends the draft', (tester) async {
       final controller = _controller(tester);
       final input = TextEditingController(text: 'ship it');

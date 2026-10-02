@@ -111,6 +111,9 @@ class ModelsController extends ChangeNotifier {
   String? get error => errorInternal;
 
   void restoreFromSettings(AiGatewayProfile profile) {
+    if (settingsControllerInternal.snapshot.assistantExecutionTarget.isGateway) {
+      return;
+    }
     final models = modelsFromProfileInternal(profile);
     if (models.length == itemsInternal.length &&
         models.every(
@@ -128,7 +131,16 @@ class ModelsController extends ChangeNotifier {
     notifyListeners();
     try {
       final profile = settingsControllerInternal.snapshot.aiGateway;
-      if (profile.baseUrl.trim().isNotEmpty) {
+      if (settingsControllerInternal
+          .snapshot
+          .assistantExecutionTarget
+          .isGateway) {
+        if (!runtimeInternal.isConnected) {
+          itemsInternal = const [];
+          throw StateError('Gateway model catalog unavailable');
+        }
+        itemsInternal = await runtimeInternal.listModels();
+      } else if (profile.baseUrl.trim().isNotEmpty) {
         final synced = await settingsControllerInternal.syncAiGatewayCatalog(
           profile,
         );

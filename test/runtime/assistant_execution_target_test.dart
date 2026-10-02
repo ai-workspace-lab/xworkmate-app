@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xworkmate/app/app_controller.dart';
+import 'package:xworkmate/models/app_models.dart';
 import 'package:xworkmate/app/app_controller_desktop_external_acp_routing.dart';
 import 'package:xworkmate/app/app_controller_openclaw_task_queue.dart';
 import 'package:xworkmate/app/ui_feature_manifest.dart';
@@ -15,6 +16,11 @@ import 'package:xworkmate/runtime/runtime_models.dart';
 import 'package:xworkmate/runtime/runtime_dispatch_resolver.dart';
 import 'package:xworkmate/runtime/secure_config_store.dart';
 import 'package:xworkmate/runtime/runtime_coordinator.dart';
+import 'package:xworkmate/runtime/gateway_runtime.dart';
+import 'package:xworkmate/runtime/device_identity_store.dart';
+import 'package:xworkmate/runtime/gateway_runtime_session_client.dart';
+import 'package:xworkmate/runtime/codex_runtime.dart';
+import 'package:xworkmate/runtime/codex_config_bridge.dart';
 import 'package:xworkmate/runtime/desktop_platform_service.dart';
 import 'package:xworkmate/runtime/account_runtime_client.dart';
 
@@ -35,6 +41,96 @@ const String _sandboxBridgeServerUrl = 'https://bridge.invalid';
 
 void main() {
   group('AssistantExecutionTarget', () {
+    test(
+      'Chat Work Code capture product semantics and central model through Gateway',
+      () async {
+        final client = _RecordingGoTaskServiceClient();
+        final home = await Directory.systemTemp.createTemp(
+          'xworkmate-product-contract-',
+        );
+        addTearDown(() => _resilientDelete(home));
+        final store = SecureConfigStore(
+          secretRootPathResolver: () async => '${home.path}/secrets',
+          appDataRootPathResolver: () async => '${home.path}/app-data',
+          supportRootPathResolver: () async => '${home.path}/support',
+          enableSecureStorage: false,
+        );
+        await store.initialize();
+        final controller = _connectedGatewayController(
+          client,
+          store: store,
+          homeDir: home.path,
+          runtimeCoordinator: RuntimeCoordinator(
+            gateway: GatewayRuntime(
+              store: store,
+              identityStore: DeviceIdentityStore(store),
+              sessionClient: _ProductGatewaySessionClient(),
+            ),
+            codex: CodexRuntime(),
+            configBridge: CodexConfigBridge(),
+          ),
+        );
+        addTearDown(() async {
+          await controller.runtime.disconnect();
+          await controller.skillsController.refresh();
+          controller.dispose();
+        });
+        await controller.assistantThreadsRestoredInternal.future;
+        for (final mode in AssistantMode.values) {
+          final key = 'unit-product-${mode.name}';
+          await _selectGatewaySession(controller, key);
+          controller.runtimeInternal.snapshotInternal = controller
+              .runtimeInternal
+              .snapshot
+              .copyWith(
+                status: RuntimeConnectionStatus.connected,
+                statusText: 'Connected',
+              );
+          controller.modelsControllerInternal.itemsInternal = const [
+            GatewayModelSummary(
+              id: 'model-1',
+              name: 'Central model',
+              provider: 'xworkmate',
+              contextWindow: null,
+              maxOutputTokens: null,
+            ),
+          ];
+          await controller.setAssistantProductMode(mode);
+          controller.modelsControllerInternal.itemsInternal = const [];
+          await expectLater(
+            controller.sendChatMessage('Blocked ${mode.name}', sessionKey: key),
+            throwsStateError,
+          );
+          expect(client.requests.length, mode.index);
+          controller.modelsControllerInternal.itemsInternal = const [
+            GatewayModelSummary(
+              id: 'model-1',
+              name: 'Central model',
+              provider: 'xworkmate',
+              contextWindow: null,
+              maxOutputTokens: null,
+            ),
+          ];
+          await controller.selectAssistantModelForSession(
+            key,
+            'xworkmate/model-1',
+          );
+          await controller.sendChatMessage('Run ${mode.name}', sessionKey: key);
+          await client.waitForRequestCount(mode.index + 1);
+          final request = client.requests.last;
+          expect(request.target, AssistantExecutionTarget.gateway);
+          expect(request.metadata['xworkmateProductCapability'], {
+            'schemaVersion': 1,
+            'mode': mode.name,
+            'model': 'xworkmate/model-1',
+          });
+          expect(request.metadata, contains('xworkmateTaskArtifactContract'));
+          expect(request.toExternalAcpParams(), isNot(contains('provider')));
+          expect(request.toExternalAcpParams(), isNot(contains('model')));
+        }
+      },
+    );
+
     test('maps agent and gateway values without collapsing them', () {
       expect(
         threadExecutionModeFromAssistantExecutionTarget(
@@ -218,10 +314,12 @@ void main() {
           'unit-fixture-task-a',
         );
 
-        expect(controller.currentAssistantExecutionTarget.isAgent, isTrue);
+        expect(controller.currentAssistantExecutionTarget.isGateway, isTrue);
         expect(
-          controller.assistantProviderForSession(controller.currentSessionKey),
-          SingleAgentProvider.unspecified,
+          controller
+              .assistantProviderForSession(controller.currentSessionKey)
+              .providerId,
+          'openclaw',
         );
 
         await controller.setAssistantExecutionTarget(
@@ -695,6 +793,17 @@ void main() {
       );
 
       expect(fakeGoTaskService.requests, hasLength(1));
+      expect(
+        fakeGoTaskService
+            .requests
+            .single
+            .metadata['xworkmateProductCapability'],
+        containsPair('mode', 'chat'),
+      );
+      expect(
+        fakeGoTaskService.requests.single.metadata,
+        contains('xworkmateTaskArtifactContract'),
+      );
       expect(fakeGoTaskService.requests.single.selectedSkills, const <String>[
         'Browser Automation (browser-automation)',
       ]);
@@ -872,12 +981,13 @@ void main() {
       );
     });
 
-    test('skill selection ignores stale non-bridge skill keys', () {
+    test('skill selection ignores stale non-bridge skill keys', () async {
       final controller = _sandboxController(
         environmentOverride: const <String, String>{},
       );
       addTearDown(controller.dispose);
-      controller.initializeAssistantThreadContext(
+      await controller.assistantThreadsRestoredInternal.future;
+      controller.upsertTaskThreadInternal(
         'unit-skill-source-task',
         executionTarget: AssistantExecutionTarget.gateway,
         messageViewMode: AssistantMessageViewMode.rendered,
@@ -1214,10 +1324,7 @@ void main() {
         expect(fakeGoTaskService.executeCount, 0);
         expect(capture.lastAuthorizationHeader, 'Bearer bridge-token');
         if (controller.chatMessages.isNotEmpty) {
-          expect(
-            controller.chatMessages.last.text,
-            contains('ACP_HTTP_401'),
-          );
+          expect(controller.chatMessages.last.text, contains('ACP_HTTP_401'));
         }
       },
     );
@@ -3410,57 +3517,69 @@ void main() {
       },
     );
 
-    test('OpenClaw gateway task uses the server default model', () async {
-      final fakeGoTaskService = _BlockingGoTaskServiceClient();
-      final controller = _connectedGatewayController(fakeGoTaskService);
-      addTearDown(() {
-        fakeGoTaskService.completeAll();
-        controller.dispose();
-      });
+    test(
+      'OpenClaw gateway task captures a central model and omits low-level provider model',
+      () async {
+        final fakeGoTaskService = _BlockingGoTaskServiceClient();
+        final controller = _connectedGatewayController(fakeGoTaskService);
+        addTearDown(() {
+          fakeGoTaskService.completeAll();
+          controller.dispose();
+        });
 
-      await _selectGatewaySession(controller, 'openclaw-default-model-task');
-      await controller.selectAssistantModelForSession(
-        'openclaw-default-model-task',
-        'ollama/kimi-k2.5',
-      );
+        await _selectGatewaySession(controller, 'openclaw-default-model-task');
+        await controller.selectAssistantModelForSession(
+          'openclaw-default-model-task',
+          'ollama/kimi-k2.5',
+        );
 
-      final taskFuture = controller.sendChatMessage('use OpenClaw default');
-      await fakeGoTaskService.waitForRequestCount(1);
-      await expectLater(
-        taskFuture.timeout(const Duration(seconds: 2)),
-        completes,
-      );
+        await controller.selectAssistantModelForSession(
+          'openclaw-default-model-task',
+          'xworkmate/model-1',
+        );
+        final taskFuture = controller.sendChatMessage('use central model');
+        await fakeGoTaskService.waitForRequestCount(1);
+        await expectLater(
+          taskFuture.timeout(const Duration(seconds: 2)),
+          completes,
+        );
 
-      final request = fakeGoTaskService.requests.single;
-      expect(request.target, AssistantExecutionTarget.gateway);
-      expect(request.provider, SingleAgentProvider.openclaw);
-      expect(request.model, isEmpty);
+        final request = fakeGoTaskService.requests.single;
+        expect(request.target, AssistantExecutionTarget.gateway);
+        expect(request.provider, SingleAgentProvider.openclaw);
+        expect(request.model, isEmpty);
+        expect(request.metadata['xworkmateProductCapability'], {
+          'schemaVersion': 1,
+          'mode': 'chat',
+          'model': 'xworkmate/model-1',
+        });
 
-      final params = request.toExternalAcpParams();
-      expect(params.containsKey('model'), isFalse);
-      expect(
-        params['routing'],
-        isNot(containsPair('explicitModel', 'ollama/kimi-k2.5')),
-      );
+        final params = request.toExternalAcpParams();
+        expect(params.containsKey('model'), isFalse);
+        expect(
+          params['routing'],
+          isNot(containsPair('explicitModel', 'ollama/kimi-k2.5')),
+        );
 
-      fakeGoTaskService.complete(
-        'openclaw-default-model-task',
-        const GoTaskServiceResult(
-          success: true,
-          message: 'result',
-          turnId: 'turn-openclaw-default-model',
-          raw: <String, dynamic>{},
-          errorMessage: '',
-          resolvedModel: '',
-          route: GoTaskServiceRoute.externalAcpSingle,
-        ),
-      );
-      await _waitForThreadLifecycleStatus(
-        controller,
-        'openclaw-default-model-task',
-        'ready',
-      );
-    });
+        fakeGoTaskService.complete(
+          'openclaw-default-model-task',
+          const GoTaskServiceResult(
+            success: true,
+            message: 'result',
+            turnId: 'turn-openclaw-default-model',
+            raw: <String, dynamic>{},
+            errorMessage: '',
+            resolvedModel: '',
+            route: GoTaskServiceRoute.externalAcpSingle,
+          ),
+        );
+        await _waitForThreadLifecycleStatus(
+          controller,
+          'openclaw-default-model-task',
+          'ready',
+        );
+      },
+    );
 
     test(
       'abortRun removes a queued OpenClaw task without bridge cancel',
@@ -4885,6 +5004,7 @@ class _CapabilityServerCapture {
   final HttpServer _server;
   final Uri baseEndpoint;
   int requestCount = 0;
+
   /// Requests carrying the `acp.capabilities` JSON-RPC method. Reconnecting a
   /// profile also refreshes health, agents, and sessions against this same
   /// endpoint, so the total request count cannot tell whether the provider
@@ -4978,6 +5098,7 @@ Future<void> _resilientDelete(Directory dir) async {
 
 AppController _sandboxController({
   SecureConfigStore? store,
+  AssistantExecutionTarget? fixtureTarget,
   RuntimeCoordinator? runtimeCoordinator,
   DesktopPlatformService? desktopPlatformService,
   UiFeatureManifest? uiFeatureManifest,
@@ -4998,7 +5119,11 @@ AppController _sandboxController({
     });
   }
   return AppController(
-    store: store,
+    store:
+        store ??
+        (fixtureTarget == null
+            ? null
+            : _TargetFixtureStore(actualHome, fixtureTarget)),
     runtimeCoordinator: runtimeCoordinator,
     desktopPlatformService: desktopPlatformService,
     uiFeatureManifest: uiFeatureManifest,
@@ -5019,8 +5144,9 @@ AppController _connectedController(
   GoTaskServiceClient client, {
   String? homeDir,
 }) {
-  return _sandboxController(
+  final controller = _sandboxController(
     goTaskServiceClient: client,
+    fixtureTarget: AssistantExecutionTarget.agent,
     uiFeatureManifest: _defaultDesktopManifest(),
     environmentOverride: const <String, String>{
       'BRIDGE_AUTH_TOKEN': 'bridge-token',
@@ -5034,14 +5160,43 @@ AppController _connectedController(
     ],
     homeDir: homeDir,
   );
+  // This fixture deliberately represents the explicit legacy Agent contract.
+  // Product defaults are Gateway; do not let them change transport error tests.
+  controller.settingsControllerInternal.snapshotInternal = controller.settings
+      .copyWith(assistantExecutionTarget: AssistantExecutionTarget.agent);
+  return controller;
 }
 
 AppController _connectedGatewayController(
   GoTaskServiceClient client, {
   String? homeDir,
+  SecureConfigStore? store,
+  RuntimeCoordinator? runtimeCoordinator,
 }) {
-  return _sandboxController(
+  final fixtureHome = homeDir?.isNotEmpty == true
+      ? homeDir!
+      : Directory.systemTemp.createTempSync('xworkmate-gateway-fixture-').path;
+  if (homeDir == null || homeDir.isEmpty) {
+    addTearDown(() => _resilientDelete(Directory(fixtureHome)));
+  }
+  final fixtureStore =
+      store ??
+      SecureConfigStore(
+        secretRootPathResolver: () async => '$fixtureHome/secrets',
+        appDataRootPathResolver: () async => '$fixtureHome/app-data',
+        supportRootPathResolver: () async => '$fixtureHome/support',
+        enableSecureStorage: false,
+      );
+  final controller = _sandboxController(
     goTaskServiceClient: client,
+    store: fixtureStore,
+    runtimeCoordinator:
+        runtimeCoordinator ??
+        RuntimeCoordinator(
+          gateway: _FixtureGatewayRuntime(fixtureStore),
+          codex: CodexRuntime(),
+          configBridge: CodexConfigBridge(),
+        ),
     uiFeatureManifest: _defaultDesktopManifest(),
     environmentOverride: const <String, String>{
       'BRIDGE_AUTH_TOKEN': 'bridge-token',
@@ -5057,8 +5212,15 @@ AppController _connectedGatewayController(
       AssistantExecutionTarget.agent,
       AssistantExecutionTarget.gateway,
     ],
-    homeDir: homeDir,
+    homeDir: homeDir ?? fixtureHome,
   );
+  final gateway = controller.runtime;
+  if (gateway is _FixtureGatewayRuntime) {
+    gateway.skills = () => controller.skillsControllerInternal.itemsInternal;
+  }
+  controller.modelsControllerInternal.itemsInternal =
+      _FixtureGatewayRuntime.catalog;
+  return controller;
 }
 
 Future<void> _selectGatewaySession(
@@ -5070,6 +5232,21 @@ Future<void> _selectGatewaySession(
     AssistantExecutionTarget.gateway,
   );
   await controller.setAssistantProvider(SingleAgentProvider.openclaw);
+  // Gateway transport fixtures now also expose an actual remote central catalog.
+  controller.runtimeInternal.snapshotInternal = controller.runtime.snapshot
+      .copyWith(
+        status: RuntimeConnectionStatus.connected,
+        statusText: 'Connected',
+      );
+  controller.modelsControllerInternal.itemsInternal = const [
+    GatewayModelSummary(
+      id: 'model-1',
+      name: 'Central model',
+      provider: 'xworkmate',
+      contextWindow: null,
+      maxOutputTokens: null,
+    ),
+  ];
   controller.upsertTaskThreadInternal(
     sessionKey,
     executionTarget: AssistantExecutionTarget.gateway,
@@ -5535,5 +5712,106 @@ class _NoopRuntimeDispatchResolver implements RuntimeDispatchResolver {
       }
     }
     return null;
+  }
+}
+
+class _TargetFixtureStore extends SecureConfigStore {
+  _TargetFixtureStore(String home, this.target)
+    : super(
+        secretRootPathResolver: () async => '$home/secrets',
+        appDataRootPathResolver: () async => '$home/app-data',
+        supportRootPathResolver: () async => '$home/support',
+        enableSecureStorage: false,
+      );
+  final AssistantExecutionTarget target;
+  @override
+  Future<SettingsSnapshot> loadSettingsSnapshot() async =>
+      (await super.loadSettingsSnapshot()).copyWith(
+        assistantExecutionTarget: target,
+      );
+}
+
+class _ProductGatewaySessionClient implements GatewayRuntimeSessionClient {
+  @override
+  Stream<GatewayRuntimeSessionUpdate> get updates => const Stream.empty();
+  @override
+  Future<GatewayRuntimeSessionConnectResult> connect(
+    GatewayRuntimeSessionConnectRequest request,
+  ) async => GatewayRuntimeSessionConnectResult(
+    snapshot: GatewayConnectionSnapshot.initial(mode: request.mode).copyWith(
+      status: RuntimeConnectionStatus.connected,
+      statusText: 'Connected',
+    ),
+    auth: const {},
+    returnedDeviceToken: '',
+    raw: const {},
+  );
+  @override
+  Future<void> disconnect({required String runtimeId}) async {}
+  @override
+  Future<void> dispose() async {}
+  @override
+  Future<dynamic> request({
+    required String runtimeId,
+    required String method,
+    Map<String, dynamic>? params,
+    Duration timeout = const Duration(seconds: 15),
+    bool allowErrorPayload = false,
+  }) async => {
+    'models': [
+      {'id': 'model-1', 'name': 'Central model', 'provider': 'xworkmate'},
+    ],
+    'agents': [],
+    'sessions': [],
+    'skills': [],
+    'messages': [],
+    'jobs': [],
+  };
+}
+
+/// A local Gateway fixture: no network, no disconnect log/auto-refresh races.
+/// Its catalog is remote-fixture data, not a production model preset.
+class _FixtureGatewayRuntime extends GatewayRuntime {
+  _FixtureGatewayRuntime(SecureConfigStore store)
+    : super(
+        store: store,
+        identityStore: DeviceIdentityStore(store),
+        sessionClient: _ProductGatewaySessionClient(),
+      ) {
+    snapshotInternal = snapshotInternal.copyWith(
+      status: RuntimeConnectionStatus.connected,
+      statusText: 'Connected',
+    );
+  }
+  static const catalog = <GatewayModelSummary>[
+    GatewayModelSummary(
+      id: 'model-1',
+      name: 'Central model',
+      provider: 'xworkmate',
+      contextWindow: null,
+      maxOutputTokens: null,
+    ),
+  ];
+  List<GatewaySkillSummary> Function()? skills;
+  @override
+  bool get isConnected => true;
+  @override
+  GatewayConnectionSnapshot get snapshot => super.snapshot.copyWith(
+    status: RuntimeConnectionStatus.connected,
+    statusText: 'Connected',
+  );
+  @override
+  Future<void> initialize() async {
+    await storeInternal.initialize();
+  }
+
+  @override
+  Future<List<GatewayModelSummary>> listModels() async => catalog;
+  @override
+  Future<List<GatewaySkillSummary>> listSkills({String? agentId}) async =>
+      skills?.call() ?? const [];
+  @override
+  Future<void> disconnect({bool clearDesiredProfile = true}) async {
+    // A fixture has no live connection or background reconnect to close.
   }
 }

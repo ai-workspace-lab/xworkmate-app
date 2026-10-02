@@ -20,7 +20,7 @@ Flutter-based AI workspace shell for running assistant threads with local and re
 
 ## Architecture
 
-Single execution path: **Flutter → GoTaskServiceClient → ACP Transport → xworkmate-bridge → Remote Provider**
+Single product execution path: **Flutter → GoTaskServiceClient → xworkmate-bridge → OpenClaw Gateway → Work/Code workers**
 
 See [docs/architecture/](./docs/architecture/) for the full architecture documentation.
 
@@ -89,3 +89,46 @@ curl -sfL https://install.svc.plus/xworkmate-app | bash -
 - [Core Integration Test Cases](./docs/cases/README.md)
 - [Cross-Repo Task State Workflow](./docs/architecture/cross-repo-task-state-workflow.md)
 - [CHANGELOG](./CHANGELOG.md)
+
+## Run Chat, Work, Code and Bot
+
+Keep the existing desktop layout and mobile shell. Choose Chat, Work or Code in
+the desktop **+** menu or mobile configuration sheet. New threads use Gateway.
+Connect the App to the managed Bridge endpoint with the account-managed secure
+credential; the Bridge routes to OpenClaw. The Gateway deployment must configure
+its central provider as `xworkmate`, expose that provider through `models.list`,
+with a central model. Only live `xworkmate/<model>` catalog entries
+are selectable for product execution. The App sends no provider credentials to
+workers. Every product turn and new Bot schedule explicitly sends one validated
+catalog ref. An empty catalog blocks submission and Bot creation; no unverified
+Gateway default or local model preset is used. Old Bot jobs retain their own
+configured models when paused or inspected.
+
+Work uses the Gateway's DSH ACP worker and Code uses the pinned OpenCode v2
+worker. Existing task progress, stop/recovery, file list and previews remain in
+place. `code.diff`/`.patch`, `tests.log` and JSON test reports are rendered as
+actual task artifacts. Exporting a report does not itself mean tests passed.
+Bot opens from the same menus and uses real server-side cron creation, pause,
+execution history and deletion. Notifications use configured Gateway channels
+with explicit recipients; native APNs/FCM push is not implemented here.
+
+For local verification, use the repository Flutter toolchain:
+
+```sh
+flutter pub get
+flutter analyze
+flutter test
+flutter build macos --debug
+flutter build apk --debug
+flutter build ios --debug --no-codesign
+flutter build ios --simulator --debug
+python3 test/scripts/android_release_signing_test.py
+```
+
+The iOS project includes a CocoaPods fallback for plugins that do not yet use
+Swift Package Manager. Its deployment target stays 15.5. Release APK/AAB builds
+require a complete upload-keystore contract; the release script and Gradle
+reject missing signing rather than emitting a debug-signed release. Use a debug
+APK for local checks. Apple signing, Play signing, privacy/review submissions
+and deployed worker/model integration are separate acceptance gates. This local
+implementation is not evidence of App Store or Google Play approval.

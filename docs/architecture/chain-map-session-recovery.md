@@ -348,3 +348,31 @@ resolveGatewayThreadConnectionState(thread)
 4. **R4: Polling parameters**: Hardcoded poll interval/retry values in `ExternalCodeAgentAcpDesktopTransport` need to align with bridge's task deadlines (10/30/60 min). If polling stops before deadline, app marks failed while task is still running.
 
 5. **R5: OpenClaw handle expiration**: The bridge's in-memory `OpenClawTaskRecord` is not authoritative after restart. The plugin's SessionEntry-backed agent_end record preserves known terminal states; runs that ended before this record was written still fall back to the bounded deadline path.
+
+## Product worker extension
+
+The product mode is stored on the App thread and captured per turn in
+`metadata.xworkmateProductCapability` (`schemaVersion: 1`, Chat/Work/Code).
+Bridge validates this contract, resolves the real OpenClaw session and passes
+`productCapability` to `xworkmate.session.prepare`. The Gateway tool host binds
+the current trusted session/run/tool-call context to that prepared artifact
+scope before running Work (DSH ACP) or Code (OpenCode v2). Neither the App nor
+model chooses a filesystem execution scope. Cancellation/recovery continues
+to use the existing mapped App/OpenClaw/run identity; mode changes affect
+subsequent turns and do not reclassify an active run.
+
+Code exports `code.diff` and `tests.log` into the current task artifact scope.
+The existing file list and text preview render these actual outputs; successful
+file export alone does not establish passing tests. Runtime progress and
+terminal state use the existing Gateway task event/snapshot contract.
+
+Explicit model selections are complete `xworkmate/<model>` refs from the live
+Gateway catalog. Other providers and offline/local preset lists are not offered
+for product Gateway execution. Empty catalog blocks product execution; a turn
+must capture an available central ref. `sessions.patch` must apply that model to the
+mapped Gateway session before `chat.send`; patch failure blocks submission.
+
+These changes have local contract/widget/build evidence only. Worker execution,
+remote cancellation, tenant isolation, artifacts and reconnect continuity still
+require deployed end-to-end acceptance. Scheduled Bot worker execution also
+requires a trusted hook to prepare its server-created cron session/run scope.

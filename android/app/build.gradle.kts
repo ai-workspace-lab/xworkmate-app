@@ -52,15 +52,26 @@ android {
 
     buildTypes {
         release {
-            signingConfig = if (keystorePropertiesFile.exists()) {
-                signingConfigs.getByName("release")
-            } else {
-                signingConfigs.getByName("debug")
-            }
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 }
 
 flutter {
     source = "../.."
+}
+
+// Debug is available locally. Store release artifacts require the upload key.
+gradle.taskGraph.whenReady {
+    val releaseArtifact = allTasks.any { it.project == project &&
+        it.name in setOf("assembleRelease", "bundleRelease", "packageRelease", "signReleaseBundle") }
+    if (releaseArtifact) {
+        val required = listOf("storeFile", "storePassword", "keyAlias", "keyPassword")
+        if (!keystorePropertiesFile.exists() || required.any { keystoreProperties.getProperty(it).isNullOrBlank() }) {
+            throw GradleException("Android release signing requires a complete android/key.properties upload-key contract.")
+        }
+        if (!file(keystoreProperties.getProperty("storeFile")).isFile) {
+            throw GradleException("Android release upload keystore is unavailable.")
+        }
+    }
 }

@@ -1,6 +1,7 @@
 // ignore_for_file: unused_import, unnecessary_import
 
 import 'dart:async';
+import 'assistant_bot_dialog.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
@@ -222,7 +223,6 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
     setState(() {});
   }
 
-
   Future<void> handlePasteShortcutInternal() async {
     if (handlingPasteShortcutInternal) {
       return;
@@ -412,12 +412,43 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
                     offset: const Offset(0, 48),
                     onSelected: (value) {
                       switch (value) {
+                        case 'chat':
+                        case 'work':
+                        case 'code':
+                          unawaited(
+                            widget.controller.setAssistantProductMode(
+                              AssistantModeContract.fromJsonValue(value),
+                            ),
+                          );
+                          break;
+                        case 'bot':
+                          unawaited(
+                            showAssistantBotDialog(context, widget.controller),
+                          );
+                          break;
                         case 'attach':
                           widget.onPickAttachments();
                           break;
                       }
                     },
                     itemBuilder: (context) => [
+                      for (final mode in AssistantMode.values)
+                        CheckedPopupMenuItem<String>(
+                          key: Key('assistant-product-mode-${mode.name}'),
+                          value: mode.name,
+                          checked:
+                              widget.controller.assistantProductModeForSession(
+                                widget.controller.currentSessionKey,
+                              ) ==
+                              mode,
+                          child: Text(mode.label),
+                        ),
+                      const PopupMenuItem<String>(
+                        key: Key('assistant-bot-menu-item'),
+                        value: 'bot',
+                        child: Text('Bot'),
+                      ),
+                      const PopupMenuDivider(),
                       const PopupMenuItem<String>(
                         value: 'attach',
                         child: ListTile(
@@ -460,44 +491,44 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
                         for (final plugin in BuiltinPluginCatalog.byGroup(
                           group,
                         ))
-                        PopupMenuItem<String>(
-                          key: Key(
-                            'assistant-builtin-plugin-item-${plugin.id}',
-                          ),
-                          value: plugin.id,
-                          child: Row(
-                            children: [
-                              BuiltinPluginIconTile(plugin: plugin),
-                              const SizedBox(width: 10),
-                              Text(
-                                plugin.name,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w600,
+                          PopupMenuItem<String>(
+                            key: Key(
+                              'assistant-builtin-plugin-item-${plugin.id}',
+                            ),
+                            value: plugin.id,
+                            child: Row(
+                              children: [
+                                BuiltinPluginIconTile(plugin: plugin),
+                                const SizedBox(width: 10),
+                                Text(
+                                  plugin.name,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  plugin.description,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: Theme.of(context).textTheme.bodySmall
-                                      ?.copyWith(color: palette.textMuted),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    plugin.description,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: Theme.of(context).textTheme.bodySmall
+                                        ?.copyWith(color: palette.textMuted),
+                                  ),
                                 ),
-                              ),
-                              if (selectedBuiltinPluginIdsInternal.contains(
-                                plugin.id,
-                              )) ...[
-                                const SizedBox(width: 6),
-                                Icon(
-                                  Icons.check_rounded,
-                                  size: 16,
-                                  color: palette.accent,
-                                ),
+                                if (selectedBuiltinPluginIdsInternal.contains(
+                                  plugin.id,
+                                )) ...[
+                                  const SizedBox(width: 6),
+                                  Icon(
+                                    Icons.check_rounded,
+                                    size: 16,
+                                    color: palette.accent,
+                                  ),
+                                ],
                               ],
-                            ],
+                            ),
                           ),
-                        ),
                       ],
                     ],
                     child: const ComposerIconButtonInternal(
@@ -513,7 +544,7 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
                       ? ComposerToolbarChipInternal(
                           key: const Key('assistant-model-button'),
                           icon: Icons.bolt_rounded,
-                          tooltip: modelTooltipInternal(widget.modelLabel),
+                          tooltip: appText('Gateway 模型目录不可用', 'Gateway model catalog unavailable'),
                           showChevron: false,
                           padding: const EdgeInsets.symmetric(
                             horizontal: 10,

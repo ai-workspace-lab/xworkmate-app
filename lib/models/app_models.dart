@@ -151,12 +151,27 @@ class StatusInfo {
 
 enum AppSidebarState { expanded, collapsed, hidden }
 
-enum AssistantMode { code, office }
+enum AssistantMode { chat, work, code }
 
 extension AssistantModeCopy on AssistantMode {
   String get label => switch (this) {
     AssistantMode.code => appText('代码开发', 'Code'),
-    AssistantMode.office => appText('日常办公', 'Office'),
+    AssistantMode.chat => appText('对话', 'Chat'),
+    AssistantMode.work => appText('工作', 'Work'),
+  };
+}
+
+extension AssistantModeContract on AssistantMode {
+  static AssistantMode fromJsonValue(String? value) =>
+      AssistantMode.values.firstWhere(
+        (mode) => mode.name == value,
+        orElse: () => AssistantMode.chat,
+      );
+
+  Map<String, dynamic> toTaskMetadata({String model = ''}) => <String, dynamic>{
+    'schemaVersion': 1,
+    'mode': name,
+    if (model.trim().isNotEmpty) 'model': model.trim(),
   };
 }
 
