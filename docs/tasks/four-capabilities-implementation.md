@@ -77,3 +77,15 @@ Final full-suite failure names and attribution: [final-full-failures.txt](four-c
 Changed paths are listed in [changed-paths.txt](four-capabilities-evidence/changed-paths.txt). Scope: product modes/metadata/default Gateway, central catalog, Bot popup/native cron contract, artifact text types, relevant tests, three chain maps/README, html pin, Android signing refusal and necessary iOS Pods wiring. No unrelated macOS/Linux/Windows generated change is included.
 
 Remaining gates: fix/accept old baseline failures in their owning tasks; deploy central catalog/provider and trusted worker/cron contracts; prove actual inference, scoped files/progress/cancel/recovery and notifications against the managed Bridge; verify mobile/desktop layouts with existing golden baselines; configure Apple/Play signing and complete privacy/export/review submission. This implementation is locally reviewable and built, not production/store accepted.
+
+
+## Home-Lab deployment follow-up (2026-10-03)
+
+CI source validation and verification passed; Linux, Windows and macOS matrix builds passed.
+Android release remains correctly blocked without an upload signing contract. The iOS
+unsigned CI branch exposed Bash 3.2 nounset behavior for an empty optional endpoint
+array. This path is repaired without altering signing policy; a real Bash 3.2 scripted
+build fixture first reproduced the failure, then passed both absent and supplied
+endpoint cases. CI is being rerun for the patched candidate; full layered baseline
+failures remain open. Remote runtime acceptance is recorded separately with the
+Home-Lab deployment report rather than being implied by App compilation.
