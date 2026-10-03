@@ -3,12 +3,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../app/app_controller.dart';
-import '../../app/ui_feature_manifest.dart';
+import '../../models/app_models.dart';
+import 'assistant_bot_dialog.dart';
 import '../../i18n/app_language.dart';
-import '../../runtime/runtime_models.dart';
 import '../../theme/app_palette.dart';
 import '../../theme/app_theme.dart';
-import 'assistant_page_composer_support.dart';
 
 class AssistantTaskDialogModeControlsInternal extends StatelessWidget {
   const AssistantTaskDialogModeControlsInternal({
@@ -20,181 +19,59 @@ class AssistantTaskDialogModeControlsInternal extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final uiFeatures = controller.featuresFor(
-      resolveUiFeaturePlatformFromContext(context),
-    );
-    final supportedExecutionTargets = controller
-        .visibleAssistantExecutionTargets(uiFeatures.availableExecutionTargets);
-    if (supportedExecutionTargets.isEmpty) {
-      return const SizedBox.shrink();
-    }
-    final currentExecutionTarget =
-        resolveAssistantExecutionTargetFromVisibleTargets(
-          supportedExecutionTargets,
-          currentTarget: controller.assistantExecutionTarget,
-        );
-    final executionTarget = collapseAssistantExecutionTargetForDisplay(
-      currentExecutionTarget,
-    );
-    final providerMenuProviders = controller.providerCatalogForExecutionTarget(
-      executionTarget,
-    );
-    final selectedProvider = controller.resolveProviderForExecutionTarget(
-      controller
-          .assistantProviderForSession(controller.currentSessionKey)
-          .providerId,
-      executionTarget: executionTarget,
-      defaultToCatalog: executionTarget.isGateway,
-    );
+    return _TaskDialogProductModeMenuButtonInternal(controller: controller);
+  }
+}
 
-    return Wrap(
-      spacing: 4,
-      runSpacing: 4,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      children: [
-        _TaskDialogExecutionTargetMenuButtonInternal(
-          controller: controller,
-          executionTarget: executionTarget,
-          supportedExecutionTargets: supportedExecutionTargets,
-        ),
-        _TaskDialogProviderMenuButtonInternal(
-          controller: controller,
-          selectedProvider: selectedProvider,
-          providers: providerMenuProviders,
-        ),
+class _TaskDialogProductModeMenuButtonInternal extends StatelessWidget {
+  const _TaskDialogProductModeMenuButtonInternal({required this.controller});
+  final AppController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    final mode = controller.assistantProductModeForSession(
+      controller.currentSessionKey,
+    );
+    // Retain the original mode chip footprint while removing route/provider choices.
+    final labelMetrics = TextPainter(
+      text: TextSpan(
+        text: 'Gateway',
+        style: Theme.of(context).textTheme.labelMedium,
+      ),
+      textDirection: Directionality.of(context),
+      textScaler: MediaQuery.textScalerOf(context),
+    )..layout();
+    return PopupMenuButton<AssistantMode>(
+      key: const Key('assistant-product-mode-button'),
+      tooltip: appText('任务模式', 'Task mode'),
+      onSelected: (value) => unawaited(_select(context, value)),
+      itemBuilder: (_) => [
+        for (final value in AssistantMode.values)
+          CheckedPopupMenuItem<AssistantMode>(
+            key: Key('assistant-product-mode-${value.name}'),
+            value: value,
+            checked: value == mode,
+            child: Text(value.label),
+          ),
       ],
-    );
-  }
-}
-
-class _TaskDialogExecutionTargetMenuButtonInternal extends StatelessWidget {
-  const _TaskDialogExecutionTargetMenuButtonInternal({
-    required this.controller,
-    required this.executionTarget,
-    required this.supportedExecutionTargets,
-  });
-
-  final AppController controller;
-  final AssistantExecutionTarget executionTarget;
-  final List<AssistantExecutionTarget> supportedExecutionTargets;
-
-  @override
-  Widget build(BuildContext context) {
-    final palette = context.palette;
-    final selectedLabel = executionTarget.label;
-
-    return PopupMenuButton<AssistantExecutionTarget>(
-      key: const Key('assistant-execution-target-button'),
-      tooltip: appText('任务对话模式', 'Task Dialog Mode'),
-      onSelected: (value) {
-        unawaited(_handleExecutionTargetSelected(value));
-      },
-      itemBuilder: (context) => supportedExecutionTargets
-          .map((value) {
-            return PopupMenuItem<AssistantExecutionTarget>(
-              value: value,
-              key: Key('assistant-execution-target-menu-item-${value.name}'),
-              child: Row(
-                children: [
-                  Icon(value.icon, size: 18),
-                  const SizedBox(width: 10),
-                  Expanded(child: Text(value.label)),
-                  if (value == executionTarget)
-                    const Icon(Icons.check_rounded, size: 18),
-                ],
-              ),
-            );
-          })
-          .toList(growable: false),
       child: _TaskDialogSelectorChipInternal(
-        leading: Icon(executionTarget.icon, size: 14, color: palette.textMuted),
-        label: selectedLabel,
-        tooltip: appText('任务对话模式', 'Task Dialog Mode'),
+        leading: Icon(
+          Icons.hub_outlined,
+          size: 14,
+          color: context.palette.textMuted,
+        ),
+        label: mode.label,
+        labelWidth: labelMetrics.width,
+        tooltip: appText('任务模式', 'Task mode'),
       ),
     );
   }
 
-  Future<void> _handleExecutionTargetSelected(
-    AssistantExecutionTarget value,
-  ) async {
-    final resolvedTarget = resolveAssistantExecutionTargetFromVisibleTargets(
-      supportedExecutionTargets,
-      currentTarget: value,
-    );
-    await controller.setAssistantExecutionTarget(resolvedTarget);
-  }
-}
-
-class _TaskDialogProviderMenuButtonInternal extends StatelessWidget {
-  const _TaskDialogProviderMenuButtonInternal({
-    required this.controller,
-    required this.selectedProvider,
-    required this.providers,
-  });
-
-  final AppController controller;
-  final SingleAgentProvider selectedProvider;
-  final List<SingleAgentProvider> providers;
-
-  @override
-  Widget build(BuildContext context) {
-    final isEnabled = providers.isNotEmpty;
-    final hasSelection = !selectedProvider.isUnspecified;
-    final label = hasSelection
-        ? selectedProvider.label
-        : appText('Provider', 'Provider');
-
-    return PopupMenuButton<SingleAgentProvider>(
-      key: const Key('assistant-provider-button'),
-      enabled: isEnabled,
-      tooltip: appText('智能体 Provider', 'Agent Provider'),
-      onSelected: (provider) {
-        unawaited(_handleProviderSelected(provider));
-      },
-      itemBuilder: (context) => providers
-          .map(
-            (provider) => PopupMenuItem<SingleAgentProvider>(
-              value: provider,
-              key: Key('assistant-provider-menu-item-${provider.providerId}'),
-              child: Row(
-                children: [
-                  SingleAgentProviderBadgeInternal(
-                    key: Key(
-                      'assistant-provider-menu-badge-${provider.providerId}',
-                    ),
-                    provider: provider,
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(child: Text(provider.label)),
-                  if (provider == selectedProvider)
-                    const Icon(Icons.check_rounded, size: 18),
-                ],
-              ),
-            ),
-          )
-          .toList(growable: false),
-      child: _TaskDialogSelectorChipInternal(
-        leading: hasSelection
-            ? SingleAgentProviderBadgeInternal(
-                key: const Key('assistant-provider-badge'),
-                provider: selectedProvider,
-              )
-            : Icon(
-                Icons.hub_outlined,
-                size: 14,
-                color: context.palette.textMuted,
-              ),
-        label: label,
-        tooltip: appText('智能体 Provider', 'Agent Provider'),
-      ),
-    );
-  }
-
-  Future<void> _handleProviderSelected(SingleAgentProvider provider) async {
-    if (providers.isEmpty) {
-      return;
+  Future<void> _select(BuildContext context, AssistantMode mode) async {
+    await controller.setAssistantProductMode(mode);
+    if (mode == AssistantMode.autoBot && context.mounted) {
+      await showAssistantBotDialog(context, controller);
     }
-    await controller.setAssistantProvider(provider);
   }
 }
 
@@ -203,11 +80,13 @@ class _TaskDialogSelectorChipInternal extends StatelessWidget {
     required this.leading,
     required this.label,
     required this.tooltip,
+    this.labelWidth,
   });
 
   final Widget leading;
   final String label;
   final String tooltip;
+  final double? labelWidth;
 
   @override
   Widget build(BuildContext context) {
@@ -231,7 +110,14 @@ class _TaskDialogSelectorChipInternal extends StatelessWidget {
           children: [
             leading,
             const SizedBox(width: 6),
-            Text(label, style: theme.textTheme.labelMedium),
+            SizedBox(
+              width: labelWidth,
+              child: Text(
+                label,
+                style: theme.textTheme.labelMedium,
+                maxLines: 1,
+              ),
+            ),
             const SizedBox(width: 2),
             Icon(
               Icons.keyboard_arrow_down_rounded,

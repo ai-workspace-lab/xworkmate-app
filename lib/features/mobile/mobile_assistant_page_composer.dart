@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../assistant/assistant_bot_dialog.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
@@ -6,6 +7,7 @@ import 'package:flutter/cupertino.dart';
 import '../../app/app_controller.dart';
 import '../../i18n/app_language.dart';
 import '../../runtime/runtime_models.dart';
+import '../../models/app_models.dart';
 import '../../theme/app_palette.dart';
 import '../../theme/app_theme.dart';
 import 'mobile_builtin_plugin_choice_chip.dart';
@@ -47,8 +49,6 @@ class MobileAssistantComposer extends StatelessWidget {
     required this.onPickAttachments,
     required this.onRemoveAttachment,
     required this.onThinkingChanged,
-    required this.onSetExecutionTarget,
-    required this.onSetProvider,
     required this.onComposerStateChanged,
     required this.onSend,
   });
@@ -62,22 +62,46 @@ class MobileAssistantComposer extends StatelessWidget {
   final VoidCallback onPickAttachments;
   final ValueChanged<ComposerAttachmentInternal> onRemoveAttachment;
   final ValueChanged<String> onThinkingChanged;
-  final Future<void> Function(AssistantExecutionTarget target)
-  onSetExecutionTarget;
-  final Future<void> Function(SingleAgentProvider provider) onSetProvider;
   final VoidCallback onComposerStateChanged;
   final VoidCallback onSend;
+
+  Future<void> showProductModes(BuildContext context) async {
+    final mode = await showModalBottomSheet<AssistantMode>(
+      context: context,
+      builder: (sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final mode in AssistantMode.values)
+              ListTile(
+                key: Key('mobile-assistant-product-mode-${mode.name}'),
+                title: Text(mode.label),
+                selected:
+                    controller.assistantProductModeForSession(
+                      controller.currentSessionKey,
+                    ) ==
+                    mode,
+                onTap: () => Navigator.pop(sheetContext, mode),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (mode == null) return;
+    await controller.setAssistantProductMode(mode);
+    onComposerStateChanged();
+    if (mode == AssistantMode.autoBot && context.mounted) {
+      await showAssistantBotDialog(
+        context,
+        controller,
+        initialPrompt: inputController.text.trim(),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
-    final target = controller.currentAssistantExecutionTarget;
-    final provider = controller.assistantProviderForSession(
-      controller.currentSessionKey,
-    );
-    final providerLabel = provider.isUnspecified
-        ? appText('Provider 未就绪', 'Provider unavailable')
-        : provider.label;
     final hasPendingRun =
         controller.hasAssistantPendingRun || controller.activeRunId != null;
     final selectedSkillKeys = controller
@@ -283,36 +307,17 @@ class MobileAssistantComposer extends StatelessWidget {
                             children: [
                               MobileAssistantActionChip(
                                 key: const Key(
-                                  'mobile-assistant-target-button',
-                                ),
-                                icon: target.isGateway
-                                    ? Icons.cloud_queue_rounded
-                                    : Icons.smart_toy_outlined,
-                                label: target.compactLabel,
-                                onTap: () {
-                                  Navigator.pop(sheetContext);
-                                  showMobileAssistantTargetSheet(
-                                    context,
-                                    controller: controller,
-                                    onSelected: onSetExecutionTarget,
-                                  );
-                                },
-                              ),
-                              MobileAssistantActionChip(
-                                key: const Key(
-                                  'mobile-assistant-provider-button',
+                                  'mobile-assistant-product-mode-button',
                                 ),
                                 icon: Icons.hub_outlined,
-                                label: providerLabel,
+                                label: controller
+                                    .assistantProductModeForSession(
+                                      controller.currentSessionKey,
+                                    )
+                                    .label,
                                 onTap: () {
                                   Navigator.pop(sheetContext);
-                                  showMobileAssistantProviderSheet(
-                                    context,
-                                    controller: controller,
-                                    target: target,
-                                    selectedProvider: provider,
-                                    onSelected: onSetProvider,
-                                  );
+                                  unawaited(showProductModes(context));
                                 },
                               ),
                               MobileAssistantActionChip(
@@ -363,8 +368,7 @@ class MobileAssistantComposer extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(height: 12),
-                          for (final group
-                              in BuiltinPluginCatalog.groups) ...[
+                          for (final group in BuiltinPluginCatalog.groups) ...[
                             Padding(
                               padding: const EdgeInsets.only(bottom: 6),
                               child: Text(
@@ -539,10 +543,7 @@ class MobileAssistantComposer extends StatelessWidget {
                                 return const SizedBox.shrink();
                               }
                               return Text(
-                                appText(
-                                  '询问 XWorkmate...',
-                                  'Ask XWorkmate...',
-                                ),
+                                appText('询问 XWorkmate...', 'Ask XWorkmate...'),
                                 textAlign: TextAlign.center,
                                 style: TextStyle(color: palette.textMuted),
                               );
@@ -555,7 +556,27 @@ class MobileAssistantComposer extends StatelessWidget {
                   const SizedBox(width: 8),
                   _MobileAssistantPrimaryActionButton(
                     isBusy: hasPendingRun,
-                    onSend: onSend,
+                    isAutoBot:
+                        controller.assistantProductModeForSession(
+                          controller.currentSessionKey,
+                        ) ==
+                        AssistantMode.autoBot,
+                    onSend: () {
+                      if (controller.assistantProductModeForSession(
+                            controller.currentSessionKey,
+                          ) ==
+                          AssistantMode.autoBot) {
+                        unawaited(
+                          showAssistantBotDialog(
+                            context,
+                            controller,
+                            initialPrompt: inputController.text.trim(),
+                          ),
+                        );
+                      } else {
+                        onSend();
+                      }
+                    },
                     onStop: () => unawaited(controller.abortRun()),
                   ),
                 ],
@@ -642,11 +663,13 @@ class MobileAssistantComposer extends StatelessWidget {
 class _MobileAssistantPrimaryActionButton extends StatelessWidget {
   const _MobileAssistantPrimaryActionButton({
     required this.isBusy,
+    this.isAutoBot = false,
     required this.onSend,
     required this.onStop,
   });
 
   final bool isBusy;
+  final bool isAutoBot;
   final VoidCallback onSend;
   final VoidCallback onStop;
 
@@ -668,6 +691,8 @@ class _MobileAssistantPrimaryActionButton extends StatelessWidget {
         ),
         tooltip: isBusy
             ? appText('停止运行', 'Stop run')
+            : isAutoBot
+            ? appText('管理 AutoBot', 'Manage AutoBot')
             : appText('提交任务', 'Submit task'),
         onPressed: isBusy ? onStop : onSend,
         style: IconButton.styleFrom(
@@ -684,7 +709,11 @@ class _MobileAssistantPrimaryActionButton extends StatelessWidget {
           padding: EdgeInsets.zero,
         ),
         icon: Icon(
-          isBusy ? Icons.stop_rounded : Icons.arrow_upward_rounded,
+          isBusy
+              ? Icons.stop_rounded
+              : isAutoBot
+              ? Icons.schedule_rounded
+              : Icons.arrow_upward_rounded,
           size: isBusy ? 20 : 22,
         ),
       ),

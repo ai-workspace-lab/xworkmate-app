@@ -211,17 +211,7 @@ extension AppControllerDesktopThreadSessions on AppController {
   AssistantExecutionTarget resolveAssistantExecutionTargetFromRecordsInternal(
     TaskThread? record,
   ) {
-    return resolveAssistantExecutionTargetFromRecordForTest(
-      record,
-      defaultExecutionTarget: pickDraftThreadExecutionTargetInternal(
-        currentTarget: sanitizePersistedExecutionTargetInternal(
-          settings.assistantExecutionTarget,
-        ),
-        visibleTargets: visibleAssistantExecutionTargets(
-          AssistantExecutionTarget.values,
-        ),
-      ),
-    );
+    return AssistantExecutionTarget.gateway;
   }
 
   TaskThread? taskThreadForSessionInternal(String sessionKey) {
@@ -296,6 +286,12 @@ extension AppControllerDesktopThreadSessions on AppController {
     final availableChoices = assistantModelChoicesForSessionInternal(
       normalizedSessionKey,
     );
+    if (assistantExecutionTargetForSession(normalizedSessionKey).isGateway) {
+      if (availableChoices.contains(recordModel)) return recordModel;
+      final configured = settings.defaultModel.trim();
+      if (availableChoices.contains(configured)) return configured;
+      return availableChoices.isEmpty ? '' : availableChoices.first;
+    }
     if (recordModel.isNotEmpty &&
         (availableChoices.isEmpty || availableChoices.contains(recordModel))) {
       return recordModel;
@@ -700,6 +696,12 @@ extension AppControllerDesktopThreadSessions on AppController {
     final trimmed = sessionKey.trim();
     return trimmed.isEmpty ? 'main' : trimmed;
   }
+
+  AssistantMode assistantProductModeForSession(String sessionKey) =>
+      taskThreadForSessionInternal(
+        normalizedAssistantSessionKeyInternal(sessionKey),
+      )?.contextState.productMode ??
+      AssistantMode.chat;
 
   AssistantExecutionTarget assistantExecutionTargetForSession(
     String sessionKey,
