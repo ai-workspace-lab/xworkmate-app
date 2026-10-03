@@ -6,14 +6,21 @@ import '../../runtime/central_gateway_catalog.dart';
 
 Future<void> showAssistantBotDialog(
   BuildContext context,
-  AppController controller,
-) => showDialog<void>(
+  AppController controller, {
+  String initialPrompt = '',
+}) => showDialog<void>(
   context: context,
-  builder: (_) => AssistantBotDialog(controller: controller),
+  builder: (_) =>
+      AssistantBotDialog(controller: controller, initialPrompt: initialPrompt),
 );
 
 class AssistantBotDialog extends StatefulWidget {
-  const AssistantBotDialog({super.key, required this.controller});
+  const AssistantBotDialog({
+    super.key,
+    required this.controller,
+    this.initialPrompt = '',
+  });
+  final String initialPrompt;
   final AppController controller;
   @override
   State<AssistantBotDialog> createState() => _AssistantBotDialogState();
@@ -41,6 +48,7 @@ class _AssistantBotDialogState extends State<AssistantBotDialog> {
   @override
   void initState() {
     super.initState();
+    prompt.text = widget.initialPrompt;
     if (connected) {
       refresh();
     }
@@ -112,7 +120,7 @@ class _AssistantBotDialogState extends State<AssistantBotDialog> {
     );
     return AlertDialog(
       key: const Key('assistant-bot-dialog'),
-      title: const Text('Bot'),
+      title: const Text('AutoBot'),
       content: SizedBox(
         width: 560,
         child: SingleChildScrollView(
@@ -120,7 +128,7 @@ class _AssistantBotDialogState extends State<AssistantBotDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (!connected) const Text('请先连接 AI Workspace Gateway。'),
+              if (!connected) const Text('请先连接 AI Workspace。'),
               if (notificationError != null) Text(notificationError!),
               if (error != null)
                 Text(error!, key: const Key('assistant-bot-error')),

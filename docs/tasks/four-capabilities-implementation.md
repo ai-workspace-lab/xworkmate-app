@@ -7,11 +7,11 @@ Original App checkout was not modified. This isolated candidate is submitted for
 
 ## Implemented closure
 
-- Chat / Work / Code are persisted product modes, independent of provider IDs. Existing desktop attachment menu and mobile configuration sheet expose them; existing composer/task/progress/file layout stays in place.
-- New and unspecified execution targets default to Gateway. Every product turn preserves `xworkmateTaskArtifactContract` and includes `metadata.xworkmateProductCapability={schemaVersion:1,mode,model}`. The App connects to managed Bridge; default execution is OpenClaw Gateway, Work DSH ACP and Code pinned OpenCode v2 on server workers.
+- Chat / Work / Coding / AutoBot are persisted product modes, independent of provider IDs. The original desktop Gateway chip and mobile configuration mode chip expose them; existing composer/task/progress/file layout stays in place.
+- All product execution targets are fixed to Gateway, including persisted legacy Agent records. Every product turn preserves `xworkmateTaskArtifactContract` and includes `metadata.xworkmateProductCapability={schemaVersion:1,mode,model}`. The App connects to managed Bridge; default execution is OpenClaw Gateway, Work DSH ACP and Coding pinned OpenCode v2 on server workers.
 - Only the connected remote catalog's `provider=xworkmate` entries become selectable full `xworkmate/<model>` refs. A saved selection is used only if still listed; otherwise a configured listed ref or the first listed central ref is used. An empty catalog fails before task binding/prepare and does not invoke an unverified Gateway default. No provider credentials or local model presets are sent to workers.
 - Actual model application is a Bridge responsibility: validate central ref, map local session key, successfully apply `sessions.patch {key,model}`, then submit. App fake transport tests validate metadata and zero submission when catalog is empty; they do not prove deployed model selection.
-- Bot popup uses authenticated runtime RPC: native `cron.add` interval/isolated agentTurn with explicit central `model`, `cron.update` enabled, `cron.runs`, confirmed `cron.remove`. Empty central catalog blocks creation. Pause/history/delete preserve existing job models. All post-mutation refreshes check controller errors and surface failures.
+- AutoBot popup uses authenticated runtime RPC: native `cron.add` interval/isolated agentTurn with explicit central `model`, `cron.update` enabled, `cron.runs`, confirmed `cron.remove`. Empty central catalog blocks creation. Pause/history/delete preserve existing job models. All post-mutation refreshes check controller errors and surface failures.
 - Notification choices are only currently configured, enabled Gateway channels with an explicit recipient. Default delivery is `none`. APNs/FCM push is not implemented.
 - Existing task progress, cancellation/recovery and artifacts are reused. `.diff`/`.patch` gain text previews; `tests.log` and JSON reports remain actual scoped artifacts. There is no new structured diff/test pane and a report does not imply a passing test result.
 
@@ -19,9 +19,9 @@ Original App checkout was not modified. This isolated candidate is submitted for
 
 The three chain maps in `docs/architecture/chain-map-{task-execution,artifact-lifecycle,session-recovery}.md` are updated in this change. Host session/run/tool-call IDs must bind the prepared task scope before workers can execute. Paths/attachments remain under the existing artifact contract; model output cannot choose run IDs or arbitrary filesystem roots. Worker export must actually produce scoped `code.diff`/`tests.log` before the App can display them.
 
-OpenClaw npm package `2026.5.28` native cron schema was inspected, not guessed. `cron.add` does not allow arbitrary metadata; scheduling is server-side. Isolated execution uses trusted native cron identity (`cron:<jobId>` and host run session), not an App-provided path. Work/Code scheduled workers require the plugin's trusted cron hook; this App change alone does not make scheduled worker execution available.
+OpenClaw npm package `2026.5.28` native cron schema was inspected, not guessed. `cron.add` does not allow arbitrary metadata; scheduling is server-side. Isolated execution uses trusted native cron identity (`cron:<jobId>` and host run session), not an App-provided path. Work/Coding scheduled workers require the plugin's trusted cron hook; this App change alone does not make scheduled worker execution available.
 
-The explicit low-level Agent transport remains only under the parent-requested migration scope; it is not the default product route. Owner: unified Gateway migration lane. Exit criterion: deployed Gateway Chat/Work/Code/Bot acceptance including cancel/artifacts/recovery. Removal is tied to that acceptance milestone; no production removal date is claimed here.
+The App product route is fixed to authenticated Bridge → OpenClaw Gateway; explicit Agent selection is rejected. Low-level runtime types remain for existing protocol/storage interpretation and isolated infrastructure code, and are not exposed as product execution choices. Product Coding persists `coding`, while the deployed Bridge/plugin schemaVersion 1 still transports `mode: "code"`. Owner: Bridge/plugin contract owners; exit criterion: define a new protocol version, deploy compatible consumers and verify a coordinated mixed-version rollout before changing the wire value. Only old persisted thread decoding maps `code` to Coding. AutoBot has no ordinary turn metadata and its controller guard rejects chat submission.
 
 ## Reproducible dependency and native packaging changes
 
@@ -89,3 +89,40 @@ build fixture first reproduced the failure, then passed both absent and supplied
 endpoint cases. CI is being rerun for the patched candidate; full layered baseline
 failures remain open. Remote runtime acceptance is recorded separately with the
 Home-Lab deployment report rather than being implied by App compilation.
+
+## Four-mode dialog correction (2026-10-03)
+
+The original Gateway chip position now selects Chat / Work / Coding / AutoBot.
+The label slot retains the old Gateway text width; Provider is removed.
+File attachment, plugin, model, thinking, permission, send and artifact controls
+retain their existing arrangement; removing Provider closes its former chip slot. Four modes no longer appear in the attachment
+menu. Mobile replaces its former target chip with the same mode choices.
+AutoBot selection opens native cron management; Manage copies text into the
+manager without clearing the draft or reading/uploading attachments. A direct
+controller send in AutoBot mode fails before prepare/submission.
+
+Tests cover the four labels, persistence and old `code` migration, v1 wire name,
+central-model propagation, fixed Gateway route, rejection of Agent selection,
+AutoBot draft retention/no chat callback, absence of Provider/route controls,
+mode-chip geometry, and an in-memory pixel comparison of the unchanged input field with focus/caret settled. The
+actual widget menu render is `/tmp/xworkmate-four-modes-widget-render.png`; it is
+an English test rendering with locally loaded system and Material/Cupertino icon
+fonts, not a device/live-service screenshot. Existing recorded golden baselines were not refreshed.
+
+The composer no longer exposes a Provider chip, disabled provider placeholder,
+Gateway/Agent route selector or supplier menu on desktop/mobile. Obsolete mobile
+target/provider sheets, callbacks and the unused desktop provider badge are
+removed. Existing central model settings/catalog selection stays available;
+Provider routing is not a model selector. Plugin, permission and provisioning
+controls are outside this cleanup and remain available.
+
+Latest validation after removing Provider: `flutter analyze --no-pub` has no
+issues; 31 nearest tests plus 2 mobile configuration tests pass. The frozen full
+suite finishes at **590 passed / 23 failed** (148.370s); all failed names exactly
+match the prior 23-name baseline, with **zero additional failures**. Commands,
+limits and names are in [four-modes-accepted-tests.txt](four-capabilities-evidence/four-modes-accepted-tests.txt).
+The real control rendering is [four-modes-widget-render.png](four-capabilities-evidence/four-modes-widget-render.png).
+Final macOS/Android candidate packages are built from the committed source with
+an explicit source commit and Store policy flag; their separate delivery manifest
+records exact hashes. The previous unsigned iOS package is not rebuilt for this
+latest dialog and must not be described as containing these changes.

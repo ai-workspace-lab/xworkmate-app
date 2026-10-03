@@ -299,12 +299,13 @@ etc.), not by extending the task execution lifecycle.
 7. **F7: SSE stream interruption** — Recovery polling must align with bridge task deadlines and must apply terminal snapshots immediately
 8. **F8: chat.send is not a detached task** — agent_end state must remain queryable by runId even when the native task registry has no record
 
-## Product capabilities (Chat / Work / Code / Bot)
+## Product capabilities (Chat / Work / Coding / AutoBot)
 
-Chat, Work and Code are product modes stored in `ThreadContextState.productMode`.
-New threads and persisted values without a target select Gateway. Selecting a
-product mode routes through Bridge to the canonical OpenClaw Gateway. The
-existing desktop attachment popup and mobile configuration sheet expose modes;
+Chat, Work, Coding and AutoBot are product modes stored in `ThreadContextState.productMode`.
+All product tasks use App → authenticated Bridge → canonical OpenClaw Gateway,
+including threads with a persisted legacy Agent binding. The original desktop
+Gateway chip position now selects the four product modes; the mobile configuration
+mode chip opens the same four choices. There is no selectable product transport;
 the main composer, task progress and artifact layout are unchanged.
 
 Each turn adds `metadata.xworkmateProductCapability = {schemaVersion: 1,
@@ -312,16 +313,37 @@ mode: "chat" | "work" | "code", model?: <central-catalog selection>}` while
 preserving `xworkmateTaskArtifactContract`. Bridge maps the App thread key to
 an OpenClaw session before applying a catalog model. Metadata alone does not
 prove the Gateway session model changed; Bridge must successfully patch the
-mapped Gateway session model before submission. Work and Code execution is
+mapped Gateway session model before submission. Work and Coding execution is
 server-side through Gateway workers; the App ships no downloaded runtime.
 Although the low-level metadata schema allows an omitted model, App product
 submission requires a ref from the currently connected remote `xworkmate`
 catalog and fails before prepare when the catalog is empty. It never delegates
 model choice to an unverified Gateway default.
 
-Bot uses the authenticated Bridge runtime RPC for OpenClaw 2026.5.28
+AutoBot uses the authenticated Bridge runtime RPC for OpenClaw 2026.5.28
 `cron.add` (isolated `agentTurn` with a validated central `model`, `every` schedule), `cron.update`
 (`patch.enabled`), `cron.runs` and `cron.remove`. Notification delivery defaults
 to `none`; `announce` is offered only for configured, enabled Gateway channels
 and an explicit recipient. These are Gateway delivery records, not APNs/FCM
 push. A missing/unauthorized method is shown as an error, never local success.
+
+### Product name and transport ownership
+
+`ThreadContextState.productMode` persists `coding` and `autoBot`. Only decoding
+old persisted thread data maps `code` to Coding. The deployed schemaVersion 1
+Bridge/plugin contract still transports Coding as `mode: "code"`; this is one
+route with a wire-name mapping, not a second product mode. The Bridge/plugin
+contract owners must define a new schema version, deploy compatible consumers,
+and verify mixed-version rollout before changing that value. No calendar date
+or automatic migration is assumed.
+
+AutoBot selection opens native scheduled-task management. Composer management
+copies the draft into its prompt field and retains the original draft and
+attachments; it never calls chat.send/session.start. The controller rejects
+ordinary turns on AutoBot threads before binding, prepare or task submission.
+Its native cron methods continue through the authenticated Bridge runtime RPC.
+
+The desktop/mobile composer has no Provider or Gateway/Agent route choice.
+OpenClaw is the fixed execution provider behind Bridge. Central model selection
+remains in existing settings/catalog controls; removing Provider does not remove
+model configuration or introduce a direct vendor/OAuth route.

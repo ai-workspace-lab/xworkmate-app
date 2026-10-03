@@ -18,6 +18,7 @@ import '../../models/app_models.dart';
 import '../../runtime/runtime_models.dart';
 import '../../theme/app_palette.dart';
 import 'mobile_assistant_page_composer.dart';
+import '../assistant/assistant_bot_dialog.dart';
 import 'mobile_assistant_page_conversation.dart';
 
 class MobileAssistantDetailPage extends StatefulWidget {
@@ -136,6 +137,17 @@ class _MobileAssistantDetailPageState extends State<MobileAssistantDetailPage> {
   }
 
   Future<void> sendCurrentPrompt() async {
+    if (widget.controller.assistantProductModeForSession(
+          widget.controller.currentSessionKey,
+        ) ==
+        AssistantMode.autoBot) {
+      await showAssistantBotDialog(
+        context,
+        widget.controller,
+        initialPrompt: inputController.text.trim(),
+      );
+      return;
+    }
     final text = inputController.text.trim();
     if (text.isEmpty && _attachments.isEmpty) {
       inputFocusNode.requestFocus();
@@ -166,36 +178,6 @@ class _MobileAssistantDetailPageState extends State<MobileAssistantDetailPage> {
         return;
       }
       HapticFeedback.heavyImpact();
-      ScaffoldMessenger.maybeOf(
-        context,
-      )?.showSnackBar(SnackBar(content: Text(error.toString())));
-    }
-  }
-
-  Future<void> setExecutionTarget(AssistantExecutionTarget target) async {
-    HapticFeedback.selectionClick();
-    try {
-      await widget.controller.ensureActiveAssistantThreadInternal();
-      await widget.controller.setAssistantExecutionTarget(target);
-    } catch (error) {
-      if (!mounted) {
-        return;
-      }
-      ScaffoldMessenger.maybeOf(
-        context,
-      )?.showSnackBar(SnackBar(content: Text(error.toString())));
-    }
-  }
-
-  Future<void> setProvider(SingleAgentProvider provider) async {
-    HapticFeedback.selectionClick();
-    try {
-      await widget.controller.ensureActiveAssistantThreadInternal();
-      await widget.controller.setAssistantProvider(provider);
-    } catch (error) {
-      if (!mounted) {
-        return;
-      }
       ScaffoldMessenger.maybeOf(
         context,
       )?.showSnackBar(SnackBar(content: Text(error.toString())));
@@ -342,7 +324,9 @@ class _MobileAssistantDetailPageState extends State<MobileAssistantDetailPage> {
                         ? _MobileTaskWorkspaceReference(
                             workspaceReference: taskWorkspaceReference,
                             onCopy: () => unawaited(
-                              copyTaskWorkspaceReference(taskWorkspaceReference),
+                              copyTaskWorkspaceReference(
+                                taskWorkspaceReference,
+                              ),
                             ),
                           )
                         : null,
@@ -382,8 +366,6 @@ class _MobileAssistantDetailPageState extends State<MobileAssistantDetailPage> {
                               thinking = value;
                             });
                           },
-                          onSetExecutionTarget: setExecutionTarget,
-                          onSetProvider: setProvider,
                           onComposerStateChanged: () {
                             if (mounted) {
                               setState(() {});
@@ -840,15 +822,15 @@ class MobileBridgeHeroStatus extends StatelessWidget {
                   detail!,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodyMedium?.copyWith(color: palette.textSecondary),
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: palette.textSecondary,
+                  ),
                 ),
               ],
               if (extraWidget != null) ...[
                 const SizedBox(height: 6),
                 extraWidget!,
-              ]
+              ],
             ],
           ),
         ),

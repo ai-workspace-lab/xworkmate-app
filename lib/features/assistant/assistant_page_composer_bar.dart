@@ -340,12 +340,27 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
 
   /// A draft is sendable when it has non-whitespace text (or an attachment) and
   /// nothing is already running.
+  bool get isAutoBotInternal =>
+      widget.controller.assistantProductModeForSession(
+        widget.controller.currentSessionKey,
+      ) ==
+      AssistantMode.autoBot;
+
   bool get canSendInternal =>
       !runInFlightInternal &&
-      (widget.inputController.text.trim().isNotEmpty ||
+      (isAutoBotInternal ||
+          widget.inputController.text.trim().isNotEmpty ||
           widget.attachments.isNotEmpty);
 
   Future<void> handleSendInternal() async {
+    if (isAutoBotInternal) {
+      await showAssistantBotDialog(
+        context,
+        widget.controller,
+        initialPrompt: widget.inputController.text.trim(),
+      );
+      return;
+    }
     applySelectedBuiltinPluginsToInputInternal();
     await widget.onSend();
   }
@@ -374,6 +389,8 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
         .toList(growable: false);
     final submitLabel = runInFlightInternal
         ? appText('运行中', 'Running')
+        : isAutoBotInternal
+        ? appText('管理', 'Manage')
         : appText('提交', 'Submit');
     // The tooltip carries the key hint, and when the button is disabled, the
     // reason — a dead control with no explanation is worse than none.
@@ -382,6 +399,8 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
             '任务运行中，可在上方进度条停止。',
             'Task running — stop it from the progress bar above.',
           )
+        : isAutoBotInternal
+        ? appText('管理 AutoBot', 'Manage AutoBot')
         : canSendInternal
         ? appText('提交（Enter）', 'Submit (Enter)')
         : appText('先输入内容或添加附件', 'Type something or add an attachment first');
@@ -412,43 +431,12 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
                     offset: const Offset(0, 48),
                     onSelected: (value) {
                       switch (value) {
-                        case 'chat':
-                        case 'work':
-                        case 'code':
-                          unawaited(
-                            widget.controller.setAssistantProductMode(
-                              AssistantModeContract.fromJsonValue(value),
-                            ),
-                          );
-                          break;
-                        case 'bot':
-                          unawaited(
-                            showAssistantBotDialog(context, widget.controller),
-                          );
-                          break;
                         case 'attach':
                           widget.onPickAttachments();
                           break;
                       }
                     },
                     itemBuilder: (context) => [
-                      for (final mode in AssistantMode.values)
-                        CheckedPopupMenuItem<String>(
-                          key: Key('assistant-product-mode-${mode.name}'),
-                          value: mode.name,
-                          checked:
-                              widget.controller.assistantProductModeForSession(
-                                widget.controller.currentSessionKey,
-                              ) ==
-                              mode,
-                          child: Text(mode.label),
-                        ),
-                      const PopupMenuItem<String>(
-                        key: Key('assistant-bot-menu-item'),
-                        value: 'bot',
-                        child: Text('Bot'),
-                      ),
-                      const PopupMenuDivider(),
                       const PopupMenuItem<String>(
                         value: 'attach',
                         child: ListTile(
@@ -544,7 +532,10 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
                       ? ComposerToolbarChipInternal(
                           key: const Key('assistant-model-button'),
                           icon: Icons.bolt_rounded,
-                          tooltip: appText('Gateway 模型目录不可用', 'Gateway model catalog unavailable'),
+                          tooltip: appText(
+                            '中央模型目录不可用',
+                            'Central model catalog unavailable',
+                          ),
                           showChevron: false,
                           padding: const EdgeInsets.symmetric(
                             horizontal: 10,

@@ -3,99 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../app/app_controller.dart';
-import '../../app/ui_feature_manifest.dart';
 import '../../i18n/app_language.dart';
 import '../../runtime/runtime_models.dart';
-
-Future<void> showMobileAssistantTargetSheet(
-  BuildContext context, {
-  required AppController controller,
-  required Future<void> Function(AssistantExecutionTarget target) onSelected,
-}) {
-  final features = controller.featuresFor(UiFeaturePlatform.mobile);
-  final targets = controller.visibleAssistantExecutionTargets(
-    features.availableExecutionTargets,
-  );
-  final current = controller.currentAssistantExecutionTarget;
-  return showMobileAssistantSheet(
-    context,
-    title: appText('运行目标', 'Execution Target'),
-    children: targets
-        .map(
-          (target) => ListTile(
-            key: Key('mobile-assistant-target-item-${target.name}'),
-            leading: Icon(
-              target.isGateway
-                  ? Icons.cloud_queue_rounded
-                  : Icons.smart_toy_outlined,
-            ),
-            title: Text(target.label),
-            trailing: target == current
-                ? const Icon(Icons.check_rounded)
-                : null,
-            onTap: () {
-              Navigator.of(context).pop();
-              unawaited(onSelected(target));
-            },
-          ),
-        )
-        .toList(growable: false),
-  );
-}
-
-Future<void> showMobileAssistantProviderSheet(
-  BuildContext context, {
-  required AppController controller,
-  required AssistantExecutionTarget target,
-  required SingleAgentProvider selectedProvider,
-  required Future<void> Function(SingleAgentProvider provider) onSelected,
-}) {
-  final providers = controller.providerCatalogForExecutionTarget(target);
-  return showMobileAssistantSheet(
-    context,
-    title: appText('Provider', 'Provider'),
-    children: providers.isEmpty
-        ? [
-            Padding(
-              key: const Key('mobile-assistant-provider-empty-state'),
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
-              child: Text(
-                appText(
-                  'Bridge 尚未提供可用 Provider。不会自动伪造默认 Provider。',
-                  'Bridge has not provided any provider. No default provider is fabricated.',
-                ),
-              ),
-            ),
-          ]
-        : providers
-              .map(
-                (provider) => ListTile(
-                  key: Key(
-                    'mobile-assistant-provider-item-${provider.providerId}',
-                  ),
-                  leading: CircleAvatar(
-                    radius: 14,
-                    child: Text(mobileProviderBadgeLabel(provider)),
-                  ),
-                  title: Text(provider.label),
-                  subtitle: provider.unavailableReason.trim().isEmpty
-                      ? null
-                      : Text(provider.unavailableReason),
-                  enabled: provider.enabled,
-                  trailing: provider == selectedProvider
-                      ? const Icon(Icons.check_rounded)
-                      : null,
-                  onTap: provider.enabled
-                      ? () {
-                          Navigator.of(context).pop();
-                          unawaited(onSelected(provider));
-                        }
-                      : null,
-                ),
-              )
-              .toList(growable: false),
-  );
-}
 
 Future<void> showMobileAssistantPermissionSheet(
   BuildContext context, {
@@ -208,13 +117,4 @@ IconData mobilePermissionIcon(AssistantPermissionLevel level) {
     AssistantPermissionLevel.defaultAccess => Icons.verified_user_outlined,
     AssistantPermissionLevel.fullAccess => Icons.error_outline_rounded,
   };
-}
-
-String mobileProviderBadgeLabel(SingleAgentProvider provider) {
-  final badge = provider.badge.trim();
-  if (badge.isNotEmpty) {
-    return badge;
-  }
-  final label = provider.label.trim();
-  return label.isEmpty ? '?' : label.characters.first;
 }

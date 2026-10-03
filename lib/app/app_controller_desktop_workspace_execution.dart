@@ -54,7 +54,10 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
   Future<void> setAssistantExecutionTarget(
     AssistantExecutionTarget target,
   ) async {
-    final resolvedTarget = sanitizePersistedExecutionTargetInternal(target);
+    if (target != AssistantExecutionTarget.gateway) {
+      throw StateError('App tasks require the managed Bridge Gateway route.');
+    }
+    final resolvedTarget = AssistantExecutionTarget.gateway;
     final currentTarget = assistantExecutionTargetForSession(
       sessionsControllerInternal.currentSessionKey,
     );

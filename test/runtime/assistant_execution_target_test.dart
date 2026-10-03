@@ -42,7 +42,7 @@ const String _sandboxBridgeServerUrl = 'https://bridge.invalid';
 void main() {
   group('AssistantExecutionTarget', () {
     test(
-      'Chat Work Code capture product semantics and central model through Gateway',
+      'Chat Work Coding capture product semantics and central model through Gateway',
       () async {
         final client = _RecordingGoTaskServiceClient();
         final home = await Directory.systemTemp.createTemp(
@@ -76,7 +76,11 @@ void main() {
           controller.dispose();
         });
         await controller.assistantThreadsRestoredInternal.future;
-        for (final mode in AssistantMode.values) {
+        for (final mode in [
+          AssistantMode.chat,
+          AssistantMode.work,
+          AssistantMode.coding,
+        ]) {
           final key = 'unit-product-${mode.name}';
           await _selectGatewaySession(controller, key);
           controller.runtimeInternal.snapshotInternal = controller
@@ -121,13 +125,30 @@ void main() {
           expect(request.target, AssistantExecutionTarget.gateway);
           expect(request.metadata['xworkmateProductCapability'], {
             'schemaVersion': 1,
-            'mode': mode.name,
+            'mode': mode == AssistantMode.coding ? 'code' : mode.name,
             'model': 'xworkmate/model-1',
           });
           expect(request.metadata, contains('xworkmateTaskArtifactContract'));
           expect(request.toExternalAcpParams(), isNot(contains('provider')));
           expect(request.toExternalAcpParams(), isNot(contains('model')));
         }
+        await controller.setAssistantProductMode(AssistantMode.autoBot);
+        final before = client.requests.length;
+        await expectLater(
+          controller.sendChatMessage('must not send'),
+          throwsStateError,
+        );
+        expect(client.requests.length, before);
+        await expectLater(
+          controller.setAssistantExecutionTarget(
+            AssistantExecutionTarget.agent,
+          ),
+          throwsStateError,
+        );
+        expect(
+          controller.currentAssistantExecutionTarget,
+          AssistantExecutionTarget.gateway,
+        );
       },
     );
 
@@ -1065,7 +1086,7 @@ void main() {
     );
 
     test(
-      'does not refresh agent provider catalog when agent mode is selected with an empty catalog',
+      'rejects legacy Agent selection without refreshing its provider catalog',
       () async {
         final capture = await _startFailingCapabilityServer();
         addTearDown(capture.close);
@@ -1130,8 +1151,11 @@ void main() {
 
         expect(controller.assistantProviderCatalog, isEmpty);
 
-        await controller.setAssistantExecutionTarget(
-          AssistantExecutionTarget.agent,
+        await expectLater(
+          controller.setAssistantExecutionTarget(
+            AssistantExecutionTarget.agent,
+          ),
+          throwsStateError,
         );
         await _settleBridgeRequests(capture);
 
@@ -1212,7 +1236,7 @@ void main() {
     );
 
     test(
-      'sendChatMessage surfaces managed bridge auth failure before agent provider dispatch',
+      'sendChatMessage surfaces managed bridge auth failure before Gateway dispatch',
       () async {
         final capture = await _startUnauthorizedCapabilityServer();
         addTearDown(capture.close);
@@ -1272,7 +1296,7 @@ void main() {
             'BRIDGE_AUTH_TOKEN': 'bridge-token',
           },
           initialAvailableExecutionTargets: const <AssistantExecutionTarget>[
-            AssistantExecutionTarget.agent,
+            AssistantExecutionTarget.gateway,
             AssistantExecutionTarget.gateway,
           ],
         );
@@ -1304,7 +1328,7 @@ void main() {
           'unit-fixture-task-a',
         );
         await controller.setAssistantExecutionTarget(
-          AssistantExecutionTarget.agent,
+          AssistantExecutionTarget.gateway,
         );
         await Future<void>.delayed(const Duration(milliseconds: 200));
         controller.bridgeCapabilitiesRefreshAttemptedInternal = true;
@@ -1443,6 +1467,7 @@ void main() {
       await controller.sessionsController.switchSession('unit-fixture-task-a');
 
       await controller.sendChatMessage('first turn');
+      await _waitForTaskSettled(controller, controller.currentSessionKey);
 
       expect(fakeGoTaskService.requests, hasLength(1));
       final request = fakeGoTaskService.requests.single;
@@ -1758,6 +1783,7 @@ void main() {
             ),
           ],
         );
+        await _waitForTaskSettled(controller, controller.currentSessionKey);
 
         final request = fakeGoTaskService.requests.single;
         expect(request.inlineAttachments, hasLength(1));
@@ -1848,13 +1874,14 @@ void main() {
         addTearDown(() async {
           await _resilientDelete(localWorkspace);
         });
+        late final AppController controller;
         final fakeGoTaskService = _RecordingGoTaskServiceClient()
           ..onExecuteTask = ((request) async {
             await Directory(
-              '${request.workingDirectory}/assets/images',
+              '${controller.assistantWorkspacePathForSession(request.sessionId)}/assets/images',
             ).create(recursive: true);
             await File(
-              '${request.workingDirectory}/assets/images/final.v2.png',
+              '${controller.assistantWorkspacePathForSession(request.sessionId)}/assets/images/final.v2.png',
             ).writeAsBytes(<int>[1, 2, 3, 4]);
           })
           ..updatesBeforeNextOutcome.add(
@@ -1888,7 +1915,7 @@ void main() {
               route: GoTaskServiceRoute.externalAcpSingle,
             ),
           );
-        final controller = _connectedController(
+        controller = _connectedController(
           fakeGoTaskService,
           homeDir: localWorkspace.path,
         );
@@ -1899,6 +1926,7 @@ void main() {
         );
 
         await controller.sendChatMessage('first turn');
+        await _waitForTaskSettled(controller, controller.currentSessionKey);
 
         expect(fakeGoTaskService.requests, hasLength(1));
         expect(fakeGoTaskService.requests.single.resumeSession, isFalse);
@@ -1931,6 +1959,7 @@ void main() {
         );
 
         await controller.sendChatMessage('follow up');
+        await _waitForTaskSettled(controller, controller.currentSessionKey);
 
         expect(fakeGoTaskService.requests, hasLength(2));
         expect(fakeGoTaskService.requests.last.resumeSession, isTrue);
@@ -1989,6 +2018,7 @@ void main() {
         );
 
         await controller.sendChatMessage('first turn');
+        await _waitForTaskSettled(controller, controller.currentSessionKey);
 
         expect(fakeGoTaskService.requests, hasLength(1));
         expect(fakeGoTaskService.requests.single.resumeSession, isFalse);
@@ -2008,6 +2038,7 @@ void main() {
         );
 
         await controller.sendChatMessage('retry after unconfirmed connect');
+        await _waitForTaskSettled(controller, controller.currentSessionKey);
 
         expect(fakeGoTaskService.requests, hasLength(2));
         expect(fakeGoTaskService.requests.last.resumeSession, isFalse);
@@ -2056,6 +2087,7 @@ void main() {
         );
 
         await controller.sendChatMessage('first turn');
+        await _waitForTaskSettled(controller, controller.currentSessionKey);
 
         expect(fakeGoTaskService.requests, hasLength(1));
         expect(fakeGoTaskService.requests.single.resumeSession, isFalse);
@@ -2067,6 +2099,7 @@ void main() {
         expect(failedThread?.lastArtifactSyncStatus, 'failed');
 
         await controller.sendChatMessage('retry after auth recovery');
+        await _waitForTaskSettled(controller, controller.currentSessionKey);
 
         expect(fakeGoTaskService.requests, hasLength(2));
         expect(fakeGoTaskService.requests.last.resumeSession, isFalse);
@@ -2115,6 +2148,7 @@ void main() {
         );
 
         await controller.sendChatMessage('first turn');
+        await _waitForTaskSettled(controller, controller.currentSessionKey);
 
         expect(fakeGoTaskService.requests, hasLength(1));
         expect(fakeGoTaskService.requests.single.resumeSession, isFalse);
@@ -2128,6 +2162,7 @@ void main() {
         expect(failedThread?.lastArtifactSyncStatus, 'failed');
 
         await controller.sendChatMessage('retry final artifact');
+        await _waitForTaskSettled(controller, controller.currentSessionKey);
 
         expect(fakeGoTaskService.requests, hasLength(2));
         expect(fakeGoTaskService.requests.last.resumeSession, isFalse);
@@ -2190,6 +2225,7 @@ void main() {
         );
 
         await controller.sendChatMessage('first turn');
+        await _waitForTaskSettled(controller, controller.currentSessionKey);
 
         expect(fakeGoTaskService.requests, hasLength(1));
         expect(fakeGoTaskService.requests.single.resumeSession, isFalse);
@@ -2212,6 +2248,7 @@ void main() {
         );
 
         await controller.sendChatMessage('follow up');
+        await _waitForTaskSettled(controller, controller.currentSessionKey);
 
         expect(fakeGoTaskService.requests, hasLength(2));
         expect(fakeGoTaskService.requests.last.resumeSession, isFalse);
@@ -2346,6 +2383,7 @@ void main() {
         ),
       );
       await taskBFuture;
+      await _waitForTaskSettled(controller, 'task-b');
       expect(controller.assistantSessionHasPendingRun('task-a'), isTrue);
       expect(controller.assistantSessionHasPendingRun('task-b'), isFalse);
       expect(
@@ -2374,6 +2412,7 @@ void main() {
         ),
       );
       await taskAFuture;
+      await _waitForTaskSettled(controller, 'task-a');
       expect(controller.assistantSessionHasPendingRun('task-a'), isFalse);
       expect(
         controller.localSessionMessagesInternal['task-a']!.map(
@@ -2418,6 +2457,7 @@ void main() {
         ),
       );
       await taskFuture;
+      await _waitForTaskSettled(controller, 'same-prompt-new-task');
 
       expect(
         controller.localSessionMessagesInternal['same-prompt-new-task']!.map(
@@ -2487,6 +2527,7 @@ void main() {
           ),
         );
         await secondFuture;
+        await _waitForTaskSettled(controller, 'running-task');
 
         expect(
           controller.localSessionMessagesInternal['running-task']!.map(
@@ -2550,6 +2591,7 @@ void main() {
           ),
         );
         await taskAFuture;
+        await _waitForTaskSettled(controller, sessionA);
 
         expect(controller.currentSessionKey, sessionB);
         expect(
@@ -2606,6 +2648,7 @@ void main() {
           ),
         );
         await taskBFuture;
+        await _waitForTaskSettled(controller, sessionB);
 
         expect(controller.currentSessionKey, sessionB);
         expect(
@@ -2725,6 +2768,7 @@ void main() {
           ),
         );
         await taskAFuture;
+        await _waitForTaskSettled(controller, sessionA);
 
         fakeGoTaskService.complete(
           sessionB,
@@ -2749,6 +2793,7 @@ void main() {
           ),
         );
         await taskBFuture;
+        await _waitForTaskSettled(controller, sessionB);
 
         final taskAWorkspace = controller.assistantWorkspacePathForSession(
           sessionA,
@@ -2855,6 +2900,7 @@ void main() {
           ),
         );
         await taskAFuture;
+        await _waitForTaskSettled(controller, sessionA);
 
         await controller.switchSession(sessionB);
         final taskBFuture = controller.sendChatMessage(prompt);
@@ -2872,6 +2918,7 @@ void main() {
           ),
         );
         await taskBFuture;
+        await _waitForTaskSettled(controller, sessionB);
 
         final taskBThread = controller.requireTaskThreadForSessionInternal(
           sessionB,
@@ -2931,6 +2978,7 @@ void main() {
           ),
         );
         await taskFuture;
+        await _waitForTaskSettled(controller, 'artifact-only-task');
 
         final workspacePath = controller.assistantWorkspacePathForSession(
           'artifact-only-task',
@@ -2997,6 +3045,7 @@ void main() {
           ),
         );
         await firstFuture;
+        await _waitForTaskSettled(controller, 'terminal-failure-task');
 
         final secondFuture = controller.sendChatMessage('second run fails');
         await fakeGoTaskService.waitForRequestCount(2);
@@ -3013,6 +3062,7 @@ void main() {
           ),
         );
         await secondFuture;
+        await _waitForTaskSettled(controller, 'terminal-failure-task');
 
         final thread = controller.requireTaskThreadForSessionInternal(
           'terminal-failure-task',
@@ -3074,6 +3124,7 @@ void main() {
           ),
         );
         await firstFuture;
+        await _waitForTaskSettled(controller, 'empty-output-task');
 
         final secondFuture = controller.sendChatMessage('empty run');
         await fakeGoTaskService.waitForRequestCount(2);
@@ -3090,6 +3141,7 @@ void main() {
           ),
         );
         await secondFuture;
+        await _waitForTaskSettled(controller, 'empty-output-task');
 
         final thread = controller.requireTaskThreadForSessionInternal(
           'empty-output-task',
@@ -3159,6 +3211,7 @@ void main() {
         ),
       );
       await taskBFuture;
+      await _waitForTaskSettled(controller, 'task-b');
       expect(
         controller.localSessionMessagesInternal['task-b']!.map(
           (message) => message.text,
@@ -3179,6 +3232,7 @@ void main() {
         ),
       );
       await taskAFuture;
+      await _waitForTaskSettled(controller, 'task-a');
       expect(
         controller.localSessionMessagesInternal['task-a']!.map(
           (message) => message.text,
@@ -4686,6 +4740,7 @@ void main() {
           ),
         );
         await interruptedFuture;
+        await _waitForTaskSettled(controller, 'interrupted-task');
 
         await controller.switchSession('retry-task');
         controller.appendLocalSessionMessageInternal(
@@ -4727,6 +4782,7 @@ void main() {
           ),
         );
         await retryFuture;
+        await _waitForTaskSettled(controller, 'retry-task');
       },
     );
 
@@ -4862,7 +4918,9 @@ void main() {
       await controller.switchSession('confirmed-session');
 
       await controller.sendChatMessage('first turn');
+      await _waitForTaskSettled(controller, controller.currentSessionKey);
       await controller.sendChatMessage('second turn');
+      await _waitForTaskSettled(controller, controller.currentSessionKey);
 
       expect(fakeGoTaskService.requests, hasLength(2));
       expect(fakeGoTaskService.requests.first.resumeSession, isFalse);
@@ -5144,27 +5202,8 @@ AppController _connectedController(
   GoTaskServiceClient client, {
   String? homeDir,
 }) {
-  final controller = _sandboxController(
-    goTaskServiceClient: client,
-    fixtureTarget: AssistantExecutionTarget.agent,
-    uiFeatureManifest: _defaultDesktopManifest(),
-    environmentOverride: const <String, String>{
-      'BRIDGE_AUTH_TOKEN': 'bridge-token',
-      'XWORKMATE_MANAGED_BRIDGE_URL': _sandboxBridgeServerUrl,
-    },
-    initialBridgeProviderCatalog: const <SingleAgentProvider>[
-      SingleAgentProvider.codex,
-    ],
-    initialAvailableExecutionTargets: const <AssistantExecutionTarget>[
-      AssistantExecutionTarget.agent,
-    ],
-    homeDir: homeDir,
-  );
-  // This fixture deliberately represents the explicit legacy Agent contract.
-  // Product defaults are Gateway; do not let them change transport error tests.
-  controller.settingsControllerInternal.snapshotInternal = controller.settings
-      .copyWith(assistantExecutionTarget: AssistantExecutionTarget.agent);
-  return controller;
+  // Product lifecycle/error fixtures now exercise the canonical Bridge Gateway.
+  return _connectedGatewayController(client, homeDir: homeDir);
 }
 
 AppController _connectedGatewayController(
@@ -5252,6 +5291,27 @@ Future<void> _selectGatewaySession(
     executionTarget: AssistantExecutionTarget.gateway,
     selectedProvider: SingleAgentProvider.openclaw,
     selectedProviderSource: ThreadSelectionSource.explicit,
+  );
+}
+
+Future<void> _waitForTaskSettled(
+  AppController controller,
+  String sessionKey,
+) async {
+  bool active() =>
+      controller.assistantSessionHasPendingRun(sessionKey) ||
+      controller.openClawGatewayActiveTurnsInternal.values.any(
+        (turn) => turn.sessionKey == sessionKey,
+      );
+  final deadline = DateTime.now().add(const Duration(seconds: 15));
+  while (active() && DateTime.now().isBefore(deadline)) {
+    await Future<void>.delayed(const Duration(milliseconds: 10));
+  }
+  expect(
+    active(),
+    isFalse,
+    reason:
+        'Gateway admission and failure/artifact finalization must settle before terminal assertions',
   );
 }
 

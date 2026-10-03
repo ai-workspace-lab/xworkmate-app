@@ -14,14 +14,30 @@ void main() {
         expect(context.productMode, mode);
         expect(context.copyWith(selectedModelId: 'next').productMode, mode);
         expect(ThreadContextState.fromJson(context.toJson()).productMode, mode);
+        if (mode == AssistantMode.autoBot) {
+          expect(() => mode.toTaskMetadata(), throwsStateError);
+          continue;
+        }
         expect(mode.toTaskMetadata(model: ' catalog-model '), <String, dynamic>{
           'schemaVersion': 1,
-          'mode': mode.name,
+          'mode': mode == AssistantMode.coding ? 'code' : mode.name,
           'model': 'catalog-model',
         });
       }
     },
   );
+
+  test('four product labels and persisted Code migrate to Coding', () {
+    expect(AssistantMode.values.map((mode) => mode.label), [
+      'Chat',
+      'Work',
+      'Coding',
+      'AutoBot',
+    ]);
+    final restored = ThreadContextState.fromJson({'productMode': 'code'});
+    expect(restored.productMode, AssistantMode.coding);
+    expect(restored.toJson()['productMode'], 'coding');
+  });
 
   test('new threads default to Chat and Gateway', () {
     expect(ThreadContextState.fromJson({}).productMode, AssistantMode.chat);

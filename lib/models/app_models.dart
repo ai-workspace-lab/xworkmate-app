@@ -151,28 +151,39 @@ class StatusInfo {
 
 enum AppSidebarState { expanded, collapsed, hidden }
 
-enum AssistantMode { chat, work, code }
+enum AssistantMode { chat, work, coding, autoBot }
 
 extension AssistantModeCopy on AssistantMode {
   String get label => switch (this) {
-    AssistantMode.code => appText('代码开发', 'Code'),
-    AssistantMode.chat => appText('对话', 'Chat'),
-    AssistantMode.work => appText('工作', 'Work'),
+    AssistantMode.chat => 'Chat',
+    AssistantMode.work => 'Work',
+    AssistantMode.coding => 'Coding',
+    AssistantMode.autoBot => 'AutoBot',
   };
 }
 
 extension AssistantModeContract on AssistantMode {
-  static AssistantMode fromJsonValue(String? value) =>
-      AssistantMode.values.firstWhere(
-        (mode) => mode.name == value,
-        orElse: () => AssistantMode.chat,
-      );
+  // Only persisted thread records use the former product name. New records
+  // write `coding`; the deployed Bridge v1 task contract still expects `code`.
+  static AssistantMode fromJsonValue(String? value) => value == 'code'
+      ? AssistantMode.coding
+      : AssistantMode.values.firstWhere(
+          (mode) => mode.name == value,
+          orElse: () => AssistantMode.chat,
+        );
 
-  Map<String, dynamic> toTaskMetadata({String model = ''}) => <String, dynamic>{
-    'schemaVersion': 1,
-    'mode': name,
-    if (model.trim().isNotEmpty) 'model': model.trim(),
-  };
+  Map<String, dynamic> toTaskMetadata({String model = ''}) {
+    if (this == AssistantMode.autoBot) {
+      throw StateError(
+        'AutoBot uses scheduled task management, not chat turns.',
+      );
+    }
+    return <String, dynamic>{
+      'schemaVersion': 1,
+      'mode': this == AssistantMode.coding ? 'code' : name,
+      if (model.trim().isNotEmpty) 'model': model.trim(),
+    };
+  }
 }
 
 enum SettingsTab { gateway, archivedTasks, remoteDesktop, plugins, logs, help }

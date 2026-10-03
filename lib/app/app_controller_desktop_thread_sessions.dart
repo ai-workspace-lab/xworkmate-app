@@ -211,17 +211,7 @@ extension AppControllerDesktopThreadSessions on AppController {
   AssistantExecutionTarget resolveAssistantExecutionTargetFromRecordsInternal(
     TaskThread? record,
   ) {
-    return resolveAssistantExecutionTargetFromRecordForTest(
-      record,
-      defaultExecutionTarget: pickDraftThreadExecutionTargetInternal(
-        currentTarget: sanitizePersistedExecutionTargetInternal(
-          settings.assistantExecutionTarget,
-        ),
-        visibleTargets: visibleAssistantExecutionTargets(
-          AssistantExecutionTarget.values,
-        ),
-      ),
-    );
+    return AssistantExecutionTarget.gateway;
   }
 
   TaskThread? taskThreadForSessionInternal(String sessionKey) {

@@ -1,7 +1,14 @@
+// ignore_for_file: invalid_use_of_protected_member
+import 'dart:io';
+import 'dart:ui' as ui;
+import 'package:flutter/rendering.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xworkmate/app/app_controller.dart';
+import 'package:xworkmate/models/app_models.dart';
+import 'package:xworkmate/i18n/app_language.dart';
+import 'package:xworkmate/features/assistant/assistant_page_task_dialog_controls.dart';
 import 'package:xworkmate/features/assistant/assistant_page_composer_clipboard.dart';
 import 'package:xworkmate/features/assistant/assistant_bot_dialog.dart';
 import 'package:xworkmate/features/assistant/assistant_page_composer_skill_picker.dart';
@@ -16,9 +23,44 @@ import 'package:xworkmate/widgets/surface_card.dart';
 void main() {
   group('composer input contract', () {
     testWidgets(
-      'existing attachment menu exposes Chat Work Code without moving the composer',
+      'original route chip exposes four modes without moving the composer',
       (tester) async {
         final controller = _controller(tester);
+        final originalLanguage = activeAppLanguage;
+        setActiveAppLanguage(AppLanguage.en);
+        addTearDown(() => setActiveAppLanguage(originalLanguage));
+        await tester.binding.setSurfaceSize(const Size(800, 320));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        await tester.runAsync(() async {
+          final font = File('/System/Library/Fonts/SFNS.ttf');
+          final cjkFont = File('/System/Library/Fonts/STHeiti Light.ttc');
+          if (Platform.isMacOS && await font.exists()) {
+            final loader = FontLoader('XWorkmateEvidence')
+              ..addFont(
+                font.readAsBytes().then((bytes) => ByteData.sublistView(bytes)),
+              );
+            await loader.load();
+            if (await cjkFont.exists()) {
+              final cjkLoader = FontLoader('XWorkmateEvidenceCJK')
+                ..addFont(
+                  cjkFont.readAsBytes().then(
+                    (bytes) => ByteData.sublistView(bytes),
+                  ),
+                );
+              await cjkLoader.load();
+            }
+          }
+          final materialIcons = FontLoader('MaterialIcons')
+            ..addFont(rootBundle.load('fonts/MaterialIcons-Regular.otf'));
+          await materialIcons.load();
+          final cupertinoIcons =
+              FontLoader('packages/cupertino_icons/CupertinoIcons')..addFont(
+                rootBundle.load(
+                  'packages/cupertino_icons/assets/CupertinoIcons.ttf',
+                ),
+              );
+          await cupertinoIcons.load();
+        });
         await tester.pumpWidget(
           _app(
             SizedBox(
@@ -31,15 +73,27 @@ void main() {
             ),
           ),
         );
-        await tester.pump();
+        FocusManager.instance.primaryFocus?.unfocus();
+        await tester.pumpAndSettle();
+        final beforePixels = await _cropInput(tester);
         final before = tester.getRect(
           find.byKey(const Key('assistant-input-field')),
         );
         await tester.tap(
-          find.byKey(const Key('assistant-attachment-menu-button')),
+          find.byKey(const Key('assistant-product-mode-button')),
         );
         await tester.pumpAndSettle();
-        for (final mode in ['chat', 'work', 'code']) {
+        final menuPixels = await _capture(tester);
+        await tester.runAsync(() async {
+          final png = await menuPixels.toByteData(
+            format: ui.ImageByteFormat.png,
+          );
+          await File(
+            '/tmp/xworkmate-four-modes-widget-render.png',
+          ).writeAsBytes(png!.buffer.asUint8List());
+        });
+        menuPixels.dispose();
+        for (final mode in ['chat', 'work', 'coding', 'autoBot']) {
           expect(
             find.byKey(Key('assistant-product-mode-$mode')),
             findsOneWidget,
@@ -51,6 +105,94 @@ void main() {
           tester.getRect(find.byKey(const Key('assistant-input-field'))),
           before,
         );
+        FocusManager.instance.primaryFocus?.unfocus();
+        await tester.pumpAndSettle();
+        final afterPixels = await _cropInput(tester);
+        await expectLater(afterPixels, matchesReferenceImage(beforePixels));
+        beforePixels.dispose();
+        afterPixels.dispose();
+      },
+    );
+
+    testWidgets(
+      'AutoBot manages schedules and retains the draft without chat send',
+      (tester) async {
+        final controller = _controller(tester);
+        final input = TextEditingController(text: 'keep my task draft');
+        addTearDown(input.dispose);
+        controller.sessionsControllerInternal.currentSessionKeyInternal =
+            'unit-mode-fixture';
+        controller.upsertTaskThreadInternal(
+          'unit-mode-fixture',
+          productMode: AssistantMode.autoBot,
+        );
+        var sends = 0;
+        await tester.pumpWidget(
+          _app(
+            SizedBox(
+              height: 320,
+              child: _lowerPane(
+                controller: controller,
+                inputController: input,
+                onSend: () async => sends++,
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('AutoBot'), findsOneWidget);
+        await tester.tap(find.byKey(const Key('assistant-send-button')));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('assistant-bot-dialog')), findsOneWidget);
+        expect(sends, 0);
+        expect(input.text, 'keep my task draft');
+        final prompt = tester.widget<TextField>(
+          find.byKey(const Key('assistant-bot-prompt')),
+        );
+        expect(prompt.controller?.text, 'keep my task draft');
+      },
+    );
+
+    testWidgets(
+      'mode chip retains its footprint with no Provider or route choice',
+      (tester) async {
+        final controller = _controller(tester);
+        controller.sessionsControllerInternal.currentSessionKeyInternal =
+            'unit-mode-fixture';
+        Future<void> render(AssistantMode mode) async {
+          controller.upsertTaskThreadInternal(
+            'unit-mode-fixture',
+            productMode: mode,
+          );
+          await tester.pumpWidget(
+            _app(
+              AssistantTaskDialogModeControlsInternal(controller: controller),
+            ),
+          );
+          await tester.pumpAndSettle();
+        }
+
+        await render(AssistantMode.chat);
+        final modeRect = tester.getRect(
+          find.byKey(const Key('assistant-product-mode-button')),
+        );
+        for (final mode in AssistantMode.values) {
+          await render(mode);
+          expect(
+            find.byKey(const Key('assistant-provider-button')),
+            findsNothing,
+          );
+          expect(
+            tester.getRect(
+              find.byKey(const Key('assistant-product-mode-button')),
+            ),
+            modeRect,
+          );
+          expect(
+            find.byKey(const Key('assistant-execution-target-button')),
+            findsNothing,
+          );
+        }
       },
     );
 
@@ -67,7 +209,7 @@ void main() {
             .onPressed,
         isNull,
       );
-      expect(find.text('请先连接 AI Workspace Gateway。'), findsOneWidget);
+      expect(find.text('请先连接 AI Workspace。'), findsOneWidget);
     });
 
     testWidgets('Enter sends the draft', (tester) async {
@@ -339,12 +481,40 @@ AppController _controller(WidgetTester tester) {
 
 // The composer always receives a bounded height in the app (the lower pane is
 // a SizedBox of the computed pane height), so the harness gives it one too.
-Widget _app(Widget child) => MaterialApp(
-  theme: AppTheme.light(platform: TargetPlatform.macOS),
-  home: Scaffold(
-    body: Align(alignment: Alignment.bottomCenter, child: child),
+final _renderKey = GlobalKey();
+
+Widget _app(Widget child) => RepaintBoundary(
+  key: _renderKey,
+  child: MaterialApp(
+    debugShowCheckedModeBanner: false,
+    theme: _evidenceTheme(),
+    home: Scaffold(
+      body: Align(alignment: Alignment.bottomCenter, child: child),
+    ),
   ),
 );
+
+ThemeData _evidenceTheme() {
+  final base = AppTheme.light(platform: TargetPlatform.macOS);
+  TextStyle font(TextStyle? style) => (style ?? const TextStyle()).copyWith(
+    fontFamily: 'XWorkmateEvidence',
+    fontFamilyFallback: const ['XWorkmateEvidenceCJK'],
+  );
+  return base.copyWith(
+    textTheme: base.textTheme.apply(
+      fontFamily: 'XWorkmateEvidence',
+      fontFamilyFallback: const ['XWorkmateEvidenceCJK'],
+    ),
+    inputDecorationTheme: base.inputDecorationTheme.copyWith(
+      hintStyle: font(base.inputDecorationTheme.hintStyle),
+    ),
+    filledButtonTheme: FilledButtonThemeData(
+      style: base.filledButtonTheme.style?.copyWith(
+        textStyle: WidgetStatePropertyAll(font(base.textTheme.labelLarge)),
+      ),
+    ),
+  );
+}
 
 Widget _lowerPane({
   required AppController controller,
@@ -374,4 +544,29 @@ Widget _lowerPane({
       onSend: onSend ?? () async {},
     ),
   );
+}
+
+Future<ui.Image> _capture(WidgetTester tester) async {
+  final boundary =
+      _renderKey.currentContext!.findRenderObject()! as RenderRepaintBoundary;
+  return (await tester.runAsync(() => boundary.toImage(pixelRatio: 1)))!;
+}
+
+Future<ui.Image> _cropInput(WidgetTester tester) async {
+  final image = await _capture(tester);
+  final rect = tester.getRect(find.byKey(const Key('assistant-input-field')));
+  final recorder = ui.PictureRecorder();
+  ui.Canvas(recorder).drawImageRect(
+    image,
+    rect,
+    ui.Rect.fromLTWH(0, 0, rect.width, rect.height),
+    ui.Paint(),
+  );
+  final picture = recorder.endRecording();
+  final cropped = await tester.runAsync(
+    () => picture.toImage(rect.width.ceil(), rect.height.ceil()),
+  );
+  picture.dispose();
+  image.dispose();
+  return cropped!;
 }

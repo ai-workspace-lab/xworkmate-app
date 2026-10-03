@@ -90,25 +90,26 @@ curl -sfL https://install.svc.plus/xworkmate-app | bash -
 - [Cross-Repo Task State Workflow](./docs/architecture/cross-repo-task-state-workflow.md)
 - [CHANGELOG](./CHANGELOG.md)
 
-## Run Chat, Work, Code and Bot
+## Run Chat, Work, Coding and AutoBot
 
-Keep the existing desktop layout and mobile shell. Choose Chat, Work or Code in
-the desktop **+** menu or mobile configuration sheet. New threads use Gateway.
+Keep the existing desktop layout and mobile shell. Choose Chat, Work, Coding or AutoBot in
+the original desktop Gateway chip position or the mobile configuration mode chip.
+All product requests follow App → authenticated Bridge → OpenClaw Gateway.
 Connect the App to the managed Bridge endpoint with the account-managed secure
 credential; the Bridge routes to OpenClaw. The Gateway deployment must configure
 its central provider as `xworkmate`, expose that provider through `models.list`,
 with a central model. Only live `xworkmate/<model>` catalog entries
 are selectable for product execution. The App sends no provider credentials to
-workers. Every product turn and new Bot schedule explicitly sends one validated
-catalog ref. An empty catalog blocks submission and Bot creation; no unverified
-Gateway default or local model preset is used. Old Bot jobs retain their own
+workers. Every product turn and new AutoBot schedule explicitly sends one validated
+catalog ref. An empty catalog blocks submission and AutoBot creation; no unverified
+Gateway default or local model preset is used. Existing AutoBot jobs retain their own
 configured models when paused or inspected.
 
-Work uses the Gateway's DSH ACP worker and Code uses the pinned OpenCode v2
+Work uses the Gateway's DSH ACP worker and Coding uses the pinned OpenCode v2
 worker. Existing task progress, stop/recovery, file list and previews remain in
 place. `code.diff`/`.patch`, `tests.log` and JSON test reports are rendered as
 actual task artifacts. Exporting a report does not itself mean tests passed.
-Bot opens from the same menus and uses real server-side cron creation, pause,
+AutoBot selection opens scheduled-task management and uses real server-side cron creation, pause,
 execution history and deletion. Notifications use configured Gateway channels
 with explicit recipients; native APNs/FCM push is not implemented here.
 
@@ -132,3 +133,8 @@ reject missing signing rather than emitting a debug-signed release. Use a debug
 APK for local checks. Apple signing, Play signing, privacy/review submissions
 and deployed worker/model integration are separate acceptance gates. This local
 implementation is not evidence of App Store or Google Play approval.
+
+The desktop/mobile composer has no Provider or Gateway/Agent route choice.
+OpenClaw is the fixed execution provider behind Bridge. Central model selection
+remains in existing settings/catalog controls; removing Provider does not remove
+model configuration or introduce a direct vendor/OAuth route.

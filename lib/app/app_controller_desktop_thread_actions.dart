@@ -362,6 +362,12 @@ extension AppControllerDesktopThreadActions on AppController {
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey,
     );
+    if (assistantProductModeForSession(normalizedSessionKey) ==
+        AssistantMode.autoBot) {
+      throw StateError(
+        'AutoBot uses scheduled task management, not chat turns.',
+      );
+    }
     final currentTarget = assistantExecutionTargetForSession(
       normalizedSessionKey,
     );
