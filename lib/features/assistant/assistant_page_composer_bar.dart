@@ -26,6 +26,7 @@ import 'assistant_page_main.dart';
 import 'assistant_page_components.dart';
 import 'assistant_page_composer_state_helpers.dart';
 import 'assistant_page_composer_support.dart';
+import 'assistant_page_role_task_panel.dart';
 import 'assistant_page_tooltip_labels.dart';
 import 'assistant_page_message_widgets.dart';
 import 'assistant_page_task_models.dart';
@@ -222,7 +223,6 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
     setState(() {});
   }
 
-
   Future<void> handlePasteShortcutInternal() async {
     if (handlingPasteShortcutInternal) {
       return;
@@ -403,6 +403,7 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
           mainAxisSize: MainAxisSize.max,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            AssistantRoleTaskPanelInternal(controller: controller),
             Row(
               children: [
                 if (uiFeatures.supportsFileAttachments) ...[
@@ -460,44 +461,44 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
                         for (final plugin in BuiltinPluginCatalog.byGroup(
                           group,
                         ))
-                        PopupMenuItem<String>(
-                          key: Key(
-                            'assistant-builtin-plugin-item-${plugin.id}',
-                          ),
-                          value: plugin.id,
-                          child: Row(
-                            children: [
-                              BuiltinPluginIconTile(plugin: plugin),
-                              const SizedBox(width: 10),
-                              Text(
-                                plugin.name,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w600,
+                          PopupMenuItem<String>(
+                            key: Key(
+                              'assistant-builtin-plugin-item-${plugin.id}',
+                            ),
+                            value: plugin.id,
+                            child: Row(
+                              children: [
+                                BuiltinPluginIconTile(plugin: plugin),
+                                const SizedBox(width: 10),
+                                Text(
+                                  plugin.name,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  plugin.description,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: Theme.of(context).textTheme.bodySmall
-                                      ?.copyWith(color: palette.textMuted),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    plugin.description,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: Theme.of(context).textTheme.bodySmall
+                                        ?.copyWith(color: palette.textMuted),
+                                  ),
                                 ),
-                              ),
-                              if (selectedBuiltinPluginIdsInternal.contains(
-                                plugin.id,
-                              )) ...[
-                                const SizedBox(width: 6),
-                                Icon(
-                                  Icons.check_rounded,
-                                  size: 16,
-                                  color: palette.accent,
-                                ),
+                                if (selectedBuiltinPluginIdsInternal.contains(
+                                  plugin.id,
+                                )) ...[
+                                  const SizedBox(width: 6),
+                                  Icon(
+                                    Icons.check_rounded,
+                                    size: 16,
+                                    color: palette.accent,
+                                  ),
+                                ],
                               ],
-                            ],
+                            ),
                           ),
-                        ),
                       ],
                     ],
                     child: const ComposerIconButtonInternal(
