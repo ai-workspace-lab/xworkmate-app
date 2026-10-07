@@ -72,7 +72,7 @@ case "$platform" in
         --build-number="$BUILD_NUMBER" \
         --dart-define="XWORKMATE_DISPLAY_VERSION=$DISPLAY_VERSION" \
         --dart-define="XWORKMATE_BUILD_NUMBER=$BUILD_NUMBER" \
-        "${endpoint_defines[@]}"
+        ${endpoint_defines[@]+"${endpoint_defines[@]}"}
       mkdir -p dist/ios
       (
         cd build/ios/iphoneos
