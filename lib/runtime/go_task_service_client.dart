@@ -2,7 +2,10 @@ import 'dart:convert';
 
 import 'package:crypto/crypto.dart' as crypto;
 
+import 'role_routing.dart';
 import 'runtime_models.dart';
+
+export 'role_routing.dart';
 
 enum GoTaskServiceRoute { externalAcpSingle, externalAcpMulti }
 
@@ -226,6 +229,7 @@ class GoTaskServiceRequest {
     this.resumeSession = false,
     this.collaborationMode = GoTaskServiceCollaborationMode.standard,
     this.multiAgent = false,
+    this.roleRouting = RoleRoutingSelection.off,
   });
 
   final String sessionId;
@@ -247,6 +251,9 @@ class GoTaskServiceRequest {
   final bool resumeSession;
   final GoTaskServiceCollaborationMode collaborationMode;
   final bool multiAgent;
+
+  /// Bridge role routing; when active the bridge picks executor and model.
+  final RoleRoutingSelection roleRouting;
 
   bool get isMultiAgentRequest =>
       multiAgent ||
@@ -324,7 +331,10 @@ class GoTaskServiceRequest {
         'remoteWorkingDirectoryHint': remoteWorkingDirectoryHint.trim(),
       if (requestModel.isNotEmpty) 'model': requestModel,
       if (thinking.trim().isNotEmpty) 'thinking': thinking.trim(),
-      'routing': resolvedRouting.toJson(),
+      'routing': <String, dynamic>{
+        ...resolvedRouting.toJson(),
+        ...roleRouting.toRoutingJson(),
+      },
       if (routingHint.trim().isNotEmpty) 'routingHint': routingHint.trim(),
       'requestedExecutionTarget': normalizedTarget.promptValue,
       if (_usesGatewaySessionMode(acpMode)) ...<String, dynamic>{
@@ -488,6 +498,15 @@ class GoTaskServiceResult {
   final String errorMessage;
   final String resolvedModel;
   final GoTaskServiceRoute route;
+
+  /// Role the bridge actually routed this turn to (empty when not role-routed).
+  String get resolvedRole => raw['resolvedRole']?.toString().trim() ?? '';
+
+  /// Exact gateway model ID the bridge selected for a role-routed turn.
+  String get resolvedModelId => raw['resolvedModelId']?.toString().trim() ?? '';
+
+  /// True only when the executor reported the requested model back.
+  bool get modelBindingVerified => raw['modelBindingVerified'] == true;
 
   String get resolvedWorkingDirectory =>
       raw['resolvedWorkingDirectory']?.toString().trim() ??
@@ -701,6 +720,15 @@ abstract class GoTaskServiceClient {
     required String sessionId,
     required String threadId,
     OpenClawTaskAssociation? association,
+  });
+
+  /// Answers a bridge permission prompt for a role-routed task. A null
+  /// [optionId] denies (ACP "cancelled" outcome).
+  Future<void> respondPermission({
+    required AssistantExecutionTarget target,
+    required String sessionId,
+    required String requestId,
+    String? optionId,
   });
 
   Future<void> dispose();

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../app/app_controller.dart';
 import '../../app/ui_feature_manifest.dart';
 import '../../i18n/app_language.dart';
+import '../../runtime/role_routing.dart';
 import '../../runtime/runtime_models.dart';
 import '../../theme/app_palette.dart';
 import '../../theme/app_theme.dart';
@@ -62,8 +63,150 @@ class AssistantTaskDialogModeControlsInternal extends StatelessWidget {
           selectedProvider: selectedProvider,
           providers: providerMenuProviders,
         ),
+        if (!executionTarget.isGateway &&
+            controller.bridgeRoleRoutingCatalog.enabled)
+          _TaskDialogRoleMenuButtonInternal(controller: controller),
       ],
     );
+  }
+}
+
+String roleRoutingRoleLabelInternal(String role) => switch (role) {
+  'chat' => 'Chat',
+  'worker' => 'Worker',
+  'engineer' => 'Engineer',
+  'architect' => 'Architect',
+  'researcher' => 'Researcher',
+  'specialist' => 'Specialist',
+  _ => role,
+};
+
+/// Auto/manual role routing. "Off" keeps the provider/model chosen above;
+/// otherwise the bridge picks executor and model under its role policy.
+class _TaskDialogRoleMenuButtonInternal extends StatelessWidget {
+  const _TaskDialogRoleMenuButtonInternal({required this.controller});
+
+  final AppController controller;
+
+  static const String _offValue = 'off';
+  static const String _autoValue = 'auto';
+
+  @override
+  Widget build(BuildContext context) {
+    final catalog = controller.bridgeRoleRoutingCatalog;
+    final selection = controller.assistantRoleRoutingSelection;
+    final selectedValue = _valueFor(selection);
+    final entries = <PopupMenuEntry<String>>[
+      _item(_offValue, appText('角色：关闭', 'Role: off'), selectedValue),
+      _item(_autoValue, appText('角色：自动', 'Role: auto'), selectedValue),
+      for (final role in catalog.enabledRoles) ...[
+        const PopupMenuDivider(),
+        _item(
+          'role:${role.role}',
+          appText(
+            '${roleRoutingRoleLabelInternal(role.role)} · 模型自动',
+            '${roleRoutingRoleLabelInternal(role.role)} · auto model',
+          ),
+          selectedValue,
+        ),
+        for (final model in role.models)
+          _item(
+            'model:${role.role}:${model.key}',
+            '${roleRoutingRoleLabelInternal(role.role)} · ${model.label}',
+            selectedValue,
+          ),
+      ],
+    ];
+    return PopupMenuButton<String>(
+      key: const Key('assistant-role-routing-button'),
+      tooltip: appText('角色路由', 'Role routing'),
+      onSelected: (value) =>
+          controller.setAssistantRoleRoutingSelection(_selectionFor(value)),
+      itemBuilder: (context) => entries,
+      child: _TaskDialogSelectorChipInternal(
+        leading: Icon(
+          Icons.account_tree_outlined,
+          size: 14,
+          color: context.palette.textMuted,
+        ),
+        label: _label(selection, catalog),
+        tooltip: appText(
+          '角色路由（策略 ${catalog.policyVersion}）',
+          'Role routing (policy ${catalog.policyVersion})',
+        ),
+      ),
+    );
+  }
+
+  PopupMenuItem<String> _item(String value, String label, String selected) {
+    return PopupMenuItem<String>(
+      value: value,
+      key: Key('assistant-role-routing-item-$value'),
+      child: Row(
+        children: [
+          Expanded(child: Text(label)),
+          if (value == selected) const Icon(Icons.check_rounded, size: 18),
+        ],
+      ),
+    );
+  }
+
+  static String _valueFor(RoleRoutingSelection selection) {
+    switch (selection.mode) {
+      case RoleRoutingMode.off:
+        return _offValue;
+      case RoleRoutingMode.auto:
+        return _autoValue;
+      case RoleRoutingMode.manual:
+        return selection.modelKey.isEmpty
+            ? 'role:${selection.role}'
+            : 'model:${selection.role}:${selection.modelKey}';
+    }
+  }
+
+  static RoleRoutingSelection _selectionFor(String value) {
+    if (value == _autoValue) {
+      return const RoleRoutingSelection(mode: RoleRoutingMode.auto);
+    }
+    if (value.startsWith('role:')) {
+      return RoleRoutingSelection(
+        mode: RoleRoutingMode.manual,
+        role: value.substring('role:'.length),
+      );
+    }
+    if (value.startsWith('model:')) {
+      final rest = value.substring('model:'.length);
+      final separator = rest.indexOf(':');
+      return RoleRoutingSelection(
+        mode: RoleRoutingMode.manual,
+        role: rest.substring(0, separator),
+        modelKey: rest.substring(separator + 1),
+      );
+    }
+    return RoleRoutingSelection.off;
+  }
+
+  static String _label(
+    RoleRoutingSelection selection,
+    BridgeRoleRoutingCatalog catalog,
+  ) {
+    switch (selection.mode) {
+      case RoleRoutingMode.off:
+        return appText('角色：关闭', 'Role: off');
+      case RoleRoutingMode.auto:
+        return appText('角色：自动', 'Role: auto');
+      case RoleRoutingMode.manual:
+        final roleLabel = roleRoutingRoleLabelInternal(selection.role);
+        if (selection.modelKey.isEmpty) {
+          return roleLabel;
+        }
+        final model = catalog
+            .role(selection.role)
+            ?.models
+            .where((item) => item.key == selection.modelKey)
+            .firstOrNull;
+        return '$roleLabel · ${model?.label ?? selection.modelKey}';
+    }
   }
 }
 

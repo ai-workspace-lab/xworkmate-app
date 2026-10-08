@@ -37,6 +37,7 @@ import 'app_controller_desktop_thread_sessions.dart';
 import 'app_controller_desktop_thread_actions.dart';
 import 'app_controller_desktop_workspace_execution.dart';
 import 'app_controller_desktop_settings_runtime.dart';
+import '../runtime/role_routing.dart';
 import 'app_controller_desktop_thread_storage.dart';
 import 'app_controller_desktop_skill_permissions.dart';
 import 'app_controller_desktop_external_acp_routing.dart';
@@ -66,6 +67,8 @@ Future<void> refreshAcpCapabilitiesRuntimeInternal(
         normalizeSingleAgentProviderList(capabilities.gatewayProviderCatalog);
     controller.bridgeAvailableExecutionTargetsInternal =
         capabilities.availableExecutionTargets;
+    controller.bridgeRoleRoutingCatalogInternal =
+        BridgeRoleRoutingCatalog.fromCapabilities(capabilities.raw);
   } else if (refreshError != null) {
     controller.bridgeCapabilitiesRefreshErrorInternal = refreshError
         .toString()
@@ -89,6 +92,8 @@ Future<void> refreshSingleAgentCapabilitiesRuntimeInternal(
         normalizeSingleAgentProviderList(capabilities.gatewayProviderCatalog);
     controller.bridgeAvailableExecutionTargetsInternal =
         capabilities.availableExecutionTargets;
+    controller.bridgeRoleRoutingCatalogInternal =
+        BridgeRoleRoutingCatalog.fromCapabilities(capabilities.raw);
     controller.bridgeCapabilitiesRefreshAttemptedInternal = true;
     controller.bridgeCapabilitiesRefreshErrorInternal = '';
   } catch (error) {

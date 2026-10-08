@@ -25,6 +25,7 @@ import '../runtime/embedded_agent_launch_policy.dart';
 import '../runtime/runtime_coordinator.dart';
 import '../runtime/runtime_dispatch_resolver.dart';
 import '../runtime/gateway_acp_client.dart';
+import '../runtime/role_routing.dart';
 import '../runtime/codex_runtime.dart';
 import '../runtime/codex_config_bridge.dart';
 import '../runtime/code_agent_node_orchestrator.dart';
@@ -249,6 +250,15 @@ class AppController extends ChangeNotifier {
       const <AssistantExecutionTarget>[];
   bool bridgeCapabilitiesRefreshAttemptedInternal = false;
   String bridgeCapabilitiesRefreshErrorInternal = '';
+  BridgeRoleRoutingCatalog bridgeRoleRoutingCatalogInternal =
+      BridgeRoleRoutingCatalog.unavailable;
+  RoleRoutingSelection assistantRoleRoutingSelectionInternal =
+      RoleRoutingSelection.off;
+  final Map<String, RoleTaskStatus> roleTaskStatusBySessionInternal =
+      <String, RoleTaskStatus>{};
+  final Map<String, List<RoleTaskPermissionRequest>>
+  rolePendingPermissionsBySessionInternal =
+      <String, List<RoleTaskPermissionRequest>>{};
   final Map<String, List<GatewayChatMessage>> assistantThreadMessagesInternal =
       <String, List<GatewayChatMessage>>{};
   late final DesktopTaskThreadRepository taskThreadRepositoryInternal =

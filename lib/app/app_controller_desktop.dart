@@ -11,3 +11,4 @@ export 'app_controller_desktop_skill_permissions.dart';
 export 'app_controller_desktop_runtime_helpers.dart';
 export 'app_controller_desktop_github_publish.dart';
 export 'app_controller_desktop_conversation_workflow.dart';
+export 'app_controller_desktop_role_routing.dart';
