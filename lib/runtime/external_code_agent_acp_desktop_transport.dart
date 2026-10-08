@@ -76,6 +76,18 @@ class ExternalCodeAgentAcpDesktopTransport implements GoTaskServiceClient {
       );
     } on GatewayAcpException catch (error) {
       if (_isRecoverableTaskStreamClosure(error)) {
+        if (request.roleRouting.isActive) {
+          final recovered = await _recoverRoleTaskAfterStreamClosure(
+            request,
+            onUpdate: onUpdate,
+            streamedText: streamedText,
+            completedMessage: completedMessage,
+          );
+          if (recovered != null) {
+            return recovered;
+          }
+          rethrow;
+        }
         final recovered = await _recoverTaskResultAfterStreamClosure(
           request,
           taskEndpoint: _taskEndpointResolver == null
@@ -112,6 +124,124 @@ class ExternalCodeAgentAcpDesktopTransport implements GoTaskServiceClient {
   bool _isRecoverableTaskStreamClosure(GatewayAcpException error) {
     return error.code == 'ACP_HTTP_CONNECTION_CLOSED' ||
         error.code == 'ACP_SSE_NO_RESULT';
+  }
+
+  /// Role-routed tasks keep running on the bridge after the SSE stream drops.
+  /// Poll the bridge's role task snapshot by session, re-surface pending
+  /// permission prompts, and return once the task is terminal. Polling stops
+  /// after [_roleTaskRecoveryWindow], the bridge's permission timeout.
+  Future<GoTaskServiceResult?> _recoverRoleTaskAfterStreamClosure(
+    GoTaskServiceRequest request, {
+    required void Function(GoTaskServiceUpdate update) onUpdate,
+    required String streamedText,
+    required String? completedMessage,
+  }) async {
+    final endpoint = _sessionSnapshotEndpoint(
+      _endpointResolver(request.target),
+    );
+    if (endpoint == null) {
+      return null;
+    }
+    final deadline = DateTime.now().add(_roleTaskRecoveryWindow);
+    final announced = <String>{};
+    while (DateTime.now().isBefore(deadline)) {
+      Map<String, dynamic> snapshot;
+      try {
+        final response = await _client.request(
+          method: 'xworkmate.tasks.get',
+          params: <String, dynamic>{
+            'sessionId': request.sessionId,
+            'threadId': request.threadId,
+          },
+          endpointOverride: endpoint,
+        );
+        snapshot = _castMap(response['result']);
+      } on GatewayAcpException {
+        await Future<void>.delayed(_recoveryPollDelay);
+        continue;
+      } on SocketException {
+        await Future<void>.delayed(_recoveryPollDelay);
+        continue;
+      }
+      for (final raw in (snapshot['pendingPermissions'] as List?) ?? const []) {
+        final pending = _castMap(raw);
+        final requestId = pending['requestId']?.toString() ?? '';
+        if (requestId.isEmpty || !announced.add(requestId)) {
+          continue;
+        }
+        onUpdate(
+          GoTaskServiceUpdate(
+            sessionId: request.sessionId,
+            threadId: request.threadId,
+            turnId: snapshot['turnId']?.toString() ?? '',
+            type: 'task',
+            text: '',
+            message: '',
+            pending: true,
+            error: false,
+            route: request.route,
+            payload: <String, dynamic>{
+              'type': 'task',
+              'event': 'task.permission_requested',
+              'sessionId': request.sessionId,
+              'threadId': request.threadId,
+              'task': <String, dynamic>{
+                'phase': 'permission_requested',
+                'role': snapshot['resolvedRole'],
+                'detail': pending,
+              },
+            },
+          ),
+        );
+      }
+      final status = (snapshot['status'] ?? '').toString().trim().toLowerCase();
+      if (status == 'completed' ||
+          status == 'failed' ||
+          status == 'cancelled') {
+        return goTaskServiceResultFromAcpResponse(
+          <String, dynamic>{
+            'jsonrpc': '2.0',
+            'id': 'recovered-from-role-task-snapshot',
+            'result': snapshot,
+          },
+          route: request.route,
+          streamedText: streamedText,
+          completedMessage: completedMessage,
+        );
+      }
+      await Future<void>.delayed(_recoveryPollDelay);
+    }
+    return null;
+  }
+
+  static const Duration _roleTaskRecoveryWindow = Duration(minutes: 10);
+
+  @override
+  Future<void> respondPermission({
+    required AssistantExecutionTarget target,
+    required String sessionId,
+    required String requestId,
+    String? optionId,
+  }) async {
+    final endpoint = _sessionSnapshotEndpoint(_endpointResolver(target));
+    if (endpoint == null) {
+      throw const GatewayAcpException(
+        'xworkmate-bridge is not connected',
+        code: 'BRIDGE_NOT_CONNECTED',
+      );
+    }
+    await _client.request(
+      method: 'xworkmate.permissions.respond',
+      params: <String, dynamic>{
+        'sessionId': sessionId,
+        'requestId': requestId,
+        if (optionId != null && optionId.trim().isNotEmpty)
+          'optionId': optionId.trim()
+        else
+          'decision': 'cancel',
+      },
+      endpointOverride: endpoint,
+    );
   }
 
   Future<GoTaskServiceResult?> _recoverTaskResultAfterStreamClosure(

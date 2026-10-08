@@ -257,6 +257,36 @@ terminal snapshot. Missing or incomplete artifacts are represented only through
 etc.), not by extending the task execution lifecycle.
 ```
 
+## Role-routed agent turns (Engineer loop)
+
+When the bridge advertises `acp.capabilities.roleRouting.enabled` and the user
+picks a role in the composer (`assistant-role-routing-button`), agent turns add
+`routing.role` / `routing.roleMode` / `routing.roleModel`. The bridge then
+selects executor and model under its role policy instead of the provider/model
+chips. Contract and work items: xworkmate-bridge
+`docs/architecture/role-routing-engineer-loop.md`.
+
+```
+runGatewayChatTurnInternal (roleRouting = roleRoutingForTurnInternal(target))
+  → session.start (/acp/rpc, SSE)
+      ← session.update type=task  task.selected | started | permission_requested
+                                  | permission_resolved | completed | failed
+                                  | cancelled | rejected
+        → applyRoleTaskUpdateInternal → AssistantRoleTaskPanelInternal
+      ← session.update type=delta (executor text chunks)
+  user clicks an option → respondRolePermission
+      → xworkmate.permissions.respond {sessionId, requestId, optionId | decision=cancel}
+  stop button → cancelTask → session.cancel (denies pending prompts, aborts run)
+  SSE closed → _recoverRoleTaskAfterStreamClosure
+      → xworkmate.tasks.get {sessionId} every 2s for up to 10 min,
+        re-surfacing pendingPermissions, until status is terminal
+  result → applyRoleTaskResultInternal (resolvedRole / resolvedModelId /
+           resolvedProviderId / modelBindingVerified) → applyGatewayChatResultInternal
+```
+
+Turns without a role selection, and gateway (OpenClaw) turns, keep the flow
+above unchanged.
+
 ## Key Files by Repo
 
 ### xworkmate-app
@@ -267,6 +297,9 @@ etc.), not by extending the task execution lifecycle.
 - `lib/app/app_controller_desktop_thread_sessions.dart` — session 恢复逻辑
 - `lib/app/app_controller_desktop_thread_actions.dart` — 消息发送
 - `lib/runtime/agent_registry.dart` — agent registry
+- `lib/runtime/role_routing.dart` — role routing catalog / selection / task event models
+- `lib/app/app_controller_desktop_role_routing.dart` — role routing state, permission responses
+- `lib/features/assistant/assistant_page_role_task_panel.dart` — actual role/model status + approval prompt
 
 ### xworkmate-bridge
 - `internal/acp/http_handler.go` — HTTP server + WebSocket handler
@@ -277,6 +310,9 @@ etc.), not by extending the task execution lifecycle.
 - `internal/acp/openclaw_artifact_download.go` — artifact 下载代理
 - `internal/gatewayruntime/runtime.go` — gateway WebSocket client
 - `internal/router/router.go` — 路由引擎
+- `internal/rolepolicy/` — 角色策略、硬条件选择器、live `/v1/models`
+- `internal/acp/role_routing.go` / `permission_broker.go` — 角色任务执行、任务事件、授权回传
+- `internal/acpagentadapter/` — `adapter acp-agent`（DeepSeek Harness / OpenCode ACP）
 
 ### openclaw-multi-session-plugins
 - `src/exportArtifacts.ts` — artifact prepare/export/read (963 lines)
@@ -298,6 +334,7 @@ etc.), not by extending the task execution lifecycle.
 6. **F6: Artifact ref key rotation** — Secret change invalidates all signed refs
 7. **F7: SSE stream interruption** — Recovery polling must align with bridge task deadlines and must apply terminal snapshots immediately
 8. **F8: chat.send is not a detached task** — agent_end state must remain queryable by runId even when the native task registry has no record
+9. **F9: Role task state is bridge-memory only** — a bridge restart drops in-flight role tasks and pending permission prompts; recovery finds no role snapshot, keeps polling until its 10-minute window ends, then the turn fails
 
 ## Product capabilities (Chat / Work / Coding / AutoBot)
 
