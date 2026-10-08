@@ -1,0 +1,33 @@
+Baseline snapshot: 50e7cda81e74d79502b61bd858e71dfcfb9a7d7e
+Method: git archive HEAD into /tmp/xworkmate-app-capabilities-baseline; same installed Flutter 3.41.4 and html 0.15.6 package resolution. No changes to the original checkout.
+
+Command: flutter test --no-pub test/runtime/assistant_execution_target_test.dart test/runtime/app_controller_thread_workspace_binding_test.dart test/runtime/assistant_connection_state_test.dart test/runtime/assistant_model_display_test.dart
+Source log: /tmp/xworkmate-capabilities-baseline.log
+02:22 +92 -1: test/runtime/app_controller_thread_workspace_binding_test.dart: downloads bridge URL artifacts into the local thread workspace [E]
+02:22 +92 -2: test/runtime/app_controller_thread_workspace_binding_test.dart: syncs bridge OpenClaw download URL artifacts into the draft task workspace [E]
+02:22 +92 -3: test/runtime/app_controller_thread_workspace_binding_test.dart: keeps signed OpenClaw artifacts when the snapshot status is none [E]
+02:23 +95 -4: test/runtime/app_controller_thread_workspace_binding_test.dart: resumes bridge artifact downloads after a weak network disconnect [E]
+02:23 +95 -5: test/runtime/app_controller_thread_workspace_binding_test.dart: retries bridge artifact downloads up to five weak network attempts [E]
+02:23 +95 -6: test/runtime/app_controller_thread_workspace_binding_test.dart: keeps syncing later artifacts when one download fails [E]
+02:23 +95 -7: test/runtime/app_controller_thread_workspace_binding_test.dart: drops artifacts when size or sha256 validation fails [E]
+02:24 +105 -8: test/runtime/app_controller_thread_workspace_binding_test.dart: OpenClaw artifact sync times out when artifact downloads keep failing [E]
+02:25 +107 -9: test/runtime/assistant_connection_state_test.dart: Assistant connection state uses the same gateway capability readiness for status and send guard [E]
+02:26 +107 -10: test/runtime/assistant_connection_state_test.dart: Assistant connection state refreshes gateway capabilities when previous discovery missed openclaw [E]
+02:29 +121 -11: test/runtime/assistant_model_display_test.dart: Assistant model display shows matched runtime model when gateway catalog is available [E]
+02:29 +121 -11: Some tests failed.
+
+Command: flutter test --no-pub test/features/mobile/mobile_assistant_home_golden_test.dart test/features/mobile/mobile_assistant_page_test.dart test/features/mobile/mobile_settings_page_test.dart test/features/workbench/workbench_page_test.dart test/runtime/gateway_acp_client_auth_test.dart
+Source log: /tmp/xworkmate-capabilities-baseline-ui.log
+00:00 +0 -1: test/features/mobile/mobile_assistant_home_golden_test.dart: mobile assistant home matches v1.1 redesign golden [E]
+00:00 +0 -2: test/features/mobile/mobile_assistant_home_golden_test.dart: mobile assistant home shows the selected plugin shortcut [E]
+00:01 +0 -3: test/features/mobile/mobile_assistant_page_test.dart: MobileAssistantPage mobile shell renders the mobile assistant surface [E]
+00:01 +0 -4: test/features/mobile/mobile_assistant_page_test.dart: MobileAssistantPage mobile menu opens task navigation with home breadcrumb [E]
+00:01 +0 -5: test/features/mobile/mobile_assistant_page_test.dart: MobileAssistantPage mobile plugins tab shows the built-in plugin panel [E]
+00:02 +1 -6: test/features/mobile/mobile_assistant_page_test.dart: MobileAssistantPage mobile history opens quick task switcher [E]
+00:04 +10 -7: test/features/mobile/mobile_settings_page_test.dart: MobileSettingsPage login failure is visible on the mobile sign-in card [E]
+00:05 +16 -8: test/features/mobile/mobile_settings_page_test.dart: MobileSettingsPage sync completion refreshes last sync row and shows feedback [E]
+00:07 +18 -9: test/features/workbench/workbench_page_test.dart: workbench overview matches the desktop visual baseline [E]
+00:09 +50 -10: test/runtime/gateway_acp_client_auth_test.dart: GatewayAcpClient authorization desktop bridge auth resolver prefers synced managed bridge token over stale environment token [E]
+00:09 +58 -11: test/runtime/gateway_acp_client_auth_test.dart: GatewayAcpClient authorization desktop controller uses unified bridge RPC for all task submits [E]
+00:09 +58 -12: test/runtime/gateway_acp_client_auth_test.dart: GatewayAcpClient authorization desktop controller resolves OpenClaw gateway submit to unified bridge RPC [E]
+00:09 +63 -12: Some tests failed.

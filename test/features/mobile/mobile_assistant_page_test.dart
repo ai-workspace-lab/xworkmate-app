@@ -1,10 +1,7 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xworkmate/app/app_controller.dart';
 import 'package:xworkmate/app/app_shell_desktop.dart';
-import 'package:xworkmate/app/ui_feature_manifest.dart';
 import 'package:xworkmate/app/workspace_page_registry.dart';
 import 'package:xworkmate/features/mobile/mobile_assistant_page.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
@@ -402,131 +399,81 @@ void main() {
       );
     });
 
-    testWidgets('provider sheet fails closed when capabilities are empty', (
-      tester,
-    ) async {
-      final controller = AppController(
-        environmentOverride: const <String, String>{},
-      );
-      addTearDown(controller.dispose);
-
-      await tester.pumpWidget(_buildTestApp(controller: controller));
-      await tester.pumpAndSettle();
-
-      await tester.tap(
-        find.byKey(const Key('mobile-assistant-composer-add-button')),
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(
-        find.byKey(const Key('mobile-assistant-provider-button')),
-      );
-      await tester.pumpAndSettle();
-
-      expect(
-        find.byKey(const Key('mobile-assistant-provider-empty-state')),
-        findsOneWidget,
-      );
-      expect(
-        find.byKey(const Key('mobile-assistant-provider-item-codex')),
-        findsNothing,
-      );
-      expect(
-        find.byKey(const Key('mobile-assistant-provider-item-openclaw')),
-        findsNothing,
-      );
-    });
-
-    testWidgets('provider sheet follows execution target capabilities', (
-      tester,
-    ) async {
-      final controller = AppController(
-        environmentOverride: const <String, String>{},
-        uiFeatureManifest: _defaultDesktopManifest(),
-        initialBridgeProviderCatalog: const <SingleAgentProvider>[
-          SingleAgentProvider.codex,
-        ],
-        initialGatewayProviderCatalog: <SingleAgentProvider>[
-          SingleAgentProvider.openclaw.copyWith(
-            supportedTargets: const <AssistantExecutionTarget>[
-              AssistantExecutionTarget.gateway,
-            ],
-          ),
-        ],
-        initialAvailableExecutionTargets: const <AssistantExecutionTarget>[
-          AssistantExecutionTarget.agent,
-          AssistantExecutionTarget.gateway,
-        ],
-      );
-      addTearDown(controller.dispose);
-
-      await tester.pumpWidget(
-        MaterialApp(
-          theme: AppTheme.light().copyWith(platform: TargetPlatform.iOS),
-          home: Scaffold(
-            body: Builder(
-              builder: (context) => Column(
-                children: [
-                  TextButton(
-                    key: const Key('show-agent-provider-sheet'),
-                    onPressed: () {
-                      showMobileAssistantProviderSheet(
-                        context,
-                        controller: controller,
-                        target: AssistantExecutionTarget.agent,
-                        selectedProvider: SingleAgentProvider.codex,
-                        onSelected: (_) async {},
-                      );
-                    },
-                    child: const Text('Agent providers'),
+    for (final withCatalog in [false, true]) {
+      testWidgets(
+        'mobile mode configuration removes provider routing (catalog=$withCatalog)',
+        (tester) async {
+          final controller = AppController(
+            environmentOverride: const <String, String>{},
+            initialBridgeProviderCatalog: withCatalog
+                ? const [SingleAgentProvider.codex]
+                : const [],
+            initialGatewayProviderCatalog: withCatalog
+                ? const [SingleAgentProvider.openclaw]
+                : const [],
+          );
+          final input = TextEditingController();
+          final focus = FocusNode();
+          addTearDown(controller.dispose);
+          addTearDown(input.dispose);
+          addTearDown(focus.dispose);
+          await tester.pumpWidget(
+            MaterialApp(
+              theme: AppTheme.light(platform: TargetPlatform.iOS),
+              home: Scaffold(
+                body: Align(
+                  alignment: Alignment.bottomCenter,
+                  child: MobileAssistantComposer(
+                    controller: controller,
+                    inputController: input,
+                    focusNode: focus,
+                    thinking: 'off',
+                    bottomPadding: 0,
+                    attachments: const [],
+                    onPickAttachments: () {},
+                    onRemoveAttachment: (_) {},
+                    onThinkingChanged: (_) {},
+                    onComposerStateChanged: () {},
+                    onSend: () {},
                   ),
-                  TextButton(
-                    key: const Key('show-gateway-provider-sheet'),
-                    onPressed: () {
-                      showMobileAssistantProviderSheet(
-                        context,
-                        controller: controller,
-                        target: AssistantExecutionTarget.gateway,
-                        selectedProvider: SingleAgentProvider.openclaw,
-                        onSelected: (_) async {},
-                      );
-                    },
-                    child: const Text('Gateway providers'),
-                  ),
-                ],
+                ),
               ),
             ),
-          ),
-        ),
+          );
+          await tester.pumpAndSettle();
+          await tester.tap(
+            find.byKey(const Key('mobile-assistant-composer-add-button')),
+          );
+          await tester.pumpAndSettle();
+          expect(
+            find.byKey(const Key('mobile-assistant-provider-button')),
+            findsNothing,
+          );
+          expect(
+            find.byKey(const Key('mobile-assistant-provider-empty-state')),
+            findsNothing,
+          );
+          await tester.tap(
+            find.byKey(const Key('mobile-assistant-product-mode-button')),
+          );
+          await tester.pumpAndSettle();
+          for (final mode in ['chat', 'work', 'coding', 'autoBot']) {
+            expect(
+              find.byKey(Key('mobile-assistant-product-mode-$mode')),
+              findsOneWidget,
+            );
+          }
+          expect(
+            find.byKey(const Key('mobile-assistant-target-item-gateway')),
+            findsNothing,
+          );
+          expect(
+            find.byKey(const Key('mobile-assistant-target-item-agent')),
+            findsNothing,
+          );
+        },
       );
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.byKey(const Key('show-agent-provider-sheet')));
-      await tester.pumpAndSettle();
-
-      expect(
-        find.byKey(const Key('mobile-assistant-provider-item-codex')),
-        findsOneWidget,
-      );
-      expect(
-        find.byKey(const Key('mobile-assistant-provider-item-openclaw')),
-        findsNothing,
-      );
-
-      await tester.tap(find.byKey(const Key('mobile-assistant-sheet-close')));
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.byKey(const Key('show-gateway-provider-sheet')));
-      await tester.pumpAndSettle();
-
-      expect(
-        find.byKey(const Key('mobile-assistant-provider-item-openclaw')),
-        findsOneWidget,
-      );
-      expect(
-        find.byKey(const Key('mobile-assistant-provider-item-codex')),
-        findsNothing,
-      );
-    });
+    }
 
     testWidgets('composer and submit stay visible with iPhone keyboard inset', (
       tester,
@@ -609,11 +556,5 @@ Widget _buildTestApp({
       data: MediaQueryData(size: const Size(430, 932), viewInsets: viewInsets),
       child: Scaffold(body: child),
     ),
-  );
-}
-
-UiFeatureManifest _defaultDesktopManifest() {
-  return UiFeatureManifest.fromYamlString(
-    File(UiFeatureManifest.assetPath).readAsStringSync(),
   );
 }

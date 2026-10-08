@@ -481,7 +481,7 @@ class UiFeatureAccess {
     AssistantExecutionTarget? target,
   ) {
     final available = availableExecutionTargets;
-    final resolved = target ?? available.first;
+    final resolved = target ?? AssistantExecutionTarget.gateway;
     return available.contains(resolved) ? resolved : available.first;
   }
 }

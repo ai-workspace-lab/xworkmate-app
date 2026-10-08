@@ -23,6 +23,7 @@ import '../../widgets/desktop_workspace_scaffold.dart';
 import '../../widgets/pane_resize_handle.dart';
 import '../../widgets/surface_card.dart';
 import 'assistant_page_main.dart';
+import 'assistant_bot_dialog.dart';
 import 'assistant_page_components.dart';
 import 'assistant_page_composer_bar.dart';
 import 'assistant_page_composer_state_helpers.dart';
@@ -94,6 +95,17 @@ extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
 
   Future<void> submitPromptInternal() async {
     final controller = widget.controller;
+    if (controller.assistantProductModeForSession(
+          controller.currentSessionKey,
+        ) ==
+        AssistantMode.autoBot) {
+      await showAssistantBotDialog(
+        context,
+        controller,
+        initialPrompt: inputControllerInternal.text.trim(),
+      );
+      return;
+    }
     final uiFeatures = controller.featuresFor(
       resolveUiFeaturePlatformFromContext(context),
     );

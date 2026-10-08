@@ -362,3 +362,31 @@ stateDiagram-v2
 | App sync | syncArtifactsFromBridge() | `~/.xworkmate/threads/<s>/` |
 | OpenClaw media | saveMediaBuffer(subdir) | `~/.openclaw/media/<subdir>/` |
 | OpenClaw temp | resolvePreferredOpenClawTmpDir() | `/tmp/openclaw/` |
+
+## Product worker extension
+
+The product mode is stored on the App thread and captured per turn in
+`metadata.xworkmateProductCapability` (`schemaVersion: 1`, Chat/Work/Code).
+Bridge validates this contract, resolves the real OpenClaw session and passes
+`productCapability` to `xworkmate.session.prepare`. The Gateway tool host binds
+the current trusted session/run/tool-call context to that prepared artifact
+scope before running Work (DSH ACP) or Code (OpenCode v2). Neither the App nor
+model chooses a filesystem execution scope. Cancellation/recovery continues
+to use the existing mapped App/OpenClaw/run identity; mode changes affect
+subsequent turns and do not reclassify an active run.
+
+Code exports `code.diff` and `tests.log` into the current task artifact scope.
+The existing file list and text preview render these actual outputs; successful
+file export alone does not establish passing tests. Runtime progress and
+terminal state use the existing Gateway task event/snapshot contract.
+
+Explicit model selections are complete `xworkmate/<model>` refs from the live
+Gateway catalog. Other providers and offline/local preset lists are not offered
+for product Gateway execution. Empty selection delegates to the deployment's
+central provider default. `sessions.patch` must apply a requested model to the
+mapped Gateway session before `chat.send`; patch failure blocks submission.
+
+These changes have local contract/widget/build evidence only. Worker execution,
+remote cancellation, tenant isolation, artifacts and reconnect continuity still
+require deployed end-to-end acceptance. Scheduled Bot worker execution also
+requires a trusted hook to prepare its server-created cron session/run scope.

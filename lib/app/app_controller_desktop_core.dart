@@ -587,10 +587,9 @@ class AppController extends ChangeNotifier {
   List<AssistantExecutionTarget> visibleAssistantExecutionTargets(
     Iterable<AssistantExecutionTarget> supportedTargets,
   ) {
-    final visible = compactAssistantExecutionTargets(supportedTargets);
-    final bridgeVisible = bridgeAvailableExecutionTargets;
-    if (bridgeVisible.isEmpty) return visible;
-    return visible.where((item) => bridgeVisible.contains(item)).toList();
+    return supportedTargets.contains(AssistantExecutionTarget.gateway)
+        ? const [AssistantExecutionTarget.gateway]
+        : const [];
   }
 
   String resolvedAssistantModelForTargetInternal(

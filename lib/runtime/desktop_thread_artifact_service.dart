@@ -668,6 +668,7 @@ class DesktopThreadArtifactService {
       'mov' => 'video/quicktime',
       'webm' => 'video/webm',
       'zip' => 'application/zip',
+      'diff' || 'patch' => 'text/x-diff',
       'dart' => 'text/x-dart',
       'js' => 'text/javascript',
       'ts' => 'text/typescript',
@@ -688,6 +689,8 @@ class DesktopThreadArtifactService {
   static bool isPlainTextExtensionInternal(String extension) {
     return <String>{
       'txt',
+      'diff',
+      'patch',
       'log',
       'json',
       'yaml',

@@ -1,6 +1,7 @@
 // ignore_for_file: unused_import, unnecessary_import
 
 import 'dart:async';
+import 'assistant_bot_dialog.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
@@ -340,12 +341,27 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
 
   /// A draft is sendable when it has non-whitespace text (or an attachment) and
   /// nothing is already running.
+  bool get isAutoBotInternal =>
+      widget.controller.assistantProductModeForSession(
+        widget.controller.currentSessionKey,
+      ) ==
+      AssistantMode.autoBot;
+
   bool get canSendInternal =>
       !runInFlightInternal &&
-      (widget.inputController.text.trim().isNotEmpty ||
+      (isAutoBotInternal ||
+          widget.inputController.text.trim().isNotEmpty ||
           widget.attachments.isNotEmpty);
 
   Future<void> handleSendInternal() async {
+    if (isAutoBotInternal) {
+      await showAssistantBotDialog(
+        context,
+        widget.controller,
+        initialPrompt: widget.inputController.text.trim(),
+      );
+      return;
+    }
     applySelectedBuiltinPluginsToInputInternal();
     await widget.onSend();
   }
@@ -374,6 +390,8 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
         .toList(growable: false);
     final submitLabel = runInFlightInternal
         ? appText('运行中', 'Running')
+        : isAutoBotInternal
+        ? appText('管理', 'Manage')
         : appText('提交', 'Submit');
     // The tooltip carries the key hint, and when the button is disabled, the
     // reason — a dead control with no explanation is worse than none.
@@ -382,6 +400,8 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
             '任务运行中，可在上方进度条停止。',
             'Task running — stop it from the progress bar above.',
           )
+        : isAutoBotInternal
+        ? appText('管理 AutoBot', 'Manage AutoBot')
         : canSendInternal
         ? appText('提交（Enter）', 'Submit (Enter)')
         : appText('先输入内容或添加附件', 'Type something or add an attachment first');
@@ -514,7 +534,10 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
                       ? ComposerToolbarChipInternal(
                           key: const Key('assistant-model-button'),
                           icon: Icons.bolt_rounded,
-                          tooltip: modelTooltipInternal(widget.modelLabel),
+                          tooltip: appText(
+                            '中央模型目录不可用',
+                            'Central model catalog unavailable',
+                          ),
                           showChevron: false,
                           padding: const EdgeInsets.symmetric(
                             horizontal: 10,

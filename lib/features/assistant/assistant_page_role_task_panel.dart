@@ -7,7 +7,6 @@ import '../../i18n/app_language.dart';
 import '../../runtime/role_routing.dart';
 import '../../theme/app_palette.dart';
 import '../../theme/app_theme.dart';
-import 'assistant_page_task_dialog_controls.dart';
 
 /// Shows the role, model and executor the bridge actually selected for the
 /// current task, plus any permission prompt waiting for the user.
@@ -63,9 +62,19 @@ class AssistantRoleTaskPanelInternal extends StatelessWidget {
     );
   }
 
+  static String _roleLabel(String role) => switch (role) {
+    'chat' => 'Chat',
+    'worker' => 'Worker',
+    'engineer' => 'Engineer',
+    'architect' => 'Architect',
+    'researcher' => 'Researcher',
+    'specialist' => 'Specialist',
+    _ => role,
+  };
+
   static String _statusLine(RoleTaskStatus status) {
     final parts = <String>[
-      if (status.role.isNotEmpty) roleRoutingRoleLabelInternal(status.role),
+      if (status.role.isNotEmpty) _roleLabel(status.role),
       if (status.modelId.isNotEmpty) status.modelId,
       if (status.providerId.isNotEmpty) status.providerId,
     ];
