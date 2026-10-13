@@ -136,6 +136,12 @@ desktop:
       build_modes: [debug, profile, release]
       description: Desktop assistant destination
       ui_surface: sidebar_navigation
+    bot_team:
+      enabled: true
+      release_tier: beta
+      build_modes: [debug, profile, release]
+      description: Desktop Bot team destination (role tasks via Accounts and the DSH orchestrator)
+      ui_surface: sidebar_navigation
     settings:
       enabled: true
       release_tier: stable

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../features/assistant/assistant_page.dart';
+import '../features/bot_team/bot_team_page.dart';
 import '../features/mobile/mobile_assistant_nav_page.dart';
 import '../features/mobile/mobile_settings_page.dart';
 import '../features/mobile/mobile_workbench_page.dart';
@@ -59,6 +60,13 @@ final Map<WorkspaceDestination, WorkspacePageSpec> workspacePageSpecsInternal =
               onOpenDetail: onOpenDetail,
               mobileActions: mobileActions,
             ),
+      ),
+      WorkspaceDestination.botTeam: WorkspacePageSpec(
+        destination: WorkspaceDestination.botTeam,
+        desktopBuilder: (controller, onOpenDetail) =>
+            BotTeamPage(clientFactory: controller.createTaskSessionClient),
+        mobileBuilder: (controller, onOpenDetail, mobileActions) =>
+            BotTeamPage(clientFactory: controller.createTaskSessionClient),
       ),
       WorkspaceDestination.workbench: WorkspacePageSpec(
         destination: WorkspaceDestination.workbench,

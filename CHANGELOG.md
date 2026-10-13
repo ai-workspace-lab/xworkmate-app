@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Bot 团队（AI Workspace v2.1）：桌面边栏新增「Bot 团队」入口（功能开关 `navigation.bot_team`，beta）。按角色下发任务，任务写入 Accounts（经 Bridge `/api/v1`），由 DSH 编排器选择执行器与模型；页面展示进度、结果，并支持取消。助手里旧的 ACP 角色下拉框和授权回传随 Bridge 一起移除。
 - Android release builds now publish both the APK and a Play Console-ready AAB.
   Main, tag, and manual release lanes require the Vault-backed upload keystore;
   pull request verification builds retain an explicit debug-signing fallback.

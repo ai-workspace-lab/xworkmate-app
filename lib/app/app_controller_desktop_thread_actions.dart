@@ -38,7 +38,6 @@ import 'app_controller_desktop_navigation.dart';
 import 'app_controller_desktop_gateway.dart';
 import 'app_controller_desktop_settings.dart';
 import 'app_controller_desktop_external_acp_routing.dart';
-import 'app_controller_desktop_role_routing.dart';
 import 'app_controller_desktop_thread_binding.dart';
 import 'app_controller_desktop_thread_sessions.dart';
 import 'app_controller_desktop_workspace_execution.dart';
@@ -637,9 +636,6 @@ extension AppControllerDesktopThreadActions on AppController {
     }
     markGatewayChatRunInternal(sessionKey);
     var handedOffToBridgeTask = false;
-    final roleRouting = roleRoutingForTurnInternal(target);
-    roleTaskStatusBySessionInternal.remove(sessionKey);
-    rolePendingPermissionsBySessionInternal.remove(sessionKey);
     try {
       final result = await goTaskServiceClientInternal.executeTask(
         GoTaskServiceRequest(
@@ -660,12 +656,8 @@ extension AppControllerDesktopThreadActions on AppController {
           routing: routing,
           routingHint: 'gateway',
           resumeSession: resumeSession,
-          roleRouting: roleRouting,
         ),
         onUpdate: (update) {
-          if (applyRoleTaskUpdateInternal(sessionKey, update)) {
-            return;
-          }
           if (update.isDelta) {
             appendAiGatewayStreamingTextInternal(sessionKey, update.text);
             notifyIfActiveInternal();
@@ -696,7 +688,6 @@ extension AppControllerDesktopThreadActions on AppController {
         );
         return;
       }
-      applyRoleTaskResultInternal(sessionKey, result);
       await applyGatewayChatResultInternal(
         sessionKey: sessionKey,
         target: target,

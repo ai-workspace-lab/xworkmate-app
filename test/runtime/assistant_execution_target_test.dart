@@ -5304,13 +5304,6 @@ class _RecordingGoTaskServiceClient implements GoTaskServiceClient {
     OpenClawTaskAssociation? association,
   }) async {}
 
-  @override
-  Future<void> respondPermission({
-    required AssistantExecutionTarget target,
-    required String sessionId,
-    required String requestId,
-    String? optionId,
-  }) async {}
 
   @override
   Future<void> dispose() async {}
@@ -5438,13 +5431,6 @@ class _BlockingGoTaskServiceClient implements GoTaskServiceClient {
     }
   }
 
-  @override
-  Future<void> respondPermission({
-    required AssistantExecutionTarget target,
-    required String sessionId,
-    required String requestId,
-    String? optionId,
-  }) async {}
 
   @override
   Future<void> dispose() async {}
