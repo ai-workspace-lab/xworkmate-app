@@ -47,8 +47,6 @@ class MobileAssistantComposer extends StatelessWidget {
     required this.onPickAttachments,
     required this.onRemoveAttachment,
     required this.onThinkingChanged,
-    required this.onSetExecutionTarget,
-    required this.onSetProvider,
     required this.onComposerStateChanged,
     required this.onSend,
   });
@@ -62,22 +60,12 @@ class MobileAssistantComposer extends StatelessWidget {
   final VoidCallback onPickAttachments;
   final ValueChanged<ComposerAttachmentInternal> onRemoveAttachment;
   final ValueChanged<String> onThinkingChanged;
-  final Future<void> Function(AssistantExecutionTarget target)
-  onSetExecutionTarget;
-  final Future<void> Function(SingleAgentProvider provider) onSetProvider;
   final VoidCallback onComposerStateChanged;
   final VoidCallback onSend;
 
   @override
   Widget build(BuildContext context) {
     final palette = context.palette;
-    final target = controller.currentAssistantExecutionTarget;
-    final provider = controller.assistantProviderForSession(
-      controller.currentSessionKey,
-    );
-    final providerLabel = provider.isUnspecified
-        ? appText('Provider 未就绪', 'Provider unavailable')
-        : provider.label;
     final hasPendingRun =
         controller.hasAssistantPendingRun || controller.activeRunId != null;
     final selectedSkillKeys = controller
@@ -281,40 +269,6 @@ class MobileAssistantComposer extends StatelessWidget {
                             spacing: 8,
                             runSpacing: 10,
                             children: [
-                              MobileAssistantActionChip(
-                                key: const Key(
-                                  'mobile-assistant-target-button',
-                                ),
-                                icon: target.isGateway
-                                    ? Icons.cloud_queue_rounded
-                                    : Icons.smart_toy_outlined,
-                                label: target.compactLabel,
-                                onTap: () {
-                                  Navigator.pop(sheetContext);
-                                  showMobileAssistantTargetSheet(
-                                    context,
-                                    controller: controller,
-                                    onSelected: onSetExecutionTarget,
-                                  );
-                                },
-                              ),
-                              MobileAssistantActionChip(
-                                key: const Key(
-                                  'mobile-assistant-provider-button',
-                                ),
-                                icon: Icons.hub_outlined,
-                                label: providerLabel,
-                                onTap: () {
-                                  Navigator.pop(sheetContext);
-                                  showMobileAssistantProviderSheet(
-                                    context,
-                                    controller: controller,
-                                    target: target,
-                                    selectedProvider: provider,
-                                    onSelected: onSetProvider,
-                                  );
-                                },
-                              ),
                               MobileAssistantActionChip(
                                 key: const Key(
                                   'mobile-assistant-permission-button',

@@ -1,13 +1,9 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xworkmate/app/app_controller.dart';
 import 'package:xworkmate/app/app_shell_desktop.dart';
-import 'package:xworkmate/app/ui_feature_manifest.dart';
 import 'package:xworkmate/app/workspace_page_registry.dart';
 import 'package:xworkmate/features/mobile/mobile_assistant_page.dart';
-import 'package:xworkmate/runtime/runtime_models.dart';
 import 'package:xworkmate/theme/app_theme.dart';
 
 void main() {
@@ -363,6 +359,20 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('mobile-assistant-tab-0')), findsOneWidget);
+      // Tasks always use the default connector, the unified bridge entry
+      // and the default provider, so the sheet offers no choice of them.
+      expect(
+        find.byKey(const Key('mobile-assistant-target-button')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const Key('mobile-assistant-provider-button')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const Key('mobile-assistant-permission-button')),
+        findsOneWidget,
+      );
       expect(find.byKey(const Key('mobile-assistant-tab-1')), findsOneWidget);
       expect(find.byKey(const Key('mobile-assistant-tab-2')), findsOneWidget);
       expect(
@@ -399,132 +409,6 @@ void main() {
           const Key('mobile-assistant-selected-plugin-builtin.document'),
         ),
         findsOneWidget,
-      );
-    });
-
-    testWidgets('provider sheet fails closed when capabilities are empty', (
-      tester,
-    ) async {
-      final controller = AppController(
-        environmentOverride: const <String, String>{},
-      );
-      addTearDown(controller.dispose);
-
-      await tester.pumpWidget(_buildTestApp(controller: controller));
-      await tester.pumpAndSettle();
-
-      await tester.tap(
-        find.byKey(const Key('mobile-assistant-composer-add-button')),
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(
-        find.byKey(const Key('mobile-assistant-provider-button')),
-      );
-      await tester.pumpAndSettle();
-
-      expect(
-        find.byKey(const Key('mobile-assistant-provider-empty-state')),
-        findsOneWidget,
-      );
-      expect(
-        find.byKey(const Key('mobile-assistant-provider-item-codex')),
-        findsNothing,
-      );
-      expect(
-        find.byKey(const Key('mobile-assistant-provider-item-openclaw')),
-        findsNothing,
-      );
-    });
-
-    testWidgets('provider sheet follows execution target capabilities', (
-      tester,
-    ) async {
-      final controller = AppController(
-        environmentOverride: const <String, String>{},
-        uiFeatureManifest: _defaultDesktopManifest(),
-        initialBridgeProviderCatalog: const <SingleAgentProvider>[
-          SingleAgentProvider.codex,
-        ],
-        initialGatewayProviderCatalog: <SingleAgentProvider>[
-          SingleAgentProvider.openclaw.copyWith(
-            supportedTargets: const <AssistantExecutionTarget>[
-              AssistantExecutionTarget.gateway,
-            ],
-          ),
-        ],
-        initialAvailableExecutionTargets: const <AssistantExecutionTarget>[
-          AssistantExecutionTarget.agent,
-          AssistantExecutionTarget.gateway,
-        ],
-      );
-      addTearDown(controller.dispose);
-
-      await tester.pumpWidget(
-        MaterialApp(
-          theme: AppTheme.light().copyWith(platform: TargetPlatform.iOS),
-          home: Scaffold(
-            body: Builder(
-              builder: (context) => Column(
-                children: [
-                  TextButton(
-                    key: const Key('show-agent-provider-sheet'),
-                    onPressed: () {
-                      showMobileAssistantProviderSheet(
-                        context,
-                        controller: controller,
-                        target: AssistantExecutionTarget.agent,
-                        selectedProvider: SingleAgentProvider.codex,
-                        onSelected: (_) async {},
-                      );
-                    },
-                    child: const Text('Agent providers'),
-                  ),
-                  TextButton(
-                    key: const Key('show-gateway-provider-sheet'),
-                    onPressed: () {
-                      showMobileAssistantProviderSheet(
-                        context,
-                        controller: controller,
-                        target: AssistantExecutionTarget.gateway,
-                        selectedProvider: SingleAgentProvider.openclaw,
-                        onSelected: (_) async {},
-                      );
-                    },
-                    child: const Text('Gateway providers'),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.byKey(const Key('show-agent-provider-sheet')));
-      await tester.pumpAndSettle();
-
-      expect(
-        find.byKey(const Key('mobile-assistant-provider-item-codex')),
-        findsOneWidget,
-      );
-      expect(
-        find.byKey(const Key('mobile-assistant-provider-item-openclaw')),
-        findsNothing,
-      );
-
-      await tester.tap(find.byKey(const Key('mobile-assistant-sheet-close')));
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.byKey(const Key('show-gateway-provider-sheet')));
-      await tester.pumpAndSettle();
-
-      expect(
-        find.byKey(const Key('mobile-assistant-provider-item-openclaw')),
-        findsOneWidget,
-      );
-      expect(
-        find.byKey(const Key('mobile-assistant-provider-item-codex')),
-        findsNothing,
       );
     });
 
@@ -609,11 +493,5 @@ Widget _buildTestApp({
       data: MediaQueryData(size: const Size(430, 932), viewInsets: viewInsets),
       child: Scaffold(body: child),
     ),
-  );
-}
-
-UiFeatureManifest _defaultDesktopManifest() {
-  return UiFeatureManifest.fromYamlString(
-    File(UiFeatureManifest.assetPath).readAsStringSync(),
   );
 }
