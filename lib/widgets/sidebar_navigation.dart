@@ -5,6 +5,7 @@ import '../models/app_models.dart';
 import '../runtime/runtime_models.dart';
 import '../theme/app_palette.dart';
 import '../theme/app_theme.dart';
+import 'pane_toggle_icon.dart';
 
 part 'sidebar_navigation_footer.dart';
 part 'sidebar_navigation_task_section.dart';
@@ -225,9 +226,9 @@ class _SidebarHeaderChevron extends StatelessWidget {
         border: Border.all(color: palette.strokeSoft),
       ),
       child: Center(
-        child: Icon(
-          Icons.chevron_right_rounded,
-          size: size * 0.72,
+        child: PaneToggleIcon(
+          side: PaneSide.left,
+          size: size * 0.6,
           color: palette.textSecondary,
         ),
       ),

@@ -34,7 +34,6 @@ import 'assistant_page_composer_clipboard.dart';
 import '../plugins/builtin_plugin_catalog.dart';
 import '../plugins/builtin_plugin_visuals.dart';
 import 'assistant_page_components_core.dart';
-import 'assistant_page_task_dialog_controls.dart';
 
 class ComposerBarInternal extends StatefulWidget {
   const ComposerBarInternal({
@@ -505,8 +504,6 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
                   ),
                   const SizedBox(width: 6),
                 ],
-                AssistantTaskDialogModeControlsInternal(controller: controller),
-                const SizedBox(width: 4),
                 if (widget.showModelControl) ...[
                   widget.modelOptions.isEmpty
                       ? ComposerToolbarChipInternal(

@@ -172,36 +172,6 @@ class _MobileAssistantDetailPageState extends State<MobileAssistantDetailPage> {
     }
   }
 
-  Future<void> setExecutionTarget(AssistantExecutionTarget target) async {
-    HapticFeedback.selectionClick();
-    try {
-      await widget.controller.ensureActiveAssistantThreadInternal();
-      await widget.controller.setAssistantExecutionTarget(target);
-    } catch (error) {
-      if (!mounted) {
-        return;
-      }
-      ScaffoldMessenger.maybeOf(
-        context,
-      )?.showSnackBar(SnackBar(content: Text(error.toString())));
-    }
-  }
-
-  Future<void> setProvider(SingleAgentProvider provider) async {
-    HapticFeedback.selectionClick();
-    try {
-      await widget.controller.ensureActiveAssistantThreadInternal();
-      await widget.controller.setAssistantProvider(provider);
-    } catch (error) {
-      if (!mounted) {
-        return;
-      }
-      ScaffoldMessenger.maybeOf(
-        context,
-      )?.showSnackBar(SnackBar(content: Text(error.toString())));
-    }
-  }
-
   Future<void> createMobileTask() async {
     final uiFeatures = widget.controller.featuresFor(
       resolveUiFeaturePlatformFromContext(context),
@@ -382,8 +352,6 @@ class _MobileAssistantDetailPageState extends State<MobileAssistantDetailPage> {
                               thinking = value;
                             });
                           },
-                          onSetExecutionTarget: setExecutionTarget,
-                          onSetProvider: setProvider,
                           onComposerStateChanged: () {
                             if (mounted) {
                               setState(() {});
