@@ -1,9 +1,6 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xworkmate/app/app_controller.dart';
-import 'package:xworkmate/app/ui_feature_manifest.dart';
 import 'package:xworkmate/features/assistant/assistant_page_composer_clipboard.dart';
 import 'package:xworkmate/features/assistant/assistant_page_composer_skill_picker.dart';
 import 'package:xworkmate/features/assistant/assistant_page_main.dart';
@@ -14,327 +11,8 @@ import 'package:xworkmate/widgets/surface_card.dart';
 void main() {
   group('AssistantLowerPaneInternal', () {
     testWidgets(
-      'does not fabricate providers when live capabilities are unavailable',
-      (tester) async {
-        final controller = AppController(
-          environmentOverride: const <String, String>{},
-        );
-        addTearDown(controller.dispose);
-
-        await controller.sessionsController.switchSession(
-          'unit-fixture-task-a',
-        );
-
-        await tester.pumpWidget(
-          _buildTestApp(child: _buildLowerPane(controller: controller)),
-        );
-        await tester.pumpAndSettle();
-
-        expect(
-          find.byKey(const Key('assistant-provider-button')),
-          findsOneWidget,
-        );
-        expect(find.text('未提供'), findsNothing);
-
-        final providerButton = tester
-            .widget<PopupMenuButton<SingleAgentProvider>>(
-              find.byKey(const Key('assistant-provider-button')),
-            );
-        expect(providerButton.enabled, isFalse);
-
-        expect(
-          find.byKey(const Key('assistant-provider-menu-item-codex')),
-          findsNothing,
-        );
-        expect(
-          find.byKey(const Key('assistant-provider-menu-item-opencode')),
-          findsNothing,
-        );
-        expect(
-          find.byKey(const Key('assistant-provider-menu-item-gemini')),
-          findsNothing,
-        );
-        expect(
-          find.byKey(const Key('assistant-provider-menu-item-openclaw')),
-          findsNothing,
-        );
-      },
-    );
-
-    testWidgets('shows mode-specific provider catalogs', (tester) async {
-      final controller = AppController(
-        environmentOverride: const <String, String>{},
-        uiFeatureManifest: _defaultDesktopManifest(),
-        initialBridgeProviderCatalog: const <SingleAgentProvider>[
-          SingleAgentProvider.codex,
-          SingleAgentProvider.opencode,
-          SingleAgentProvider.gemini,
-        ],
-        initialGatewayProviderCatalog: <SingleAgentProvider>[
-          SingleAgentProvider.openclaw.copyWith(
-            logoEmoji: '🦞',
-            supportedTargets: const <AssistantExecutionTarget>[
-              AssistantExecutionTarget.gateway,
-            ],
-          ),
-        ],
-        initialAvailableExecutionTargets: const <AssistantExecutionTarget>[
-          AssistantExecutionTarget.agent,
-          AssistantExecutionTarget.gateway,
-        ],
-      );
-      addTearDown(controller.dispose);
-
-      await controller.sessionsController.switchSession('unit-fixture-task-a');
-      controller.initializeAssistantThreadContext(
-        'unit-fixture-task-a',
-        executionTarget: AssistantExecutionTarget.agent,
-        messageViewMode: controller.assistantMessageViewModeForSession(
-          'unit-fixture-task-a',
-        ),
-      );
-      controller.notifyListeners();
-
-      await tester.pumpWidget(
-        _buildTestApp(child: _buildLowerPane(controller: controller)),
-      );
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.byKey(const Key('assistant-provider-button')));
-      await tester.pumpAndSettle();
-
-      expect(
-        find.byKey(const Key('assistant-provider-menu-item-codex')),
-        findsOneWidget,
-      );
-      expect(
-        find.byKey(const Key('assistant-provider-menu-item-opencode')),
-        findsOneWidget,
-      );
-      expect(
-        find.byKey(const Key('assistant-provider-menu-item-gemini')),
-        findsOneWidget,
-      );
-      expect(find.byIcon(Icons.check_rounded), findsOneWidget);
-      await tester.tap(
-        find.byKey(const Key('assistant-provider-menu-item-codex')),
-      );
-      await tester.pumpAndSettle();
-
-      expect(
-        find.byKey(const Key('assistant-execution-target-button')),
-        findsOneWidget,
-      );
-
-      final gatewayThread = controller
-          .requireTaskThreadForSessionInternal('unit-fixture-task-a')
-          .copyWith(
-            executionBinding: ExecutionBinding(
-              executionMode: threadExecutionModeFromAssistantExecutionTarget(
-                AssistantExecutionTarget.gateway,
-              ),
-              executorId: SingleAgentProvider.openclaw.providerId,
-              providerId: SingleAgentProvider.openclaw.providerId,
-              endpointId: '',
-              executionModeSource: ThreadSelectionSource.explicit,
-              providerSource: ThreadSelectionSource.explicit,
-            ),
-            updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-          );
-      controller.taskThreadRepositoryInternal.replace(
-        gatewayThread,
-        persist: false,
-      );
-      controller.notifyListeners();
-      await tester.pumpAndSettle();
-
-      expect(controller.assistantExecutionTarget.name, 'gateway');
-      expect(
-        find.byKey(const Key('assistant-provider-button')),
-        findsOneWidget,
-      );
-
-      await tester.tap(find.byKey(const Key('assistant-provider-button')));
-      await tester.pumpAndSettle();
-
-      expect(
-        find.byKey(const Key('assistant-provider-menu-item-openclaw')),
-        findsOneWidget,
-      );
-      expect(find.byIcon(Icons.check_rounded), findsOneWidget);
-      await tester.tap(
-        find.byKey(const Key('assistant-provider-menu-item-openclaw')),
-      );
-      await tester.pumpAndSettle();
-
-      final agentThread = controller
-          .requireTaskThreadForSessionInternal('unit-fixture-task-a')
-          .copyWith(
-            executionBinding: ExecutionBinding(
-              executionMode: threadExecutionModeFromAssistantExecutionTarget(
-                AssistantExecutionTarget.agent,
-              ),
-              executorId: SingleAgentProvider.codex.providerId,
-              providerId: SingleAgentProvider.codex.providerId,
-              endpointId: '',
-              executionModeSource: ThreadSelectionSource.explicit,
-              providerSource: ThreadSelectionSource.explicit,
-            ),
-            updatedAtMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
-          );
-      controller.taskThreadRepositoryInternal.replace(
-        agentThread,
-        persist: false,
-      );
-      controller.notifyListeners();
-      await tester.pumpAndSettle();
-
-      expect(controller.assistantExecutionTarget.name, 'agent');
-      expect(
-        find.byKey(const Key('assistant-provider-button')),
-        findsOneWidget,
-      );
-
-      await tester.tap(find.byKey(const Key('assistant-provider-button')));
-      await tester.pumpAndSettle();
-
-      expect(
-        find.byKey(const Key('assistant-provider-menu-item-codex')),
-        findsOneWidget,
-      );
-      expect(
-        find.byKey(const Key('assistant-provider-menu-item-openclaw')),
-        findsNothing,
-      );
-      expect(
-        find.byKey(const Key('assistant-provider-menu-item-opencode')),
-        findsOneWidget,
-      );
-      expect(
-        find.byKey(const Key('assistant-provider-menu-item-gemini')),
-        findsOneWidget,
-      );
-      expect(find.byIcon(Icons.check_rounded), findsOneWidget);
-    });
-
-    testWidgets('shows assistant providers and allows switching provider', (
-      tester,
-    ) async {
-      final controller = AppController(
-        environmentOverride: const <String, String>{},
-        uiFeatureManifest: _defaultDesktopManifest(),
-        initialBridgeProviderCatalog: const <SingleAgentProvider>[
-          SingleAgentProvider.codex,
-          SingleAgentProvider.opencode,
-          SingleAgentProvider.gemini,
-        ],
-      );
-      addTearDown(controller.dispose);
-
-      await controller.sessionsController.switchSession('unit-fixture-task-a');
-
-      await tester.pumpWidget(
-        _buildTestApp(child: _buildLowerPane(controller: controller)),
-      );
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.byKey(const Key('assistant-provider-button')));
-      await tester.pumpAndSettle();
-
-      expect(
-        find.byKey(const Key('assistant-provider-menu-item-codex')),
-        findsOneWidget,
-      );
-      expect(
-        find.byKey(const Key('assistant-provider-menu-item-opencode')),
-        findsOneWidget,
-      );
-      expect(
-        find.byKey(const Key('assistant-provider-menu-item-gemini')),
-        findsOneWidget,
-      );
-
-      await tester.tap(
-        find.byKey(const Key('assistant-provider-menu-item-opencode')),
-      );
-      await tester.pumpAndSettle();
-
-      expect(
-        controller
-            .assistantProviderForSession(controller.currentSessionKey)
-            .providerId,
-        'opencode',
-      );
-    });
-
-    testWidgets('locks gateway provider menu to canonical openclaw only', (
-      tester,
-    ) async {
-      final controller = AppController(
-        environmentOverride: const <String, String>{},
-        uiFeatureManifest: _defaultDesktopManifest(),
-        initialBridgeProviderCatalog: const <SingleAgentProvider>[
-          SingleAgentProvider.codex,
-          SingleAgentProvider.opencode,
-          SingleAgentProvider.gemini,
-        ],
-        initialGatewayProviderCatalog: <SingleAgentProvider>[
-          SingleAgentProvider.openclaw.copyWith(
-            logoEmoji: '🦞',
-            supportedTargets: const <AssistantExecutionTarget>[
-              AssistantExecutionTarget.gateway,
-            ],
-          ),
-        ],
-        initialAvailableExecutionTargets: const <AssistantExecutionTarget>[
-          AssistantExecutionTarget.agent,
-          AssistantExecutionTarget.gateway,
-        ],
-      );
-      addTearDown(controller.dispose);
-
-      await controller.sessionsController.switchSession('unit-fixture-task-a');
-      controller.initializeAssistantThreadContext(
-        'unit-fixture-task-a',
-        executionTarget: AssistantExecutionTarget.gateway,
-        messageViewMode: controller.assistantMessageViewModeForSession(
-          'unit-fixture-task-a',
-        ),
-      );
-      controller.notifyListeners();
-
-      await tester.pumpWidget(
-        _buildTestApp(child: _buildLowerPane(controller: controller)),
-      );
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.byKey(const Key('assistant-provider-button')));
-      await tester.pumpAndSettle();
-
-      expect(
-        find.byKey(const Key('assistant-provider-menu-item-openclaw')),
-        findsOneWidget,
-      );
-      expect(
-        find.byKey(const Key('assistant-provider-menu-item-hermes')),
-        findsNothing,
-      );
-      expect(
-        find.byKey(const Key('assistant-provider-menu-item-codex')),
-        findsNothing,
-      );
-      expect(find.byIcon(Icons.check_rounded), findsOneWidget);
-
-      expect(
-        controller
-            .assistantProviderForSession(controller.currentSessionKey)
-            .providerId,
-        'openclaw',
-      );
-    });
-
-    testWidgets(
-      'does not fabricate agent mode when only OpenClaw gateway is live',
+      'the composer routes through the default bridge entry and shows no '
+      'connector or provider menus',
       (tester) async {
         final controller = AppController(
           environmentOverride: const <String, String>{},
@@ -342,109 +20,31 @@ void main() {
             SingleAgentProvider.openclaw,
           ],
           initialAvailableExecutionTargets: const <AssistantExecutionTarget>[
+            AssistantExecutionTarget.agent,
             AssistantExecutionTarget.gateway,
           ],
         );
         addTearDown(controller.dispose);
-
         await controller.sessionsController.switchSession(
           'unit-fixture-task-a',
         );
-        controller.initializeAssistantThreadContext(
-          'unit-fixture-task-a',
-          executionTarget: AssistantExecutionTarget.gateway,
-          messageViewMode: controller.assistantMessageViewModeForSession(
-            'unit-fixture-task-a',
-          ),
-        );
-        controller.notifyListeners();
 
         await tester.pumpWidget(
           _buildTestApp(child: _buildLowerPane(controller: controller)),
         );
         await tester.pumpAndSettle();
 
-        await tester.tap(
-          find.byKey(const Key('assistant-execution-target-button')),
-        );
-        await tester.pumpAndSettle();
-
         expect(
-          find.byKey(const Key('assistant-execution-target-menu-item-agent')),
+          find.byKey(const Key('assistant-execution-target-button')),
           findsNothing,
         );
         expect(
-          find.byKey(const Key('assistant-execution-target-menu-item-gateway')),
-          findsOneWidget,
+          find.byKey(const Key('assistant-provider-button')),
+          findsNothing,
         );
+        expect(find.byKey(const Key('assistant-send-button')), findsOneWidget);
       },
     );
-
-    testWidgets('shows Agent and Gateway modes when bridge reports both', (
-      tester,
-    ) async {
-      final controller = AppController(
-        environmentOverride: const <String, String>{},
-        uiFeatureManifest: _defaultDesktopManifest(),
-        initialBridgeProviderCatalog: const <SingleAgentProvider>[
-          SingleAgentProvider.codex,
-          SingleAgentProvider.opencode,
-        ],
-        initialGatewayProviderCatalog: const <SingleAgentProvider>[
-          SingleAgentProvider.openclaw,
-        ],
-        initialAvailableExecutionTargets: const <AssistantExecutionTarget>[
-          AssistantExecutionTarget.agent,
-          AssistantExecutionTarget.gateway,
-        ],
-      );
-      addTearDown(controller.dispose);
-
-      await controller.sessionsController.switchSession('unit-fixture-task-a');
-      controller.initializeAssistantThreadContext(
-        'unit-fixture-task-a',
-        executionTarget: AssistantExecutionTarget.gateway,
-        messageViewMode: controller.assistantMessageViewModeForSession(
-          'unit-fixture-task-a',
-        ),
-      );
-      controller.notifyListeners();
-
-      await tester.pumpWidget(
-        _buildTestApp(child: _buildLowerPane(controller: controller)),
-      );
-      await tester.pumpAndSettle();
-
-      expect(controller.currentAssistantExecutionTarget.isGateway, isTrue);
-
-      await tester.tap(
-        find.byKey(const Key('assistant-execution-target-button')),
-      );
-      await tester.pumpAndSettle();
-
-      expect(
-        find.byKey(const Key('assistant-execution-target-menu-item-agent')),
-        findsOneWidget,
-      );
-      expect(
-        find.byKey(const Key('assistant-execution-target-menu-item-gateway')),
-        findsOneWidget,
-      );
-
-      expect(controller.currentAssistantExecutionTarget.isGateway, isTrue);
-      expect(
-        controller
-            .providerCatalogForExecutionTarget(AssistantExecutionTarget.agent)
-            .map((provider) => provider.providerId),
-        const <String>['codex', 'opencode'],
-      );
-      expect(
-        controller
-            .providerCatalogForExecutionTarget(AssistantExecutionTarget.gateway)
-            .map((provider) => provider.providerId),
-        const <String>[kCanonicalGatewayProviderId],
-      );
-    });
 
     testWidgets('uses submit button instead of connect action', (tester) async {
       final controller = AppController(
@@ -729,12 +329,6 @@ void main() {
       },
     );
   });
-}
-
-UiFeatureManifest _defaultDesktopManifest() {
-  return UiFeatureManifest.fromYamlString(
-    File(UiFeatureManifest.assetPath).readAsStringSync(),
-  );
 }
 
 Widget _buildTestApp({required Widget child, double height = 360}) {
