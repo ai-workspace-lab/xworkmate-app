@@ -4,6 +4,7 @@ import 'package:xworkmate/app/app_controller.dart';
 import 'package:xworkmate/app/app_shell_desktop.dart';
 import 'package:xworkmate/app/workspace_page_registry.dart';
 import 'package:xworkmate/features/mobile/mobile_assistant_page.dart';
+import 'package:xworkmate/runtime/runtime_models.dart';
 import 'package:xworkmate/theme/app_theme.dart';
 
 void main() {
@@ -411,6 +412,82 @@ void main() {
         findsOneWidget,
       );
     });
+
+    for (final withCatalog in [false, true]) {
+      testWidgets(
+        'mobile mode configuration removes provider routing (catalog=$withCatalog)',
+        (tester) async {
+          final controller = AppController(
+            environmentOverride: const <String, String>{},
+            initialBridgeProviderCatalog: withCatalog
+                ? const [SingleAgentProvider.codex]
+                : const [],
+            initialGatewayProviderCatalog: withCatalog
+                ? const [SingleAgentProvider.openclaw]
+                : const [],
+          );
+          final input = TextEditingController();
+          final focus = FocusNode();
+          addTearDown(controller.dispose);
+          addTearDown(input.dispose);
+          addTearDown(focus.dispose);
+          await tester.pumpWidget(
+            MaterialApp(
+              theme: AppTheme.light(platform: TargetPlatform.iOS),
+              home: Scaffold(
+                body: Align(
+                  alignment: Alignment.bottomCenter,
+                  child: MobileAssistantComposer(
+                    controller: controller,
+                    inputController: input,
+                    focusNode: focus,
+                    thinking: 'off',
+                    bottomPadding: 0,
+                    attachments: const [],
+                    onPickAttachments: () {},
+                    onRemoveAttachment: (_) {},
+                    onThinkingChanged: (_) {},
+                    onComposerStateChanged: () {},
+                    onSend: () {},
+                  ),
+                ),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+          await tester.tap(
+            find.byKey(const Key('mobile-assistant-composer-add-button')),
+          );
+          await tester.pumpAndSettle();
+          expect(
+            find.byKey(const Key('mobile-assistant-provider-button')),
+            findsNothing,
+          );
+          expect(
+            find.byKey(const Key('mobile-assistant-provider-empty-state')),
+            findsNothing,
+          );
+          await tester.tap(
+            find.byKey(const Key('mobile-assistant-product-mode-button')),
+          );
+          await tester.pumpAndSettle();
+          for (final mode in ['chat', 'work', 'coding', 'autoBot']) {
+            expect(
+              find.byKey(Key('mobile-assistant-product-mode-$mode')),
+              findsOneWidget,
+            );
+          }
+          expect(
+            find.byKey(const Key('mobile-assistant-target-item-gateway')),
+            findsNothing,
+          );
+          expect(
+            find.byKey(const Key('mobile-assistant-target-item-agent')),
+            findsNothing,
+          );
+        },
+      );
+    }
 
     testWidgets('composer and submit stay visible with iPhone keyboard inset', (
       tester,

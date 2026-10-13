@@ -6,6 +6,43 @@ import 'package:xworkmate/runtime/desktop_thread_artifact_service.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
 
 void main() {
+  test('Code diff and test logs project as bounded text artifacts', () async {
+    final workspace = await Directory.systemTemp.createTemp(
+      'xworkmate-code-artifacts-',
+    );
+    addTearDown(() => workspace.delete(recursive: true));
+    const content = {
+      'changes.patch':
+          '--- a/main.dart\n+++ b/main.dart\n@@ -1 +1 @@\n-old\n+new',
+      'changes.diff': '-old\n+new',
+      'tests.log': '2 tests passed',
+      'test-results.json': '{"passed":2,"failed":0}',
+    };
+    for (final artifact in content.entries) {
+      await File(
+        '${workspace.path}/${artifact.key}',
+      ).writeAsString(artifact.value);
+    }
+    final service = DesktopThreadArtifactService();
+    final snapshot = await service.loadSnapshot(
+      workspacePath: workspace.path,
+      workspaceKind: WorkspaceRefKind.localPath,
+      artifactRelativePaths: content.keys.toList(),
+    );
+    expect(snapshot.fileEntries, hasLength(4));
+    for (final entry in snapshot.fileEntries) {
+      expect(entry.previewable, isTrue, reason: entry.relativePath);
+      final preview = await service.loadPreview(
+        entry: entry,
+        workspacePath: workspace.path,
+        workspaceKind: WorkspaceRefKind.localPath,
+        artifactRelativePaths: content.keys.toList(),
+      );
+      expect(preview.kind, AssistantArtifactPreviewKind.text);
+      expect(preview.content, content[entry.relativePath]);
+    }
+  });
+
   test(
     'loadSnapshot hides historical workspace files when current run has no artifacts',
     () async {

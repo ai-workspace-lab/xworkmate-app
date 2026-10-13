@@ -253,7 +253,7 @@ extension AppControllerDesktopThreadStorage on AppController {
   AssistantExecutionTarget sanitizePersistedExecutionTargetInternal(
     AssistantExecutionTarget? target,
   ) {
-    return sanitizeExecutionTargetInternal(target);
+    return AssistantExecutionTarget.gateway;
   }
 
   void appendAssistantThreadMessageInternal(

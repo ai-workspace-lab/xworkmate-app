@@ -43,20 +43,41 @@ import 'app_controller_desktop_runtime_helpers.dart';
 
 // ignore_for_file: invalid_use_of_visible_for_testing_member, invalid_use_of_protected_member
 extension AppControllerDesktopWorkspaceExecution on AppController {
+  Future<void> setAssistantProductMode(AssistantMode mode) async {
+    await ensureActiveAssistantThreadInternal();
+    await setAssistantExecutionTarget(AssistantExecutionTarget.gateway);
+    upsertTaskThreadInternal(currentSessionKey, productMode: mode);
+    await flushAssistantThreadPersistenceInternal();
+    notifyIfActiveInternal();
+  }
+
   Future<void> setAssistantExecutionTarget(
     AssistantExecutionTarget target,
   ) async {
-    final resolvedTarget = sanitizePersistedExecutionTargetInternal(target);
+    if (target != AssistantExecutionTarget.gateway) {
+      throw StateError('App tasks require the managed Bridge Gateway route.');
+    }
+    final resolvedTarget = AssistantExecutionTarget.gateway;
     final currentTarget = assistantExecutionTargetForSession(
       sessionsControllerInternal.currentSessionKey,
     );
+    final record = taskThreadForSessionInternal(
+      sessionsControllerInternal.currentSessionKey,
+    );
     if (currentTarget == resolvedTarget &&
-        settings.assistantExecutionTarget == resolvedTarget) {
+        settings.assistantExecutionTarget == resolvedTarget &&
+        record?.executionBinding.providerSource ==
+            ThreadSelectionSource.explicit &&
+        (record?.executionBinding.providerId.isNotEmpty ?? false)) {
       return;
     }
     if (!assistantThreadRecordsInternal.containsKey(
       sessionsControllerInternal.currentSessionKey,
     )) {
+      // Finish this write before initialization schedules background binding.
+      await persistAssistantLastSessionKeyInternal(
+        sessionsControllerInternal.currentSessionKey,
+      );
       initializeAssistantThreadContext(
         sessionsControllerInternal.currentSessionKey,
         executionTarget: resolvedTarget,
@@ -243,7 +264,8 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
         ),
         refreshAcpCapabilities: refreshAcpCapabilities,
       );
-    } catch (e, stackTrace) { debugPrint('Error: $e\n$stackTrace');
+    } catch (e, stackTrace) {
+      debugPrint('Error: $e\n$stackTrace');
       // Keep the selected execution target even when the immediate reconnect
       // fails so the user can retry or adjust gateway settings manually.
     }
@@ -280,6 +302,10 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
     final choices = matchesSessionKey(normalizedSessionKey, currentSessionKey)
         ? assistantModelChoices
         : assistantModelChoicesForSessionInternal(normalizedSessionKey);
+    if (assistantExecutionTargetForSession(normalizedSessionKey).isGateway &&
+        !choices.contains(trimmed)) {
+      return;
+    }
     if (choices.isNotEmpty && !choices.contains(trimmed)) {
       return;
     }
@@ -446,7 +472,8 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
               sessionId: normalizedSessionKey,
               threadId: normalizedSessionKey,
             );
-          } catch (e, stackTrace) { debugPrint('Error: $e\n$stackTrace');
+          } catch (e, stackTrace) {
+            debugPrint('Error: $e\n$stackTrace');
             // Best effort only.
           }
         }).catchError((_) {}),

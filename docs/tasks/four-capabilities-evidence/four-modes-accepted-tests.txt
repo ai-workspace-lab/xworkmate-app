@@ -1,0 +1,45 @@
+Latest four-mode / no-Provider source validation (2026-10-03)
+
+flutter analyze --no-pub: no issues (/tmp/xworkmate-no-provider-analyze-frozen.log)
+Nearest persistence/desktop/mobile AutoBot tests: 31 passed (/tmp/xworkmate-no-provider-green.log)
+Mobile no-provider mode configuration: 2 passed (/tmp/xworkmate-no-provider-mobile-final.log)
+Full flutter test --no-pub --reporter json: 590 passed / 23 failed, 148.370s, exit 1
+Raw local output: /tmp/xworkmate-no-provider-accepted.json
+All 23 failed names exactly match final-full-failures.txt from the prior baseline.
+No new failed names. Recorded golden baselines were not refreshed.
+Gateway lifecycle fixtures were migrated from direct Agent to canonical Gateway,
+retaining send/cancel/recovery/artifact assertions and awaiting admission + real
+terminal finalization. An interim mixed compilation from editing the mobile key
+while tests ran was discarded; the accepted run used frozen source.
+
+Visual evidence: four-modes-widget-render.png is an actual English Flutter
+composer/menu test rendering with loaded system text and Material/Cupertino
+icon fonts, compact viewport and no debug ribbon. It is not a device or live
+service screenshot. Input-field pixel comparison and mode-chip rectangles pass.
+Mocked runtime/RPC tests do not prove remote model/worker execution or store
+acceptance. The old unsigned iOS package predates this latest dialog update.
+
+Failed names:
+workbench overview matches the desktop visual baseline
+MobileSettingsPage login failure is visible on the mobile sign-in card
+MobileSettingsPage sync completion refreshes last sync row and shows feedback
+mobile assistant home matches v1.1 redesign golden
+mobile assistant home shows the selected plugin shortcut
+MobileAssistantPage mobile shell renders the mobile assistant surface
+MobileAssistantPage mobile menu opens task navigation with home breadcrumb
+MobileAssistantPage mobile plugins tab shows the built-in plugin panel
+MobileAssistantPage mobile history opens quick task switcher
+GatewayAcpClient authorization desktop bridge auth resolver prefers synced managed bridge token over stale environment token
+GatewayAcpClient authorization desktop controller uses unified bridge RPC for all task submits
+GatewayAcpClient authorization desktop controller resolves OpenClaw gateway submit to unified bridge RPC
+downloads bridge URL artifacts into the local thread workspace
+syncs bridge OpenClaw download URL artifacts into the draft task workspace
+keeps signed OpenClaw artifacts when the snapshot status is none
+resumes bridge artifact downloads after a weak network disconnect
+retries bridge artifact downloads up to five weak network attempts
+keeps syncing later artifacts when one download fails
+drops artifacts when size or sha256 validation fails
+OpenClaw artifact sync times out when artifact downloads keep failing
+Assistant connection state uses the same gateway capability readiness for status and send guard
+Assistant connection state refreshes gateway capabilities when previous discovery missed openclaw
+Assistant model display shows matched runtime model when gateway catalog is available

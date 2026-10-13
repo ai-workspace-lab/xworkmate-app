@@ -1,6 +1,7 @@
 // ignore_for_file: unused_import, unnecessary_import, invalid_use_of_visible_for_testing_member, invalid_use_of_protected_member
 
 import 'dart:async';
+import '../runtime/central_gateway_catalog.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -92,10 +93,7 @@ List<String> connectedGatewayModelChoicesThreadSessionInternal(
   if (controller.connection.status != RuntimeConnectionStatus.connected) {
     return const <String>[];
   }
-  return controller.modelsControllerInternal.items
-      .map((item) => item.id.trim())
-      .where((item) => item.isNotEmpty)
-      .toList(growable: false);
+  return centralGatewayModelRefs(controller.modelsControllerInternal.items);
 }
 
 List<String> assistantModelChoicesThreadSessionInternal(

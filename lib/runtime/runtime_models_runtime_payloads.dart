@@ -664,6 +664,7 @@ WorkspaceRefKind workspaceRefKindFromWorkspaceKind(WorkspaceKind kind) {
 class ThreadContextState {
   const ThreadContextState({
     required this.messages,
+    this.productMode = AssistantMode.chat,
     required this.selectedModelId,
     required this.selectedSkillKeys,
     required this.permissionLevel,
@@ -682,6 +683,7 @@ class ThreadContextState {
     this.taskInputAttachments = const <TaskInputAttachmentRecord>[],
   });
 
+  final AssistantMode productMode;
   final List<GatewayChatMessage> messages;
   final String selectedModelId;
   final List<String> selectedSkillKeys;
@@ -701,6 +703,7 @@ class ThreadContextState {
   final List<TaskInputAttachmentRecord> taskInputAttachments;
 
   ThreadContextState copyWith({
+    AssistantMode? productMode,
     List<GatewayChatMessage>? messages,
     String? selectedModelId,
     List<String>? selectedSkillKeys,
@@ -722,6 +725,7 @@ class ThreadContextState {
     List<TaskInputAttachmentRecord>? taskInputAttachments,
   }) {
     return ThreadContextState(
+      productMode: productMode ?? this.productMode,
       messages: messages ?? this.messages,
       selectedModelId: selectedModelId ?? this.selectedModelId,
       selectedSkillKeys: selectedSkillKeys ?? this.selectedSkillKeys,
@@ -755,6 +759,7 @@ class ThreadContextState {
 
   Map<String, dynamic> toJson() {
     return <String, dynamic>{
+      'productMode': productMode.name,
       'messages': messages.map((item) => item.toJson()).toList(growable: false),
       'selectedModelId': selectedModelId,
       'selectedSkillKeys': selectedSkillKeys,
@@ -804,6 +809,9 @@ class ThreadContextState {
               .toList(growable: false)
         : const <String>[];
     return ThreadContextState(
+      productMode: AssistantModeContract.fromJsonValue(
+        json['productMode']?.toString(),
+      ),
       messages: messages,
       selectedModelId: json['selectedModelId']?.toString() ?? '',
       selectedSkillKeys: selectedSkillKeys,

@@ -118,12 +118,3 @@ IconData mobilePermissionIcon(AssistantPermissionLevel level) {
     AssistantPermissionLevel.fullAccess => Icons.error_outline_rounded,
   };
 }
-
-String mobileProviderBadgeLabel(SingleAgentProvider provider) {
-  final badge = provider.badge.trim();
-  if (badge.isNotEmpty) {
-    return badge;
-  }
-  final label = provider.label.trim();
-  return label.isEmpty ? '?' : label.characters.first;
-}

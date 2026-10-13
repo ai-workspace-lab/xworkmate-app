@@ -224,3 +224,12 @@ host_vars/jp-xhttp-contabo.svc.plus/xworkmate_bridge_distributed.yml:
 
 6. **D6: All-in-memory state amplifies risk**
    Both session state and session route store are in-memory. If either node restarts, both session data and routing stickiness are lost simultaneously.
+
+## Fixed App product route
+
+Chat, Work, Coding and AutoBot always use the managed authenticated Bridge;
+Bridge owns the canonical OpenClaw Gateway route. A legacy Agent target in local
+thread storage or in Bridge capability discovery does not expose a direct App
+route. Worker choice and scheduled-task execution stay behind Gateway. Coding
+retains the deployed schemaVersion 1 `code` wire name pending a coordinated
+Bridge/plugin protocol version migration; AutoBot uses native cron RPC.

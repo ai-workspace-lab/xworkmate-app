@@ -1,6 +1,9 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xworkmate/app/app_controller.dart';
+import 'package:xworkmate/app/ui_feature_manifest.dart';
 import 'package:xworkmate/features/assistant/assistant_page_composer_clipboard.dart';
 import 'package:xworkmate/features/assistant/assistant_page_composer_skill_picker.dart';
 import 'package:xworkmate/features/assistant/assistant_page_main.dart';
@@ -10,9 +13,66 @@ import 'package:xworkmate/widgets/surface_card.dart';
 
 void main() {
   group('AssistantLowerPaneInternal', () {
+    for (final variant in [
+      'offline',
+      'direct catalog',
+      'Gateway catalog',
+      'legacy Agent binding',
+    ]) {
+      testWidgets('$variant never exposes Provider or route controls', (
+        tester,
+      ) async {
+        final controller = AppController(
+          environmentOverride: const <String, String>{},
+          initialBridgeProviderCatalog: variant == 'direct catalog'
+              ? const [SingleAgentProvider.codex, SingleAgentProvider.opencode]
+              : const [],
+          initialGatewayProviderCatalog:
+              variant == 'Gateway catalog' || variant == 'legacy Agent binding'
+              ? const [SingleAgentProvider.openclaw]
+              : const [],
+        );
+        addTearDown(controller.dispose);
+        await controller.sessionsController.switchSession(
+          'unit-fixture-task-a',
+        );
+        if (variant == 'legacy Agent binding') {
+          controller.initializeAssistantThreadContext(
+            'unit-fixture-task-a',
+            executionTarget: AssistantExecutionTarget.agent,
+          );
+        }
+        await tester.pumpWidget(
+          _buildTestApp(child: _buildLowerPane(controller: controller)),
+        );
+        await tester.pumpAndSettle();
+        expect(
+          controller.currentAssistantExecutionTarget,
+          AssistantExecutionTarget.gateway,
+        );
+        expect(
+          find.byKey(const Key('assistant-product-mode-button')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const Key('assistant-provider-button')),
+          findsNothing,
+        );
+        expect(
+          find.byKey(const Key('assistant-execution-target-button')),
+          findsNothing,
+        );
+        for (final provider in ['openclaw', 'codex', 'opencode', 'gemini']) {
+          expect(
+            find.byKey(Key('assistant-provider-menu-item-$provider')),
+            findsNothing,
+          );
+        }
+      });
+    }
+
     testWidgets(
-      'the composer routes through the default bridge entry and shows no '
-      'connector or provider menus',
+      'four product modes are independent of the fixed Gateway route',
       (tester) async {
         final controller = AppController(
           environmentOverride: const <String, String>{},
@@ -34,15 +94,96 @@ void main() {
         );
         await tester.pumpAndSettle();
 
+        await tester.tap(
+          find.byKey(const Key('assistant-product-mode-button')),
+        );
+        await tester.pumpAndSettle();
+
         expect(
           find.byKey(const Key('assistant-execution-target-button')),
           findsNothing,
         );
         expect(
-          find.byKey(const Key('assistant-provider-button')),
+          find.byKey(const Key('assistant-execution-target-menu-item-gateway')),
           findsNothing,
         );
-        expect(find.byKey(const Key('assistant-send-button')), findsOneWidget);
+        for (final mode in ['chat', 'work', 'coding', 'autoBot']) {
+          expect(
+            find.byKey(Key('assistant-product-mode-$mode')),
+            findsOneWidget,
+          );
+        }
+      },
+    );
+
+    testWidgets(
+      'legacy Bridge targets do not become selectable product routes',
+      (tester) async {
+        final controller = AppController(
+          environmentOverride: const <String, String>{},
+          uiFeatureManifest: _defaultDesktopManifest(),
+          initialBridgeProviderCatalog: const <SingleAgentProvider>[
+            SingleAgentProvider.codex,
+            SingleAgentProvider.opencode,
+          ],
+          initialGatewayProviderCatalog: const <SingleAgentProvider>[
+            SingleAgentProvider.openclaw,
+          ],
+          initialAvailableExecutionTargets: const <AssistantExecutionTarget>[
+            AssistantExecutionTarget.agent,
+            AssistantExecutionTarget.gateway,
+          ],
+        );
+        addTearDown(controller.dispose);
+
+        await controller.sessionsController.switchSession(
+          'unit-fixture-task-a',
+        );
+        controller.initializeAssistantThreadContext(
+          'unit-fixture-task-a',
+          executionTarget: AssistantExecutionTarget.gateway,
+          messageViewMode: controller.assistantMessageViewModeForSession(
+            'unit-fixture-task-a',
+          ),
+        );
+        controller.notifyListeners();
+
+        await tester.pumpWidget(
+          _buildTestApp(child: _buildLowerPane(controller: controller)),
+        );
+        await tester.pumpAndSettle();
+
+        expect(controller.currentAssistantExecutionTarget.isGateway, isTrue);
+
+        await tester.tap(
+          find.byKey(const Key('assistant-product-mode-button')),
+        );
+        await tester.pumpAndSettle();
+
+        expect(
+          find.byKey(const Key('assistant-execution-target-menu-item-agent')),
+          findsNothing,
+        );
+        expect(
+          find.byKey(const Key('assistant-execution-target-menu-item-gateway')),
+          findsNothing,
+        );
+
+        expect(controller.currentAssistantExecutionTarget.isGateway, isTrue);
+        expect(
+          controller
+              .providerCatalogForExecutionTarget(AssistantExecutionTarget.agent)
+              .map((provider) => provider.providerId),
+          const <String>['codex', 'opencode'],
+        );
+        expect(
+          controller
+              .providerCatalogForExecutionTarget(
+                AssistantExecutionTarget.gateway,
+              )
+              .map((provider) => provider.providerId),
+          const <String>[kCanonicalGatewayProviderId],
+        );
       },
     );
 
@@ -377,5 +518,11 @@ Widget _buildLowerPane({
       onPasteImageAttachment: () async => null,
       onSend: onSend ?? () async {},
     ),
+  );
+}
+
+UiFeatureManifest _defaultDesktopManifest() {
+  return UiFeatureManifest.fromYamlString(
+    File(UiFeatureManifest.assetPath).readAsStringSync(),
   );
 }

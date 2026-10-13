@@ -120,7 +120,7 @@ class SettingsSnapshot {
       accountWorkspaceFollowed: false,
       acpBridgeServerModeConfig: AcpBridgeServerModeConfig.defaults(),
       linuxDesktop: LinuxDesktopConfig.defaults(),
-      assistantExecutionTarget: AssistantExecutionTarget.agent,
+      assistantExecutionTarget: AssistantExecutionTarget.gateway,
       assistantPermissionLevel: AssistantPermissionLevel.defaultAccess,
     );
   }

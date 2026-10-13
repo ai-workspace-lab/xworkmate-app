@@ -65,7 +65,7 @@ extension AssistantExecutionTargetCopy on AssistantExecutionTarget {
   static AssistantExecutionTarget fromJsonValue(String? value) {
     return AssistantExecutionTarget.values.firstWhere(
       (item) => item.name == value?.trim() || item.promptValue == value?.trim(),
-      orElse: () => AssistantExecutionTarget.agent,
+      orElse: () => AssistantExecutionTarget.gateway,
     );
   }
 }

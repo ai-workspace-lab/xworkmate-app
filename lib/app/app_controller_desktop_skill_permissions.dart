@@ -49,6 +49,7 @@ extension AppControllerDesktopSkillPermissions on AppController {
     WorkspaceBinding? workspaceBinding,
     ExecutionBinding? executionBinding,
     ThreadContextState? contextState,
+    AssistantMode? productMode,
     ThreadLifecycleState? lifecycleState,
     List<GatewayChatMessage>? messages,
     double? updatedAtMs,
@@ -92,7 +93,7 @@ extension AppControllerDesktopSkillPermissions on AppController {
         switch (existing?.executionBinding.executionMode) {
           ThreadExecutionMode.agent => AssistantExecutionTarget.agent,
           ThreadExecutionMode.gateway => AssistantExecutionTarget.gateway,
-          null => AssistantExecutionTarget.agent,
+          null => settings.assistantExecutionTarget,
         };
     final bridgeSkillKeys = skills
         .map((item) => item.skillKey.trim())
@@ -207,6 +208,7 @@ extension AppControllerDesktopSkillPermissions on AppController {
                 ))
             .copyWith(
               messages: nextMessages,
+              productMode: productMode,
               messageViewMode: messageViewMode,
               selectedSkillKeys: nextSelectedSkillKeys,
               selectedModelId:
