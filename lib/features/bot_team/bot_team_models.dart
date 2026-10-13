@@ -12,24 +12,44 @@ extension BotRoleCopy on BotRole {
   /// The routing value; auto sends no role and lets the policy decide.
   String get routingValue => this == BotRole.auto ? '' : name;
 
+  /// Role names stay in English in both languages: they are the names the
+  /// orchestrator policy uses.
   String get label => switch (this) {
-    BotRole.auto => appText('自动', 'Auto'),
-    BotRole.chat => appText('对话', 'Chat'),
-    BotRole.worker => appText('执行', 'Worker'),
-    BotRole.engineer => appText('工程', 'Engineer'),
-    BotRole.architect => appText('架构', 'Architect'),
-    BotRole.researcher => appText('研究', 'Researcher'),
-    BotRole.specialist => appText('专家', 'Specialist'),
+    BotRole.auto => appText('自动选择', 'Auto'),
+    BotRole.chat => 'Chat',
+    BotRole.worker => 'Worker',
+    BotRole.engineer => 'Engineer',
+    BotRole.architect => 'Architect',
+    BotRole.researcher => 'Researcher',
+    BotRole.specialist => 'Specialist',
   };
 
   String get summary => switch (this) {
-    BotRole.auto => appText('由编排策略选择角色', 'The policy picks the role'),
-    BotRole.chat => appText('问答与说明', 'Questions and explanations'),
-    BotRole.worker => appText('批量与日常操作', 'Routine and batch work'),
-    BotRole.engineer => appText('改代码、跑测试', 'Change code and run tests'),
-    BotRole.architect => appText('方案与评审', 'Design and review'),
-    BotRole.researcher => appText('调研与资料整理', 'Research and synthesis'),
-    BotRole.specialist => appText('指定领域专家', 'A named specialty'),
+    BotRole.auto => appText(
+      '由编排器按任务选择角色、执行器和模型',
+      'The orchestrator picks the role, executor and model',
+    ),
+    BotRole.chat => appText(
+      '问答、解释和简短说明',
+      'Questions, explanations and short answers',
+    ),
+    BotRole.worker => appText(
+      '按既定步骤做日常和批量操作',
+      'Routine and batch work along known steps',
+    ),
+    BotRole.engineer => appText(
+      '改代码、跑测试，交付可验证的变更',
+      'Changes code and runs tests',
+    ),
+    BotRole.architect => appText(
+      '设计方案与评审，可与研究互相协作',
+      'Designs and reviews; works with Researcher',
+    ),
+    BotRole.researcher => appText(
+      '调研资料、对比方案，整理结论',
+      'Researches, compares options, summarizes',
+    ),
+    BotRole.specialist => appText('指定领域的专家任务', 'Work for a named specialty'),
   };
 
   IconData get icon => switch (this) {
