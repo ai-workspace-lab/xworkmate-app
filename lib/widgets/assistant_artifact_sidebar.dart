@@ -12,6 +12,7 @@ import '../runtime/runtime_models.dart';
 import '../theme/app_palette.dart';
 import '../theme/app_theme.dart';
 import 'collapsed_pane_reveal_button.dart';
+import 'pane_toggle_icon.dart';
 import 'section_tabs.dart';
 import 'surface_card.dart';
 
@@ -278,6 +279,14 @@ class _AssistantArtifactSidebarState extends State<AssistantArtifactSidebar> {
                         )
                       : const Icon(Icons.refresh_rounded, size: 18),
                 ),
+                // Pane controls sit after a hairline, apart from the
+                // content actions before it.
+                Container(
+                  width: 1,
+                  height: 18,
+                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                  color: context.palette.strokeSoft,
+                ),
                 IconButton(
                   key: const Key('assistant-artifact-pane-collapse'),
                   tooltip: appText('收起右侧栏', 'Collapse sidebar'),
@@ -286,7 +295,7 @@ class _AssistantArtifactSidebarState extends State<AssistantArtifactSidebar> {
                     maximumSize: const Size(40, 40),
                   ),
                   onPressed: widget.onCollapse,
-                  icon: const Icon(Icons.keyboard_double_arrow_right_rounded),
+                  icon: const PaneToggleIcon(side: PaneSide.right, size: 20),
                 ),
               ],
             ),
@@ -657,7 +666,7 @@ class AssistantArtifactSidebarRevealButton extends StatelessWidget {
     return CollapsedPaneRevealButton(
       buttonKey: const Key('assistant-artifact-pane-toggle'),
       tooltip: appText('展开右侧栏', 'Expand artifact sidebar'),
-      icon: Icons.keyboard_double_arrow_left_rounded,
+      icon: const PaneToggleIcon(side: PaneSide.right),
       onTap: onTap,
     );
   }

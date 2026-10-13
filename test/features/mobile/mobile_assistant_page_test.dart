@@ -4,7 +4,6 @@ import 'package:xworkmate/app/app_controller.dart';
 import 'package:xworkmate/app/app_shell_desktop.dart';
 import 'package:xworkmate/app/workspace_page_registry.dart';
 import 'package:xworkmate/features/mobile/mobile_assistant_page.dart';
-import 'package:xworkmate/runtime/runtime_models.dart';
 import 'package:xworkmate/theme/app_theme.dart';
 
 void main() {
@@ -360,6 +359,20 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('mobile-assistant-tab-0')), findsOneWidget);
+      // Tasks always use the default connector, the unified bridge entry
+      // and the default provider, so the sheet offers no choice of them.
+      expect(
+        find.byKey(const Key('mobile-assistant-target-button')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const Key('mobile-assistant-provider-button')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const Key('mobile-assistant-permission-button')),
+        findsOneWidget,
+      );
       expect(find.byKey(const Key('mobile-assistant-tab-1')), findsOneWidget);
       expect(find.byKey(const Key('mobile-assistant-tab-2')), findsOneWidget);
       expect(

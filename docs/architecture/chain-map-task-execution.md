@@ -257,35 +257,36 @@ terminal snapshot. Missing or incomplete artifacts are represented only through
 etc.), not by extending the task execution lifecycle.
 ```
 
-## Role-routed agent turns (Engineer loop)
+## Bot team tasks (AI Workspace v2.1)
 
-When the bridge advertises `acp.capabilities.roleRouting.enabled` and the user
-picks a role in the composer (`assistant-role-routing-button`), agent turns add
-`routing.role` / `routing.roleMode` / `routing.roleModel`. The bridge then
-selects executor and model under its role policy instead of the provider/model
-chips. Contract and work items: xworkmate-bridge
-`docs/architecture/role-routing-engineer-loop.md`.
+Role selection and dispatch moved out of the bridge: the DSH orchestrator picks
+executor and model, and Accounts holds sessions, runs and ordered events. The
+app no longer sends `routing.role` over ACP (the bridge answers
+`ROLE_ROUTING_MOVED`) and no longer relays executor permission prompts. Role
+tasks are created from the Bot team page through the bridge `/api/v1` proxy
+with the signed-in account token. Contract: xworkmate-bridge
+`docs/architecture/adr-v2.1-role-selection-in-dsh.md`.
 
 ```
-runGatewayChatTurnInternal (roleRouting = roleRoutingForTurnInternal(target))
-  → session.start (/acp/rpc, SSE)
-      ← session.update type=task  task.selected | started | permission_requested
-                                  | permission_resolved | completed | failed
-                                  | cancelled | rejected
-        → applyRoleTaskUpdateInternal → AssistantRoleTaskPanelInternal
-      ← session.update type=delta (executor text chunks)
-  user clicks an option → respondRolePermission
-      → xworkmate.permissions.respond {sessionId, requestId, optionId | decision=cancel}
-  stop button → cancelTask → session.cancel (denies pending prompts, aborts run)
-  SSE closed → _recoverRoleTaskAfterStreamClosure
-      → xworkmate.tasks.get {sessionId} every 2s for up to 10 min,
-        re-surfacing pendingPermissions, until status is terminal
-  result → applyRoleTaskResultInternal (resolvedRole / resolvedModelId /
-           resolvedProviderId / modelBindingVerified) → applyGatewayChatResultInternal
+BotTeamPage (sidebar `workspace-sidebar-bot-team-button`, flag navigation.bot_team)
+  → BotTeamController.send
+      → GET  /api/v1/namespaces                         (personal namespace)
+      → POST /api/v1/namespaces/{ns}/sessions            (first task only)
+      → POST /api/v1/sessions/{id}/messages {clientRequestId, text,
+             routing: {roleMode: auto, role?, workspace?}}  → run.queued
+  DSH orchestrator claims the run from Accounts, selects, runs one subagent
+  poll every 1.5s while a run is active
+      → GET  /api/v1/sessions/{id}/events?after_seq=n
+        ← run.running | run.progressed{selected|memory|started}
+          | assistant.message.created | run.completed | run.failed{rejected?}
+          | run.cancel_requested | run.cancelled
+        → foldBotTasks → task cards
+  cancel → POST /api/v1/sessions/{id}/runs/{runId}/cancel {clientRequestId}
 ```
 
-Turns without a role selection, and gateway (OpenClaw) turns, keep the flow
-above unchanged.
+`workspace` is a key the orchestrator host maps to an authorized directory;
+the app never sends a path in routing. Assistant turns, and gateway (OpenClaw)
+turns, keep the flow above unchanged.
 
 ## Key Files by Repo
 
@@ -297,7 +298,8 @@ above unchanged.
 - `lib/app/app_controller_desktop_thread_sessions.dart` — session 恢复逻辑
 - `lib/app/app_controller_desktop_thread_actions.dart` — 消息发送
 - `lib/runtime/agent_registry.dart` — agent registry
-- `lib/runtime/role_routing.dart` — role routing catalog / selection / task event models
+- `lib/runtime/task_session_client.dart` — Accounts task sessions through the bridge `/api/v1` proxy
+- `lib/features/bot_team/` — Bot team page, controller and event folding
 - `lib/app/app_controller_desktop_role_routing.dart` — role routing state, permission responses
 - `lib/features/assistant/assistant_page_role_task_panel.dart` — actual role/model status + approval prompt
 

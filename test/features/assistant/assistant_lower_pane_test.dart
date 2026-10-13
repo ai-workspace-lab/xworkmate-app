@@ -1,9 +1,6 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xworkmate/app/app_controller.dart';
-import 'package:xworkmate/app/ui_feature_manifest.dart';
 import 'package:xworkmate/features/assistant/assistant_page_composer_clipboard.dart';
 import 'package:xworkmate/features/assistant/assistant_page_composer_skill_picker.dart';
 import 'package:xworkmate/features/assistant/assistant_page_main.dart';
@@ -80,22 +77,14 @@ void main() {
             SingleAgentProvider.openclaw,
           ],
           initialAvailableExecutionTargets: const <AssistantExecutionTarget>[
+            AssistantExecutionTarget.agent,
             AssistantExecutionTarget.gateway,
           ],
         );
         addTearDown(controller.dispose);
-
         await controller.sessionsController.switchSession(
           'unit-fixture-task-a',
         );
-        controller.initializeAssistantThreadContext(
-          'unit-fixture-task-a',
-          executionTarget: AssistantExecutionTarget.gateway,
-          messageViewMode: controller.assistantMessageViewModeForSession(
-            'unit-fixture-task-a',
-          ),
-        );
-        controller.notifyListeners();
 
         await tester.pumpWidget(
           _buildTestApp(child: _buildLowerPane(controller: controller)),
@@ -108,7 +97,7 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(
-          find.byKey(const Key('assistant-execution-target-menu-item-agent')),
+          find.byKey(const Key('assistant-execution-target-button')),
           findsNothing,
         );
         expect(
@@ -478,12 +467,6 @@ void main() {
       },
     );
   });
-}
-
-UiFeatureManifest _defaultDesktopManifest() {
-  return UiFeatureManifest.fromYamlString(
-    File(UiFeatureManifest.assetPath).readAsStringSync(),
-  );
 }
 
 Widget _buildTestApp({required Widget child, double height = 360}) {

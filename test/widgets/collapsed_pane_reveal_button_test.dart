@@ -16,7 +16,7 @@ void main() {
           body: CollapsedPaneRevealButton(
             buttonKey: const Key('reveal-pane'),
             tooltip: 'Expand navigation',
-            icon: Icons.keyboard_double_arrow_right_rounded,
+            icon: const Icon(Icons.keyboard_double_arrow_right_rounded),
             onTap: () => revealCount += 1,
           ),
         ),

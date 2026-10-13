@@ -2,6 +2,11 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+# Flutter's macOS build calls `lipo -verify_arch arm64 x86_64` from PATH.
+# Apple's lipo rejects several architectures in one call, so put the shim
+# that checks them one at a time ahead of it. The Xcode build phase already
+# does this; the Flutter tool step runs outside Xcode and needs it here too.
+export PATH="$ROOT_DIR/scripts/xcode-tools:$PATH"
 APP_DIR="$ROOT_DIR"
 PUBSPEC_PATH="$ROOT_DIR/pubspec.yaml"
 DIST_DIR="$ROOT_DIR/dist"

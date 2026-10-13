@@ -5,6 +5,7 @@ import '../models/app_models.dart';
 import '../runtime/runtime_models.dart';
 import '../theme/app_palette.dart';
 import '../theme/app_theme.dart';
+import 'pane_toggle_icon.dart';
 
 part 'sidebar_navigation_footer.dart';
 part 'sidebar_navigation_task_section.dart';
@@ -44,6 +45,7 @@ class SidebarNavigation extends StatelessWidget {
     this.assistantSkillCount = 0,
     this.onRefreshTasks,
     this.onCreateTask,
+    this.onOpenBotTeam,
     this.onReturnToAssistant,
     this.onSelectTask,
     this.onArchiveTask,
@@ -80,6 +82,7 @@ class SidebarNavigation extends StatelessWidget {
   final int assistantSkillCount;
   final Future<void> Function()? onRefreshTasks;
   final Future<void> Function()? onCreateTask;
+  final VoidCallback? onOpenBotTeam;
   final VoidCallback? onReturnToAssistant;
   final Future<void> Function(String sessionKey)? onSelectTask;
   final Future<void> Function(String sessionKey)? onArchiveTask;
@@ -131,6 +134,7 @@ class SidebarNavigation extends StatelessWidget {
                         onCycleSidebarState: onCycleSidebarState,
                         onRefreshTasks: onRefreshTasks,
                         onCreateTask: onCreateTask,
+                        onOpenBotTeam: onOpenBotTeam,
                         onReturnToAssistant: onReturnToAssistant,
                         onSelectTask: onSelectTask,
                         onArchiveTask: onArchiveTask,
@@ -154,12 +158,9 @@ class SidebarNavigation extends StatelessWidget {
                         availableDestinations!.contains(
                           WorkspaceDestination.settings,
                         ),
-                    sidebarState: sidebarState,
-                    onCycleSidebarState: onCycleSidebarState,
                     onOpenAccount: onOpenAccount,
-                    showAccountButton: false,
-                    accountSelected: false,
-                    showCollapseControl: false,
+                    accountName: accountName,
+                    accountSubtitle: accountSubtitle,
                   ),
                 ],
               ),
@@ -225,9 +226,9 @@ class _SidebarHeaderChevron extends StatelessWidget {
         border: Border.all(color: palette.strokeSoft),
       ),
       child: Center(
-        child: Icon(
-          Icons.chevron_right_rounded,
-          size: size * 0.72,
+        child: PaneToggleIcon(
+          side: PaneSide.left,
+          size: size * 0.6,
           color: palette.textSecondary,
         ),
       ),

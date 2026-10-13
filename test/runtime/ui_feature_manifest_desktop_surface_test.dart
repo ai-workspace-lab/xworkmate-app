@@ -17,8 +17,20 @@ void main() {
 
       expect(desktop.allowedDestinations, <WorkspaceDestination>{
         WorkspaceDestination.assistant,
+        WorkspaceDestination.botTeam,
         WorkspaceDestination.settings,
       });
+      // The Bot team is stable, so release builds (`make install-mac`)
+      // show its sidebar entry too.
+      expect(
+        manifest
+            .forPlatform(
+              UiFeaturePlatform.desktop,
+              buildMode: UiFeatureBuildMode.release,
+            )
+            .allowedDestinations,
+        contains(WorkspaceDestination.botTeam),
+      );
       expect(
         desktop.availableExecutionTargets,
         const <AssistantExecutionTarget>[AssistantExecutionTarget.gateway],

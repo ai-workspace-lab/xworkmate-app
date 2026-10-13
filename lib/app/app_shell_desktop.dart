@@ -9,6 +9,7 @@ import '../theme/app_theme.dart';
 import '../widgets/detail_drawer.dart';
 import '../widgets/collapsed_pane_reveal_button.dart';
 import '../widgets/pane_resize_handle.dart';
+import '../widgets/pane_toggle_icon.dart';
 import '../widgets/sidebar_navigation.dart';
 import 'app_controller.dart';
 import 'app_controller_desktop_thread_binding.dart';
@@ -31,9 +32,17 @@ class _AppShellState extends State<AppShell> {
   static const _desktopDestinations = <WorkspaceDestination>[
     WorkspaceDestination.workbench,
     WorkspaceDestination.assistant,
+    WorkspaceDestination.botTeam,
     WorkspaceDestination.settings,
   ];
   double? _sidebarExpandedWidth;
+
+  // Pages that talk to services on open are built the first time they are
+  // shown, not with the rest of the IndexedStack at startup.
+  static const _lazyDestinations = <WorkspaceDestination>{
+    WorkspaceDestination.botTeam,
+  };
+  final Set<WorkspaceDestination> _shownDestinations = <WorkspaceDestination>{};
 
   static const _mobileDestinations = [
     WorkspaceDestination.workbench,
@@ -374,6 +383,15 @@ class _AppShellState extends State<AppShell> {
                                         controller,
                                         visibleExecutionTargets,
                                       ),
+                                  onOpenBotTeam:
+                                      controller.capabilities
+                                          .supportsDestination(
+                                            WorkspaceDestination.botTeam,
+                                          )
+                                      ? () => controller.navigateTo(
+                                          WorkspaceDestination.botTeam,
+                                        )
+                                      : null,
                                   onReturnToAssistant: () {
                                     controller.navigateTo(
                                       WorkspaceDestination.assistant,
@@ -489,10 +507,17 @@ class _AppShellState extends State<AppShell> {
     final currentDestination = _resolveDesktopDestination(
       widget.controller.destination,
     );
+    _shownDestinations.add(currentDestination);
     return IndexedStack(
       index: _desktopDestinations.indexOf(currentDestination),
       children: _desktopDestinations
-          .map((destination) => _pageForDestination(destination, onOpenDetail))
+          .map(
+            (destination) =>
+                _lazyDestinations.contains(destination) &&
+                    !_shownDestinations.contains(destination)
+                ? const SizedBox.shrink()
+                : _pageForDestination(destination, onOpenDetail),
+          )
           .toList(),
     );
   }
@@ -529,7 +554,7 @@ class _SidebarRevealRail extends StatelessWidget {
     return CollapsedPaneRevealButton(
       buttonKey: const Key('sidebar-reveal-button'),
       tooltip: appText('展开导航', 'Expand sidebar'),
-      icon: Icons.keyboard_double_arrow_right_rounded,
+      icon: const PaneToggleIcon(side: PaneSide.left),
       onTap: onExpand,
     );
   }
