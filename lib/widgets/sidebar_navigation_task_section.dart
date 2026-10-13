@@ -38,6 +38,7 @@ class SidebarTaskSection extends StatefulWidget {
     required this.onCycleSidebarState,
     this.onRefreshTasks,
     this.onCreateTask,
+    this.onOpenBotTeam,
     this.onReturnToAssistant,
     this.onSelectTask,
     this.onArchiveTask,
@@ -53,6 +54,9 @@ class SidebarTaskSection extends StatefulWidget {
   final VoidCallback onCycleSidebarState;
   final Future<void> Function()? onRefreshTasks;
   final Future<void> Function()? onCreateTask;
+
+  /// Shown only when the Bot team destination is available.
+  final VoidCallback? onOpenBotTeam;
   final VoidCallback? onReturnToAssistant;
   final Future<void> Function(String sessionKey)? onSelectTask;
   final Future<void> Function(String sessionKey)? onArchiveTask;
@@ -205,6 +209,22 @@ class _SidebarTaskSectionState extends State<SidebarTaskSection> {
                   ),
                 ),
         ),
+        if (widget.onOpenBotTeam != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+            child: FilledButton.tonalIcon(
+              key: const Key('workspace-sidebar-bot-team-button'),
+              onPressed: widget.onOpenBotTeam,
+              icon: const Icon(Icons.groups_2_outlined),
+              label: Text(appText('Bot 团队', 'Bot team')),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(0, 40),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+              ),
+            ),
+          ),
         Padding(
           padding: const EdgeInsets.fromLTRB(4, 4, 4, 6),
           child: Text(

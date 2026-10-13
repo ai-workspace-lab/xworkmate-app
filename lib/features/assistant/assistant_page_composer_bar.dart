@@ -26,7 +26,6 @@ import 'assistant_page_main.dart';
 import 'assistant_page_components.dart';
 import 'assistant_page_composer_state_helpers.dart';
 import 'assistant_page_composer_support.dart';
-import 'assistant_page_role_task_panel.dart';
 import 'assistant_page_tooltip_labels.dart';
 import 'assistant_page_message_widgets.dart';
 import 'assistant_page_task_models.dart';
@@ -403,7 +402,6 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
           mainAxisSize: MainAxisSize.max,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            AssistantRoleTaskPanelInternal(controller: controller),
             Row(
               children: [
                 if (uiFeatures.supportsFileAttachments) ...[

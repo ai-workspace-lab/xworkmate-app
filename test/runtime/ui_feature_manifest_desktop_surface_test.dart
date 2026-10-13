@@ -17,8 +17,20 @@ void main() {
 
       expect(desktop.allowedDestinations, <WorkspaceDestination>{
         WorkspaceDestination.assistant,
+        WorkspaceDestination.botTeam,
         WorkspaceDestination.settings,
       });
+      // The Bot team is beta: debug and profile builds show it, release
+      // builds do not until the orchestrator backend is deployed.
+      expect(
+        manifest
+            .forPlatform(
+              UiFeaturePlatform.desktop,
+              buildMode: UiFeatureBuildMode.release,
+            )
+            .allowedDestinations,
+        isNot(contains(WorkspaceDestination.botTeam)),
+      );
       expect(
         desktop.availableExecutionTargets,
         const <AssistantExecutionTarget>[AssistantExecutionTarget.gateway],

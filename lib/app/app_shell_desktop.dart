@@ -31,9 +31,17 @@ class _AppShellState extends State<AppShell> {
   static const _desktopDestinations = <WorkspaceDestination>[
     WorkspaceDestination.workbench,
     WorkspaceDestination.assistant,
+    WorkspaceDestination.botTeam,
     WorkspaceDestination.settings,
   ];
   double? _sidebarExpandedWidth;
+
+  // Pages that talk to services on open are built the first time they are
+  // shown, not with the rest of the IndexedStack at startup.
+  static const _lazyDestinations = <WorkspaceDestination>{
+    WorkspaceDestination.botTeam,
+  };
+  final Set<WorkspaceDestination> _shownDestinations = <WorkspaceDestination>{};
 
   static const _mobileDestinations = [
     WorkspaceDestination.workbench,
@@ -374,6 +382,15 @@ class _AppShellState extends State<AppShell> {
                                         controller,
                                         visibleExecutionTargets,
                                       ),
+                                  onOpenBotTeam:
+                                      controller.capabilities
+                                          .supportsDestination(
+                                            WorkspaceDestination.botTeam,
+                                          )
+                                      ? () => controller.navigateTo(
+                                          WorkspaceDestination.botTeam,
+                                        )
+                                      : null,
                                   onReturnToAssistant: () {
                                     controller.navigateTo(
                                       WorkspaceDestination.assistant,
@@ -489,10 +506,17 @@ class _AppShellState extends State<AppShell> {
     final currentDestination = _resolveDesktopDestination(
       widget.controller.destination,
     );
+    _shownDestinations.add(currentDestination);
     return IndexedStack(
       index: _desktopDestinations.indexOf(currentDestination),
       children: _desktopDestinations
-          .map((destination) => _pageForDestination(destination, onOpenDetail))
+          .map(
+            (destination) =>
+                _lazyDestinations.contains(destination) &&
+                    !_shownDestinations.contains(destination)
+                ? const SizedBox.shrink()
+                : _pageForDestination(destination, onOpenDetail),
+          )
           .toList(),
     );
   }

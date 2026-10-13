@@ -44,6 +44,7 @@ class SidebarNavigation extends StatelessWidget {
     this.assistantSkillCount = 0,
     this.onRefreshTasks,
     this.onCreateTask,
+    this.onOpenBotTeam,
     this.onReturnToAssistant,
     this.onSelectTask,
     this.onArchiveTask,
@@ -80,6 +81,7 @@ class SidebarNavigation extends StatelessWidget {
   final int assistantSkillCount;
   final Future<void> Function()? onRefreshTasks;
   final Future<void> Function()? onCreateTask;
+  final VoidCallback? onOpenBotTeam;
   final VoidCallback? onReturnToAssistant;
   final Future<void> Function(String sessionKey)? onSelectTask;
   final Future<void> Function(String sessionKey)? onArchiveTask;
@@ -131,6 +133,7 @@ class SidebarNavigation extends StatelessWidget {
                         onCycleSidebarState: onCycleSidebarState,
                         onRefreshTasks: onRefreshTasks,
                         onCreateTask: onCreateTask,
+                        onOpenBotTeam: onOpenBotTeam,
                         onReturnToAssistant: onReturnToAssistant,
                         onSelectTask: onSelectTask,
                         onArchiveTask: onArchiveTask,

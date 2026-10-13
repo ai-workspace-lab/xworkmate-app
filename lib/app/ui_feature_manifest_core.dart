@@ -37,6 +37,7 @@ UiFeaturePlatform resolveUiFeaturePlatformFromContext(BuildContext context) {
 abstract final class UiFeatureKeys {
   static const navigationAssistant = 'navigation.assistant';
   static const navigationSettings = 'navigation.settings';
+  static const navigationBotTeam = 'navigation.bot_team';
 
   static const assistantDirectAi = 'assistant.direct_ai';
   static const assistantLocalGateway = 'assistant.local_gateway';
@@ -360,6 +361,7 @@ class UiFeatureAccess {
         },
         UiFeaturePlatform.desktop: <String, WorkspaceDestination>{
           UiFeatureKeys.navigationAssistant: WorkspaceDestination.assistant,
+          UiFeatureKeys.navigationBotTeam: WorkspaceDestination.botTeam,
           UiFeatureKeys.navigationSettings: WorkspaceDestination.settings,
         },
         UiFeaturePlatform.web: <String, WorkspaceDestination>{

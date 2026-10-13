@@ -2879,14 +2879,6 @@ class _ArtifactBackfillGoTaskServiceClient implements GoTaskServiceClient {
   }) async {}
 
   @override
-  Future<void> respondPermission({
-    required AssistantExecutionTarget target,
-    required String sessionId,
-    required String requestId,
-    String? optionId,
-  }) async {}
-
-  @override
   Future<void> dispose() async {}
 }
 
@@ -2920,14 +2912,6 @@ class _PollingGoTaskServiceClient implements GoTaskServiceClient {
     required String sessionId,
     required String threadId,
     OpenClawTaskAssociation? association,
-  }) async {}
-
-  @override
-  Future<void> respondPermission({
-    required AssistantExecutionTarget target,
-    required String sessionId,
-    required String requestId,
-    String? optionId,
   }) async {}
 
   @override

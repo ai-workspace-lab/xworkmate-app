@@ -2,18 +2,20 @@ import 'package:flutter/material.dart';
 
 import '../i18n/app_language.dart';
 
-enum WorkspaceDestination { workbench, assistant, settings }
+enum WorkspaceDestination { workbench, assistant, botTeam, settings }
 
 extension WorkspaceDestinationCopy on WorkspaceDestination {
   String get label => switch (this) {
     WorkspaceDestination.workbench => appText('工作台', 'Workbench'),
     WorkspaceDestination.assistant => appText('助手', 'Assistant'),
+    WorkspaceDestination.botTeam => appText('Bot 团队', 'Bot team'),
     WorkspaceDestination.settings => appText('设置', 'Settings'),
   };
 
   IconData get icon => switch (this) {
     WorkspaceDestination.workbench => Icons.view_quilt_outlined,
     WorkspaceDestination.assistant => Icons.chat_bubble_outline_rounded,
+    WorkspaceDestination.botTeam => Icons.groups_2_outlined,
     WorkspaceDestination.settings => Icons.tune_rounded,
   };
 
@@ -25,6 +27,10 @@ extension WorkspaceDestinationCopy on WorkspaceDestination {
     WorkspaceDestination.assistant => appText(
       'AI 主入口，优先承接自然输入和高频工作发起。',
       'Primary AI entry point for natural input and frequent task starts.',
+    ),
+    WorkspaceDestination.botTeam => appText(
+      '按角色下发任务，由编排器选择执行器与模型。',
+      'Send tasks to roles; the orchestrator picks executor and model.',
     ),
     WorkspaceDestination.settings => appText(
       '桥接、账户与集成配置统一收口到设置中心。',
@@ -106,6 +112,11 @@ extension AssistantFocusEntryCopy on AssistantFocusEntry {
         'Workbench is not a pinnable focus entry.',
       ),
       WorkspaceDestination.settings => AssistantFocusEntry.settings,
+      WorkspaceDestination.botTeam => throw ArgumentError.value(
+        destination,
+        'destination',
+        'The Bot team is not a pinnable focus entry.',
+      ),
       WorkspaceDestination.assistant => throw ArgumentError.value(
         destination,
         'destination',
