@@ -36,6 +36,9 @@ void main() {
     final controller = await pumpPage(tester, accounts);
 
     expect(find.byKey(const Key('bot-team-page')), findsOneWidget);
+    expect(find.byKey(const Key('bot-team-role-engineer')), findsNothing);
+    await tester.tap(find.byKey(const Key('bot-team-role-button')));
+    await tester.pumpAndSettle();
     for (final role in ['auto', 'chat', 'worker', 'engineer', 'architect', 'researcher', 'specialist']) {
       expect(find.byKey(Key('bot-team-role-$role')), findsOneWidget);
     }
@@ -43,6 +46,12 @@ void main() {
     expect(find.textContaining('DS Bot'), findsNothing);
 
     await tester.tap(find.byKey(const Key('bot-team-role-engineer')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('bot-team-role-chat')), findsNothing);
+    expect(
+      find.descendant(of: find.byKey(const Key('bot-team-role-button')), matching: find.text('Engineer')),
+      findsOneWidget,
+    );
     await tester.enterText(find.byKey(const Key('bot-team-workspace-field')), 'repo');
     await tester.enterText(find.byKey(const Key('bot-team-composer')), '修复失败的测试');
     await tester.tap(find.byKey(const Key('bot-team-send-button')));

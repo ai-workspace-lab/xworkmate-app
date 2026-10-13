@@ -116,13 +116,12 @@ class _BotTeamPageState extends State<BotTeamPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          _RolePicker(controller: _controller),
-                          const SizedBox(height: AppSpacing.sm),
                           Expanded(
                             child: _TaskTimeline(controller: _controller),
                           ),
                           const SizedBox(height: AppSpacing.sm),
                           _Composer(
+                            controller: _controller,
                             composer: _composer,
                             workspace: _workspace,
                             enabled:
@@ -245,29 +244,95 @@ class _SessionList extends StatelessWidget {
   }
 }
 
-class _RolePicker extends StatelessWidget {
-  const _RolePicker({required this.controller});
+/// The role menu in the composer: the button shows the current role, the
+/// menu lists the escalation ladder Chat → Worker → Engineer → Architect ⟷
+/// Researcher → Specialist, with "auto" above it to let the orchestrator's
+/// policy choose.
+class _RoleMenu extends StatelessWidget {
+  const _RoleMenu({required this.controller, required this.enabled});
 
   final BotTeamController controller;
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      spacing: AppSpacing.xs,
-      runSpacing: AppSpacing.xs,
-      children: [
-        for (final role in BotRole.values)
-          Tooltip(
-            message: role.summary,
-            child: ChoiceChip(
-              key: Key('bot-team-role-${role.name}'),
-              avatar: Icon(role.icon, size: 16),
-              label: Text(role.label),
-              selected: controller.role == role,
-              onSelected: (_) => controller.setRole(role),
-            ),
+    final palette = context.palette;
+    final current = controller.role;
+    return MenuAnchor(
+      alignmentOffset: const Offset(0, 6),
+      style: MenuStyle(
+        backgroundColor: WidgetStatePropertyAll(palette.surfacePrimary),
+        surfaceTintColor: const WidgetStatePropertyAll(Colors.transparent),
+        side: WidgetStatePropertyAll(BorderSide(color: palette.strokeSoft)),
+        shape: WidgetStatePropertyAll(
+          RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.dialog),
           ),
+        ),
+      ),
+      menuChildren: [
+        _item(context, BotRole.auto),
+        const Divider(height: 9),
+        for (final role in BotRole.values)
+          if (role != BotRole.auto) _item(context, role),
       ],
+      builder: (context, menu, _) => TextButton.icon(
+        key: const Key('bot-team-role-button'),
+        onPressed: enabled
+            ? () => menu.isOpen ? menu.close() : menu.open()
+            : null,
+        style: TextButton.styleFrom(
+          foregroundColor: palette.textPrimary,
+          backgroundColor: palette.chromeSurfacePressed,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadius.button),
+          ),
+        ),
+        icon: Icon(current.icon, size: 18),
+        label: Text(current.label),
+      ),
+    );
+  }
+
+  Widget _item(BuildContext context, BotRole role) {
+    final palette = context.palette;
+    final theme = Theme.of(context);
+    final selected = controller.role == role;
+    return MenuItemButton(
+      key: Key('bot-team-role-${role.name}'),
+      onPressed: () => controller.setRole(role),
+      style: MenuItemButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        backgroundColor: selected ? palette.chromeSurfacePressed : null,
+      ),
+      leadingIcon: Icon(role.icon, size: 20, color: palette.textSecondary),
+      trailingIcon: selected
+          ? Icon(Icons.check_rounded, size: 18, color: palette.accent)
+          : const SizedBox(width: 18),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minWidth: 220, maxWidth: 300),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              role.label,
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              role.summary,
+              softWrap: true,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: palette.textMuted,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -404,12 +469,14 @@ class _TaskCard extends StatelessWidget {
 
 class _Composer extends StatelessWidget {
   const _Composer({
+    required this.controller,
     required this.composer,
     required this.workspace,
     required this.enabled,
     required this.onSend,
   });
 
+  final BotTeamController controller;
   final TextEditingController composer;
   final TextEditingController workspace;
   final bool enabled;
@@ -447,6 +514,8 @@ class _Composer extends StatelessWidget {
             ),
           ),
         ),
+        const SizedBox(width: AppSpacing.sm),
+        _RoleMenu(controller: controller, enabled: enabled),
         const SizedBox(width: AppSpacing.sm),
         FilledButton.icon(
           key: const Key('bot-team-send-button'),
