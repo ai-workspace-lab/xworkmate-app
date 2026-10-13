@@ -18,7 +18,9 @@ class CollapsedPaneRevealButton extends StatefulWidget {
 
   final VoidCallback onTap;
   final String tooltip;
-  final IconData icon;
+
+  /// Painted at 20pt in the button's muted or active colour.
+  final Widget icon;
   final Key? buttonKey;
 
   @override
@@ -77,10 +79,12 @@ class _CollapsedPaneRevealButtonState extends State<CollapsedPaneRevealButton> {
                 onHighlightChanged: (pressed) =>
                     setState(() => _pressed = pressed),
                 child: Center(
-                  child: Icon(
-                    widget.icon,
-                    size: 20,
-                    color: active ? palette.textPrimary : palette.textMuted,
+                  child: IconTheme(
+                    data: IconThemeData(
+                      size: 20,
+                      color: active ? palette.textPrimary : palette.textMuted,
+                    ),
+                    child: widget.icon,
                   ),
                 ),
               ),

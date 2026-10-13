@@ -9,6 +9,7 @@ import '../theme/app_theme.dart';
 import '../widgets/detail_drawer.dart';
 import '../widgets/collapsed_pane_reveal_button.dart';
 import '../widgets/pane_resize_handle.dart';
+import '../widgets/pane_toggle_icon.dart';
 import '../widgets/sidebar_navigation.dart';
 import 'app_controller.dart';
 import 'app_controller_desktop_thread_binding.dart';
@@ -553,7 +554,7 @@ class _SidebarRevealRail extends StatelessWidget {
     return CollapsedPaneRevealButton(
       buttonKey: const Key('sidebar-reveal-button'),
       tooltip: appText('展开导航', 'Expand sidebar'),
-      icon: Icons.keyboard_double_arrow_right_rounded,
+      icon: const PaneToggleIcon(side: PaneSide.left),
       onTap: onExpand,
     );
   }

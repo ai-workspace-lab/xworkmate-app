@@ -518,7 +518,7 @@ class _SidebarBrandHeader extends StatelessWidget {
                     borderRadius: BorderRadius.circular(AppRadius.button),
                   ),
                 ),
-                icon: const Icon(Icons.view_sidebar_outlined, size: 18),
+                icon: const PaneToggleIcon(side: PaneSide.left, size: 18),
               ),
             ),
         ],
