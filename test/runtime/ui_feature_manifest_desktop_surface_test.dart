@@ -20,8 +20,8 @@ void main() {
         WorkspaceDestination.botTeam,
         WorkspaceDestination.settings,
       });
-      // The Bot team is beta: debug and profile builds show it, release
-      // builds do not until the orchestrator backend is deployed.
+      // The Bot team is stable, so release builds (`make install-mac`)
+      // show its sidebar entry too.
       expect(
         manifest
             .forPlatform(
@@ -29,7 +29,7 @@ void main() {
               buildMode: UiFeatureBuildMode.release,
             )
             .allowedDestinations,
-        isNot(contains(WorkspaceDestination.botTeam)),
+        contains(WorkspaceDestination.botTeam),
       );
       expect(
         desktop.availableExecutionTargets,
