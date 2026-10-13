@@ -104,133 +104,104 @@ class _SidebarTaskSectionState extends State<SidebarTaskSection> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        _SidebarBrandHeader(
+          showCollapseControl: widget.showCollapseControl,
+          onCollapse: widget.onCycleSidebarState,
+        ),
         Padding(
-          padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Expanded(
-                child: TextField(
-                  key: const Key('workspace-sidebar-task-search'),
-                  controller: _searchController,
-                  onChanged: (value) {
-                    setState(() {
-                      _query = value.trim().toLowerCase();
-                    });
-                  },
-                  decoration: InputDecoration(
-                    hintText: appText('搜索任务', 'Search tasks'),
-                    prefixIcon: const Icon(Icons.search_rounded),
-                    suffixIcon: _query.isEmpty
-                        ? null
-                        : IconButton(
-                            tooltip: appText('清除搜索', 'Clear search'),
-                            onPressed: () {
-                              _searchController.clear();
-                              setState(() {
-                                _query = '';
-                              });
-                            },
-                            icon: const Icon(Icons.close_rounded),
-                          ),
-                  ),
-                ),
+          padding: const EdgeInsets.fromLTRB(4, 0, 4, 10),
+          child: TextField(
+            key: const Key('workspace-sidebar-task-search'),
+            controller: _searchController,
+            onChanged: (value) {
+              setState(() {
+                _query = value.trim().toLowerCase();
+              });
+            },
+            decoration: InputDecoration(
+              isDense: true,
+              contentPadding: const EdgeInsets.symmetric(vertical: 8),
+              hintText: appText('搜索任务', 'Filter tasks'),
+              prefixIcon: const Icon(Icons.search_rounded, size: 18),
+              prefixIconConstraints: const BoxConstraints.tightFor(
+                width: 34,
+                height: 34,
               ),
-              if (widget.showCollapseControl) ...[
-                const SizedBox(width: AppSpacing.xs),
-                Tooltip(
-                  message: appText('收起侧边栏', 'Collapse sidebar'),
-                  child: IconButton(
-                    key: const Key('workspace-sidebar-collapse-button'),
-                    onPressed: widget.onCycleSidebarState,
-                    visualDensity: VisualDensity.compact,
-                    splashRadius: 18,
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints.tightFor(
-                      width: 28,
-                      height: 28,
-                    ),
-                    style: IconButton.styleFrom(
+              suffixIconConstraints: const BoxConstraints.tightFor(
+                width: 34,
+                height: 34,
+              ),
+              suffixIcon: _query.isEmpty
+                  ? null
+                  : IconButton(
+                      visualDensity: VisualDensity.compact,
                       padding: EdgeInsets.zero,
-                      minimumSize: const Size(28, 28),
-                      maximumSize: const Size(28, 28),
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      backgroundColor: Colors.transparent,
-                      foregroundColor: palette.textSecondary,
-                      overlayColor: palette.chromeSurfacePressed,
-                      side: BorderSide.none,
-                      shape: const CircleBorder(),
+                      tooltip: appText('清除搜索', 'Clear search'),
+                      onPressed: () {
+                        _searchController.clear();
+                        setState(() {
+                          _query = '';
+                        });
+                      },
+                      icon: const Icon(Icons.close_rounded, size: 18),
                     ),
-                    icon: const Icon(
-                      Icons.keyboard_double_arrow_left_rounded,
-                      size: 20,
-                    ),
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
-          child: FilledButton.tonalIcon(
-            key: const Key('workspace-sidebar-workbench-button'),
-            onPressed: widget.onOpenHome,
-            icon: const Icon(Icons.view_quilt_outlined),
-            label: Text(appText('工作台', 'Workbench')),
-            style: FilledButton.styleFrom(
-              minimumSize: const Size(0, 40),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
             ),
           ),
         ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
-          child: widget.currentSection == WorkspaceDestination.settings
-              ? _SidebarBackToAssistantButton(
-                  onPressed: widget.onReturnToAssistant,
-                )
-              : FilledButton.tonalIcon(
-                  key: const Key('workspace-sidebar-new-task-button'),
-                  onPressed: widget.onCreateTask == null
-                      ? null
-                      : () async {
-                          await widget.onCreateTask!();
-                        },
-                  icon: const Icon(Icons.edit_note_rounded),
-                  label: Text(appText('新对话', 'New conversation')),
-                  style: FilledButton.styleFrom(
-                    minimumSize: const Size(0, 40),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                ),
+        _SidebarNavRow(
+          key: const Key('workspace-sidebar-workbench-button'),
+          icon: Icons.view_quilt_outlined,
+          label: appText('工作台', 'Workbench'),
+          selected: widget.currentSection == WorkspaceDestination.workbench,
+          onTap: widget.onOpenHome,
         ),
-        if (widget.onOpenBotTeam != null)
+        if (widget.currentSection == WorkspaceDestination.settings)
           Padding(
-            padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
-            child: FilledButton.tonalIcon(
-              key: const Key('workspace-sidebar-bot-team-button'),
-              onPressed: widget.onOpenBotTeam,
-              icon: const Icon(Icons.groups_2_outlined),
-              label: Text(appText('Bot 团队', 'Bot team')),
-              style: FilledButton.styleFrom(
-                minimumSize: const Size(0, 40),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-              ),
+            padding: const EdgeInsets.fromLTRB(4, 2, 4, 2),
+            child: _SidebarBackToAssistantButton(
+              onPressed: widget.onReturnToAssistant,
             ),
+          )
+        else
+          _SidebarNavRow(
+            key: const Key('workspace-sidebar-new-task-button'),
+            icon: Icons.edit_note_rounded,
+            label: appText('新对话', 'New conversation'),
+            onTap: widget.onCreateTask == null
+                ? null
+                : () async {
+                    await widget.onCreateTask!();
+                  },
           ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(4, 4, 4, 6),
-          child: Text(
-            appText('任务列表', 'Task list'),
-            style: theme.textTheme.titleSmall,
+        if (widget.onOpenBotTeam != null)
+          _SidebarNavRow(
+            key: const Key('workspace-sidebar-bot-team-button'),
+            icon: Icons.groups_2_outlined,
+            label: appText('Bot 团队', 'Bot team'),
+            selected: widget.currentSection == WorkspaceDestination.botTeam,
+            onTap: widget.onOpenBotTeam,
           ),
+        const SizedBox(height: 10),
+        _SidebarSectionHeader(
+          label: appText('任务', 'Tasks'),
+          trailing: widget.onCreateTask == null
+              ? null
+              : IconButton(
+                  key: const Key('workspace-sidebar-section-new-task-button'),
+                  tooltip: appText('新对话', 'New conversation'),
+                  onPressed: () async {
+                    await widget.onCreateTask!();
+                  },
+                  visualDensity: VisualDensity.compact,
+                  constraints: const BoxConstraints.tightFor(
+                    width: 24,
+                    height: 24,
+                  ),
+                  padding: EdgeInsets.zero,
+                  iconSize: 18,
+                  color: palette.textMuted,
+                  icon: const Icon(Icons.add_rounded),
+                ),
         ),
         Expanded(
           child: Scrollbar(
@@ -481,6 +452,191 @@ class _SidebarTaskGroup {
 
   final AssistantExecutionTarget executionTarget;
   final List<SidebarTaskItem> items;
+}
+
+/// App mark, name and the collapse control, in one compact row.
+class _SidebarBrandHeader extends StatelessWidget {
+  const _SidebarBrandHeader({
+    required this.showCollapseControl,
+    required this.onCollapse,
+  });
+
+  final bool showCollapseControl;
+  final VoidCallback onCollapse;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(6, 2, 2, 10),
+      child: Row(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(5),
+            child: Image.asset(
+              'assets/branding/xmate_desktop_logo_transparent.png',
+              key: const Key('workspace-sidebar-brand-mark'),
+              width: 20,
+              height: 20,
+              errorBuilder: (context, error, stackTrace) => Icon(
+                Icons.blur_on_rounded,
+                size: 20,
+                color: palette.textSecondary,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'XWorkmate',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.titleSmall?.copyWith(
+                color: palette.textPrimary,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          if (showCollapseControl)
+            Tooltip(
+              message: appText('收起侧边栏', 'Collapse sidebar'),
+              child: IconButton(
+                key: const Key('workspace-sidebar-collapse-button'),
+                onPressed: onCollapse,
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints.tightFor(
+                  width: 28,
+                  height: 28,
+                ),
+                style: IconButton.styleFrom(
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  foregroundColor: palette.textSecondary,
+                  overlayColor: palette.chromeSurfacePressed,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppRadius.button),
+                  ),
+                ),
+                icon: const Icon(Icons.view_sidebar_outlined, size: 18),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// One navigation row: icon and label, flat until hovered or selected.
+class _SidebarNavRow extends StatefulWidget {
+  const _SidebarNavRow({
+    super.key,
+    required this.icon,
+    required this.label,
+    this.selected = false,
+    this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool selected;
+  final VoidCallback? onTap;
+
+  @override
+  State<_SidebarNavRow> createState() => _SidebarNavRowState();
+}
+
+class _SidebarNavRowState extends State<_SidebarNavRow> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final theme = Theme.of(context);
+    final enabled = widget.onTap != null;
+    final emphasized = widget.selected || (_hovered && enabled);
+    final foreground = !enabled
+        ? palette.textMuted
+        : emphasized
+        ? palette.textPrimary
+        : palette.textSecondary;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
+        child: Material(
+          color: widget.selected
+              ? palette.chromeSurfacePressed
+              : _hovered && enabled
+              ? palette.hover
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(AppRadius.button),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(AppRadius.button),
+            onTap: widget.onTap,
+            child: SizedBox(
+              height: 34,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Row(
+                  children: [
+                    Icon(widget.icon, size: 18, color: foreground),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        widget.label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.labelLarge?.copyWith(
+                          color: foreground,
+                          fontWeight: widget.selected
+                              ? FontWeight.w600
+                              : FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// A small, spaced uppercase section label with an optional action.
+class _SidebarSectionHeader extends StatelessWidget {
+  const _SidebarSectionHeader({required this.label, this.trailing});
+
+  final String label;
+  final Widget? trailing;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(10, 2, 6, 4),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              label.toUpperCase(),
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: palette.textMuted,
+                fontWeight: FontWeight.w600,
+                letterSpacing: 1.2,
+              ),
+            ),
+          ),
+          ?trailing,
+        ],
+      ),
+    );
+  }
 }
 
 class _SidebarTaskGroupHeader extends StatelessWidget {

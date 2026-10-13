@@ -26,9 +26,9 @@ void main() {
     expect(find.byKey(const Key('mobile-assistant-page')), findsNothing);
     expect(find.byKey(const Key('mobile-settings-page')), findsNothing);
 
-    await tester.tap(
-      find.byKey(const ValueKey<String>('sidebar-footer-settings')),
-    );
+    await tester.tap(find.byKey(const Key('sidebar-footer-menu-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('sidebar-footer-menu-settings')));
     await tester.pumpAndSettle();
 
     expect(

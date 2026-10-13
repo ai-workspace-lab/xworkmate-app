@@ -17,9 +17,9 @@ void main() {
     await app.main();
     await tester.pumpAndSettle(const Duration(seconds: 2));
 
-    await tester.tap(
-      find.byKey(const ValueKey<String>('sidebar-footer-settings')),
-    );
+    await tester.tap(find.byKey(const Key('sidebar-footer-menu-button')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('sidebar-footer-menu-settings')));
     await tester.pumpAndSettle();
 
     expect(
