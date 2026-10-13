@@ -4,6 +4,7 @@ import 'package:xworkmate/app/app_controller.dart';
 import 'package:xworkmate/app/app_shell_desktop.dart';
 import 'package:xworkmate/app/workspace_page_registry.dart';
 import 'package:xworkmate/features/mobile/mobile_assistant_page.dart';
+import 'package:xworkmate/runtime/runtime_models.dart';
 import 'package:xworkmate/theme/app_theme.dart';
 
 void main() {
