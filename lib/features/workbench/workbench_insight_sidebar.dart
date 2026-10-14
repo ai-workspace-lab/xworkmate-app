@@ -6,19 +6,17 @@ import '../../i18n/app_language.dart';
 import '../../theme/app_palette.dart';
 import 'workbench_projection.dart';
 
-/// A compact desktop-only insight rail that keeps the workbench's primary
-/// canvas intact while making operational signals available at a glance.
+/// A desktop-only insight rail beside the workbench canvas. Collapsed, it
+/// takes no width at all; the toggle lives in the workbench toolbar.
 class WorkbenchInsightSidebar extends StatelessWidget {
   const WorkbenchInsightSidebar({
     super.key,
     required this.projection,
     required this.expanded,
-    required this.onToggle,
   });
 
   final WorkbenchProjection projection;
   final bool expanded;
-  final VoidCallback onToggle;
 
   @override
   Widget build(BuildContext context) {
@@ -27,38 +25,35 @@ class WorkbenchInsightSidebar extends StatelessWidget {
       key: expanded ? null : const Key('workbench-insight-sidebar-collapsed'),
       duration: const Duration(milliseconds: 180),
       curve: Curves.easeOutCubic,
-      width: expanded ? 320 : 44,
+      width: expanded ? 320 : 0,
       clipBehavior: Clip.hardEdge,
       decoration: BoxDecoration(
         color: palette.chromeBackground,
-        border: Border(left: BorderSide(color: palette.strokeSoft)),
+        border: expanded
+            ? Border(left: BorderSide(color: palette.strokeSoft))
+            : null,
       ),
+      // Keep the content at full width while the rail animates closed, so
+      // it is clipped rather than squeezed.
       child: expanded
-          ? _InsightRailContent(projection: projection, onToggle: onToggle)
-          : Center(
-              child: Tooltip(
-                message: appText('展开工作洞察', 'Show work insights'),
-                child: IconButton(
-                  key: const Key('workbench-insights-expand-button'),
-                  onPressed: onToggle,
-                  icon: const Icon(Icons.chevron_left_rounded),
-                  color: palette.textSecondary,
-                ),
-              ),
-            ),
+          ? OverflowBox(
+              alignment: Alignment.centerLeft,
+              minWidth: 320,
+              maxWidth: 320,
+              child: _InsightRailContent(projection: projection),
+            )
+          : const SizedBox.shrink(),
     );
   }
 }
 
 class _InsightRailContent extends StatelessWidget {
-  const _InsightRailContent({required this.projection, required this.onToggle});
+  const _InsightRailContent({required this.projection});
 
   final WorkbenchProjection projection;
-  final VoidCallback onToggle;
 
   @override
   Widget build(BuildContext context) {
-    final palette = context.palette;
     final completionRate = projection.items.isEmpty
         ? 0.0
         : projection.completedCount / projection.items.length;
@@ -82,27 +77,12 @@ class _InsightRailContent extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(12, 8, 12, 14),
               children: [
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(4, 4, 0, 10),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          appText('工作洞察', 'Work insights'),
-                          style: Theme.of(context).textTheme.titleSmall
-                              ?.copyWith(fontWeight: FontWeight.w800),
-                        ),
-                      ),
-                      Tooltip(
-                        message: appText('收起工作洞察', 'Hide work insights'),
-                        child: IconButton(
-                          key: const Key('workbench-insights-collapse-button'),
-                          onPressed: onToggle,
-                          icon: const Icon(Icons.chevron_right_rounded),
-                          color: palette.textSecondary,
-                          visualDensity: VisualDensity.compact,
-                        ),
-                      ),
-                    ],
+                  padding: const EdgeInsets.fromLTRB(4, 12, 0, 12),
+                  child: Text(
+                    appText('工作洞察', 'Work insights'),
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
                 ),
                 _InsightCard(

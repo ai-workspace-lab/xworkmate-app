@@ -8,6 +8,8 @@ class WorkbenchNavigation extends StatelessWidget {
     required this.onChanged,
     required this.onActivityWindowChanged,
     required this.onQuickRecord,
+    this.leading,
+    this.trailing,
   });
 
   final int index;
@@ -15,6 +17,12 @@ class WorkbenchNavigation extends StatelessWidget {
   final ValueChanged<int> onChanged;
   final ValueChanged<int> onActivityWindowChanged;
   final VoidCallback onQuickRecord;
+
+  /// Pane control before the tabs (the hidden sidebar's way back).
+  final Widget? leading;
+
+  /// Pane controls at the end of the toolbar, after a hairline.
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
@@ -33,6 +41,7 @@ class WorkbenchNavigation extends StatelessWidget {
       ),
       child: Row(
         children: [
+          ?leading,
           Expanded(
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
@@ -90,6 +99,12 @@ class WorkbenchNavigation extends StatelessWidget {
               ),
             ),
           ),
+          if (trailing != null) ...[
+            const SizedBox(width: 8),
+            Container(width: 1, height: 20, color: palette.strokeSoft),
+            const SizedBox(width: 4),
+            trailing!,
+          ],
         ],
       ),
     );

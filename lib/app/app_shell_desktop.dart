@@ -7,9 +7,7 @@ import '../runtime/runtime_models.dart';
 import '../theme/app_palette.dart';
 import '../theme/app_theme.dart';
 import '../widgets/detail_drawer.dart';
-import '../widgets/collapsed_pane_reveal_button.dart';
 import '../widgets/pane_resize_handle.dart';
-import '../widgets/pane_toggle_icon.dart';
 import '../widgets/sidebar_navigation.dart';
 import 'app_controller.dart';
 import 'app_controller_desktop_thread_binding.dart';
@@ -481,15 +479,6 @@ class _AppShellState extends State<AppShell> {
                                 onClose: controller.closeDetail,
                               ),
                             ),
-                          if (!showSidebar)
-                            Positioned(
-                              left: 12,
-                              top: 12,
-                              child: _SidebarRevealRail(
-                                onExpand: () =>
-                                    _toggleSidebarVisibility(controller),
-                              ),
-                            ),
                         ],
                       );
                     },
@@ -540,22 +529,6 @@ class _AppShellState extends State<AppShell> {
       controller: widget.controller,
       onOpenDetail: onOpenDetail,
       surface: WorkspacePageSurface.desktop,
-    );
-  }
-}
-
-class _SidebarRevealRail extends StatelessWidget {
-  const _SidebarRevealRail({required this.onExpand});
-
-  final VoidCallback onExpand;
-
-  @override
-  Widget build(BuildContext context) {
-    return CollapsedPaneRevealButton(
-      buttonKey: const Key('sidebar-reveal-button'),
-      tooltip: appText('展开导航', 'Expand sidebar'),
-      icon: const PaneToggleIcon(side: PaneSide.left),
-      onTap: onExpand,
     );
   }
 }
