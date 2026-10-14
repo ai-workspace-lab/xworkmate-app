@@ -68,6 +68,7 @@ extension AppControllerDesktopThreadActions on AppController {
       normalized,
     )?.openClawTaskAssociation;
     return aiGatewayPendingSessionKeysInternal.contains(normalized) ||
+        roleTaskPendingSessionKeysInternal.contains(normalized) ||
         (association != null && !association.isTerminal) ||
         openClawGatewayQueuedTurnsBySessionInternal[normalized]?.any(
               (turn) => !turn.cancelled,
@@ -362,10 +363,10 @@ extension AppControllerDesktopThreadActions on AppController {
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey,
     );
-    if (assistantProductModeForSession(normalizedSessionKey) ==
-        AssistantMode.autoBot) {
+    final productMode = assistantProductModeForSession(normalizedSessionKey);
+    if (productMode.runsOnBotTeam) {
       throw StateError(
-        'AutoBot uses scheduled task management, not chat turns.',
+        '${productMode.label} tasks run on DS Bot, not as Gateway turns.',
       );
     }
     final currentTarget = assistantExecutionTargetForSession(

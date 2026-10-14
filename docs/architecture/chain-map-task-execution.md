@@ -288,6 +288,36 @@ BotTeamPage (sidebar `workspace-sidebar-bot-team-button`, flag navigation.bot_te
 the app never sends a path in routing. Assistant turns, and gateway (OpenClaw)
 turns, keep the flow above unchanged.
 
+### Roles in the conversation composer
+
+The composer's role chip offers six roles, in escalation order:
+Chat → Worker → Engineer → Architect ⟷ Researcher → Specialist
+(`AssistantMode`, persisted per thread as `productMode`; earlier
+`work` / `coding` / `code` / `autoBot` records read back as Chat).
+
+```
+Chat        → sendChatMessage → Bridge → OpenClaw Gateway
+              (metadata xworkmateProductCapability {mode: chat})
+other role  ├ Run now (send button)
+            │   → AppController.runRoleTaskInConversation
+            │     → RoleTaskRunner: create session, POST messages with
+            │       routing {roleMode: auto, role}, poll events until terminal
+            │     → request and answer appended to this conversation
+            │       ("[Role · executor · model]" header; failures as errors)
+            └ To Bot team (hand-off button)
+                → AppController.handOffRoleTaskToBotTeam
+                  → create session, POST messages with the same routing
+                  → a note in this conversation; the run continues in the
+                    background (offline, long-running or scheduled work) and
+                    is followed on the Bot team page
+```
+
+DS Bot roles never become Gateway turns: `dispatchGatewayChatTurnInternal`
+rejects them, and `AssistantMode.toTaskMetadata` only serves Chat. Role tasks
+take text only; the composer refuses to send attachments with them. AutoBot
+(the cron manager in the composer) is gone; scheduled work belongs to the Bot
+team.
+
 ## Key Files by Repo
 
 ### xworkmate-app

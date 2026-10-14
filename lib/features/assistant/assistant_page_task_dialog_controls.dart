@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../app/app_controller.dart';
 import '../../models/app_models.dart';
-import 'assistant_bot_dialog.dart';
+import '../bot_team/bot_team_models.dart';
 import '../../i18n/app_language.dart';
 import '../../theme/app_palette.dart';
 import '../../theme/app_theme.dart';
@@ -32,48 +32,86 @@ class _TaskDialogProductModeMenuButtonInternal extends StatelessWidget {
     final mode = controller.assistantProductModeForSession(
       controller.currentSessionKey,
     );
-    // Retain the original mode chip footprint while removing route/provider choices.
+    final theme = Theme.of(context);
+    final palette = context.palette;
+    // Size the chip for the longest role name so it does not jump as the
+    // role changes.
     final labelMetrics = TextPainter(
-      text: TextSpan(
-        text: 'Gateway',
-        style: Theme.of(context).textTheme.labelMedium,
-      ),
+      text: TextSpan(text: 'Researcher', style: theme.textTheme.labelMedium),
       textDirection: Directionality.of(context),
       textScaler: MediaQuery.textScalerOf(context),
     )..layout();
     return PopupMenuButton<AssistantMode>(
       key: const Key('assistant-product-mode-button'),
-      tooltip: appText('任务模式', 'Task mode'),
-      onSelected: (value) => unawaited(_select(context, value)),
+      tooltip: appText('任务角色', 'Task role'),
+      onSelected: (value) =>
+          unawaited(controller.setAssistantProductMode(value)),
       itemBuilder: (_) => [
-        for (final value in AssistantMode.values)
-          CheckedPopupMenuItem<AssistantMode>(
+        for (final value in AssistantMode.values) ...[
+          if (value == AssistantMode.worker) const PopupMenuDivider(),
+          PopupMenuItem<AssistantMode>(
             key: Key('assistant-product-mode-${value.name}'),
             value: value,
-            checked: value == mode,
-            child: Text(value.label),
+            child: Row(
+              children: [
+                Icon(
+                  roleIconInternal(value),
+                  size: 20,
+                  color: palette.textSecondary,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        value.label,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      Text(
+                        roleSummaryInternal(value),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: palette.textMuted,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                if (value == mode)
+                  Icon(Icons.check_rounded, size: 18, color: palette.accent)
+                else
+                  const SizedBox(width: 18),
+              ],
+            ),
           ),
+        ],
       ],
       child: _TaskDialogSelectorChipInternal(
         leading: Icon(
-          Icons.hub_outlined,
+          roleIconInternal(mode),
           size: 14,
-          color: context.palette.textMuted,
+          color: palette.textMuted,
         ),
         label: mode.label,
         labelWidth: labelMetrics.width,
-        tooltip: appText('任务模式', 'Task mode'),
+        tooltip: appText('任务角色', 'Task role'),
       ),
     );
   }
-
-  Future<void> _select(BuildContext context, AssistantMode mode) async {
-    await controller.setAssistantProductMode(mode);
-    if (mode == AssistantMode.autoBot && context.mounted) {
-      await showAssistantBotDialog(context, controller);
-    }
-  }
 }
+
+/// Chat answers here through the Gateway; the other roles share the Bot
+/// team's icons and descriptions.
+IconData roleIconInternal(AssistantMode mode) =>
+    BotRole.values.byName(mode.name).icon;
+
+String roleSummaryInternal(AssistantMode mode) => mode.runsOnBotTeam
+    ? BotRole.values.byName(mode.name).summary
+    : appText('直接对话，立刻回答', 'Talk here and get the answer right away');
 
 class _TaskDialogSelectorChipInternal extends StatelessWidget {
   const _TaskDialogSelectorChipInternal({

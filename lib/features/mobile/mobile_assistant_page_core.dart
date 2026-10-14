@@ -18,7 +18,6 @@ import '../../models/app_models.dart';
 import '../../runtime/runtime_models.dart';
 import '../../theme/app_palette.dart';
 import 'mobile_assistant_page_composer.dart';
-import '../assistant/assistant_bot_dialog.dart';
 import 'mobile_assistant_page_conversation.dart';
 
 class MobileAssistantDetailPage extends StatefulWidget {
@@ -137,18 +136,38 @@ class _MobileAssistantDetailPageState extends State<MobileAssistantDetailPage> {
   }
 
   Future<void> sendCurrentPrompt() async {
-    if (widget.controller.assistantProductModeForSession(
-          widget.controller.currentSessionKey,
-        ) ==
-        AssistantMode.autoBot) {
-      await showAssistantBotDialog(
-        context,
-        widget.controller,
-        initialPrompt: inputController.text.trim(),
+    final role = widget.controller.assistantProductModeForSession(
+      widget.controller.currentSessionKey,
+    );
+    final text = inputController.text.trim();
+    if (role.runsOnBotTeam) {
+      if (text.isEmpty) {
+        inputFocusNode.requestFocus();
+        return;
+      }
+      if (_attachments.isNotEmpty) {
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+          SnackBar(
+            content: Text(
+              appText(
+                'DS Bot 角色任务暂不支持附件，请移除附件或切换到 Chat。',
+                'DS Bot role tasks take text only; remove the attachments or '
+                    'switch to Chat.',
+              ),
+            ),
+          ),
+        );
+        return;
+      }
+      final sessionKey = widget.controller.currentSessionKey;
+      inputController.clear();
+      await widget.controller.runRoleTaskInConversation(
+        sessionKey: sessionKey,
+        text: text,
+        role: role,
       );
       return;
     }
-    final text = inputController.text.trim();
     if (text.isEmpty && _attachments.isEmpty) {
       inputFocusNode.requestFocus();
       return;

@@ -71,50 +71,49 @@ void main() {
       });
     }
 
-    testWidgets(
-      'four product modes are independent of the fixed Gateway route',
-      (tester) async {
-        final controller = AppController(
-          environmentOverride: const <String, String>{},
-          initialGatewayProviderCatalog: const <SingleAgentProvider>[
-            SingleAgentProvider.openclaw,
-          ],
-          initialAvailableExecutionTargets: const <AssistantExecutionTarget>[
-            AssistantExecutionTarget.agent,
-            AssistantExecutionTarget.gateway,
-          ],
-        );
-        addTearDown(controller.dispose);
-        await controller.sessionsController.switchSession(
-          'unit-fixture-task-a',
-        );
+    testWidgets('the six roles are independent of the fixed Gateway route', (
+      tester,
+    ) async {
+      final controller = AppController(
+        environmentOverride: const <String, String>{},
+        initialGatewayProviderCatalog: const <SingleAgentProvider>[
+          SingleAgentProvider.openclaw,
+        ],
+        initialAvailableExecutionTargets: const <AssistantExecutionTarget>[
+          AssistantExecutionTarget.agent,
+          AssistantExecutionTarget.gateway,
+        ],
+      );
+      addTearDown(controller.dispose);
+      await controller.sessionsController.switchSession('unit-fixture-task-a');
 
-        await tester.pumpWidget(
-          _buildTestApp(child: _buildLowerPane(controller: controller)),
-        );
-        await tester.pumpAndSettle();
+      await tester.pumpWidget(
+        _buildTestApp(child: _buildLowerPane(controller: controller)),
+      );
+      await tester.pumpAndSettle();
 
-        await tester.tap(
-          find.byKey(const Key('assistant-product-mode-button')),
-        );
-        await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('assistant-product-mode-button')));
+      await tester.pumpAndSettle();
 
-        expect(
-          find.byKey(const Key('assistant-execution-target-button')),
-          findsNothing,
-        );
-        expect(
-          find.byKey(const Key('assistant-execution-target-menu-item-gateway')),
-          findsNothing,
-        );
-        for (final mode in ['chat', 'work', 'coding', 'autoBot']) {
-          expect(
-            find.byKey(Key('assistant-product-mode-$mode')),
-            findsOneWidget,
-          );
-        }
-      },
-    );
+      expect(
+        find.byKey(const Key('assistant-execution-target-button')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const Key('assistant-execution-target-menu-item-gateway')),
+        findsNothing,
+      );
+      for (final mode in [
+        'chat',
+        'worker',
+        'engineer',
+        'architect',
+        'researcher',
+        'specialist',
+      ]) {
+        expect(find.byKey(Key('assistant-product-mode-$mode')), findsOneWidget);
+      }
+    });
 
     testWidgets(
       'legacy Bridge targets do not become selectable product routes',

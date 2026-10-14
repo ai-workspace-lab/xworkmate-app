@@ -471,7 +471,25 @@ void main() {
             find.byKey(const Key('mobile-assistant-product-mode-button')),
           );
           await tester.pumpAndSettle();
-          for (final mode in ['chat', 'work', 'coding', 'autoBot']) {
+          for (final mode in [
+            'chat',
+            'worker',
+            'engineer',
+            'architect',
+            'researcher',
+            'specialist',
+          ]) {
+            // The sheet scrolls on small phones.
+            await tester.scrollUntilVisible(
+              find.byKey(Key('mobile-assistant-product-mode-$mode')),
+              48,
+              scrollable: find
+                  .descendant(
+                    of: find.byType(BottomSheet),
+                    matching: find.byType(Scrollable),
+                  )
+                  .first,
+            );
             expect(
               find.byKey(Key('mobile-assistant-product-mode-$mode')),
               findsOneWidget,

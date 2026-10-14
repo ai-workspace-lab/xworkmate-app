@@ -42,7 +42,7 @@ const String _sandboxBridgeServerUrl = 'https://bridge.invalid';
 void main() {
   group('AssistantExecutionTarget', () {
     test(
-      'Chat Work Coding capture product semantics and central model through Gateway',
+      'Chat captures product semantics and central model through Gateway',
       () async {
         final client = _RecordingGoTaskServiceClient();
         final home = await Directory.systemTemp.createTemp(
@@ -76,11 +76,7 @@ void main() {
           controller.dispose();
         });
         await controller.assistantThreadsRestoredInternal.future;
-        for (final mode in [
-          AssistantMode.chat,
-          AssistantMode.work,
-          AssistantMode.coding,
-        ]) {
+        for (final mode in [AssistantMode.chat]) {
           final key = 'unit-product-${mode.name}';
           await _selectGatewaySession(controller, key);
           controller.runtimeInternal.snapshotInternal = controller
@@ -125,14 +121,15 @@ void main() {
           expect(request.target, AssistantExecutionTarget.gateway);
           expect(request.metadata['xworkmateProductCapability'], {
             'schemaVersion': 1,
-            'mode': mode == AssistantMode.coding ? 'code' : mode.name,
+            'mode': 'chat',
             'model': 'xworkmate/model-1',
           });
           expect(request.metadata, contains('xworkmateTaskArtifactContract'));
           expect(request.toExternalAcpParams(), isNot(contains('provider')));
           expect(request.toExternalAcpParams(), isNot(contains('model')));
         }
-        await controller.setAssistantProductMode(AssistantMode.autoBot);
+        // DS Bot roles never become Gateway turns.
+        await controller.setAssistantProductMode(AssistantMode.engineer);
         final before = client.requests.length;
         await expectLater(
           controller.sendChatMessage('must not send'),
