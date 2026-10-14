@@ -2170,14 +2170,19 @@ class _ArtifactDownloadAttemptResult {
     required this.bytes,
     required this.completed,
     required this.reset,
-    this.gone = false,
-  });
+  }) : gone = false;
 
   const _ArtifactDownloadAttemptResult.retry()
-    : this(bytes: const <int>[], completed: false, reset: false);
+    : bytes = const <int>[],
+      completed = false,
+      reset = false,
+      gone = false;
 
   const _ArtifactDownloadAttemptResult.gone()
-    : this(bytes: const <int>[], completed: false, reset: false, gone: true);
+    : bytes = const <int>[],
+      completed = false,
+      reset = false,
+      gone = true;
 
   final List<int> bytes;
   final bool completed;

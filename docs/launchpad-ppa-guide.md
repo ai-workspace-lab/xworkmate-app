@@ -50,7 +50,7 @@ Consequences worth knowing:
 | Launchpad team | [`ai-workspace-lab`](https://launchpad.net/~ai-workspace-lab) |
 | PPA | `ppa:ai-workspace-lab/ppa` |
 | Debian package name | `xworkmate` |
-| Target series | `jammy` (22.04), `noble` (24.04) |
+| Target series | `jammy` (22.04), `noble` (24.04), `resolute` (26.04), `stonking` (26.10) |
 
 One-time setup:
 
@@ -72,21 +72,28 @@ upload, so every source package gets a distinct version:
 | :--- | :--- |
 | Tagged release, jammy | `1.2.0~ubuntu22.04.1` |
 | Tagged release, noble | `1.2.0~ubuntu24.04.1` |
+| Tagged release, resolute | `1.2.0~ubuntu26.04.1` |
+| Tagged release, stonking | `1.2.0~ubuntu26.10.1` |
 | Untagged CI build, jammy | `1.2.0~ci417~ubuntu22.04.1` |
 
 The `~ciN` marker sorts *below* the plain release, so a CI build of `1.2.0` never
-shadows the eventual `1.2.0` release; `~ubuntu22.04.1` sorts below
-`~ubuntu24.04.1`, so a release upgrade keeps moving forward.
+shadows the eventual `1.2.0` release; the Ubuntu series suffixes sort in
+release order so upgrades keep moving forward across all four supported series.
 `scripts/ci/build_linux_source_packages.sh` asserts both orderings with
 `dpkg --compare-versions` on every build.
 
 Override the trailing `.1` with `PPA_PACKAGE_REVISION` when a packaging-only fix
 has to be re-uploaded for an unchanged upstream version. Override the series list
-with `PPA_SERIES="jammy:22.04 noble:24.04"`.
+with `PPA_SERIES="jammy:22.04 noble:24.04 resolute:26.04 stonking:26.10"`.
 
 ---
 
 ## 4. What CI does
+
+GitHub Actions is the build and upload path for this PPA. Do not use the legacy
+Launchpad recipe to build or publish packages. The workflow passes the ordered
+`PPA_SERIES` list to the Linux source-package step so each release is built
+once for every supported Ubuntu series. The upstream version remains `1.2.0`.
 
 In `.github/workflows/build-and-release.yml`:
 

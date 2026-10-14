@@ -11,6 +11,7 @@ APP_DIR="$ROOT_DIR"
 PUBSPEC_PATH="$ROOT_DIR/pubspec.yaml"
 DIST_DIR="$ROOT_DIR/dist"
 APP_NAME="${APP_NAME:-XWorkmate}"
+FLUTTER_BIN="${FLUTTER:-flutter}"
 BUILD_MODE="${BUILD_MODE:-release}"
 APP_STORE_DEFINE="${APP_STORE_DEFINE:---dart-define=XWORKMATE_APP_STORE=${XWORKMATE_APP_STORE:-true}}"
 SIGN_IDENTITY="${XWORKMATE_SIGN_IDENTITY:-}"
@@ -144,7 +145,7 @@ else
 fi
 
 BUILD_ARGS=(
-  flutter build macos
+  "$FLUTTER_BIN" build macos
   "--$BUILD_MODE"
   --build-name="$APP_RELEASE_VERSION"
   --build-number="$APP_BUILD"

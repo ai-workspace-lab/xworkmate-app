@@ -339,7 +339,7 @@ Future<AccountSyncResult> syncAccountSettingsInternal(
 
   try {
     if (normalizedBaseUrl.isEmpty) {
-      return _persistAccountSyncContractFailureInternal(
+      return await _persistAccountSyncContractFailureInternal(
         controller,
         message: 'Account base URL is required',
         quiet: quiet,
@@ -361,7 +361,7 @@ Future<AccountSyncResult> syncAccountSettingsInternal(
     );
     final bridgeToken = _extractBridgeAuthTokenMetadata(syncPayload);
     if (bridgeToken.isEmpty) {
-      return _persistAccountSyncContractFailureInternal(
+      return await _persistAccountSyncContractFailureInternal(
         controller,
         message: 'Bridge authorization is unavailable',
         quiet: quiet,

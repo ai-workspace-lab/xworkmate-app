@@ -19,6 +19,12 @@ analyzer:
     - third_party/**/test/**
     - third_party/**/analysis_options.yaml
     - third_party/flutter_secure_storage_windows/**
+    - android/**
+    - ios/**
+    - web/**
+    - windows/**
+    - macos/**
+    - linux/**
 
 linter:
   # The lint rules applied to this project can be customized in the
