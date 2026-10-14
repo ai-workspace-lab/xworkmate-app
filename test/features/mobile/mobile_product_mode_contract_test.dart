@@ -8,10 +8,10 @@ import 'package:xworkmate/theme/app_theme.dart';
 
 void main() {
   testWidgets(
-    'mobile AutoBot manages schedules without clearing or sending the draft',
+    'mobile roles run now through the page and offer a Bot team hand-off',
     (tester) async {
       final controller = AppController(environmentOverride: const {});
-      final input = TextEditingController(text: 'scheduled mobile draft');
+      final input = TextEditingController(text: 'refactor on mobile');
       final focus = FocusNode();
       addTearDown(controller.dispose);
       addTearDown(input.dispose);
@@ -20,27 +20,31 @@ void main() {
           'unit-mobile-modes';
       controller.upsertTaskThreadInternal(
         'unit-mobile-modes',
-        productMode: AssistantMode.autoBot,
+        productMode: AssistantMode.engineer,
       );
       var sends = 0;
       await tester.pumpWidget(
         MaterialApp(
           theme: AppTheme.light(platform: TargetPlatform.iOS),
           home: Scaffold(
-            body: Align(
-              alignment: Alignment.bottomCenter,
-              child: MobileAssistantComposer(
-                controller: controller,
-                inputController: input,
-                focusNode: focus,
-                thinking: 'off',
-                bottomPadding: 0,
-                attachments: const [],
-                onPickAttachments: () {},
-                onRemoveAttachment: (_) {},
-                onThinkingChanged: (_) {},
-                onComposerStateChanged: () {},
-                onSend: () => sends++,
+            // The page rebuilds the composer when the controller changes.
+            body: AnimatedBuilder(
+              animation: controller,
+              builder: (context, _) => Align(
+                alignment: Alignment.bottomCenter,
+                child: MobileAssistantComposer(
+                  controller: controller,
+                  inputController: input,
+                  focusNode: focus,
+                  thinking: 'off',
+                  bottomPadding: 0,
+                  attachments: const [],
+                  onPickAttachments: () {},
+                  onRemoveAttachment: (_) {},
+                  onThinkingChanged: (_) {},
+                  onComposerStateChanged: () {},
+                  onSend: () => sends++,
+                ),
               ),
             ),
           ),
@@ -49,16 +53,30 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('mobile-assistant-send-button')));
       await tester.pumpAndSettle();
-      expect(find.byKey(const Key('assistant-bot-dialog')), findsOneWidget);
-      expect(
-        tester
-            .widget<TextField>(find.byKey(const Key('assistant-bot-prompt')))
-            .controller
-            ?.text,
-        'scheduled mobile draft',
+      expect(sends, 1);
+
+      // No Bridge or account here: the hand-off is noted in the
+      // conversation instead of being dropped.
+      await tester.tap(
+        find.byKey(const Key('mobile-assistant-hand-off-button')),
       );
-      expect(input.text, 'scheduled mobile draft');
-      expect(sends, 0);
+      await tester.pumpAndSettle();
+      expect(input.text, isEmpty);
+      final messages =
+          controller.assistantThreadMessagesInternal['unit-mobile-modes']!;
+      expect(messages[messages.length - 2].text, 'refactor on mobile');
+      expect(messages.last.error, isTrue);
+
+      controller.upsertTaskThreadInternal(
+        'unit-mobile-modes',
+        productMode: AssistantMode.chat,
+      );
+      controller.notifyListeners();
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('mobile-assistant-hand-off-button')),
+        findsNothing,
+      );
     },
   );
 }

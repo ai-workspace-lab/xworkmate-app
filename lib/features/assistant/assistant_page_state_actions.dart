@@ -9,6 +9,7 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:markdown/markdown.dart' as md;
 import 'package:path_provider/path_provider.dart';
 import '../../app/app_controller.dart';
+import '../../app/app_controller_desktop_bot_team.dart';
 import '../../app/app_controller_desktop_thread_binding.dart';
 import '../../app/app_metadata.dart';
 import '../../app/ui_feature_manifest.dart';
@@ -23,7 +24,6 @@ import '../../widgets/desktop_workspace_scaffold.dart';
 import '../../widgets/pane_resize_handle.dart';
 import '../../widgets/surface_card.dart';
 import 'assistant_page_main.dart';
-import 'assistant_bot_dialog.dart';
 import 'assistant_page_components.dart';
 import 'assistant_page_composer_bar.dart';
 import 'assistant_page_composer_state_helpers.dart';
@@ -93,17 +93,45 @@ extension AssistantPageStateActionsInternal on AssistantPageStateInternal {
     });
   }
 
+  /// Runs the draft as a DS Bot task for [role] right away; the request and
+  /// the answer land in this conversation.
+  Future<void> runRoleTaskNowInternal(AssistantMode role) async {
+    final controller = widget.controller;
+    final text = inputControllerInternal.text.trim();
+    if (text.isEmpty) {
+      return;
+    }
+    if (attachmentsInternal.isNotEmpty) {
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        SnackBar(
+          content: Text(
+            appText(
+              'DS Bot 角色任务暂不支持附件，请移除附件或切换到 Chat。',
+              'DS Bot role tasks take text only; remove the attachments or '
+                  'switch to Chat.',
+            ),
+          ),
+        ),
+      );
+      return;
+    }
+    final sessionKey = controller.currentSessionKey;
+    inputControllerInternal.clear();
+    clearComposerDraftForSessionInternal(sessionKey);
+    await controller.runRoleTaskInConversation(
+      sessionKey: sessionKey,
+      text: text,
+      role: role,
+    );
+  }
+
   Future<void> submitPromptInternal() async {
     final controller = widget.controller;
-    if (controller.assistantProductModeForSession(
-          controller.currentSessionKey,
-        ) ==
-        AssistantMode.autoBot) {
-      await showAssistantBotDialog(
-        context,
-        controller,
-        initialPrompt: inputControllerInternal.text.trim(),
-      );
+    final productMode = controller.assistantProductModeForSession(
+      controller.currentSessionKey,
+    );
+    if (productMode.runsOnBotTeam) {
+      await runRoleTaskNowInternal(productMode);
       return;
     }
     final uiFeatures = controller.featuresFor(

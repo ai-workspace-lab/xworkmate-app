@@ -1,7 +1,6 @@
 // ignore_for_file: unused_import, unnecessary_import
 
 import 'dart:async';
-import 'assistant_bot_dialog.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
@@ -11,6 +10,7 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:markdown/markdown.dart' as md;
 import 'package:path_provider/path_provider.dart';
 import '../../app/app_controller.dart';
+import '../../app/app_controller_desktop_bot_team.dart';
 import '../../app/app_metadata.dart';
 import '../../app/ui_feature_manifest.dart';
 import '../../i18n/app_language.dart';
@@ -338,31 +338,56 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
   bool get runInFlightInternal => widget.controller
       .assistantSessionHasPendingRun(widget.controller.currentSessionKey);
 
-  /// A draft is sendable when it has non-whitespace text (or an attachment) and
-  /// nothing is already running.
-  bool get isAutoBotInternal =>
-      widget.controller.assistantProductModeForSession(
-        widget.controller.currentSessionKey,
-      ) ==
-      AssistantMode.autoBot;
+  AssistantMode get productModeInternal => widget.controller
+      .assistantProductModeForSession(widget.controller.currentSessionKey);
 
+  /// A draft is sendable when it has non-whitespace text (or, for Chat, an
+  /// attachment) and nothing is already running. DS Bot role tasks carry
+  /// text only.
   bool get canSendInternal =>
       !runInFlightInternal &&
-      (isAutoBotInternal ||
-          widget.inputController.text.trim().isNotEmpty ||
-          widget.attachments.isNotEmpty);
+      (widget.inputController.text.trim().isNotEmpty ||
+          (!productModeInternal.runsOnBotTeam &&
+              widget.attachments.isNotEmpty));
 
   Future<void> handleSendInternal() async {
-    if (isAutoBotInternal) {
-      await showAssistantBotDialog(
-        context,
-        widget.controller,
-        initialPrompt: widget.inputController.text.trim(),
-      );
-      return;
-    }
     applySelectedBuiltinPluginsToInputInternal();
     await widget.onSend();
+  }
+
+  /// Hands the draft to the Bot team as a background task thread for the
+  /// current role, for offline, long-running or scheduled work.
+  Future<void> handOffToBotTeamInternal() async {
+    final controller = widget.controller;
+    final text = widget.inputController.text.trim();
+    if (text.isEmpty || !productModeInternal.runsOnBotTeam) {
+      return;
+    }
+    if (widget.attachments.isNotEmpty) {
+      showRoleTaskAttachmentNoticeInternal();
+      return;
+    }
+    final sessionKey = controller.currentSessionKey;
+    widget.inputController.clear();
+    await controller.handOffRoleTaskToBotTeam(
+      sessionKey: sessionKey,
+      text: text,
+      role: productModeInternal,
+    );
+  }
+
+  void showRoleTaskAttachmentNoticeInternal() {
+    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+      SnackBar(
+        content: Text(
+          appText(
+            'DS Bot 角色任务暂不支持附件，请移除附件或切换到 Chat。',
+            'DS Bot role tasks take text only; remove the attachments or '
+                'switch to Chat.',
+          ),
+        ),
+      ),
+    );
   }
 
   void resetSkillPickerSearchInternal() {
@@ -387,10 +412,11 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
     final selectedSkills = widget.availableSkills
         .where((skill) => widget.selectedSkillKeys.contains(skill.key))
         .toList(growable: false);
+    final runsOnBotTeam = productModeInternal.runsOnBotTeam;
     final submitLabel = runInFlightInternal
         ? appText('运行中', 'Running')
-        : isAutoBotInternal
-        ? appText('管理', 'Manage')
+        : runsOnBotTeam
+        ? appText('立即执行', 'Run now')
         : appText('提交', 'Submit');
     // The tooltip carries the key hint, and when the button is disabled, the
     // reason — a dead control with no explanation is worse than none.
@@ -399,8 +425,11 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
             '任务运行中，可在上方进度条停止。',
             'Task running — stop it from the progress bar above.',
           )
-        : isAutoBotInternal
-        ? appText('管理 AutoBot', 'Manage AutoBot')
+        : runsOnBotTeam && canSendInternal
+        ? appText(
+            '交给 DS Bot 立即执行，结果回到对话（Enter）',
+            'Run now on DS Bot; the answer comes back here (Enter)',
+          )
         : canSendInternal
         ? appText('提交（Enter）', 'Submit (Enter)')
         : appText('先输入内容或添加附件', 'Type something or add an attachment first');
@@ -792,6 +821,34 @@ class ComposerBarStateInternal extends State<ComposerBarInternal> {
                   ),
                 ),
                 const SizedBox(width: 8),
+                if (runsOnBotTeam) ...[
+                  Tooltip(
+                    message: appText(
+                      '交给 Bot 团队在后台执行（离线、长时间、定时任务）',
+                      'Hand to the Bot team to run in the background '
+                          '(offline, long-running or scheduled work)',
+                    ),
+                    child: OutlinedButton.icon(
+                      key: const Key('assistant-hand-off-button'),
+                      onPressed: canSendInternal
+                          ? () => unawaited(handOffToBotTeamInternal())
+                          : null,
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        minimumSize: const Size(64, 28),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      icon: const Icon(Icons.schedule_send_outlined, size: 18),
+                      label: Text(appText('交给 Bot 团队', 'To Bot team')),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                ],
                 Tooltip(
                   message: submitTooltip,
                   child: FilledButton(

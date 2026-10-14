@@ -162,36 +162,48 @@ class StatusInfo {
 
 enum AppSidebarState { expanded, collapsed, hidden }
 
-enum AssistantMode { chat, work, coding, autoBot }
+/// The six roles a task can be given, in escalation order:
+/// Chat → Worker → Engineer → Architect ⟷ Researcher → Specialist.
+///
+/// Chat runs in the conversation through the Bridge and Gateway. The other
+/// roles run on DS Bot, whose orchestrator selects the executor and model
+/// for the role: either right away with the answer coming back into the
+/// conversation, or handed to the Bot team as a background task thread.
+enum AssistantMode { chat, worker, engineer, architect, researcher, specialist }
 
 extension AssistantModeCopy on AssistantMode {
+  /// Role names stay in English in both languages: they are the names the
+  /// DS Bot orchestrator policy uses.
   String get label => switch (this) {
     AssistantMode.chat => 'Chat',
-    AssistantMode.work => 'Work',
-    AssistantMode.coding => 'Coding',
-    AssistantMode.autoBot => 'AutoBot',
+    AssistantMode.worker => 'Worker',
+    AssistantMode.engineer => 'Engineer',
+    AssistantMode.architect => 'Architect',
+    AssistantMode.researcher => 'Researcher',
+    AssistantMode.specialist => 'Specialist',
   };
+
+  /// Every role but Chat is executed by DS Bot instead of the Gateway.
+  bool get runsOnBotTeam => this != AssistantMode.chat;
 }
 
 extension AssistantModeContract on AssistantMode {
-  // Only persisted thread records use the former product name. New records
-  // write `coding`; the deployed Bridge v1 task contract still expects `code`.
-  static AssistantMode fromJsonValue(String? value) => value == 'code'
-      ? AssistantMode.coding
-      : AssistantMode.values.firstWhere(
-          (mode) => mode.name == value,
-          orElse: () => AssistantMode.chat,
-        );
-
-  Map<String, dynamic> toTaskMetadata({String model = ''}) {
-    if (this == AssistantMode.autoBot) {
-      throw StateError(
-        'AutoBot uses scheduled task management, not chat turns.',
+  /// Unknown values, including the earlier Work / Coding / AutoBot modes,
+  /// fall back to Chat.
+  static AssistantMode fromJsonValue(String? value) =>
+      AssistantMode.values.firstWhere(
+        (mode) => mode.name == value,
+        orElse: () => AssistantMode.chat,
       );
+
+  /// Gateway task metadata. Only Chat turns go to the Gateway.
+  Map<String, dynamic> toTaskMetadata({String model = ''}) {
+    if (runsOnBotTeam) {
+      throw StateError('$label tasks run on DS Bot, not as Gateway turns.');
     }
     return <String, dynamic>{
       'schemaVersion': 1,
-      'mode': this == AssistantMode.coding ? 'code' : name,
+      'mode': 'chat',
       if (model.trim().isNotEmpty) 'model': model.trim(),
     };
   }

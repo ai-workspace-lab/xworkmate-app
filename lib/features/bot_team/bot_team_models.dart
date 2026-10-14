@@ -63,6 +63,23 @@ extension BotRoleCopy on BotRole {
   };
 }
 
+/// Session title for a task: its first 40 characters.
+String botTaskTitle(String text) {
+  final prompt = text.trim();
+  return prompt.length > 40 ? '${prompt.substring(0, 40)}…' : prompt;
+}
+
+/// Routing for a task. An empty [role] lets the orchestrator's policy pick
+/// one; [workspace] is a key the orchestrator host maps to a directory.
+Map<String, Object?> botRoleRouting({
+  String role = '',
+  String workspace = '',
+}) => <String, Object?>{
+  'roleMode': 'auto',
+  if (role.trim().isNotEmpty) 'role': role.trim(),
+  if (workspace.trim().isNotEmpty) 'workspace': workspace.trim(),
+};
+
 enum BotTaskPhase {
   queued,
   claimed,

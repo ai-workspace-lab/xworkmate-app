@@ -262,6 +262,8 @@ class AppController extends ChangeNotifier {
   final Map<String, HttpClient> aiGatewayStreamingClientsInternal =
       <String, HttpClient>{};
   final Set<String> aiGatewayPendingSessionKeysInternal = <String>{};
+  /// Conversations waiting on a DS Bot role task run in place.
+  final Set<String> roleTaskPendingSessionKeysInternal = <String>{};
   final Set<String> aiGatewayAbortedSessionKeysInternal = <String>{};
   final Map<String, Future<void>> assistantThreadTurnQueuesInternal =
       <String, Future<void>>{};
