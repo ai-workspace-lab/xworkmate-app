@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 env:
-  FLUTTER_VERSION: 3.41.4
+  FLUTTER_VERSION: 3.47.0
 
 jobs:
   flutter-integration:

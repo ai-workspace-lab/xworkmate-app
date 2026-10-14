@@ -2,7 +2,7 @@ name: Build and Release XWorkmate Packages
 
 env:
   VAULT_ADDR: https://vault.svc.plus
-  FLUTTER_VERSION: 3.41.4
+  FLUTTER_VERSION: 3.47.0
 
 on:
   push:
@@ -298,6 +298,8 @@ jobs:
       - name: Build Linux distro source packages
         if: ${{ matrix.platform == 'linux' && steps.preflight.outputs.should_build_platform == 'true' }}
         shell: bash
+        env:
+          PPA_SERIES: "jammy:22.04 noble:24.04 resolute:26.04 stonking:26.10"
         run: bash ./scripts/ci/build_linux_source_packages.sh
 
       # Signs a copy with a throwaway key. Without this the signing code would

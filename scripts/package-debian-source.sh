@@ -17,7 +17,7 @@ payload_dir="${PAYLOAD_DIR:-$repo_root/dist/linux/payload}"
 out_root="${DEB_SOURCE_OUT_DIR:-$repo_root/dist/ppa}"
 # "<series>:<ubuntu version>" pairs. The Ubuntu version becomes the version
 # suffix so the same upstream release can be uploaded to several series.
-series_spec="${PPA_SERIES:-jammy:22.04 noble:24.04}"
+series_spec="${PPA_SERIES:-jammy:22.04 noble:24.04 resolute:26.04 stonking:26.10}"
 package_revision="${PPA_PACKAGE_REVISION:-1}"
 maintainer="${DEB_MAINTAINER:-AI Workspace Lab <dev@ai-workspace-lab.org>}"
 

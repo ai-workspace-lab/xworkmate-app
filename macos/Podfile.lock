@@ -20,10 +20,10 @@ EXTERNAL SOURCES:
     :path: Flutter/ephemeral
 
 SPEC CHECKSUMS:
-  flutter_webrtc: 377dbcebdde6fed0fc40de87bcaaa2bffcec9a88
-  FlutterMacOS: d0db08ddef1a9af05a5ec4b724367152bb0500b1
+  flutter_webrtc: d55fd3f5c75b42940b6b4b2cf376a5797398d1f8
+  FlutterMacOS: c232990155153907050900a2e175c7773903ba4e
   WebRTC-SDK: 79942c006ea64f6fb48d7da8a4786dfc820bc1db
 
 PODFILE CHECKSUM: 7804cba3ecbc9953edc70dee53b2ce2b4aeaa013
 
-COCOAPODS: 1.17.0
+COCOAPODS: 1.13.0

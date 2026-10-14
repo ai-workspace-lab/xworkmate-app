@@ -25,19 +25,41 @@ bash ./scripts/package-rpm-source.sh
 echo "==> [verify] Checking the Debian version ordering invariants..."
 eval "$(python3 ./scripts/ci/build_version.py --format shell)"
 base_version="$PLATFORM_RELEASE_VERSION"
-ci_version="${base_version}~ci${GITHUB_RUN_NUMBER:-${BUILD_NUMBER}}~ubuntu22.04.1"
-tag_version="${base_version}~ubuntu22.04.1"
-next_series_version="${base_version}~ubuntu24.04.1"
+series_spec="${PPA_SERIES:-jammy:22.04 noble:24.04 resolute:26.04 stonking:26.10}"
+read -r -a ppa_series <<< "$series_spec"
+if [[ "${#ppa_series[@]}" -lt 2 ]]; then
+  echo "==> [verify] PPA_SERIES must contain at least two ordered series." >&2
+  exit 1
+fi
+
+series_versions=()
+for entry in "${ppa_series[@]}"; do
+  series_version="${entry##*:}"
+  if [[ "$series_version" == "$entry" || ! "$series_version" =~ ^[0-9]+\.[0-9]+$ ]]; then
+    echo "==> [verify] Malformed PPA_SERIES entry: '$entry' (expected '<series>:<version>')." >&2
+    exit 1
+  fi
+  series_versions+=("$series_version")
+done
+
+first_series_version="${series_versions[0]}"
+ci_version="${base_version}~ci${GITHUB_RUN_NUMBER:-${BUILD_NUMBER}}~ubuntu${first_series_version}.1"
+tag_version="${base_version}~ubuntu${first_series_version}.1"
 
 if ! dpkg --compare-versions "$ci_version" lt "$tag_version"; then
   echo "==> [verify] $ci_version does not sort below $tag_version." >&2
   exit 1
 fi
-if ! dpkg --compare-versions "$tag_version" lt "$next_series_version"; then
-  echo "==> [verify] $tag_version does not sort below $next_series_version." >&2
-  exit 1
-fi
-echo "==> [verify] $ci_version < $tag_version < $next_series_version"
+previous_version="$tag_version"
+for series_version in "${series_versions[@]:1}"; do
+  next_series_version="${base_version}~ubuntu${series_version}.1"
+  if ! dpkg --compare-versions "$previous_version" lt "$next_series_version"; then
+    echo "==> [verify] $previous_version does not sort below $next_series_version." >&2
+    exit 1
+  fi
+  previous_version="$next_series_version"
+done
+echo "==> [verify] $ci_version < $tag_version < $previous_version"
 
 echo "==> [verify] Checking the generated Debian source packages..."
 verify_root="$(mktemp -d)"
@@ -46,6 +68,10 @@ trap 'rm -rf "$verify_root"' EXIT
 mapfile -t dsc_files < <(find "$repo_root/dist/ppa" -mindepth 1 -maxdepth 2 -name '*.dsc' | sort)
 if [[ "${#dsc_files[@]}" -eq 0 ]]; then
   echo "==> [verify] No .dsc files were produced." >&2
+  exit 1
+fi
+if [[ "${#dsc_files[@]}" -ne "${#ppa_series[@]}" ]]; then
+  echo "==> [verify] Expected ${#ppa_series[@]} source packages from PPA_SERIES, found ${#dsc_files[@]}." >&2
   exit 1
 fi
 
