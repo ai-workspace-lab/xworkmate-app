@@ -10,7 +10,6 @@ import 'package:xworkmate/models/app_models.dart';
 import 'package:xworkmate/i18n/app_language.dart';
 import 'package:xworkmate/features/assistant/assistant_page_task_dialog_controls.dart';
 import 'package:xworkmate/features/assistant/assistant_page_composer_clipboard.dart';
-import 'package:xworkmate/features/assistant/assistant_bot_dialog.dart';
 import 'package:xworkmate/features/assistant/assistant_page_composer_skill_picker.dart';
 import 'package:xworkmate/features/assistant/assistant_page_main.dart';
 import 'package:xworkmate/theme/app_theme.dart';
@@ -23,7 +22,7 @@ import 'package:xworkmate/widgets/surface_card.dart';
 void main() {
   group('composer input contract', () {
     testWidgets(
-      'original route chip exposes four modes without moving the composer',
+      'original route chip exposes the six roles without moving the composer',
       (tester) async {
         final controller = _controller(tester);
         final originalLanguage = activeAppLanguage;
@@ -89,11 +88,18 @@ void main() {
             format: ui.ImageByteFormat.png,
           );
           await File(
-            '/tmp/xworkmate-four-modes-widget-render.png',
+            '/tmp/xworkmate-six-roles-widget-render.png',
           ).writeAsBytes(png!.buffer.asUint8List());
         });
         menuPixels.dispose();
-        for (final mode in ['chat', 'work', 'coding', 'autoBot']) {
+        for (final mode in [
+          'chat',
+          'worker',
+          'engineer',
+          'architect',
+          'researcher',
+          'specialist',
+        ]) {
           expect(
             find.byKey(Key('assistant-product-mode-$mode')),
             findsOneWidget,
@@ -115,16 +121,16 @@ void main() {
     );
 
     testWidgets(
-      'AutoBot manages schedules and retains the draft without chat send',
+      'a DS Bot role offers Run now and a Bot team hand-off; Chat does not',
       (tester) async {
         final controller = _controller(tester);
-        final input = TextEditingController(text: 'keep my task draft');
+        final input = TextEditingController(text: 'refactor the parser');
         addTearDown(input.dispose);
         controller.sessionsControllerInternal.currentSessionKeyInternal =
             'unit-mode-fixture';
         controller.upsertTaskThreadInternal(
           'unit-mode-fixture',
-          productMode: AssistantMode.autoBot,
+          productMode: AssistantMode.engineer,
         );
         var sends = 0;
         await tester.pumpWidget(
@@ -140,18 +146,73 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
-        expect(find.text('AutoBot'), findsOneWidget);
+        expect(find.text('Engineer'), findsOneWidget);
+        expect(find.text('立即执行'), findsOneWidget);
+        expect(
+          find.byKey(const Key('assistant-hand-off-button')),
+          findsOneWidget,
+        );
+
         await tester.tap(find.byKey(const Key('assistant-send-button')));
         await tester.pumpAndSettle();
-        expect(find.byKey(const Key('assistant-bot-dialog')), findsOneWidget);
-        expect(sends, 0);
-        expect(input.text, 'keep my task draft');
-        final prompt = tester.widget<TextField>(
-          find.byKey(const Key('assistant-bot-prompt')),
+        expect(sends, 1);
+
+        // No Bridge or account here: the hand-off is noted in the
+        // conversation instead of being dropped, and nothing is sent.
+        await tester.tap(find.byKey(const Key('assistant-hand-off-button')));
+        await tester.pumpAndSettle();
+        expect(input.text, isEmpty);
+        expect(sends, 1);
+        final messages =
+            controller.assistantThreadMessagesInternal['unit-mode-fixture']!;
+        expect(messages[messages.length - 2].text, 'refactor the parser');
+        expect(messages.last.role, 'assistant');
+        expect(messages.last.error, isTrue);
+
+        controller.upsertTaskThreadInternal(
+          'unit-mode-fixture',
+          productMode: AssistantMode.chat,
         );
-        expect(prompt.controller?.text, 'keep my task draft');
+        controller.notifyListeners();
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const Key('assistant-hand-off-button')),
+          findsNothing,
+        );
+        expect(find.text('提交'), findsOneWidget);
       },
     );
+
+    testWidgets('the role menu lists the six roles in escalation order', (
+      tester,
+    ) async {
+      final controller = _controller(tester);
+      controller.sessionsControllerInternal.currentSessionKeyInternal =
+          'unit-mode-fixture';
+      await tester.pumpWidget(
+        _app(AssistantTaskDialogModeControlsInternal(controller: controller)),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('assistant-product-mode-button')));
+      await tester.pumpAndSettle();
+      final tops = [
+        for (final mode in AssistantMode.values)
+          tester
+              .getTopLeft(
+                find.byKey(Key('assistant-product-mode-${mode.name}')),
+              )
+              .dy,
+      ];
+      expect(tops, [...tops]..sort());
+      expect(AssistantMode.values.map((mode) => mode.label), [
+        'Chat',
+        'Worker',
+        'Engineer',
+        'Architect',
+        'Researcher',
+        'Specialist',
+      ]);
+    });
 
     testWidgets(
       'mode chip retains its footprint with no Provider or route choice',
@@ -195,22 +256,6 @@ void main() {
         }
       },
     );
-
-    testWidgets('Bot popup remains unavailable without authenticated Gateway', (
-      tester,
-    ) async {
-      final controller = _controller(tester);
-      await tester.pumpWidget(_app(AssistantBotDialog(controller: controller)));
-      await tester.pump();
-      expect(find.byKey(const Key('assistant-bot-dialog')), findsOneWidget);
-      expect(
-        tester
-            .widget<FilledButton>(find.byKey(const Key('assistant-bot-create')))
-            .onPressed,
-        isNull,
-      );
-      expect(find.text('请先连接 AI Workspace。'), findsOneWidget);
-    });
 
     testWidgets('Enter sends the draft', (tester) async {
       final controller = _controller(tester);

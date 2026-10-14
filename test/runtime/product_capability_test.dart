@@ -3,40 +3,46 @@ import 'package:xworkmate/models/app_models.dart';
 import 'package:xworkmate/runtime/runtime_models.dart';
 
 void main() {
-  test(
-    'product capability survives thread persistence without provider identity',
-    () {
-      for (final mode in AssistantMode.values) {
-        final context = ThreadContextState.fromJson(<String, dynamic>{
-          'productMode': mode.name,
-          'selectedModelId': 'catalog-model',
-        });
-        expect(context.productMode, mode);
-        expect(context.copyWith(selectedModelId: 'next').productMode, mode);
-        expect(ThreadContextState.fromJson(context.toJson()).productMode, mode);
-        if (mode == AssistantMode.autoBot) {
-          expect(() => mode.toTaskMetadata(), throwsStateError);
-          continue;
-        }
-        expect(mode.toTaskMetadata(model: ' catalog-model '), <String, dynamic>{
-          'schemaVersion': 1,
-          'mode': mode == AssistantMode.coding ? 'code' : mode.name,
-          'model': 'catalog-model',
-        });
-      }
-    },
-  );
+  test('the role survives thread persistence without provider identity', () {
+    for (final mode in AssistantMode.values) {
+      final context = ThreadContextState.fromJson(<String, dynamic>{
+        'productMode': mode.name,
+        'selectedModelId': 'catalog-model',
+      });
+      expect(context.productMode, mode);
+      expect(context.copyWith(selectedModelId: 'next').productMode, mode);
+      expect(ThreadContextState.fromJson(context.toJson()).productMode, mode);
+    }
+  });
 
-  test('four product labels and persisted Code migrate to Coding', () {
+  test('six roles in escalation order; only Chat is a Gateway turn', () {
     expect(AssistantMode.values.map((mode) => mode.label), [
       'Chat',
-      'Work',
-      'Coding',
-      'AutoBot',
+      'Worker',
+      'Engineer',
+      'Architect',
+      'Researcher',
+      'Specialist',
     ]);
-    final restored = ThreadContextState.fromJson({'productMode': 'code'});
-    expect(restored.productMode, AssistantMode.coding);
-    expect(restored.toJson()['productMode'], 'coding');
+    expect(AssistantMode.chat.runsOnBotTeam, isFalse);
+    expect(AssistantMode.chat.toTaskMetadata(model: ' catalog-model '), {
+      'schemaVersion': 1,
+      'mode': 'chat',
+      'model': 'catalog-model',
+    });
+    for (final role in AssistantMode.values.skip(1)) {
+      expect(role.runsOnBotTeam, isTrue);
+      expect(() => role.toTaskMetadata(), throwsStateError);
+    }
+  });
+
+  test('earlier Work / Coding / AutoBot records fall back to Chat', () {
+    for (final legacy in ['work', 'coding', 'code', 'autoBot', 'unknown']) {
+      expect(
+        ThreadContextState.fromJson({'productMode': legacy}).productMode,
+        AssistantMode.chat,
+      );
+    }
   });
 
   test('new threads default to Chat and Gateway', () {

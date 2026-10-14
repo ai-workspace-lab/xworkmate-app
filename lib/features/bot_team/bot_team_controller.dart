@@ -121,12 +121,9 @@ class BotTeamController extends ChangeNotifier {
     _notify();
     try {
       if (selectedSessionId.isEmpty) {
-        final title = prompt.length > 40
-            ? '${prompt.substring(0, 40)}…'
-            : prompt;
         final created = await client.createSession(
           namespaceId: namespaceId,
-          title: title,
+          title: botTaskTitle(prompt),
         );
         sessions = <TaskSessionSummary>[created, ...sessions];
         selectedSessionId = created.sessionId;
@@ -137,11 +134,10 @@ class BotTeamController extends ChangeNotifier {
         sessionId: selectedSessionId,
         clientRequestId: _newRequestId(),
         text: prompt,
-        routing: <String, Object?>{
-          'roleMode': 'auto',
-          if (role.routingValue.isNotEmpty) 'role': role.routingValue,
-          if (workspaceKey.trim().isNotEmpty) 'workspace': workspaceKey.trim(),
-        },
+        routing: botRoleRouting(
+          role: role.routingValue,
+          workspace: workspaceKey,
+        ),
       );
       await _refreshEvents();
       _ensurePolling();

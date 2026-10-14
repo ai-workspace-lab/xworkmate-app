@@ -1,5 +1,5 @@
 import 'dart:async';
-import '../assistant/assistant_bot_dialog.dart';
+import '../assistant/assistant_page_task_dialog_controls.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
@@ -68,14 +68,18 @@ class MobileAssistantComposer extends StatelessWidget {
   Future<void> showProductModes(BuildContext context) async {
     final mode = await showModalBottomSheet<AssistantMode>(
       context: context,
+      // Six roles with descriptions are taller than a small phone's sheet.
       builder: (sheetContext) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+        child: ListView(
+          shrinkWrap: true,
           children: [
-            for (final mode in AssistantMode.values)
+            for (final mode in AssistantMode.values) ...[
+              if (mode == AssistantMode.worker) const Divider(height: 1),
               ListTile(
                 key: Key('mobile-assistant-product-mode-${mode.name}'),
+                leading: Icon(roleIconInternal(mode)),
                 title: Text(mode.label),
+                subtitle: Text(roleSummaryInternal(mode)),
                 selected:
                     controller.assistantProductModeForSession(
                       controller.currentSessionKey,
@@ -83,6 +87,7 @@ class MobileAssistantComposer extends StatelessWidget {
                     mode,
                 onTap: () => Navigator.pop(sheetContext, mode),
               ),
+            ],
           ],
         ),
       ),
@@ -90,13 +95,40 @@ class MobileAssistantComposer extends StatelessWidget {
     if (mode == null) return;
     await controller.setAssistantProductMode(mode);
     onComposerStateChanged();
-    if (mode == AssistantMode.autoBot && context.mounted) {
-      await showAssistantBotDialog(
-        context,
-        controller,
-        initialPrompt: inputController.text.trim(),
-      );
+  }
+
+  /// Hands the draft to the Bot team as a background task thread for the
+  /// current role, for offline, long-running or scheduled work.
+  Future<void> handOffToBotTeam(BuildContext context) async {
+    final text = inputController.text.trim();
+    final role = controller.assistantProductModeForSession(
+      controller.currentSessionKey,
+    );
+    if (text.isEmpty || !role.runsOnBotTeam) {
+      return;
     }
+    if (attachments.isNotEmpty) {
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        SnackBar(
+          content: Text(
+            appText(
+              'DS Bot 角色任务暂不支持附件，请移除附件或切换到 Chat。',
+              'DS Bot role tasks take text only; remove the attachments or '
+                  'switch to Chat.',
+            ),
+          ),
+        ),
+      );
+      return;
+    }
+    final sessionKey = controller.currentSessionKey;
+    inputController.clear();
+    onComposerStateChanged();
+    await controller.handOffRoleTaskToBotTeam(
+      sessionKey: sessionKey,
+      text: text,
+      role: role,
+    );
   }
 
   @override
@@ -554,29 +586,31 @@ class MobileAssistantComposer extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(width: 8),
+                  if (!hasPendingRun &&
+                      controller
+                          .assistantProductModeForSession(
+                            controller.currentSessionKey,
+                          )
+                          .runsOnBotTeam) ...[
+                    IconButton(
+                      key: const Key('mobile-assistant-hand-off-button'),
+                      tooltip: appText(
+                        '交给 Bot 团队在后台执行',
+                        'Hand to the Bot team to run in the background',
+                      ),
+                      onPressed: () => unawaited(handOffToBotTeam(context)),
+                      icon: const Icon(Icons.schedule_send_outlined),
+                    ),
+                    const SizedBox(width: 4),
+                  ],
                   _MobileAssistantPrimaryActionButton(
                     isBusy: hasPendingRun,
-                    isAutoBot:
-                        controller.assistantProductModeForSession(
+                    runsOnBotTeam: controller
+                        .assistantProductModeForSession(
                           controller.currentSessionKey,
-                        ) ==
-                        AssistantMode.autoBot,
-                    onSend: () {
-                      if (controller.assistantProductModeForSession(
-                            controller.currentSessionKey,
-                          ) ==
-                          AssistantMode.autoBot) {
-                        unawaited(
-                          showAssistantBotDialog(
-                            context,
-                            controller,
-                            initialPrompt: inputController.text.trim(),
-                          ),
-                        );
-                      } else {
-                        onSend();
-                      }
-                    },
+                        )
+                        .runsOnBotTeam,
+                    onSend: onSend,
                     onStop: () => unawaited(controller.abortRun()),
                   ),
                 ],
@@ -663,13 +697,13 @@ class MobileAssistantComposer extends StatelessWidget {
 class _MobileAssistantPrimaryActionButton extends StatelessWidget {
   const _MobileAssistantPrimaryActionButton({
     required this.isBusy,
-    this.isAutoBot = false,
+    this.runsOnBotTeam = false,
     required this.onSend,
     required this.onStop,
   });
 
   final bool isBusy;
-  final bool isAutoBot;
+  final bool runsOnBotTeam;
   final VoidCallback onSend;
   final VoidCallback onStop;
 
@@ -691,8 +725,8 @@ class _MobileAssistantPrimaryActionButton extends StatelessWidget {
         ),
         tooltip: isBusy
             ? appText('停止运行', 'Stop run')
-            : isAutoBot
-            ? appText('管理 AutoBot', 'Manage AutoBot')
+            : runsOnBotTeam
+            ? appText('交给 DS Bot 立即执行', 'Run now on DS Bot')
             : appText('提交任务', 'Submit task'),
         onPressed: isBusy ? onStop : onSend,
         style: IconButton.styleFrom(
@@ -709,11 +743,7 @@ class _MobileAssistantPrimaryActionButton extends StatelessWidget {
           padding: EdgeInsets.zero,
         ),
         icon: Icon(
-          isBusy
-              ? Icons.stop_rounded
-              : isAutoBot
-              ? Icons.schedule_rounded
-              : Icons.arrow_upward_rounded,
+          isBusy ? Icons.stop_rounded : Icons.arrow_upward_rounded,
           size: isBusy ? 20 : 22,
         ),
       ),
