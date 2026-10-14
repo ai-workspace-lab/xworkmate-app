@@ -11,6 +11,7 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:markdown/markdown.dart' as md;
 import 'package:path_provider/path_provider.dart';
 import '../../app/app_controller.dart';
+import '../../app/sidebar_reveal_toggle.dart';
 import '../../app/app_metadata.dart';
 import '../../app/ui_feature_manifest.dart';
 import '../../i18n/app_language.dart';
@@ -805,48 +806,61 @@ class ConversationAreaInternal extends StatelessWidget {
                 constraints.maxWidth,
                 math.max<double>(180, constraints.maxWidth * 0.62),
               );
-              return Align(
-                alignment: Alignment.centerRight,
-                child: Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  alignment: WrapAlignment.end,
-                  children: [
-                    if (workflowSupported)
-                      FilledButton.tonalIcon(
-                        key: const Key(
-                          'assistant-conversation-workflow-button',
-                        ),
-                        onPressed: workflowEnabled && !workflowRunning
-                            ? onRunConversationWorkflow
-                            : null,
-                        icon: workflowRunning
-                            ? const SizedBox(
-                                width: 14,
-                                height: 14,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Icon(Icons.play_circle_outline, size: 17),
-                        label: Text(
-                          workflowRunning
-                              ? appText('运行中', 'Running')
-                              : appText('对话工作流', 'Conversation workflow'),
-                        ),
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  SidebarRevealToggle(controller: controller),
+                  Expanded(
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        alignment: WrapAlignment.end,
+                        children: [
+                          if (workflowSupported)
+                            FilledButton.tonalIcon(
+                              key: const Key(
+                                'assistant-conversation-workflow-button',
+                              ),
+                              onPressed: workflowEnabled && !workflowRunning
+                                  ? onRunConversationWorkflow
+                                  : null,
+                              icon: workflowRunning
+                                  ? const SizedBox(
+                                      width: 14,
+                                      height: 14,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : const Icon(
+                                      Icons.play_circle_outline,
+                                      size: 17,
+                                    ),
+                              label: Text(
+                                workflowRunning
+                                    ? appText('运行中', 'Running')
+                                    : appText('对话工作流', 'Conversation workflow'),
+                              ),
+                            ),
+                          MessageViewModeChipInternal(
+                            value: messageViewMode,
+                            onSelected: onMessageViewModeChanged,
+                          ),
+                          ConstrainedBox(
+                            constraints: BoxConstraints(
+                              maxWidth: maxConnectionChipWidth,
+                            ),
+                            child: ConnectionChipInternal(
+                              controller: controller,
+                            ),
+                          ),
+                        ],
                       ),
-                    MessageViewModeChipInternal(
-                      value: messageViewMode,
-                      onSelected: onMessageViewModeChanged,
                     ),
-                    ConstrainedBox(
-                      constraints: BoxConstraints(
-                        maxWidth: maxConnectionChipWidth,
-                      ),
-                      child: ConnectionChipInternal(controller: controller),
-                    ),
-                  ],
-                ),
+                  ),
+                ],
               );
             },
           ),

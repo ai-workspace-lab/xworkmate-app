@@ -9,6 +9,7 @@ import '../features/workbench/workbench_page.dart';
 import '../features/settings/settings_page.dart';
 import '../models/app_models.dart';
 import 'app_controller.dart';
+import 'sidebar_reveal_toggle.dart';
 
 enum WorkspacePageSurface { desktop, mobile }
 
@@ -63,10 +64,14 @@ final Map<WorkspaceDestination, WorkspacePageSpec> workspacePageSpecsInternal =
       ),
       WorkspaceDestination.botTeam: WorkspacePageSpec(
         destination: WorkspaceDestination.botTeam,
-        desktopBuilder: (controller, onOpenDetail) =>
-            BotTeamPage(clientFactory: controller.createTaskSessionClient),
-        mobileBuilder: (controller, onOpenDetail, mobileActions) =>
-            BotTeamPage(clientFactory: controller.createTaskSessionClient),
+        desktopBuilder: (controller, onOpenDetail) => BotTeamPage(
+          clientFactory: controller.createTaskSessionClient,
+          leading: SidebarRevealToggle(controller: controller),
+        ),
+        mobileBuilder: (controller, onOpenDetail, mobileActions) => BotTeamPage(
+          clientFactory: controller.createTaskSessionClient,
+          leading: SidebarRevealToggle(controller: controller),
+        ),
       ),
       WorkspaceDestination.workbench: WorkspacePageSpec(
         destination: WorkspaceDestination.workbench,

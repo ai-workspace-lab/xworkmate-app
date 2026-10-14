@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../../app/app_controller.dart';
+import '../../app/sidebar_reveal_toggle.dart';
+import '../../i18n/app_language.dart';
 import '../../models/app_models.dart';
+import '../../theme/app_palette.dart';
+import '../../widgets/pane_toggle_icon.dart';
 import 'workbench_analytics.dart';
 import 'workbench_detail_pages.dart';
 import 'workbench_insight_sidebar.dart';
@@ -53,6 +57,29 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
                         setState(() => _activityWindow = value);
                       },
                       onQuickRecord: _openAssistant,
+                      leading: SidebarRevealToggle(
+                        controller: widget.controller,
+                      ),
+                      trailing: Tooltip(
+                        message: _insightsExpanded
+                            ? appText('收起工作洞察', 'Hide work insights')
+                            : appText('展开工作洞察', 'Show work insights'),
+                        child: IconButton(
+                          key: Key(
+                            _insightsExpanded
+                                ? 'workbench-insights-collapse-button'
+                                : 'workbench-insights-expand-button',
+                          ),
+                          onPressed: () => setState(
+                            () => _insightsExpanded = !_insightsExpanded,
+                          ),
+                          color: context.palette.textSecondary,
+                          icon: const PaneToggleIcon(
+                            side: PaneSide.right,
+                            size: 20,
+                          ),
+                        ),
+                      ),
                     ),
                     const SizedBox(height: 14),
                     Expanded(
@@ -88,9 +115,6 @@ class _WorkbenchPageState extends State<WorkbenchPage> {
             WorkbenchInsightSidebar(
               projection: projection,
               expanded: _insightsExpanded,
-              onToggle: () {
-                setState(() => _insightsExpanded = !_insightsExpanded);
-              },
             ),
           ],
         );

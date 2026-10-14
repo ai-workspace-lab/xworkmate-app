@@ -11,12 +11,20 @@ import 'bot_team_models.dart';
 /// queued in Accounts and run by the DSH orchestrator, which picks executor
 /// and model under its policy; this page only shows what it reports.
 class BotTeamPage extends StatefulWidget {
-  const BotTeamPage({super.key, required this.clientFactory, this.controller});
+  const BotTeamPage({
+    super.key,
+    required this.clientFactory,
+    this.controller,
+    this.leading,
+  });
 
   final TaskSessionClient? Function() clientFactory;
 
   /// Injected by tests; the page owns and disposes one it creates itself.
   final BotTeamController? controller;
+
+  /// Placed before the title (the hidden sidebar's way back).
+  final Widget? leading;
 
   @override
   State<BotTeamPage> createState() => _BotTeamPageState();
@@ -74,6 +82,7 @@ class _BotTeamPageState extends State<BotTeamPage> {
             children: [
               Row(
                 children: [
+                  ?widget.leading,
                   Icon(Icons.groups_2_outlined, color: palette.textSecondary),
                   const SizedBox(width: AppSpacing.sm),
                   Text(

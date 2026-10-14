@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 
 import '../../app/app_controller.dart';
+import '../../app/sidebar_reveal_toggle.dart';
 import '../../app/app_metadata.dart';
 import '../../app/ui_feature_manifest.dart';
 import '../../app/workspace_navigation.dart';
@@ -534,6 +535,7 @@ class _SettingsPageState extends State<SettingsPage> {
             0,
           ),
           breadcrumbs: buildSettingsBreadcrumbs(controller, tab: currentTab),
+          leading: SidebarRevealToggle(controller: controller),
           title: appText('设置', 'Settings'),
           subtitle: appText(
             '配置 XWorkmate 工作区、网关默认项、界面与诊断选项',

@@ -12,6 +12,7 @@ class SettingsPageBodyShell extends StatefulWidget {
     required this.subtitle,
     required this.trailing,
     required this.bodyChildren,
+    this.leading,
     this.globalApplyBar,
   });
 
@@ -22,6 +23,9 @@ class SettingsPageBodyShell extends StatefulWidget {
   final Widget trailing;
   final Widget? globalApplyBar;
   final List<Widget> bodyChildren;
+
+  /// Placed before the header (the hidden sidebar's way back).
+  final Widget? leading;
 
   @override
   State<SettingsPageBodyShell> createState() => _SettingsPageBodyShellState();
@@ -38,7 +42,12 @@ class _SettingsPageBodyShellState extends State<SettingsPageBodyShell> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (!_isHeaderCollapsed) ...[
-            TopBar(
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ?widget.leading,
+                Expanded(
+                  child: TopBar(
               breadcrumbs: widget.breadcrumbs,
               title: widget.title,
               subtitle: widget.subtitle,
@@ -55,6 +64,9 @@ class _SettingsPageBodyShellState extends State<SettingsPageBodyShell> {
                 ],
               ),
             ),
+                ),
+              ],
+            ),
             const SizedBox(height: AppSpacing.sectionGap),
             if (widget.globalApplyBar != null) ...[
               widget.globalApplyBar!,
@@ -63,6 +75,7 @@ class _SettingsPageBodyShellState extends State<SettingsPageBodyShell> {
           ] else ...[
             Row(
               children: [
+                ?widget.leading,
                 Expanded(
                   child: AppBreadcrumbs(items: widget.breadcrumbs),
                 ),

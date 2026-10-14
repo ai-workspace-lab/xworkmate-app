@@ -7,6 +7,7 @@
 - 面板开关统一为同一个图标：左侧边栏与右侧产物栏的收起、展开都用带竖线的面板图标（竖线在面板一侧），替换原来混用的 `view_sidebar`、`›` 和 `»`；右侧栏头部的刷新与收起之间加分隔线。
 - 桌面和移动端输入框都去掉连接器（Gateway）和 Provider 的选择：任务始终走默认连接器、统一的 Bridge 入口和默认 provider，不再让用户逐条选择。
 - 对话框的任务模式由 Chat / Work / Coding / AutoBot 改为六档角色：Chat → Worker → Engineer → Architect ⟷ Researcher → Specialist。Chat 照旧在对话里直接走 Bridge → Gateway；其余角色交给 DS Bot：发送按钮「立即执行」把结果写回当前对话，「交给 Bot 团队」则新建后台任务线程（离线、长时间、定时任务），在 Bot 团队页查看。AutoBot 定时任务入口从对话框移除。旧线程里存的 Work / Coding / AutoBot 读回为 Chat。
+- 侧栏收起改为完全收起：左侧导航栏隐藏后不再在内容上方悬浮展开按钮，展开开关放进各页面顶部工具栏最左边（工作台、对话、Bot 团队、设置）；工作台右侧「工作洞察」收起后宽度为 0，开关在工作台工具栏最右边。两者都用面板开关图标。
 - Android release builds now publish both the APK and a Play Console-ready AAB.
   Main, tag, and manual release lanes require the Vault-backed upload keystore;
   pull request verification builds retain an explicit debug-signing fallback.

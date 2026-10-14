@@ -54,6 +54,13 @@ void main() {
       find.byKey(const Key('workbench-insight-sidebar-collapsed')),
       findsOneWidget,
     );
+    // Collapsed means gone: no rail is left beside the canvas.
+    expect(
+      tester
+          .getSize(find.byKey(const Key('workbench-insight-sidebar-collapsed')))
+          .width,
+      0,
+    );
     expect(find.byKey(const Key('workbench-workload-trend')), findsNothing);
 
     await tester.tap(find.byKey(const Key('workbench-insights-expand-button')));
