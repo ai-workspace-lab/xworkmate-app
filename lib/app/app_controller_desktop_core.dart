@@ -31,6 +31,7 @@ import '../runtime/code_agent_node_orchestrator.dart';
 import '../runtime/assistant_artifacts.dart';
 import '../runtime/desktop_thread_artifact_service.dart';
 import '../runtime/external_code_agent_acp_desktop_transport.dart';
+import '../runtime/agent_context_client.dart';
 import '../runtime/go_task_service_client.dart';
 
 import '../runtime/go_runtime_dispatch_desktop_client.dart';
@@ -259,6 +260,11 @@ class AppController extends ChangeNotifier {
       <String, String>{};
   final DesktopThreadArtifactService threadArtifactServiceInternal =
       DesktopThreadArtifactService();
+  final Map<String, TaskThread> qmdRemoteThreadRecordsInternal =
+      <String, TaskThread>{};
+  final Map<String, GatewaySessionSummary> qmdRemoteSessionSummariesInternal =
+      <String, GatewaySessionSummary>{};
+  AgentContextClient? agentContextClientOverride;
   final Map<String, HttpClient> aiGatewayStreamingClientsInternal =
       <String, HttpClient>{};
   final Set<String> aiGatewayPendingSessionKeysInternal = <String>{};

@@ -33,6 +33,7 @@ import '../runtime/mode_switcher.dart';
 import '../runtime/agent_registry.dart';
 import '../runtime/platform_environment.dart';
 import 'app_controller_openclaw_task_queue.dart';
+import 'app_controller_desktop_qmd_sync.dart';
 import 'app_controller_desktop_core.dart';
 import 'app_controller_desktop_navigation.dart';
 import 'app_controller_desktop_gateway.dart';
@@ -214,10 +215,17 @@ extension AppControllerDesktopThreadActions on AppController {
       await chatControllerInternal.loadSession(selectedSessionKey);
     }
     recomputeTasksInternal();
+    unawaited(refreshQmdRemoteTasksInternal());
   }
 
   Future<void> switchSession(String sessionKey) async {
     var nextSessionKey = normalizedAssistantSessionKeyInternal(sessionKey);
+    if (isQmdRemoteSessionKeyInternal(nextSessionKey)) {
+      await setCurrentAssistantSessionKeyInternal(nextSessionKey);
+      await loadQmdThreadBriefingForSessionInternal(nextSessionKey);
+      recomputeTasksInternal();
+      return;
+    }
     if (!isAppOwnedAssistantSessionKeyInternal(nextSessionKey)) {
       nextSessionKey = createAssistantDraftSessionKeyInternal();
     }
@@ -261,6 +269,14 @@ extension AppControllerDesktopThreadActions on AppController {
     var targetSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey ?? sessionsControllerInternal.currentSessionKey,
     );
+    if (isQmdRemoteSessionKeyInternal(targetSessionKey)) {
+      throw StateError(
+        appText(
+          'QMD 远程任务当前为只读同步模式，不支持直接追加消息。',
+          'QMD remote tasks are currently in read-only sync mode.',
+        ),
+      );
+    }
     if (!isAppOwnedAssistantSessionKeyInternal(targetSessionKey)) {
       if (sessionKey != null && sessionKey.trim().isNotEmpty) {
         throw StateError(

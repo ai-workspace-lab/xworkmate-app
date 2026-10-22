@@ -218,6 +218,10 @@ extension AppControllerDesktopThreadSessions on AppController {
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey,
     );
+    final remoteThread = qmdRemoteThreadRecordsInternal[normalizedSessionKey];
+    if (remoteThread != null) {
+      return remoteThread;
+    }
     if (!isAppOwnedAssistantSessionKeyInternal(normalizedSessionKey)) {
       return null;
     }
@@ -757,6 +761,17 @@ extension AppControllerDesktopThreadSessions on AppController {
       byKey[currentKey] = assistantSessionSummaryForInternal(currentKey);
     }
 
+    for (final remoteSummary in qmdRemoteSessionSummariesInternal.values) {
+      final sessionKey = remoteSummary.key;
+      final record = qmdRemoteThreadRecordsInternal[sessionKey];
+      if (record?.archived == true) {
+        continue;
+      }
+      if (!byKey.containsKey(sessionKey)) {
+        byKey[sessionKey] = remoteSummary;
+      }
+    }
+
     return byKey.values.toList(growable: false);
   }
 
@@ -771,6 +786,15 @@ extension AppControllerDesktopThreadSessions on AppController {
         continue;
       }
       items.add(assistantSessionSummaryForInternal(sessionKey, record: record));
+    }
+    for (final record in qmdRemoteThreadRecordsInternal.values) {
+      if (!record.archived) {
+        continue;
+      }
+      final summary = qmdRemoteSessionSummariesInternal[record.threadId];
+      if (summary != null) {
+        items.add(summary);
+      }
     }
     items.sort((left, right) {
       return (right.updatedAtMs ?? 0).compareTo(left.updatedAtMs ?? 0);
