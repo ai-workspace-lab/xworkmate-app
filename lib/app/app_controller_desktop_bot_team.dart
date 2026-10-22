@@ -10,14 +10,72 @@ import 'app_controller_desktop_runtime_helpers.dart';
 import 'app_controller_desktop_thread_sessions.dart';
 import 'app_controller_desktop_thread_storage.dart';
 
-/// Bot tasks go to Accounts through the Bridge `/api/v1` proxy with the
-/// signed-in account token; the DSH orchestrator runs them (AI Workspace v2.1).
+/// Bot tasks go to Accounts/DSH through the Bridge `/api/v1` proxy with the
+/// signed-in account token or self-hosted bridge token; the DSH orchestrator runs them (AI Workspace v2.1).
 extension AppControllerDesktopBotTeam on AppController {
-  /// Null until a Bridge endpoint resolves and an account session exists.
+  static String _stripBearerToken(String? raw) {
+    final trimmed = raw?.trim() ?? '';
+    if (trimmed.toLowerCase().startsWith('bearer ')) {
+      return trimmed.substring(7).trim();
+    }
+    return trimmed;
+  }
+
+  /// Resolves the auth token for Bot tasks across all sources:
+  /// 1. Cloud account session token
+  /// 2. Self-hosted Bridge token saved in Settings
+  /// 3. Runtime environment variables (ACP_BRIDGE_SERVER_TOKEN / AI_WORKSPACE_AUTH_TOKEN / BRIDGE_AUTH_TOKEN)
+  Future<String?> resolveTaskSessionAuthTokenInternal(Uri endpoint) async {
+    final accountToken = settingsControllerInternal.accountSessionTokenInternal.trim();
+    if (accountToken.isNotEmpty) {
+      return accountToken;
+    }
+    final bridgeAuthHeader = await resolveBridgeArtifactAuthorizationHeaderInternal(endpoint);
+    final stripped = _stripBearerToken(bridgeAuthHeader);
+    if (stripped.isNotEmpty) {
+      return stripped;
+    }
+    final envToken = runtimeEnvironmentValueInternal('ACP_BRIDGE_SERVER_TOKEN') ??
+        runtimeEnvironmentValueInternal('AI_WORKSPACE_AUTH_TOKEN') ??
+        runtimeEnvironmentValueInternal('BRIDGE_AUTH_TOKEN');
+    if (envToken != null && envToken.trim().isNotEmpty) {
+      return envToken.trim();
+    }
+    return null;
+  }
+
+  /// Synchronous fallback when token is available in memory or env
   TaskSessionClient? createTaskSessionClient() {
     final endpoint = resolveBridgeAcpEndpointInternal();
-    final token = settingsControllerInternal.accountSessionTokenInternal.trim();
-    if (endpoint == null || token.isEmpty) {
+    if (endpoint == null) {
+      return null;
+    }
+    var token = settingsControllerInternal.accountSessionTokenInternal.trim();
+    if (token.isEmpty) {
+      token = (runtimeEnvironmentValueInternal('ACP_BRIDGE_SERVER_TOKEN') ??
+              runtimeEnvironmentValueInternal('AI_WORKSPACE_AUTH_TOKEN') ??
+              runtimeEnvironmentValueInternal('BRIDGE_AUTH_TOKEN'))
+          ?.trim() ?? '';
+    }
+    if (token.isEmpty) {
+      return null;
+    }
+    final base = endpoint.replace(
+      path: AcpEndpointPaths.fromBaseEndpoint(endpoint).basePath,
+      query: null,
+      fragment: null,
+    );
+    return HttpTaskSessionClient(bridgeBase: base, accountToken: token);
+  }
+
+  /// Asynchronous client creator that falls back through all token sources (Cloud -> Self-hosted -> Env).
+  Future<TaskSessionClient?> resolveTaskSessionClientInternal() async {
+    final endpoint = resolveBridgeAcpEndpointInternal();
+    if (endpoint == null) {
+      return null;
+    }
+    final token = await resolveTaskSessionAuthTokenInternal(endpoint);
+    if (token == null || token.isEmpty) {
       return null;
     }
     final base = endpoint.replace(
@@ -31,6 +89,7 @@ extension AppControllerDesktopBotTeam on AppController {
   /// Runs [text] as a [role] task on DS Bot now and writes the request and
   /// its answer into the [sessionKey] conversation. The conversation shows as
   /// running until the task ends.
+  /// 直通模式：在线即时任务通过 DS Bridge DSH Adapter 执行
   Future<void> runRoleTaskInConversation({
     required String sessionKey,
     required String text,
@@ -43,7 +102,9 @@ extension AppControllerDesktopBotTeam on AppController {
       return;
     }
     appendAssistantThreadMessageInternal(key, _message('user', prompt));
-    final client = (clientFactory ?? createTaskSessionClient)();
+    final client = clientFactory != null
+        ? clientFactory()
+        : await resolveTaskSessionClientInternal();
     if (client == null) {
       appendAssistantThreadMessageInternal(key, _signInRequired());
       await flushAssistantThreadPersistenceInternal();
@@ -72,6 +133,7 @@ extension AppControllerDesktopBotTeam on AppController {
   /// offline, long-running or scheduled work, and notes the hand-off in the
   /// [sessionKey] conversation. Returns the new Bot team session id, or an
   /// empty string when the task could not be handed off.
+  /// 离线模式：离线后台任务交给 DSH Bot Adapter 角色编排
   Future<String> handOffRoleTaskToBotTeam({
     required String sessionKey,
     required String text,
@@ -85,7 +147,9 @@ extension AppControllerDesktopBotTeam on AppController {
       return '';
     }
     appendAssistantThreadMessageInternal(key, _message('user', prompt));
-    final client = (clientFactory ?? createTaskSessionClient)();
+    final client = clientFactory != null
+        ? clientFactory()
+        : await resolveTaskSessionClientInternal();
     if (client == null) {
       appendAssistantThreadMessageInternal(key, _signInRequired());
       await flushAssistantThreadPersistenceInternal();
@@ -97,11 +161,13 @@ extension AppControllerDesktopBotTeam on AppController {
         namespaceId: namespaceId,
         title: botTaskTitle(prompt),
       );
+      final routing = botRoleRouting(role: role.name);
+      routing['preferredGatewayProviderId'] = 'dsbot';
       await client.appendMessage(
         sessionId: session.sessionId,
         clientRequestId: (newRequestId ?? nextLocalMessageIdInternal)(),
         text: prompt,
-        routing: botRoleRouting(role: role.name),
+        routing: routing,
       );
       appendAssistantThreadMessageInternal(
         key,
