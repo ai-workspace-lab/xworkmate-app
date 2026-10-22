@@ -450,6 +450,10 @@ extension AppControllerDesktopWorkspaceExecution on AppController {
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey,
     );
+    final remoteThread = qmdRemoteThreadRecordsInternal[normalizedSessionKey];
+    if (remoteThread != null) {
+      return remoteThread.archived;
+    }
     return assistantThreadRecordsInternal[normalizedSessionKey]?.archived ??
         false;
   }

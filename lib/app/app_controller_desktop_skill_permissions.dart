@@ -23,6 +23,7 @@ import '../runtime/runtime_coordinator.dart';
 import '../runtime/gateway_acp_client.dart';
 import '../runtime/codex_runtime.dart';
 import '../runtime/codex_config_bridge.dart';
+import 'app_controller_desktop_qmd_sync.dart';
 import '../runtime/code_agent_node_orchestrator.dart';
 import '../runtime/assistant_artifacts.dart';
 import '../runtime/desktop_thread_artifact_service.dart';
@@ -82,6 +83,9 @@ extension AppControllerDesktopSkillPermissions on AppController {
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey,
     );
+    if (isQmdRemoteSessionKeyInternal(normalizedSessionKey)) {
+      return;
+    }
     if (!isAppOwnedAssistantSessionKeyInternal(normalizedSessionKey)) {
       throw StateError(
         'Runtime session key "$normalizedSessionKey" cannot be used as an app task.',
