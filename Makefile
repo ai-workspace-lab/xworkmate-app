@@ -2,10 +2,16 @@
 
 SHELL := /bin/bash
 
+APP_NAME ?= XWorkmate
+BUILD_SYSTEM_NAME ?= $(APP_NAME) Build System
+
 FLUTTER ?= flutter
-PNPM ?= pnpm
 DART ?= dart
 DEVICE ?= macos
+UNAME_S := $(shell uname -s)
+UNAME_M := $(shell uname -m)
+ARCH ?= $(UNAME_M)
+
 APP_STORE_DART_DEFINE ?= --dart-define=XWORKMATE_APP_STORE=true
 PUBSPEC_VERSION_LINE := $(shell sed -n 's/^version:[[:space:]]*//p' pubspec.yaml | head -n 1)
 PUBSPEC_BUILD_DATE := $(shell sed -n 's/^build-date:[[:space:]]*//p' pubspec.yaml | head -n 1)
@@ -15,144 +21,91 @@ APP_BUILD_NUMBER_RAW := $(word 2,$(subst +, ,$(PUBSPEC_VERSION_LINE)))
 APP_BUILD_NUMBER := $(if $(APP_BUILD_NUMBER_RAW),$(APP_BUILD_NUMBER_RAW),1)
 APP_BUILD_DATE := $(if $(PUBSPEC_BUILD_DATE),$(PUBSPEC_BUILD_DATE),unknown)
 APP_BUILD_COMMIT := $(if $(PUBSPEC_BUILD_ID),$(PUBSPEC_BUILD_ID),unknown)
+
 APP_DART_DEFINE_VERSION ?= --dart-define=XWORKMATE_DISPLAY_VERSION=$(APP_VERSION)
 APP_DART_DEFINE_BUILD ?= --dart-define=XWORKMATE_BUILD_NUMBER=$(APP_BUILD_NUMBER)
 APP_DART_DEFINE_BUILD_DATE ?= --dart-define=XWORKMATE_BUILD_DATE=$(APP_BUILD_DATE)
 APP_DART_DEFINE_BUILD_COMMIT ?= --dart-define=XWORKMATE_BUILD_COMMIT=$(APP_BUILD_COMMIT)
+DART_DEFINES := $(APP_DART_DEFINE_VERSION) $(APP_DART_DEFINE_BUILD) $(APP_DART_DEFINE_BUILD_DATE) $(APP_DART_DEFINE_BUILD_COMMIT)
 
-.PHONY: help deps analyze test test-all test-flutter test-golden test-integration test-integration-macos test-patrol test-go test-ci check format run open-macos-xcode sync-version build-linux build-macos build-ios-sim ios-pods ios-pods-check build-ios-release-no-codesign verify-ios-release package-deb package-linux-payload package-deb-source package-ppa package-rpm package-rpm-source package-obs package-linux package-mac install-mac clean render-release-docs docs-public-api check-export-compliance test-real-env-login-chain inspect-xworkmate-bridge-service test-api-contract test-api-scenario-contract check-api-external
+.PHONY: help \
+	package-mac build-macos-arm64 build-macos-x64 \
+	build-windows-x64 build-linux-x64 build-ios-ipa \
+	build-android-apk build-android-play \
+	analyze format clean sync-macos-config dns-check dns-flush \
+	test check run build-linux build-macos sync-version package-linux package-deb package-rpm
 
-help: ## Show available targets
-	@grep -E '^[a-zA-Z0-9_.-]+:.*?## ' Makefile | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "%-18s %s\n", $$1, $$2}'
+help:
+	@echo "$(BUILD_SYSTEM_NAME)"
+	@echo ""
+	@echo "Usage: make <target> [ARCH=<arch>]"
+	@echo ""
+	@echo "Platform targets:"
+	@echo "  package-mac        Build macOS release + DMG (native arch)"
+	@echo "  build-macos-arm64   Build macOS ARM64 release + DMG"
+	@echo "  build-macos-x64     Build macOS x64 release + DMG"
+	@echo "  build-windows-x64   Build Windows x64 release"
+	@echo "  build-linux-x64     Build Linux x64 release"
+	@echo "  build-ios-ipa       Build iOS IPA (requires macOS)"
+	@echo "  build-android-apk   Build Android APK and Play App Bundle"
+	@echo "  build-android-play  Build and verify a Play-uploadable signed AAB"
+	@echo ""
+	@echo "Utility targets:"
+	@echo "  analyze             Run Flutter static analysis"
+	@echo "  format              Format Dart code"
+	@echo "  clean               Clean build artifacts"
+	@echo "  sync-macos-config   Sync pubspec.yaml version to macOS config"
+	@echo "  dns-check           Diagnose DNS resolution and cache status"
+	@echo "  dns-flush           Flush local system DNS cache (requires sudo)"
 
-deps: ## Install Flutter dependencies
-	$(FLUTTER) pub get
+package-mac: ## Build macOS release + DMG (native arch)
+	@if [ "$(UNAME_S)" != "Darwin" ]; then \
+		echo "This target requires macOS"; \
+		exit 1; \
+	fi
+	ARCH="$(ARCH)" XWORKMATE_APP_STORE=true bash scripts/package-flutter-mac-app.sh
 
-analyze: ## Run static analysis
+build-macos-arm64: ## Build macOS ARM64 release + DMG
+	@if [ "$(UNAME_S)" != "Darwin" ]; then \
+		echo "This target requires macOS"; \
+		exit 1; \
+	fi
+	$(MAKE) package-mac ARCH=arm64
+
+build-macos-x64: ## Build macOS x64 release + DMG
+	@if [ "$(UNAME_S)" != "Darwin" ]; then \
+		echo "This target requires macOS"; \
+		exit 1; \
+	fi
+	$(MAKE) package-mac ARCH=x86_64
+
+build-windows-x64: ## Build Windows x64 release
+	$(FLUTTER) build windows --release $(DART_DEFINES)
+
+build-linux-x64: ## Build Linux x64 release
+	$(FLUTTER) build linux --release --build-name=$(APP_VERSION) --build-number=$(APP_BUILD_NUMBER) $(DART_DEFINES)
+
+build-ios-ipa: ## Build iOS IPA (requires macOS)
+	@if [ "$(UNAME_S)" != "Darwin" ]; then \
+		echo "This target requires macOS"; \
+		exit 1; \
+	fi
+	bash scripts/package-ios-ipa.sh
+
+build-android-apk: ## Build Android APK and Play App Bundle
+	bash scripts/package-android-apk.sh
+
+build-android-play: ## Build and verify a Play-uploadable signed AAB
+	bash scripts/package-android-apk.sh
+	bash scripts/verify-android-release.sh
+
+analyze: ## Run Flutter static analysis
 	$(FLUTTER) analyze
 
-test: ## Run Flutter tests
-	@if command -v $(FLUTTER) >/dev/null 2>&1; then \
-		$(FLUTTER) test; \
-	else \
-		echo "flutter SDK missing, skipping test"; \
-	fi
-
-test-flutter: ## Run the full Flutter unit/widget test suite
-	$(FLUTTER) test
-
-test-golden: ## Run Flutter Golden tests
-	$(FLUTTER) test test/golden
-
-test-integration: ## Run Flutter integration tests
-	$(FLUTTER) test integration_test
-
-test-integration-macos: ## Run macOS integration tests serially for the desktop app
-	$(FLUTTER) test integration_test/desktop_navigation_flow_test.dart -d macos
-	$(FLUTTER) test integration_test/desktop_settings_flow_test.dart -d macos
-
-test-real-env-login-chain: ## Run the real-env login/sync integration chain on macOS
-	$(FLUTTER) test integration_test/login_flow_test.dart -d macos
-
-inspect-xworkmate-bridge-service: ## Read-only SSH inspection for xworkmate-bridge.svc.plus service
-	bash scripts/check-xworkmate-bridge-service.sh
-
-test-api-contract: ## Run the API interface contract script against external services
-	bash scripts/ci/verify_api_interface_contract.sh
-
-test-api-scenario-contract: ## Run the scenario-oriented API script against external services
-	bash scripts/ci/verify_api_scenario_contract.sh
-
-check-api-external: test-api-contract test-api-scenario-contract ## Run both external API validation scripts
-
-test-patrol: ## Run Patrol end-to-end tests
-	bash scripts/ci/run_patrol_suite.sh
-
-test-go: ## Run xworkmate-bridge Go unit tests
-	cd ../xworkmate-bridge && go test ./...
-
-test-ci: test-flutter test-golden test-integration test-go ## Run the PR validation chain
-
-test-all: test-ci test-patrol ## Run the full local validation chain
-
-check: analyze test ## Run the standard validation suite
-
-format: ## Format Dart sources
+format: ## Format Dart code
 	$(DART) format lib test
 
-render-release-docs: ## Render feature matrix, roadmap, release notes, and changelog docs
-	$(DART) run tool/render_release_docs.dart
-
-docs-public-api: ## Generate the public API inventory docs payload
-	python3 scripts/docs/extract_public_api_inventory.py
-
-sync-version: ## Sync Flutter/Xcode build metadata from pubspec.yaml
-	$(FLUTTER) build macos --config-only --build-name=$(APP_VERSION) --build-number=$(APP_BUILD_NUMBER) $(APP_DART_DEFINE_VERSION) $(APP_DART_DEFINE_BUILD) $(APP_DART_DEFINE_BUILD_DATE) $(APP_DART_DEFINE_BUILD_COMMIT)
-	@echo "version=$(APP_VERSION)"
-	@echo "build=$(APP_BUILD_NUMBER)"
-	@echo "build-date=$(PUBSPEC_BUILD_DATE)"
-	@echo "build-id=$(PUBSPEC_BUILD_ID)"
-	@sed -n 's/^FLUTTER_BUILD_NAME=/xcode-build-name=/p; s/^FLUTTER_BUILD_NUMBER=/xcode-build-number=/p' macos/Flutter/ephemeral/Flutter-Generated.xcconfig
-
-run: ## Run the app on a device or desktop target (DEVICE=macos by default)
-	$(FLUTTER) run -d $(DEVICE)
-
-open-macos-xcode: ## Open the supported macOS Xcode workspace entrypoint
-	open macos/Runner.xcworkspace
-
-build-linux: ## Build the Linux app in release mode
-	$(FLUTTER) build linux --release --build-name=$(APP_VERSION) --build-number=$(APP_BUILD_NUMBER) $(APP_DART_DEFINE_VERSION) $(APP_DART_DEFINE_BUILD) $(APP_DART_DEFINE_BUILD_DATE) $(APP_DART_DEFINE_BUILD_COMMIT)
-
-build-macos: ## Build the macOS app in release mode
-	$(FLUTTER) build macos --release $(APP_STORE_DART_DEFINE) --build-name=$(APP_VERSION) --build-number=$(APP_BUILD_NUMBER) $(APP_DART_DEFINE_VERSION) $(APP_DART_DEFINE_BUILD) $(APP_DART_DEFINE_BUILD_DATE) $(APP_DART_DEFINE_BUILD_COMMIT)
-	bash scripts/check-apple-export-compliance.sh build/macos/Build/Products/Release/XWorkmate.app
-
-build-ios-sim: ## Build the iOS app for the simulator
-	$(FLUTTER) build ios --simulator $(APP_STORE_DART_DEFINE) --build-name=$(APP_VERSION) --build-number=$(APP_BUILD_NUMBER) $(APP_DART_DEFINE_VERSION) $(APP_DART_DEFINE_BUILD) $(APP_DART_DEFINE_BUILD_DATE) $(APP_DART_DEFINE_BUILD_COMMIT)
-	bash scripts/check-apple-export-compliance.sh build/ios/iphonesimulator/Runner.app
-
-ios-pods: ## Regenerate the iOS CocoaPods sandbox
-	cd ios && pod install
-
-ios-pods-check: ios-pods ## Verify Podfile.lock and Pods/Manifest.lock are in sync
-	cmp -s ios/Podfile.lock ios/Pods/Manifest.lock
-
-build-ios-release-no-codesign: ios-pods-check ## Build the iOS device app in release mode without codesigning
-	$(FLUTTER) build ios --release --no-codesign $(APP_STORE_DART_DEFINE) --build-name=$(APP_VERSION) --build-number=$(APP_BUILD_NUMBER) $(APP_DART_DEFINE_VERSION) $(APP_DART_DEFINE_BUILD) $(APP_DART_DEFINE_BUILD_DATE) $(APP_DART_DEFINE_BUILD_COMMIT)
-
-verify-ios-release: ios-pods-check build-ios-release-no-codesign analyze ## Regenerate pods, build iOS release without codesigning, and run static analysis
-
-package-deb: ## Create the Linux .deb package
-	bash scripts/package-linux-deb.sh
-
-package-linux-payload: ## Stage the prebuilt Linux install tree embedded in the distro source packages
-	bash scripts/package-linux-payload.sh
-
-package-deb-source: package-linux-payload ## Create the Debian source packages (.dsc / .changes) for Launchpad PPA
-	bash scripts/package-debian-source.sh
-
-package-ppa: package-deb-source ## Alias for package-deb-source
-
-
-package-rpm: ## Create the Linux .rpm package
-	bash scripts/package-linux-rpm.sh
-
-package-rpm-source: package-linux-payload ## Create the RPM source bundle (tarball / spec) for Open Build Service (OBS)
-	bash scripts/package-rpm-source.sh
-
-package-obs: package-rpm-source ## Alias for package-rpm-source
-
-
-package-linux: ## Create both Linux packages
-	bash scripts/package-linux.sh
-
-package-mac: ## Create the macOS .app and DMG
-	XWORKMATE_APP_STORE=true bash scripts/package-flutter-mac-app.sh
-
-install-mac: package-mac ## Package and install the macOS app into /Applications
-	bash scripts/install-flutter-mac-dmg.sh
-
-clean: ## Remove generated artifacts
+clean: ## Clean build artifacts
 	@if command -v $(FLUTTER) >/dev/null 2>&1; then \
 		$(FLUTTER) clean; \
 	else \
@@ -160,5 +113,37 @@ clean: ## Remove generated artifacts
 	fi
 	rm -rf build dist
 
-check-export-compliance: ## Verify source and built Apple plist export-compliance flags
-	bash scripts/check-apple-export-compliance.sh
+sync-macos-config: ## Sync pubspec.yaml version to macOS config
+	$(FLUTTER) build macos --config-only --build-name=$(APP_VERSION) --build-number=$(APP_BUILD_NUMBER) $(DART_DEFINES)
+	@echo "version=$(APP_VERSION)"
+	@echo "build=$(APP_BUILD_NUMBER)"
+	@echo "build-date=$(PUBSPEC_BUILD_DATE)"
+	@echo "build-id=$(PUBSPEC_BUILD_ID)"
+	@if [ -f macos/Flutter/ephemeral/Flutter-Generated.xcconfig ]; then \
+		sed -n 's/^FLUTTER_BUILD_NAME=/xcode-build-name=/p; s/^FLUTTER_BUILD_NUMBER=/xcode-build-number=/p' macos/Flutter/ephemeral/Flutter-Generated.xcconfig; \
+	fi
+
+dns-check: ## Diagnose DNS resolution and cache status
+	@bash ./scripts/dns-check.sh
+
+dns-flush: ## Flush local system DNS cache (requires sudo)
+	@bash ./scripts/dns-flush.sh
+
+test: ## Run Flutter tests
+	$(FLUTTER) test
+
+check: analyze test ## Run static analysis and tests
+
+run: ## Run the app on a device or desktop target (DEVICE=macos by default)
+	$(FLUTTER) run -d $(DEVICE)
+
+# Convenience aliases
+build-linux: build-linux-x64
+build-macos: package-mac
+sync-version: sync-macos-config
+package-linux:
+	bash scripts/package-linux.sh
+package-deb:
+	bash scripts/package-linux-deb.sh
+package-rpm:
+	bash scripts/package-linux-rpm.sh
