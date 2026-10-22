@@ -10,11 +10,11 @@ import 'scheduled_tasks_models.dart';
 class ScheduledTasksController extends ChangeNotifier {
   ScheduledTasksController({
     required this.appController,
-    bool autoStartScheduler = true,
+    bool autoStartScheduler = false,
   }) {
     _initDefaultTasks();
     if (autoStartScheduler) {
-      _startScheduler();
+      startScheduler();
     }
   }
 
@@ -104,11 +104,16 @@ class ScheduledTasksController extends ChangeNotifier {
     ]);
   }
 
-  void _startScheduler() {
+  void startScheduler() {
     _schedulerTimer?.cancel();
     _schedulerTimer = Timer.periodic(const Duration(seconds: 45), (_) {
       unawaited(_checkAndRunDueTasks());
     });
+  }
+
+  void stopScheduler() {
+    _schedulerTimer?.cancel();
+    _schedulerTimer = null;
   }
 
   Future<void> _checkAndRunDueTasks() async {

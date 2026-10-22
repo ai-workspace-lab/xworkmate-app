@@ -29,10 +29,12 @@ class _ScheduledTasksPageState extends State<ScheduledTasksPage> {
     super.initState();
     _tasksController = widget.controller.scheduledTasksController;
     _tasksController.addListener(_onTasksChanged);
+    _tasksController.startScheduler();
   }
 
   @override
   void dispose() {
+    _tasksController.stopScheduler();
     _tasksController.removeListener(_onTasksChanged);
     super.dispose();
   }
