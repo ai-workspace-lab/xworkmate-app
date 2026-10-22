@@ -38,6 +38,7 @@ abstract final class UiFeatureKeys {
   static const navigationAssistant = 'navigation.assistant';
   static const navigationSettings = 'navigation.settings';
   static const navigationBotTeam = 'navigation.bot_team';
+  static const navigationScheduledTasks = 'navigation.scheduled_tasks';
 
   static const assistantDirectAi = 'assistant.direct_ai';
   static const assistantLocalGateway = 'assistant.local_gateway';
@@ -357,15 +358,21 @@ class UiFeatureAccess {
       <UiFeaturePlatform, Map<String, WorkspaceDestination>>{
         UiFeaturePlatform.mobile: <String, WorkspaceDestination>{
           UiFeatureKeys.navigationAssistant: WorkspaceDestination.assistant,
+          UiFeatureKeys.navigationScheduledTasks:
+              WorkspaceDestination.scheduledTasks,
           UiFeatureKeys.navigationSettings: WorkspaceDestination.settings,
         },
         UiFeaturePlatform.desktop: <String, WorkspaceDestination>{
           UiFeatureKeys.navigationAssistant: WorkspaceDestination.assistant,
           UiFeatureKeys.navigationBotTeam: WorkspaceDestination.botTeam,
+          UiFeatureKeys.navigationScheduledTasks:
+              WorkspaceDestination.scheduledTasks,
           UiFeatureKeys.navigationSettings: WorkspaceDestination.settings,
         },
         UiFeaturePlatform.web: <String, WorkspaceDestination>{
           UiFeatureKeys.navigationAssistant: WorkspaceDestination.assistant,
+          UiFeatureKeys.navigationScheduledTasks:
+              WorkspaceDestination.scheduledTasks,
           UiFeatureKeys.navigationSettings: WorkspaceDestination.settings,
         },
       };

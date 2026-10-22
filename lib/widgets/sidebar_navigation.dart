@@ -46,6 +46,7 @@ class SidebarNavigation extends StatelessWidget {
     this.onRefreshTasks,
     this.onCreateTask,
     this.onOpenBotTeam,
+    this.onOpenScheduledTasks,
     this.onReturnToAssistant,
     this.onSelectTask,
     this.onArchiveTask,
@@ -83,6 +84,7 @@ class SidebarNavigation extends StatelessWidget {
   final Future<void> Function()? onRefreshTasks;
   final Future<void> Function()? onCreateTask;
   final VoidCallback? onOpenBotTeam;
+  final VoidCallback? onOpenScheduledTasks;
   final VoidCallback? onReturnToAssistant;
   final Future<void> Function(String sessionKey)? onSelectTask;
   final Future<void> Function(String sessionKey)? onArchiveTask;
@@ -135,6 +137,7 @@ class SidebarNavigation extends StatelessWidget {
                         onRefreshTasks: onRefreshTasks,
                         onCreateTask: onCreateTask,
                         onOpenBotTeam: onOpenBotTeam,
+                        onOpenScheduledTasks: onOpenScheduledTasks,
                         onReturnToAssistant: onReturnToAssistant,
                         onSelectTask: onSelectTask,
                         onArchiveTask: onArchiveTask,
@@ -142,7 +145,54 @@ class SidebarNavigation extends StatelessWidget {
                       ),
                     )
                   else
-                    const Spacer(),
+                    Expanded(
+                      child: Column(
+                        children: [
+                          _SidebarCollapsedNavButton(
+                            key: const Key('sidebar-collapsed-workbench-button'),
+                            icon: Icons.view_quilt_outlined,
+                            tooltip: appText('工作台', 'Workbench'),
+                            selected: currentSection == WorkspaceDestination.workbench,
+                            onTap: onOpenHome,
+                          ),
+                          const SizedBox(height: 6),
+                          if (onCreateTask != null) ...[
+                            _SidebarCollapsedNavButton(
+                              key: const Key('sidebar-collapsed-new-task-button'),
+                              icon: Icons.edit_note_rounded,
+                              tooltip: appText('新对话', 'New conversation'),
+                              selected: false,
+                              onTap: () async {
+                                await onCreateTask!();
+                              },
+                            ),
+                            const SizedBox(height: 6),
+                          ],
+                          if (onOpenBotTeam != null) ...[
+                            _SidebarCollapsedNavButton(
+                              key: const Key('sidebar-collapsed-bot-team-button'),
+                              icon: Icons.groups_2_outlined,
+                              tooltip: appText('Bot 团队', 'Bot team'),
+                              selected: currentSection == WorkspaceDestination.botTeam,
+                              onTap: onOpenBotTeam,
+                            ),
+                            const SizedBox(height: 6),
+                          ],
+                          if (onOpenScheduledTasks != null) ...[
+                            _SidebarCollapsedNavButton(
+                              key: const Key('sidebar-collapsed-scheduled-tasks-button'),
+                              icon: Icons.access_time_rounded,
+                              tooltip: appText('定时任务', 'Scheduled tasks'),
+                              selected:
+                                  currentSection == WorkspaceDestination.scheduledTasks,
+                              onTap: onOpenScheduledTasks,
+                            ),
+                            const SizedBox(height: 6),
+                          ],
+                          const Spacer(),
+                        ],
+                      ),
+                    ),
                   const SizedBox(height: AppSpacing.xs),
                   SidebarFooter(
                     isCollapsed: isCollapsed,
@@ -232,6 +282,79 @@ class _SidebarHeaderChevron extends StatelessWidget {
           color: palette.textSecondary,
         ),
       ),
+    );
+  }
+}
+
+class _SidebarCollapsedNavButton extends StatefulWidget {
+  const _SidebarCollapsedNavButton({
+    super.key,
+    required this.icon,
+    required this.tooltip,
+    this.selected = false,
+    this.onTap,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final bool selected;
+  final VoidCallback? onTap;
+
+  @override
+  State<_SidebarCollapsedNavButton> createState() =>
+      _SidebarCollapsedNavButtonState();
+}
+
+class _SidebarCollapsedNavButtonState
+    extends State<_SidebarCollapsedNavButton> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.palette;
+    final enabled = widget.onTap != null;
+    final content = Center(
+      child: MouseRegion(
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
+        child: Material(
+          color: widget.selected
+              ? palette.chromeSurfacePressed
+              : (_hovered && enabled
+                  ? palette.hover
+                  : palette.surfacePrimary),
+          borderRadius: BorderRadius.circular(10),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(10),
+            onTap: widget.onTap,
+            child: Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: palette.strokeSoft),
+              ),
+              child: Center(
+                child: Icon(
+                  widget.icon,
+                  size: 20,
+                  color: !enabled
+                      ? palette.textMuted
+                      : widget.selected
+                      ? palette.textPrimary
+                      : palette.textSecondary,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    return Tooltip(
+      message: widget.tooltip,
+      waitDuration: const Duration(milliseconds: 200),
+      child: content,
     );
   }
 }

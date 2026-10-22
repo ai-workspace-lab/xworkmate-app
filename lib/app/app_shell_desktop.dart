@@ -390,6 +390,15 @@ class _AppShellState extends State<AppShell> {
                                           WorkspaceDestination.botTeam,
                                         )
                                       : null,
+                                  onOpenScheduledTasks:
+                                      controller.capabilities
+                                          .supportsDestination(
+                                            WorkspaceDestination.scheduledTasks,
+                                          )
+                                      ? () => controller.navigateTo(
+                                          WorkspaceDestination.scheduledTasks,
+                                        )
+                                      : null,
                                   onReturnToAssistant: () {
                                     controller.navigateTo(
                                       WorkspaceDestination.assistant,

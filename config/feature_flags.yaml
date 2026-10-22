@@ -11,6 +11,12 @@ mobile:
       build_modes: [debug, profile, release]
       description: Mobile assistant destination
       ui_surface: mobile_shell
+    scheduled_tasks:
+      enabled: true
+      release_tier: stable
+      build_modes: [debug, profile, release]
+      description: Mobile scheduled tasks destination
+      ui_surface: mobile_shell
     settings:
       enabled: true
       release_tier: stable
@@ -142,6 +148,12 @@ desktop:
       build_modes: [debug, profile, release]
       description: Desktop Bot team destination (role tasks via Accounts and the DSH orchestrator)
       ui_surface: sidebar_navigation
+    scheduled_tasks:
+      enabled: true
+      release_tier: stable
+      build_modes: [debug, profile, release]
+      description: Desktop scheduled tasks destination
+      ui_surface: sidebar_navigation
     settings:
       enabled: true
       release_tier: stable
@@ -272,6 +284,12 @@ web:
       release_tier: stable
       build_modes: [debug, profile, release]
       description: Web assistant destination
+      ui_surface: web_shell
+    scheduled_tasks:
+      enabled: true
+      release_tier: stable
+      build_modes: [debug, profile, release]
+      description: Web scheduled tasks destination
       ui_surface: web_shell
     settings:
       enabled: true
