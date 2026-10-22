@@ -1,6 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xworkmate/app/app_controller.dart';
-import 'package:xworkmate/app/app_controller_desktop_bot_team.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();

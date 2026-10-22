@@ -38,6 +38,7 @@ import '../runtime/go_runtime_dispatch_desktop_client.dart';
 import '../runtime/mode_switcher.dart';
 import '../runtime/agent_registry.dart';
 import '../runtime/platform_environment.dart';
+import '../features/scheduled_tasks/scheduled_tasks_controller.dart';
 import 'task_thread_repositories.dart';
 import 'app_controller_openclaw_task_queue.dart';
 import 'app_controller_desktop_navigation.dart';
@@ -140,6 +141,9 @@ class AppController extends ChangeNotifier {
     cronJobsControllerInternal = CronJobsController(
       runtimeCoordinatorInternal.gateway,
     );
+    scheduledTasksControllerInternal = ScheduledTasksController(
+      appController: this,
+    );
     dogsControllerInternal = DevicesController(
       runtimeCoordinatorInternal.gateway,
     );
@@ -208,6 +212,7 @@ class AppController extends ChangeNotifier {
     skillsControllerInternal.dispose();
     modelsControllerInternal.dispose();
     cronJobsControllerInternal.dispose();
+    scheduledTasksControllerInternal.dispose();
     devicesControllerInternal.dispose();
     tasksControllerInternal.dispose();
     storeInternal.dispose();
@@ -231,6 +236,7 @@ class AppController extends ChangeNotifier {
   late final SkillsController skillsControllerInternal;
   late final ModelsController modelsControllerInternal;
   late final CronJobsController cronJobsControllerInternal;
+  late final ScheduledTasksController scheduledTasksControllerInternal;
   late final DevicesController devicesControllerInternal;
   late final DevicesController dogsControllerInternal;
   late final DerivedTasksController tasksControllerInternal;
@@ -382,6 +388,8 @@ class AppController extends ChangeNotifier {
   SkillsController get skillsController => skillsControllerInternal;
   ModelsController get modelsController => modelsControllerInternal;
   CronJobsController get cronJobsController => cronJobsControllerInternal;
+  ScheduledTasksController get scheduledTasksController =>
+      scheduledTasksControllerInternal;
   DevicesController get devicesController => devicesControllerInternal;
   DerivedTasksController get tasksController => tasksControllerInternal;
   DesktopIntegrationState get desktopIntegration =>

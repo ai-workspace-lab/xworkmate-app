@@ -39,6 +39,7 @@ class SidebarTaskSection extends StatefulWidget {
     this.onRefreshTasks,
     this.onCreateTask,
     this.onOpenBotTeam,
+    this.onOpenScheduledTasks,
     this.onReturnToAssistant,
     this.onSelectTask,
     this.onArchiveTask,
@@ -57,6 +58,7 @@ class SidebarTaskSection extends StatefulWidget {
 
   /// Shown only when the Bot team destination is available.
   final VoidCallback? onOpenBotTeam;
+  final VoidCallback? onOpenScheduledTasks;
   final VoidCallback? onReturnToAssistant;
   final Future<void> Function(String sessionKey)? onSelectTask;
   final Future<void> Function(String sessionKey)? onArchiveTask;
@@ -180,6 +182,16 @@ class _SidebarTaskSectionState extends State<SidebarTaskSection> {
             label: appText('Bot 团队', 'Bot team'),
             selected: widget.currentSection == WorkspaceDestination.botTeam,
             onTap: widget.onOpenBotTeam,
+          ),
+        if (widget.onOpenScheduledTasks != null)
+          _SidebarNavRow(
+            key: const Key('workspace-sidebar-scheduled-tasks-button'),
+            icon: Icons.access_time_rounded,
+            label: appText('定时任务', 'Scheduled tasks'),
+            tooltip: appText('定时任务', 'Scheduled tasks'),
+            selected:
+                widget.currentSection == WorkspaceDestination.scheduledTasks,
+            onTap: widget.onOpenScheduledTasks,
           ),
         const SizedBox(height: 10),
         _SidebarSectionHeader(
@@ -533,12 +545,14 @@ class _SidebarNavRow extends StatefulWidget {
     super.key,
     required this.icon,
     required this.label,
+    this.tooltip,
     this.selected = false,
     this.onTap,
   });
 
   final IconData icon;
   final String label;
+  final String? tooltip;
   final bool selected;
   final VoidCallback? onTap;
 
@@ -560,7 +574,7 @@ class _SidebarNavRowState extends State<_SidebarNavRow> {
         : emphasized
         ? palette.textPrimary
         : palette.textSecondary;
-    return Padding(
+    final rowWidget = Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
       child: MouseRegion(
         onEnter: (_) => setState(() => _hovered = true),
@@ -604,6 +618,15 @@ class _SidebarNavRowState extends State<_SidebarNavRow> {
         ),
       ),
     );
+
+    if (widget.tooltip != null && widget.tooltip!.isNotEmpty) {
+      return Tooltip(
+        message: widget.tooltip!,
+        waitDuration: const Duration(milliseconds: 250),
+        child: rowWidget,
+      );
+    }
+    return rowWidget;
   }
 }
 

@@ -5,6 +5,7 @@ import '../features/bot_team/bot_team_page.dart';
 import '../features/mobile/mobile_assistant_nav_page.dart';
 import '../features/mobile/mobile_settings_page.dart';
 import '../features/mobile/mobile_workbench_page.dart';
+import '../features/scheduled_tasks/scheduled_tasks_page.dart';
 import '../features/workbench/workbench_page.dart';
 import '../features/settings/settings_page.dart';
 import '../models/app_models.dart';
@@ -70,6 +71,17 @@ final Map<WorkspaceDestination, WorkspacePageSpec> workspacePageSpecsInternal =
         ),
         mobileBuilder: (controller, onOpenDetail, mobileActions) => BotTeamPage(
           clientFactory: controller.createTaskSessionClient,
+          leading: SidebarRevealToggle(controller: controller),
+        ),
+      ),
+      WorkspaceDestination.scheduledTasks: WorkspacePageSpec(
+        destination: WorkspaceDestination.scheduledTasks,
+        desktopBuilder: (controller, onOpenDetail) => ScheduledTasksPage(
+          controller: controller,
+          leading: SidebarRevealToggle(controller: controller),
+        ),
+        mobileBuilder: (controller, onOpenDetail, mobileActions) => ScheduledTasksPage(
+          controller: controller,
           leading: SidebarRevealToggle(controller: controller),
         ),
       ),
