@@ -33,6 +33,25 @@ QMD remains the history/document and retrieval integration in each mode, not a
 second live execution authority. This initial standalone mode is single-user
 private only; optional identity integration does not establish multi-tenant safety.
 
+### Standalone conversation binding and acceptance gates
+
+Immediate role conversations reuse the existing `TaskSessionBindingStore`, scoped
+by local thread, selected connection source and canonical Bridge endpoint. The
+binding is persisted before sending the first message. Later turns verify the
+bound session rather than creating a new session on each send. A missing or
+inconsistent binding fails visibly instead of silently forking conversation state.
+Changing a bearer alone does not change the local binding key.
+
+Authentication follows the selected source: manual Bridge uses its saved secure
+credential; cloud uses the signed-in account credential. An explicit source with
+missing credentials cannot fall through to another source or environment token.
+
+Acceptance is staged: unit/widget contract tests, PostgreSQL integration tests,
+review and PR checks, merged source, then separately authorized runtime delivery
+and real two-turn/restart verification. Fixtures and a merged PR are not evidence
+of a successful live model conversation. Ownership-loss safety and committed
+credential hygiene must be resolved before final product acceptance.
+
 ### S0: Shared cloud-session attach (runtime contract, controller wiring pending)
 
 The cloud-session MVP keeps the current TaskThread/UI identity local while a
