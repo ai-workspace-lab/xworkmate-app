@@ -20,6 +20,95 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   group('AppControllerDesktopBotTeam Self-Hosted Fallback Tests', () {
+    for (final source in ['bridge', 'cloud', 'default']) {
+      test('rejects remote HTTP before reading credentials: $source', () async {
+        final store = _CredentialStore();
+        final controller = AppController(
+          store: store,
+          environmentOverride: const {
+            'XWORKMATE_MANAGED_BRIDGE_URL': 'http://remote.example.com/team',
+            'AI_WORKSPACE_AUTH_TOKEN': 'fixture-environment',
+          },
+        );
+        addTearDown(controller.dispose);
+        final settings = controller.settingsControllerInternal;
+        if (source == 'cloud') {
+          settings.accountSessionTokenInternal = 'fixture-cloud';
+        }
+        settings.snapshotInternal = settings.snapshot.copyWith(
+          acpBridgeServerModeConfig: AcpBridgeServerModeConfig.defaults()
+              .copyWith(
+                effective: AcpBridgeServerEffectiveConfig(
+                  endpoint: source == 'default'
+                      ? ''
+                      : 'http://remote.example.com/team',
+                  source: source,
+                  tokenRef: 'self-ref',
+                  reason: 'test',
+                ),
+                selfHosted: source == 'bridge'
+                    ? const AcpBridgeServerSelfHostedConfig(
+                        serverUrl: 'http://remote.example.com/team',
+                        username: 'fixture-user',
+                        passwordRef: 'self-ref',
+                      )
+                    : null,
+              ),
+        );
+        expect(
+          await controller.resolveTaskSessionAuthTokenInternal(
+            Uri.parse('http://remote.example.com/team'),
+          ),
+          isNull,
+        );
+        expect(await controller.resolveTaskSessionClientInternal(), isNull);
+        expect(controller.createTaskSessionClient(), isNull);
+        expect(store.refs, isEmpty);
+      });
+    }
+
+    for (final host in ['127.0.0.1', 'localhost', '[::1]']) {
+      test(
+        'allows explicitly configured self-host HTTP loopback: $host',
+        () async {
+          final store = _CredentialStore();
+          final controller = AppController(
+            store: store,
+            environmentOverride: const {},
+          );
+          addTearDown(controller.dispose);
+          final endpoint = 'http://$host:8787/team/acp/rpc';
+          final settings = controller.settingsControllerInternal;
+          settings.snapshotInternal = settings.snapshot.copyWith(
+            acpBridgeServerModeConfig: AcpBridgeServerModeConfig.defaults()
+                .copyWith(
+                  effective: AcpBridgeServerEffectiveConfig(
+                    endpoint: endpoint,
+                    source: 'bridge',
+                    tokenRef: 'self-ref',
+                    reason: 'test',
+                  ),
+                  selfHosted: AcpBridgeServerSelfHostedConfig(
+                    serverUrl: endpoint,
+                    username: 'fixture-user',
+                    passwordRef: 'self-ref',
+                  ),
+                ),
+          );
+          expect(
+            await controller.resolveTaskSessionAuthTokenInternal(
+              Uri.parse(endpoint),
+            ),
+            'fixture-self-host',
+          );
+          expect(
+            await controller.resolveTaskSessionClientInternal(),
+            isNotNull,
+          );
+        },
+      );
+    }
+
     for (final missing in [false, true]) {
       test(
         'explicit self-host uses only its credential (missing=$missing)',

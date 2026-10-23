@@ -62,6 +62,17 @@ extension AppControllerDesktopBotTeam on AppController {
         !['http', 'https'].contains(endpoint.scheme)) {
       return null;
     }
+    // Match the shared-session transport contract: remote origins require
+    // HTTPS; an explicitly configured loopback may intentionally use HTTP.
+    final host = endpoint.host.toLowerCase();
+    final isLoopback =
+        host == 'localhost' ||
+        host == '127.0.0.1' ||
+        host == '::1' ||
+        host == '[::1]';
+    if (endpoint.scheme != 'https' && !isLoopback) {
+      return null;
+    }
     return endpoint.replace(
       path: AcpEndpointPaths.fromBaseEndpoint(endpoint).basePath,
       query: null,

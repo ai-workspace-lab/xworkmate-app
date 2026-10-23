@@ -5,7 +5,52 @@ import 'package:xworkmate/runtime/task_session_client.dart';
 
 import 'fake_task_session_client.dart';
 
+class _EmptyEventClient extends FakeTaskSessionClient {
+  int polls = 0;
+  bool completeAfterEmpty = false;
+  @override
+  Future<TaskEventPage> listEvents({
+    required String sessionId,
+    int afterSeq = 0,
+    int limit = 100,
+  }) async {
+    polls++;
+    return TaskEventPage(
+      events: completeAfterEmpty && polls > 1
+          ? [
+              TaskSessionEvent(
+                seq: 10,
+                type: 'run.completed',
+                payload: const {'taskRunId': 'run-1'},
+                createdAt: null,
+              ),
+            ]
+          : [],
+      lastEventSeq: afterSeq,
+    );
+  }
+}
+
 void main() {
+  test('no events at timeout leaves accepted run active', () async {
+    final client = _EmptyEventClient();
+    final view = await RoleTaskRunner(
+      client: client,
+      timeout: Duration.zero,
+    ).run(text: 'pending', role: 'worker');
+    expect(view.runId, 'run-1');
+    expect(view.active, isTrue);
+    expect(view.phase, BotTaskPhase.queued);
+  });
+  test('an empty page does not end polling before a terminal event', () async {
+    final client = _EmptyEventClient()..completeAfterEmpty = true;
+    final view = await RoleTaskRunner(
+      client: client,
+      pollInterval: Duration.zero,
+    ).run(text: 'pending', role: 'worker');
+    expect(client.polls, 2);
+    expect(view.phase, BotTaskPhase.completed);
+  });
   test(
     'reused session with more than one page of history polls the new run',
     () async {

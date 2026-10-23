@@ -34,10 +34,27 @@ Future<TaskSessionSummary?> loadRoleTaskSession({
   if (namespace != binding.namespaceId) {
     throw const TaskSessionBindingMismatch(field: 'namespaceId');
   }
-  // listSessions is namespace-scoped; do not append a stale or foreign ID.
-  final sessions = await client.listSessions(namespace);
-  for (final session in sessions) {
-    if (session.sessionId == binding.cloudSessionId) return session;
+  // Session lists can be capped. Only the canonical authenticated snapshot
+  // can validate a durable ID independently of its position in the list.
+  try {
+    final snapshot = await client.loadSessionSnapshot(binding.cloudSessionId);
+    if (snapshot.sessionId != binding.cloudSessionId) {
+      throw const TaskSessionBindingMismatch(field: 'sessionId');
+    }
+    if (snapshot.namespaceId != binding.namespaceId) {
+      throw const TaskSessionBindingMismatch(field: 'namespaceId');
+    }
+    return TaskSessionSummary(
+      sessionId: snapshot.sessionId,
+      title: snapshot.title,
+      lastEventSeq: snapshot.lastEventSeq,
+      updatedAt: null,
+      lastRunState: snapshot.context['lastRunState']?.toString() ?? '',
+    );
+  } on TaskSessionException catch (error) {
+    if (error.statusCode == 404) {
+      throw const TaskSessionBindingMismatch(field: 'sessionId');
+    }
+    rethrow;
   }
-  throw const TaskSessionBindingMismatch(field: 'sessionId');
 }
