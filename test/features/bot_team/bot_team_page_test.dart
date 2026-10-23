@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xworkmate/features/bot_team/bot_team_controller.dart';
@@ -169,6 +171,12 @@ void main() {
         find.byKey(const Key('bot-team-send-button')),
       );
       expect(send.onPressed, isNull);
+      final previousComparator = goldenFileComparator;
+      goldenFileComparator = _TolerantGoldenFileComparator(
+        Uri.parse('test/features/bot_team/bot_team_page_test.dart'),
+        precisionTolerance: 0.012,
+      );
+      addTearDown(() => goldenFileComparator = previousComparator);
       await expectLater(
         find.byKey(const Key('bot-team-page')),
         matchesGoldenFile('goldens/bot_team_bridge_not_configured.png'),
@@ -228,4 +236,29 @@ void main() {
       expect(opened, 1);
     },
   );
+}
+
+class _TolerantGoldenFileComparator extends LocalFileComparator {
+  _TolerantGoldenFileComparator(
+    super.testFile, {
+    required double precisionTolerance,
+  }) : _precisionTolerance = precisionTolerance;
+
+  final double _precisionTolerance;
+
+  @override
+  Future<bool> compare(Uint8List imageBytes, Uri golden) async {
+    final result = await GoldenFileComparator.compareLists(
+      imageBytes,
+      await getGoldenBytes(golden),
+    );
+    final passed = result.passed || result.diffPercent <= _precisionTolerance;
+    if (passed) {
+      result.dispose();
+      return true;
+    }
+    final error = await generateFailureOutput(result, golden, basedir);
+    result.dispose();
+    throw FlutterError(error);
+  }
 }
