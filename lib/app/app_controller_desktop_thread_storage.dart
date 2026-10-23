@@ -506,6 +506,10 @@ extension AppControllerDesktopThreadStorage on AppController {
     final normalizedSessionKey = normalizedAssistantSessionKeyInternal(
       sessionKey,
     );
+    final remoteSummary = qmdRemoteSessionSummariesInternal[normalizedSessionKey];
+    if (remoteSummary != null) {
+      return remoteSummary;
+    }
     final resolvedRecord =
         record ?? assistantThreadRecordsInternal[normalizedSessionKey];
     final messages =

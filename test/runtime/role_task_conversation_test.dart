@@ -1,5 +1,10 @@
 // ignore_for_file: invalid_use_of_protected_member, invalid_use_of_visible_for_testing_member
 import 'package:flutter_test/flutter_test.dart';
+import 'dart:io';
+import 'package:xworkmate/runtime/file_store_support.dart';
+import 'package:xworkmate/runtime/task_session_binding.dart';
+import 'package:xworkmate/runtime/secure_config_store.dart';
+import 'package:xworkmate/features/bot_team/role_task_session_binding.dart';
 import 'package:xworkmate/app/app_controller.dart';
 import 'package:xworkmate/i18n/app_language.dart';
 import 'package:xworkmate/models/app_models.dart';
@@ -56,13 +61,81 @@ class _SettlingAccounts extends FakeTaskSessionClient {
 }
 
 void main() {
-  setUp(() => setActiveAppLanguage(AppLanguage.zh));
-
-  AppController controllerFor(String key) {
-    final controller = AppController(environmentOverride: const {});
+  AppController controllerFor(String key, {String? root}) {
+    final controller = AppController(
+      environmentOverride: const {
+        'XWORKMATE_MANAGED_BRIDGE_URL': 'https://bridge.example.com/acp/rpc',
+      },
+      store: root == null
+          ? null
+          : SecureConfigStore(
+              appDataRootPathResolver: () async => root,
+              supportRootPathResolver: () async => root,
+              enableSecureStorage: false,
+            ),
+    );
     controller.sessionsControllerInternal.currentSessionKeyInternal = key;
     return controller;
   }
+
+  setUp(() => setActiveAppLanguage(AppLanguage.zh));
+  setUp(() async {
+    final root = await Directory.systemTemp.createTemp('role-controller-');
+    debugOverridePersistentSupportRoot(root.path);
+    addTearDown(() async {
+      debugOverridePersistentSupportRoot(null);
+      await root.delete(recursive: true);
+    });
+  });
+
+  test(
+    'two turns and a reloaded controller reuse the durable binding',
+    () async {
+      final root = await Directory.systemTemp.createTemp('role-binding-');
+      addTearDown(() => root.delete(recursive: true));
+      debugOverridePersistentSupportRoot(root.path);
+      TaskSessionBindingStore store() => FileTaskSessionBindingStore(
+        layoutResolver: StoreLayoutResolver(
+          appDataRootPathResolver: () async => root.path,
+          supportRootPathResolver: () async => root.path,
+        ),
+      );
+      final accounts = _SettlingAccounts();
+      final first = controllerFor('durable-role', root: root.path);
+      addTearDown(first.dispose);
+      await first.assistantThreadsRestoredInternal.future;
+      for (final prompt in ['first turn', 'second turn']) {
+        await first.runRoleTaskInConversation(
+          sessionKey: 'durable-role',
+          text: prompt,
+          role: AssistantMode.engineer,
+          clientFactory: () => accounts,
+        );
+      }
+      final reloaded = controllerFor('durable-role', root: root.path);
+      addTearDown(reloaded.dispose);
+      await reloaded.assistantThreadsRestoredInternal.future;
+      await reloaded.runRoleTaskInConversation(
+        sessionKey: 'durable-role',
+        text: 'after reload',
+        role: AssistantMode.engineer,
+        clientFactory: () => accounts,
+      );
+      expect(accounts.sessions, hasLength(1));
+      final binding = await store().load(
+        roleTaskBindingKey(
+          threadKey: 'durable-role',
+          source: 'default',
+          endpoint: Uri.parse('https://bridge.example.com/acp/rpc'),
+        ),
+      );
+      expect(binding!.cloudSessionId, accounts.sessions.single.sessionId);
+      expect(accounts.appended, hasLength(3));
+      expect(accounts.appended.map((entry) => entry['sessionId']).toSet(), {
+        accounts.sessions.single.sessionId,
+      });
+    },
+  );
 
   test(
     'Run now puts the request and the DS Bot answer in the conversation',
@@ -98,6 +171,34 @@ void main() {
     },
   );
 
+  test('an append failure retains the new binding for the next turn', () async {
+    final controller = controllerFor('append-failure');
+    addTearDown(controller.dispose);
+    final accounts = _SettlingAccounts()
+      ..failNextAppend = StateError('fixture append failure');
+    await controller.runRoleTaskInConversation(
+      sessionKey: 'append-failure',
+      text: 'first',
+      role: AssistantMode.engineer,
+      clientFactory: () => accounts,
+    );
+    expect(
+      controller.assistantThreadMessagesInternal['append-failure']!.last.error,
+      isTrue,
+    );
+    await controller.runRoleTaskInConversation(
+      sessionKey: 'append-failure',
+      text: 'retry',
+      role: AssistantMode.engineer,
+      clientFactory: () => accounts,
+    );
+    expect(accounts.sessions, hasLength(1));
+    expect(
+      accounts.appended.single['sessionId'],
+      accounts.sessions.single.sessionId,
+    );
+  });
+
   test('a rejected role comes back as an error in the conversation', () async {
     final controller = controllerFor('unit-role-rejected');
     addTearDown(controller.dispose);
@@ -132,6 +233,7 @@ void main() {
     expect(accounts.appended.single['routing'], <String, Object?>{
       'roleMode': 'auto',
       'role': 'worker',
+      'preferredGatewayProviderId': 'dsbot',
     });
     expect(accounts.appended.single['clientRequestId'], 'req-1');
     final messages =
