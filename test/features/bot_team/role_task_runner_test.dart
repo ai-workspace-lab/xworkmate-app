@@ -1,10 +1,116 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:xworkmate/features/bot_team/bot_team_models.dart';
 import 'package:xworkmate/features/bot_team/role_task_runner.dart';
+import 'package:xworkmate/runtime/task_session_client.dart';
 
 import 'fake_task_session_client.dart';
 
+class _EmptyEventClient extends FakeTaskSessionClient {
+  int polls = 0;
+  bool completeAfterEmpty = false;
+  @override
+  Future<TaskEventPage> listEvents({
+    required String sessionId,
+    int afterSeq = 0,
+    int limit = 100,
+  }) async {
+    polls++;
+    return TaskEventPage(
+      events: completeAfterEmpty && polls > 1
+          ? [
+              TaskSessionEvent(
+                seq: 10,
+                type: 'run.completed',
+                payload: const {'taskRunId': 'run-1'},
+                createdAt: null,
+              ),
+            ]
+          : [],
+      lastEventSeq: afterSeq,
+    );
+  }
+}
+
 void main() {
+  test('no events at timeout leaves accepted run active', () async {
+    final client = _EmptyEventClient();
+    final view = await RoleTaskRunner(
+      client: client,
+      timeout: Duration.zero,
+    ).run(text: 'pending', role: 'worker');
+    expect(view.runId, 'run-1');
+    expect(view.active, isTrue);
+    expect(view.phase, BotTaskPhase.queued);
+  });
+  test('an empty page does not end polling before a terminal event', () async {
+    final client = _EmptyEventClient()..completeAfterEmpty = true;
+    final view = await RoleTaskRunner(
+      client: client,
+      pollInterval: Duration.zero,
+    ).run(text: 'pending', role: 'worker');
+    expect(client.polls, 2);
+    expect(view.phase, BotTaskPhase.completed);
+  });
+  test(
+    'reused session with more than one page of history polls the new run',
+    () async {
+      final client = FakeTaskSessionClient();
+      final session = await client.createSession(
+        namespaceId: 'ns-personal',
+        title: 'old',
+      );
+      for (var i = 0; i < 150; i++) {
+        client.addEvent(session.sessionId, 'run.completed', {
+          'taskRunId': 'old-$i',
+        });
+      }
+      final view = await RoleTaskRunner(
+        client: client,
+        timeout: Duration.zero,
+      ).run(text: 'new turn', role: 'worker', existingSession: session);
+      expect(view.runId, 'run-1');
+      expect(view.phase, BotTaskPhase.queued);
+      expect(client.sessions, hasLength(1));
+    },
+  );
+  test('reuses a session and awaits persistence before append', () async {
+    final client = FakeTaskSessionClient();
+    const session = TaskSessionSummary(
+      sessionId: 'existing',
+      title: 'old',
+      lastEventSeq: 0,
+      updatedAt: null,
+      lastRunState: '',
+    );
+    var persisted = false;
+    await RoleTaskRunner(client: client, timeout: Duration.zero).run(
+      text: 'next',
+      role: 'engineer',
+      existingSession: session,
+      onSessionReady: (namespace, selected) async {
+        expect(client.appended, isEmpty);
+        expect(selected.sessionId, 'existing');
+        await Future<void>.delayed(Duration.zero);
+        persisted = true;
+      },
+    );
+    expect(persisted, isTrue);
+    expect(client.sessions, isEmpty);
+    expect(client.appended.single['sessionId'], 'existing');
+  });
+
+  test('persistence failure prevents append', () async {
+    final client = FakeTaskSessionClient();
+    await expectLater(
+      RoleTaskRunner(client: client).run(
+        text: 'first',
+        role: 'worker',
+        onSessionReady: (_, _) async => throw StateError('write failed'),
+      ),
+      throwsStateError,
+    );
+    expect(client.appended, isEmpty);
+  });
   test('runs a role task to its end and returns the answer', () async {
     final accounts = FakeTaskSessionClient();
     final seen = <BotTaskPhase>[];

@@ -1,10 +1,14 @@
 import '../features/bot_team/bot_team_models.dart';
 import '../features/bot_team/role_task_runner.dart';
+import '../features/bot_team/role_task_session_binding.dart';
 import '../i18n/app_language.dart';
 import '../models/app_models.dart';
 import '../runtime/acp_endpoint_paths.dart';
 import '../runtime/runtime_models.dart';
 import '../runtime/task_session_client.dart';
+import '../runtime/task_session_binding.dart';
+import '../runtime/task_session_sync_service.dart';
+import '../runtime/file_store_support.dart';
 import 'app_controller_desktop_core.dart';
 import 'app_controller_desktop_runtime_helpers.dart';
 import 'app_controller_desktop_thread_sessions.dart';
@@ -21,21 +25,93 @@ extension AppControllerDesktopBotTeam on AppController {
     return trimmed;
   }
 
-  /// Resolves the auth token for Bot tasks across all sources:
-  /// 1. Cloud account session token
-  /// 2. Self-hosted Bridge token saved in Settings
-  /// 3. Runtime environment variables (ACP_BRIDGE_SERVER_TOKEN / AI_WORKSPACE_AUTH_TOKEN / BRIDGE_AUTH_TOKEN)
+  String get _taskSessionSource {
+    final config =
+        settingsControllerInternal.snapshot.acpBridgeServerModeConfig;
+    final source = config.effective.source.trim();
+    if (source != '' && source != 'default') return source;
+    if (config.selfHosted.isConfigured) return 'bridge';
+    if (settingsControllerInternal.accountSessionTokenInternal
+        .trim()
+        .isNotEmpty) {
+      return 'cloud';
+    }
+    return 'default';
+  }
+
+  Uri? _taskSessionEndpoint() {
+    final config =
+        settingsControllerInternal.snapshot.acpBridgeServerModeConfig;
+    final source = _taskSessionSource;
+    if (source == 'cloud' &&
+        config.effective.source.trim() == 'cloud' &&
+        config.effective.endpoint.trim().isEmpty) {
+      return null;
+    }
+    final raw = source == 'bridge'
+        ? config.selfHosted.serverUrl
+        : config.effective.endpoint;
+    final endpoint = raw.trim().isNotEmpty
+        ? Uri.tryParse(raw.trim())
+        : source == 'bridge'
+        ? null
+        : resolveBridgeAcpEndpointInternal();
+    if (endpoint == null ||
+        endpoint.host.isEmpty ||
+        endpoint.userInfo.isNotEmpty ||
+        !['http', 'https'].contains(endpoint.scheme)) {
+      return null;
+    }
+    // Match the shared-session transport contract: remote origins require
+    // HTTPS; an explicitly configured loopback may intentionally use HTTP.
+    final host = endpoint.host.toLowerCase();
+    final isLoopback =
+        host == 'localhost' ||
+        host == '127.0.0.1' ||
+        host == '::1' ||
+        host == '[::1]';
+    if (endpoint.scheme != 'https' && !isLoopback) {
+      return null;
+    }
+    return endpoint.replace(
+      path: AcpEndpointPaths.fromBaseEndpoint(endpoint).basePath,
+      query: null,
+      fragment: null,
+    );
+  }
+
+  /// Explicit source failures stop here. Environment compatibility applies
+  /// only when no account or self-hosted source is configured.
   Future<String?> resolveTaskSessionAuthTokenInternal(Uri endpoint) async {
-    final accountToken = settingsControllerInternal.accountSessionTokenInternal.trim();
-    if (accountToken.isNotEmpty) {
-      return accountToken;
+    final expected = _taskSessionEndpoint();
+    final base = endpoint.replace(
+      path: AcpEndpointPaths.fromBaseEndpoint(endpoint).basePath,
+      query: null,
+      fragment: null,
+    );
+    if (expected == null || base != expected) return null;
+    switch (_taskSessionSource) {
+      case 'bridge':
+        final config =
+            settingsControllerInternal.snapshot.acpBridgeServerModeConfig;
+        if (!config.selfHosted.isConfigured) return null;
+        final ref = config.selfHosted.passwordRef.trim();
+        if (ref.isEmpty) return null;
+        final token = _stripBearerToken(
+          await storeInternal.loadSecretValueByRef(ref),
+        );
+        return token.isEmpty ? null : token;
+      case 'cloud':
+        final token = settingsControllerInternal.accountSessionTokenInternal
+            .trim();
+        return token.isEmpty ? null : token;
+      case 'default':
+        break;
+      default:
+        return null;
     }
-    final bridgeAuthHeader = await resolveBridgeArtifactAuthorizationHeaderInternal(endpoint);
-    final stripped = _stripBearerToken(bridgeAuthHeader);
-    if (stripped.isNotEmpty) {
-      return stripped;
-    }
-    final envToken = runtimeEnvironmentValueInternal('ACP_BRIDGE_SERVER_TOKEN') ??
+    final envToken =
+        runtimeEnvironmentValueInternal('ACP_BRIDGE_SERVER_TOKEN') ??
         runtimeEnvironmentValueInternal('AI_WORKSPACE_AUTH_TOKEN') ??
         runtimeEnvironmentValueInternal('BRIDGE_AUTH_TOKEN');
     if (envToken != null && envToken.trim().isNotEmpty) {
@@ -44,18 +120,24 @@ extension AppControllerDesktopBotTeam on AppController {
     return null;
   }
 
-  /// Synchronous fallback when token is available in memory or env
+  /// Secure self-host credentials require the asynchronous resolver.
   TaskSessionClient? createTaskSessionClient() {
-    final endpoint = resolveBridgeAcpEndpointInternal();
+    final endpoint = _taskSessionEndpoint();
     if (endpoint == null) {
       return null;
     }
-    var token = settingsControllerInternal.accountSessionTokenInternal.trim();
-    if (token.isEmpty) {
-      token = (runtimeEnvironmentValueInternal('ACP_BRIDGE_SERVER_TOKEN') ??
-              runtimeEnvironmentValueInternal('AI_WORKSPACE_AUTH_TOKEN') ??
-              runtimeEnvironmentValueInternal('BRIDGE_AUTH_TOKEN'))
-          ?.trim() ?? '';
+    final source = _taskSessionSource;
+    if (source != 'cloud' && source != 'default') return null;
+    var token = source == 'cloud'
+        ? settingsControllerInternal.accountSessionTokenInternal.trim()
+        : '';
+    if (source == 'default') {
+      token =
+          (runtimeEnvironmentValueInternal('ACP_BRIDGE_SERVER_TOKEN') ??
+                  runtimeEnvironmentValueInternal('AI_WORKSPACE_AUTH_TOKEN') ??
+                  runtimeEnvironmentValueInternal('BRIDGE_AUTH_TOKEN'))
+              ?.trim() ??
+          '';
     }
     if (token.isEmpty) {
       return null;
@@ -68,9 +150,9 @@ extension AppControllerDesktopBotTeam on AppController {
     return HttpTaskSessionClient(bridgeBase: base, accountToken: token);
   }
 
-  /// Asynchronous client creator that falls back through all token sources (Cloud -> Self-hosted -> Env).
+  /// Creates a client using only the selected source's credentials.
   Future<TaskSessionClient?> resolveTaskSessionClientInternal() async {
-    final endpoint = resolveBridgeAcpEndpointInternal();
+    final endpoint = _taskSessionEndpoint();
     if (endpoint == null) {
       return null;
     }
@@ -95,6 +177,7 @@ extension AppControllerDesktopBotTeam on AppController {
     required String text,
     required AssistantMode role,
     TaskSessionClient? Function()? clientFactory,
+    TaskSessionBindingStore? bindingStore,
   }) async {
     final key = normalizedAssistantSessionKeyInternal(sessionKey);
     final prompt = text.trim();
@@ -102,20 +185,54 @@ extension AppControllerDesktopBotTeam on AppController {
       return;
     }
     appendAssistantThreadMessageInternal(key, _message('user', prompt));
-    final client = clientFactory != null
-        ? clientFactory()
-        : await resolveTaskSessionClientInternal();
-    if (client == null) {
-      appendAssistantThreadMessageInternal(key, _signInRequired());
-      await flushAssistantThreadPersistenceInternal();
-      return;
-    }
     roleTaskPendingSessionKeysInternal.add(key);
     notifyIfActiveInternal();
     try {
-      final view = await RoleTaskRunner(
+      final client = clientFactory != null
+          ? clientFactory()
+          : await resolveTaskSessionClientInternal();
+      if (client == null) {
+        appendAssistantThreadMessageInternal(key, _signInRequired());
+        return;
+      }
+      final endpoint = _taskSessionEndpoint();
+      if (endpoint == null) {
+        throw StateError('Task session endpoint is unavailable.');
+      }
+      final store = bindingStore ?? await _roleTaskBindingStore();
+      final bindingKey = roleTaskBindingKey(
+        threadKey: key,
+        source: _taskSessionSource,
+        endpoint: endpoint,
+      );
+      final existing = await loadRoleTaskSession(
+        store: store,
         client: client,
-      ).run(text: prompt, role: role.name);
+        bindingKey: bindingKey,
+      );
+      final view = await RoleTaskRunner(client: client).run(
+        text: prompt,
+        role: role.name,
+        existingSession: existing,
+        onSessionReady: (namespace, session) async {
+          final previous = await store.load(bindingKey);
+          if (previous != null &&
+              (previous.namespaceId != namespace ||
+                  previous.cloudSessionId != session.sessionId)) {
+            throw const TaskSessionBindingMismatch(field: 'sessionIdentity');
+          }
+          await store.save(
+            previous ??
+                TaskSessionBinding(
+                  taskThreadKey: bindingKey,
+                  cloudSessionId: session.sessionId,
+                  namespaceId: namespace,
+                  lastEventSeq: 0,
+                  snapshotVersion: 0,
+                ),
+          );
+        },
+      );
       appendAssistantThreadMessageInternal(key, _resultMessage(role, view));
     } catch (failure) {
       appendAssistantThreadMessageInternal(
@@ -127,6 +244,20 @@ extension AppControllerDesktopBotTeam on AppController {
       await flushAssistantThreadPersistenceInternal();
       notifyIfActiveInternal();
     }
+  }
+
+  Future<TaskSessionBindingStore> _roleTaskBindingStore() async {
+    final settingsFile = await storeInternal.resolvedSettingsFile();
+    if (settingsFile == null) {
+      throw StateError('Task session storage is unavailable.');
+    }
+    final root = settingsFile.parent.parent.path;
+    return FileTaskSessionBindingStore(
+      layoutResolver: StoreLayoutResolver(
+        appDataRootPathResolver: () async => root,
+        supportRootPathResolver: () async => root,
+      ),
+    );
   }
 
   /// Hands [text] to the Bot team as a background [role] task thread for

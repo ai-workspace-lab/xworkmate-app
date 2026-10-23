@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'session_sync_contract.dart';
+
 /// Shared task sessions held by Accounts and reached through the Bridge
 /// `/api/v1` proxy with the signed-in account token. Accounts is the only
 /// durable task state (AI Workspace v2.1); the DSH orchestrator claims the
@@ -119,7 +121,26 @@ abstract class TaskSessionClient {
   });
 }
 
-class HttpTaskSessionClient implements TaskSessionClient {
+/// Optional canonical lookup capability. Kept separate so existing
+/// `implements TaskSessionClient` integrations remain source-compatible.
+abstract interface class TaskSessionSnapshotReader {
+  Future<CloudSessionSnapshot> loadSnapshot(String sessionId);
+}
+
+extension TaskSessionSnapshotLookup on TaskSessionClient {
+  Future<CloudSessionSnapshot> loadSessionSnapshot(String sessionId) {
+    final client = this;
+    if (client is TaskSessionSnapshotReader) {
+      return (client as TaskSessionSnapshotReader).loadSnapshot(sessionId);
+    }
+    throw UnsupportedError(
+      'This task client does not support session snapshots.',
+    );
+  }
+}
+
+class HttpTaskSessionClient
+    implements TaskSessionClient, TaskSessionSnapshotReader {
   HttpTaskSessionClient({
     required Uri bridgeBase,
     required String accountToken,
@@ -238,6 +259,12 @@ class HttpTaskSessionClient implements TaskSessionClient {
         .map((item) => TaskSessionSummary.fromJson(_asMap(item)))
         .where((session) => session.sessionId.isNotEmpty)
         .toList(growable: false);
+  }
+
+  @override
+  Future<CloudSessionSnapshot> loadSnapshot(String sessionId) async {
+    final body = await _request('GET', _uri(<String>['sessions', sessionId]));
+    return CloudSessionSnapshot.fromJson(body);
   }
 
   @override

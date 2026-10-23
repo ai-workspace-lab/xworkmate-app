@@ -1013,10 +1013,17 @@ class _SignedInAccountPanel extends StatelessWidget {
     );
     final isAccountSyncMode = mode == _SignedInAccountMode.accountSync;
     final cloudSync = settings.acpBridgeServerModeConfig.cloudSynced;
-    final serviceUrl = cloudSync.accountBaseUrl.trim().isNotEmpty
+    final selfHosted = settings.acpBridgeServerModeConfig.selfHosted;
+    final serviceUrl = !isAccountSyncMode
+        ? (selfHosted.serverUrl.trim().isNotEmpty
+              ? selfHosted.serverUrl.trim()
+              : settings.acpBridgeServerModeConfig.effective.endpoint.trim())
+        : cloudSync.accountBaseUrl.trim().isNotEmpty
         ? cloudSync.accountBaseUrl.trim()
         : settings.accountBaseUrl.trim();
-    final accountIdentifier = cloudSync.accountIdentifier.trim().isNotEmpty
+    final accountIdentifier = !isAccountSyncMode
+        ? selfHosted.username.trim()
+        : cloudSync.accountIdentifier.trim().isNotEmpty
         ? cloudSync.accountIdentifier.trim()
         : settings.accountUsername.trim().isNotEmpty
         ? settings.accountUsername.trim()
@@ -1040,7 +1047,12 @@ class _SignedInAccountPanel extends StatelessWidget {
               : _describeBridgeSaveState(settings));
     final modeStatusLabel = accountBusy && accountStatus.trim().isNotEmpty
         ? accountStatus.trim()
-        : syncMessage;
+        : isAccountSyncMode
+        ? syncMessage
+        : appText(
+            '配置已保存，连接状态未验证',
+            'Configuration saved; connection not verified',
+          );
     final modeIcon = isAccountSyncMode
         ? Icons.cloud_outlined
         : Icons.link_outlined;
@@ -1054,7 +1066,6 @@ class _SignedInAccountPanel extends StatelessWidget {
         ? 'settings-account-sync-button'
         : 'settings-account-manual-reset-button';
     final primaryAction = isAccountSyncMode ? onSync : onResetManualBridge;
-    final exitAction = isAccountSyncMode ? onLogout : onResetManualBridge;
     final mfaEnabled =
         accountSession?.totpEnabled == true ||
         accountSession?.mfaEnabled == true;
@@ -1062,15 +1073,19 @@ class _SignedInAccountPanel extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          appText('已连接的连接器', 'Connected connectors'),
+          isAccountSyncMode
+              ? appText('已连接的连接器', 'Connected connectors')
+              : appText('已保存的连接器', 'Saved connectors'),
           style: Theme.of(context).textTheme.titleLarge,
         ),
         const SizedBox(height: 8),
         Text(
-          appText(
-            '已连接的服务优先显示；详细连接信息默认折叠。',
-            'Connected services appear first; connection details stay collapsed by default.',
-          ),
+          isAccountSyncMode
+              ? appText(
+                  '已连接的服务优先显示；详细连接信息默认折叠。',
+                  'Connected services appear first; connection details stay collapsed by default.',
+                )
+              : appText('配置已保存在此设备上。', 'Configuration saved on this device.'),
         ),
         const SizedBox(height: 16),
         Material(
@@ -1109,7 +1124,12 @@ class _SignedInAccountPanel extends StatelessWidget {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            accountSession?.email.trim().isNotEmpty == true
+                            !isAccountSyncMode
+                                ? (accountIdentifier.isEmpty
+                                      ? appText('未设置身份', 'Identity not set')
+                                      : accountIdentifier)
+                                : accountSession?.email.trim().isNotEmpty ==
+                                      true
                                 ? accountSession!.email.trim()
                                 : appText('当前账号', 'Current account'),
                             style: Theme.of(context).textTheme.bodySmall
@@ -1157,11 +1177,14 @@ class _SignedInAccountPanel extends StatelessWidget {
                                 )
                               : Text(primaryActionLabel),
                         ),
-                        TextButton(
-                          key: const ValueKey('settings-account-logout-button'),
-                          onPressed: accountBusy ? null : () => exitAction(),
-                          child: Text(appText('断开连接', 'Disconnect')),
-                        ),
+                        if (isAccountSyncMode)
+                          TextButton(
+                            key: const ValueKey(
+                              'settings-account-logout-button',
+                            ),
+                            onPressed: accountBusy ? null : () => onLogout(),
+                            child: Text(appText('断开连接', 'Disconnect')),
+                          ),
                       ],
                     ),
                   ],
@@ -1259,28 +1282,34 @@ class _SignedInAccountDetails extends StatelessWidget {
             '${appText('连接来源', 'Connection Source')}: ${_connectionSourceLabel(settings, accountState)}',
             key: const ValueKey('settings-account-summary-connection-source'),
           ),
-          const SizedBox(height: 6),
-          Text(
-            '${appText('远端摘要', 'Remote Summary')}: ${remoteSummary.isEmpty ? appText('待同步', 'Pending sync') : remoteSummary}',
-            key: const ValueKey('settings-account-summary-remote-summary'),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            '${appText('最近同步', 'Last Sync')}: ${_formatSyncTime(cloudSync.lastSyncAt)}',
-            key: const ValueKey('settings-account-summary-last-sync'),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            '${appText('MFA 状态', 'MFA Status')}: ${mfaEnabled ? appText('已启用', 'Enabled') : appText('未启用', 'Disabled')}',
-            key: const ValueKey('settings-account-summary-mfa-status'),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            '${appText('同步范围', 'Sync Scope')}: $syncScope',
-            key: const ValueKey('settings-account-summary-sync-scope'),
-          ),
-          const SizedBox(height: 6),
-          _TokenConfiguredSummary(accountState: accountState),
+          if (_signedInAccountModeFromSettings(
+                settings: settings,
+                accountState: accountState,
+              ) ==
+              _SignedInAccountMode.accountSync) ...[
+            const SizedBox(height: 6),
+            Text(
+              '${appText('远端摘要', 'Remote Summary')}: ${remoteSummary.isEmpty ? appText('待同步', 'Pending sync') : remoteSummary}',
+              key: const ValueKey('settings-account-summary-remote-summary'),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              '${appText('最近同步', 'Last Sync')}: ${_formatSyncTime(cloudSync.lastSyncAt)}',
+              key: const ValueKey('settings-account-summary-last-sync'),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              '${appText('MFA 状态', 'MFA Status')}: ${mfaEnabled ? appText('已启用', 'Enabled') : appText('未启用', 'Disabled')}',
+              key: const ValueKey('settings-account-summary-mfa-status'),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              '${appText('同步范围', 'Sync Scope')}: $syncScope',
+              key: const ValueKey('settings-account-summary-sync-scope'),
+            ),
+            const SizedBox(height: 6),
+            _TokenConfiguredSummary(accountState: accountState),
+          ],
         ],
       ),
     );

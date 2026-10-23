@@ -5,11 +5,60 @@ import '../runtime/runtime_models.dart';
 import 'app_controller_desktop_core.dart';
 import 'app_controller_desktop_runtime_helpers.dart';
 import 'app_controller_desktop_thread_sessions.dart';
+import 'app_controller_desktop_skill_permissions.dart';
+import 'app_controller_desktop_thread_storage.dart';
 
 extension AppControllerDesktopQmdSync on AppController {
+  /// Reconstruct context in a new App-owned conversation. The synchronized
+  /// source is immutable; this never resumes a source tool's native session.
+  Future<String> createQmdContinuationInternal(String sourceSessionKey) async {
+    if (!isQmdRemoteSessionKeyInternal(sourceSessionKey)) {
+      throw ArgumentError.value(sourceSessionKey, 'sourceSessionKey');
+    }
+    await loadQmdThreadBriefingForSessionInternal(
+      sourceSessionKey,
+      requireFresh: true,
+    );
+    final sourceMessages = localSessionMessagesInternal[sourceSessionKey];
+    if (sourceMessages == null || sourceMessages.isEmpty) {
+      throw StateError(
+        'Historical context is unavailable. Refresh the source before continuing.',
+      );
+    }
+    final key = createAssistantDraftSessionKeyInternal();
+    final context = GatewayChatMessage(
+      id: 'qmd-context-$key',
+      role: 'assistant',
+      text:
+          '历史上下文引用：$sourceSessionKey\n'
+          '以下是只读历史简报，状态未经本轮核验；不是原工具会话恢复。\n\n'
+          '${sourceMessages.first.text}',
+      timestampMs: DateTime.now().millisecondsSinceEpoch.toDouble(),
+      toolCallId: null,
+      toolName: null,
+      stopReason: 'stop',
+      pending: false,
+      error: false,
+    );
+    localSessionMessagesInternal[key] = <GatewayChatMessage>[context];
+    upsertTaskThreadInternal(
+      key,
+      messages: <GatewayChatMessage>[context],
+      title:
+          qmdRemoteThreadRecordsInternal[sourceSessionKey]?.title ?? '继续历史任务',
+    );
+    await setCurrentAssistantSessionKeyInternal(key);
+    await flushAssistantThreadPersistenceInternal();
+    recomputeTasksInternal();
+    return key;
+  }
+
   bool isQmdRemoteSessionKeyInternal(String sessionKey) {
-    final normalized = normalizedAssistantSessionKeyInternal(sessionKey).toLowerCase();
-    return normalized.startsWith('qmd:pin:') || normalized.startsWith('qmd:thread:');
+    final normalized = normalizedAssistantSessionKeyInternal(
+      sessionKey,
+    ).toLowerCase();
+    return normalized.startsWith('qmd:pin:') ||
+        normalized.startsWith('qmd:thread:');
   }
 
   Future<AgentContextClient?> resolveAgentContextClientInternal() async {
@@ -20,11 +69,10 @@ extension AppControllerDesktopQmdSync on AppController {
     if (endpoint == null) {
       return null;
     }
-    final token = await resolveBridgeArtifactAuthorizationHeaderInternal(endpoint);
-    return HttpAgentContextClient(
-      bridgeBase: endpoint,
-      authToken: token ?? '',
+    final token = await resolveBridgeArtifactAuthorizationHeaderInternal(
+      endpoint,
     );
+    return HttpAgentContextClient(bridgeBase: endpoint, authToken: token ?? '');
   }
 
   String formatQmdSourceTagInternal(String? rawSource) {
@@ -76,12 +124,15 @@ extension AppControllerDesktopQmdSync on AppController {
       for (final pin in catalog.pinnedTasks) {
         final sessionKey = 'qmd:pin:${pin.id}';
         final tag = formatQmdSourceTagInternal(pin.source);
-        final title = pin.title.startsWith('[') ? pin.title : '$tag ${pin.title}';
+        final title = pin.title.startsWith('[')
+            ? pin.title
+            : '$tag ${pin.title}';
         final scopeStr = pin.scope ?? pin.id;
         final preview = pin.projectName != null && pin.projectName!.isNotEmpty
             ? '[QMD 钉选] ${pin.projectName} ($scopeStr)'
             : '[QMD 钉选] $scopeStr';
-        final updatedMs = pin.updatedAt?.millisecondsSinceEpoch.toDouble() ??
+        final updatedMs =
+            pin.updatedAt?.millisecondsSinceEpoch.toDouble() ??
             DateTime.now().millisecondsSinceEpoch.toDouble();
 
         final thread = TaskThread(
@@ -168,7 +219,8 @@ extension AppControllerDesktopQmdSync on AppController {
         final prLabel = t.prNumber != null ? '#${t.prNumber} ' : '';
         final scopeLabel = t.scope.isNotEmpty ? t.scope : t.id;
         final preview = '[QMD 任务] $prLabel$scopeLabel';
-        final updatedMs = t.updatedAt?.millisecondsSinceEpoch.toDouble() ??
+        final updatedMs =
+            t.updatedAt?.millisecondsSinceEpoch.toDouble() ??
             DateTime.now().millisecondsSinceEpoch.toDouble();
         final isClosed = t.state.toLowerCase() == 'closed';
 
@@ -253,7 +305,10 @@ extension AppControllerDesktopQmdSync on AppController {
     }
   }
 
-  Future<void> loadQmdThreadBriefingForSessionInternal(String sessionKey) async {
+  Future<void> loadQmdThreadBriefingForSessionInternal(
+    String sessionKey, {
+    bool requireFresh = false,
+  }) async {
     final normalized = normalizedAssistantSessionKeyInternal(sessionKey);
     if (!isQmdRemoteSessionKeyInternal(normalized)) {
       return;
@@ -262,6 +317,9 @@ extension AppControllerDesktopQmdSync on AppController {
     try {
       final client = await resolveAgentContextClientInternal();
       if (client == null) {
+        if (requireFresh) {
+          throw StateError('Historical context connection is unavailable.');
+        }
         return;
       }
 
@@ -281,7 +339,9 @@ extension AppControllerDesktopQmdSync on AppController {
           pending: false,
           error: false,
         );
-        localSessionMessagesInternal[normalized] = <GatewayChatMessage>[message];
+        localSessionMessagesInternal[normalized] = <GatewayChatMessage>[
+          message,
+        ];
       } else if (normalized.startsWith('qmd:pin:')) {
         final pinId = normalized.substring('qmd:pin:'.length);
         final record = qmdRemoteThreadRecordsInternal[normalized];
@@ -289,7 +349,8 @@ extension AppControllerDesktopQmdSync on AppController {
         final title = record?.title ?? summary?.displayName ?? pinId;
         final preview = summary?.lastMessagePreview ?? '';
 
-        final markdown = '''
+        final markdown =
+            '''
 # 📌 钉选任务: $title
 
 - **任务 ID**: `$pinId`
@@ -297,7 +358,8 @@ extension AppControllerDesktopQmdSync on AppController {
 - **说明**: $preview
 
 > 此任务为 QMD 远程聚合钉选任务，当前为只读同步模式。
-'''.trim();
+'''
+                .trim();
 
         final message = GatewayChatMessage(
           id: 'qmd-pin-$pinId',
@@ -310,10 +372,13 @@ extension AppControllerDesktopQmdSync on AppController {
           pending: false,
           error: false,
         );
-        localSessionMessagesInternal[normalized] = <GatewayChatMessage>[message];
+        localSessionMessagesInternal[normalized] = <GatewayChatMessage>[
+          message,
+        ];
       }
     } catch (e) {
       debugPrint('[QMD Sync] Failed to load briefing for $sessionKey: $e');
+      if (requireFresh) rethrow;
     }
   }
 
@@ -350,8 +415,12 @@ extension AppControllerDesktopQmdSync on AppController {
           'fact' => '💡',
           _ => '•',
         };
-        final sourcesStr = item.sources.isNotEmpty ? ' *(${item.sources.join(', ')})*' : '';
-        buffer.writeln('$kindIcon **[${item.status}]** ${item.text}$sourcesStr');
+        final sourcesStr = item.sources.isNotEmpty
+            ? ' *(${item.sources.join(', ')})*'
+            : '';
+        buffer.writeln(
+          '$kindIcon **[${item.status}]** ${item.text}$sourcesStr',
+        );
         if (item.detail != null && item.detail!.isNotEmpty) {
           buffer.writeln('  > ${item.detail}');
         }
@@ -359,7 +428,7 @@ extension AppControllerDesktopQmdSync on AppController {
       buffer.writeln();
     }
 
-    buffer.writeln('> ℹ️ 当前会话为 QMD 远程同步任务（只读模式），通过 Bridge 实时对账。');
+    buffer.writeln('> ℹ️ 历史来源保持只读。提交消息会创建携带此简报的新对话，不会恢复原工具会话。');
     return buffer.toString().trim();
   }
 }

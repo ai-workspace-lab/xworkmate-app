@@ -615,7 +615,10 @@ void main() {
 
         expect(find.text('已连接的连接器'), findsOneWidget);
         expect(find.text('托管工作空间'), findsOneWidget);
-        expect(find.textContaining('连接状态'), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('settings-account-sync-status')),
+          findsOneWidget,
+        );
         expect(
           find.byKey(const ValueKey('settings-account-sync-button')),
           findsOneWidget,
@@ -816,7 +819,10 @@ void main() {
         );
 
         expect(find.text('自托管工作空间'), findsOneWidget);
-        expect(find.textContaining('连接状态'), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('settings-account-sync-status')),
+          findsOneWidget,
+        );
         expect(
           find.byKey(const ValueKey('settings-account-manual-reset-button')),
           findsOneWidget,
@@ -830,13 +836,13 @@ void main() {
           find.byKey(const ValueKey('settings-account-manual-reset-button')),
         );
         await tester.pump();
-        await tester.tap(
+        expect(
           find.byKey(const ValueKey('settings-account-logout-button')),
+          findsNothing,
         );
-        await tester.pump();
 
         expect(saveCount, 0);
-        expect(resetCount, 2);
+        expect(resetCount, 1);
         expect(logoutCount, 0);
       },
     );
@@ -863,6 +869,12 @@ void main() {
                         reason:
                             'Manual Bridge configuration is present and valid',
                       ),
+                      cloudSynced: AcpBridgeServerCloudSyncConfig.defaults()
+                          .copyWith(
+                            accountBaseUrl: 'https://cloud.example.com',
+                            accountIdentifier: 'cloud-user@example.com',
+                            lastSyncAt: 1700000000000,
+                          ),
                       selfHosted: AcpBridgeServerModeConfig.defaults()
                           .selfHosted
                           .copyWith(
@@ -898,7 +910,51 @@ void main() {
         );
 
         expect(find.text('自托管工作空间'), findsOneWidget);
-        expect(find.textContaining('连接状态'), findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('settings-account-sync-status')),
+          findsOneWidget,
+        );
+        expect(find.text('已连接的连接器'), findsNothing);
+        expect(find.textContaining('连接状态未验证'), findsOneWidget);
+        expect(find.text('断开连接'), findsOneWidget);
+        expect(find.textContaining('cloud-user@example.com'), findsNothing);
+        await tester.tap(
+          find.byKey(const ValueKey('settings-account-summary-expansion')),
+        );
+        await tester.pumpAndSettle();
+        expect(find.textContaining('https://cloud.example.com'), findsNothing);
+        expect(
+          tester
+              .widget<Text>(
+                find.byKey(
+                  const ValueKey('settings-account-summary-service-url'),
+                ),
+              )
+              .data,
+          '服务地址: http://127.0.0.1:8787',
+        );
+        expect(
+          tester
+              .widget<Text>(
+                find.byKey(
+                  const ValueKey('settings-account-summary-account-identifier'),
+                ),
+              )
+              .data,
+          '连接身份: admin',
+        );
+        for (final field in [
+          'remote-summary',
+          'last-sync',
+          'mfa-status',
+          'sync-scope',
+          'token-configured',
+        ]) {
+          expect(
+            find.byKey(ValueKey('settings-account-summary-$field')),
+            findsNothing,
+          );
+        }
         expect(
           find.byKey(const ValueKey('settings-account-manual-reset-button')),
           findsOneWidget,

@@ -4,6 +4,54 @@ Repo chain: xworkmate-app → xworkmate-bridge
 
 ## Recovery Scenarios
 
+### QMD history continuation (standalone or Accounts-backed Bridge)
+
+QMD synchronized records are immutable history sources. Selecting a source loads
+its briefing and retains the catalog title even when it becomes the current
+selection. Submitting a message creates a new App-owned draft containing the
+source key and briefing, then uses the normal authenticated Bridge task path.
+The submitted prompt labels the briefing as historical data, not new execution
+authorization. This reconstructs context; it does not resume a source tool's
+native session or modify its QMD task record.
+
+Bridge operates independently in self-hosted mode. Accounts session API and
+Accounts identity are optional integrations selected explicitly by deployment
+configuration. A configured Accounts upstream must not silently switch stores
+when unavailable. Endpoint health, durable persistence and real model replies
+remain separate acceptance gates.
+
+The two integration choices are independent:
+
+- Without Accounts, Bridge authenticates a private local operator and owns its
+  durable session API; connecting an account is not a prerequisite for chatting.
+- Optional Accounts identity changes authentication/identity mapping, not the
+  selected session storage owner. Token rotation must not orphan stored sessions.
+- Optional Accounts session API explicitly delegates session persistence to
+  Accounts. Errors remain visible; they do not create a second local session.
+
+QMD remains the history/document and retrieval integration in each mode, not a
+second live execution authority. This initial standalone mode is single-user
+private only; optional identity integration does not establish multi-tenant safety.
+
+### Standalone conversation binding and acceptance gates
+
+Immediate role conversations reuse the existing `TaskSessionBindingStore`, scoped
+by local thread, selected connection source and canonical Bridge endpoint. The
+binding is persisted before sending the first message. Later turns verify the
+bound session rather than creating a new session on each send. A missing or
+inconsistent binding fails visibly instead of silently forking conversation state.
+Changing a bearer alone does not change the local binding key.
+
+Authentication follows the selected source: manual Bridge uses its saved secure
+credential; cloud uses the signed-in account credential. An explicit source with
+missing credentials cannot fall through to another source or environment token.
+
+Acceptance is staged: unit/widget contract tests, PostgreSQL integration tests,
+review and PR checks, merged source, then separately authorized runtime delivery
+and real two-turn/restart verification. Fixtures and a merged PR are not evidence
+of a successful live model conversation. Ownership-loss safety and committed
+credential hygiene must be resolved before final product acceptance.
+
 ### S0: Shared cloud-session attach (runtime contract, controller wiring pending)
 
 The cloud-session MVP keeps the current TaskThread/UI identity local while a
