@@ -365,8 +365,8 @@ extension AppControllerDesktopBotTeam on AppController {
   GatewayChatMessage _signInRequired() => _message(
     'assistant',
     appText(
-      '需要先连接 Bridge 并登录账户，才能把任务交给 DS Bot。',
-      'Connect the Bridge and sign in to hand tasks to DS Bot.',
+      '请先配置 Bridge 地址和访问凭据；自托管模式无需登录账户。',
+      'Configure a Bridge endpoint and credential. Self-hosted mode does not require account sign-in.',
     ),
     error: true,
   );

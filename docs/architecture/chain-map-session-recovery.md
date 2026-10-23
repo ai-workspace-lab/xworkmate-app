@@ -46,6 +46,13 @@ Authentication follows the selected source: manual Bridge uses its saved secure
 credential; cloud uses the signed-in account credential. An explicit source with
 missing credentials cannot fall through to another source or environment token.
 
+The Bot team page resolves that credential asynchronously during load because
+desktop credentials may come from secure storage. A successfully configured
+standalone Bridge can list or create a task session and accept role tasks while
+the user is signed out of Accounts. Missing configuration or credential errors
+remain visible and keep sending disabled; they are not reported as an account
+sign-in requirement.
+
 Acceptance is staged: unit/widget contract tests, PostgreSQL integration tests,
 review and PR checks, merged source, then separately authorized runtime delivery
 and real two-turn/restart verification. Fixtures and a merged PR are not evidence

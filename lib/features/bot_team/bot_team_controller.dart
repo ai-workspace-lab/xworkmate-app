@@ -11,13 +11,13 @@ import 'bot_team_models.dart';
 /// so this controller keeps only what the page shows and re-reads the rest.
 class BotTeamController extends ChangeNotifier {
   BotTeamController({
-    required TaskSessionClient? Function() clientFactory,
+    required FutureOr<TaskSessionClient?> Function() clientFactory,
     this.pollInterval = const Duration(milliseconds: 1500),
     String Function()? newRequestId,
   }) : _clientFactory = clientFactory,
        _newRequestId = newRequestId ?? (() => const Uuid().v4());
 
-  final TaskSessionClient? Function() _clientFactory;
+  final FutureOr<TaskSessionClient?> Function() _clientFactory;
   final Duration pollInterval;
   final String Function() _newRequestId;
 
@@ -52,25 +52,41 @@ class BotTeamController extends ChangeNotifier {
       error is TaskSessionException ? error.message : error.toString();
 
   Future<void> load() async {
-    _client = _clientFactory();
-    if (_client == null) {
-      error = appText(
-        '需要先连接 Bridge 并登录账户，Bot 任务才能下发。',
-        'Connect the Bridge and sign in to send Bot tasks.',
-      );
-      _notify();
-      return;
-    }
+    if (loading || _disposed) return;
     loading = true;
     error = '';
     _notify();
     try {
+      _client = null;
+      _stopPolling();
+      _client = await _clientFactory();
+      if (_disposed) return;
+      if (_client == null) {
+        namespaceId = '';
+        sessions = const <TaskSessionSummary>[];
+        startNewSession();
+        error = appText(
+          '请先配置 Bridge 地址和访问凭据；自托管模式无需登录账户。',
+          'Configure a Bridge endpoint and credential. Self-hosted mode does not require account sign-in.',
+        );
+        return;
+      }
       namespaceId = await _client!.personalNamespaceId();
       sessions = await _client!.listSessions(namespaceId);
-      if (selectedSessionId.isEmpty && sessions.isNotEmpty) {
-        await _select(sessions.first.sessionId);
+      if (_disposed) return;
+      if (sessions.isEmpty) {
+        startNewSession();
+      } else {
+        final selected = sessions.any((s) => s.sessionId == selectedSessionId)
+            ? selectedSessionId
+            : sessions.first.sessionId;
+        await _select(selected);
       }
     } catch (failure) {
+      _client = null;
+      namespaceId = '';
+      sessions = const <TaskSessionSummary>[];
+      startNewSession();
       error = _describe(failure);
     } finally {
       loading = false;
