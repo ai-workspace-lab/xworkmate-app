@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../i18n/app_language.dart';
@@ -18,7 +20,7 @@ class BotTeamPage extends StatefulWidget {
     this.leading,
   });
 
-  final TaskSessionClient? Function() clientFactory;
+  final FutureOr<TaskSessionClient?> Function() clientFactory;
 
   /// Injected by tests; the page owns and disposes one it creates itself.
   final BotTeamController? controller;

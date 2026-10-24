@@ -66,11 +66,11 @@ final Map<WorkspaceDestination, WorkspacePageSpec> workspacePageSpecsInternal =
       WorkspaceDestination.botTeam: WorkspacePageSpec(
         destination: WorkspaceDestination.botTeam,
         desktopBuilder: (controller, onOpenDetail) => BotTeamPage(
-          clientFactory: controller.createTaskSessionClient,
+          clientFactory: controller.resolveTaskSessionClientInternal,
           leading: SidebarRevealToggle(controller: controller),
         ),
         mobileBuilder: (controller, onOpenDetail, mobileActions) => BotTeamPage(
-          clientFactory: controller.createTaskSessionClient,
+          clientFactory: controller.resolveTaskSessionClientInternal,
           leading: SidebarRevealToggle(controller: controller),
         ),
       ),
@@ -80,10 +80,11 @@ final Map<WorkspaceDestination, WorkspacePageSpec> workspacePageSpecsInternal =
           controller: controller,
           leading: SidebarRevealToggle(controller: controller),
         ),
-        mobileBuilder: (controller, onOpenDetail, mobileActions) => ScheduledTasksPage(
-          controller: controller,
-          leading: SidebarRevealToggle(controller: controller),
-        ),
+        mobileBuilder: (controller, onOpenDetail, mobileActions) =>
+            ScheduledTasksPage(
+              controller: controller,
+              leading: SidebarRevealToggle(controller: controller),
+            ),
       ),
       WorkspaceDestination.workbench: WorkspacePageSpec(
         destination: WorkspaceDestination.workbench,
