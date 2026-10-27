@@ -1,0 +1,30 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- XWorkmate APP Icon (Light Mode) · Worky-Bot (Warm Assistant Robot) -->
+  <!-- Squircle Base -->
+  <rect width="512" height="512" rx="136" fill="#FFF7ED"/>
+  
+  <!-- Worky-Bot Main Character Group (Scaled to 512x512) -->
+  <g transform="translate(64, 48) scale(1.92)">
+    <!-- Lateral Large Headphone Earcups -->
+    <rect x="24" y="74" width="20" height="42" rx="10" fill="#F97316"/>
+    <rect x="156" y="74" width="20" height="42" rx="10" fill="#F97316"/>
+    <!-- Head Chassis -->
+    <rect x="38" y="46" width="124" height="104" rx="46" fill="#F97316"/>
+    <!-- Cream White Face Visor -->
+    <rect x="52" y="62" width="96" height="66" rx="26" fill="#FFFFFF"/>
+    <!-- Warm Smiling Dot Eyes -->
+    <circle cx="80" cy="94" r="7" fill="#C2410C"/>
+    <circle cx="120" cy="94" r="7" fill="#C2410C"/>
+    <!-- Gentle Mouth Arc -->
+    <rect x="88" y="112" width="24" height="8" rx="4" fill="#FDBA74"/>
+  </g>
+
+  <!-- Bottom-Right 2x2 Ecosystem Badge -->
+  <g transform="translate(396, 396)">
+    <rect width="80" height="80" rx="22" fill="#FFFFFF" fill-opacity="0.96"/>
+    <rect x="14" y="14" width="22" height="22" rx="6" fill="#38BDF8"/>
+    <rect x="44" y="14" width="22" height="22" rx="6" fill="#0F172A"/>
+    <rect x="14" y="44" width="22" height="22" rx="6" fill="#0F172A"/>
+    <rect x="44" y="44" width="22" height="22" rx="6" fill="#38BDF8"/>
+  </g>
+</svg>
