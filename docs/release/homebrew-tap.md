@@ -32,9 +32,34 @@ The `homebrew_tap` job in [build-and-release.yml](../../.github/workflows/build-
 
 ## Repository & Secret Setup
 
-1. Create the public GitHub repository `ai-workspace-lab/homebrew-tap` (with a `Casks/` directory).
-2. Create a fine-grained GitHub Personal Access Token (or GitHub App token) with `Contents: Read and write` permission on `ai-workspace-lab/homebrew-tap`.
-3. Store the token in Vault at `kv/data/github-actions/xworkmate-app` under the key `HOMEBREW_TAP_TOKEN`.
+1. **Create the Tap Repository**
+   - Create the public GitHub repository `ai-workspace-lab/homebrew-tap` and initialize its default branch (`main`).
+
+2. **Generate `HOMEBREW_TAP_TOKEN` (Fine-grained PAT)**
+   - In GitHub, go to **Settings** → **Developer settings** → **Personal access tokens** → **Fine-grained tokens** → **Generate new token**.
+   - **Token name**: e.g. `xworkmate-homebrew-tap`.
+   - **Resource owner**: `ai-workspace-lab` (requires org admin approval if the organization enforces Fine-grained PAT approval).
+   - **Expiration**: choose according to your security policy (e.g. 90 days or 1 year).
+   - **Repository access**: **Only select repositories** → select `ai-workspace-lab/homebrew-tap`.
+   - **Repository permissions**: set **Contents** to **Read and write**; leave all other permissions as **No access**.
+   - Click **Generate token** and copy the `github_pat_...` value.
+   - *(Fallback if Fine-grained PAT is disabled)*: use **Tokens (classic)** with `public_repo` (for a public tap) or `repo` scope.
+
+3. **Store the Token in Vault**
+   - Use `vault kv patch` (not `vault kv put`) so existing secrets under `kv/github-actions/xworkmate-app` are preserved:
+
+   ```bash
+   export VAULT_ADDR="https://vault.svc.plus"
+
+   vault kv patch kv/github-actions/xworkmate-app \
+     HOMEBREW_TAP_TOKEN="github_pat_your_token"
+   ```
+
+   - Verify the key exists:
+
+   ```bash
+   vault kv get -format=json kv/github-actions/xworkmate-app | jq -r '.data.data | keys[]'
+   ```
 
 ## Local Dry-Run
 
