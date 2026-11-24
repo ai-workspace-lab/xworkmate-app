@@ -2,6 +2,15 @@
 
 XWorkmate distributes its macOS `.dmg` release via a Homebrew Cask in `ai-workspace-lab/homebrew-tap`.
 
+## Distribution Strategy
+
+1. **Phase 1 — Self-Hosted Tap (Current)**:
+   - Publish `Casks/xworkmate.rb` to `ai-workspace-lab/homebrew-tap` via CI.
+   - Users install with `brew install --cask ai-workspace-lab/tap/xworkmate`.
+2. **Phase 2 — Official `homebrew/homebrew-cask` (Future)**:
+   - Once the repository reaches **GitHub Stars ≥ 75** or demonstrates stable download/usage volume, submit `Casks/xworkmate.rb` via PR to `Homebrew/homebrew-cask` (`Casks/x/xworkmate.rb`) and verify with `brew audit --cask --online`.
+   - Once merged, users can install directly with `brew install --cask xworkmate`.
+
 ## User Installation
 
 ```bash
