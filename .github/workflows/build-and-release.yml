@@ -476,3 +476,61 @@ jobs:
         if: ${{ (matrix.target == 'testflight_ios' || matrix.target == 'testflight_macos') && needs.prepare.outputs.testflight_enabled == 'true' }}
         shell: bash
         run: bash ./scripts/ci/testflight_upload.sh "${{ matrix.testflight_platform }}" "${{ matrix.artifact_path }}"
+
+  homebrew_tap:
+    if: ${{ needs.prepare.outputs.should_release == 'true' && needs.prepare.outputs.github_release_enabled == 'true' && needs.prepare.result == 'success' && needs.build.result == 'success' && needs.release.result == 'success' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+      id-token: write
+    needs:
+      - prepare
+      - build
+      - release
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v7
+
+      - name: Load Vault secrets (Homebrew Tap)
+        id: vault_homebrew
+        uses: hashicorp/vault-action@v4
+        with:
+          url: ${{ env.VAULT_ADDR }}
+          method: jwt
+          role: github-actions-xworkmate-app
+          jwtGithubAudience: vault
+          ignoreNotFound: true
+          secrets: |
+            kv/data/github-actions/xworkmate-app HOMEBREW_TAP_TOKEN | HOMEBREW_TAP_TOKEN
+
+      - name: Download macOS DMG artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: build-macos-arm64-dmg
+          path: release-artifacts/macos
+
+      - name: Update Homebrew Cask
+        shell: bash
+        env:
+          HOMEBREW_TAP_TOKEN: ${{ steps.vault_homebrew.outputs.HOMEBREW_TAP_TOKEN }}
+          DISPLAY_VERSION: ${{ needs.prepare.outputs.display_version }}
+          RELEASE_TAG: ${{ needs.prepare.outputs.release_tag }}
+        run: |
+          dmg_file="$(find release-artifacts/macos -maxdepth 2 -name '*.dmg' | head -n 1)"
+          if [[ -z "$dmg_file" ]]; then
+            echo "No macOS .dmg artifact found." >&2
+            exit 1
+          fi
+          if [[ -n "${HOMEBREW_TAP_TOKEN:-}" ]]; then
+            bash ./scripts/ci/update_homebrew_cask.sh \
+              --dmg "$dmg_file" \
+              --version "$DISPLAY_VERSION" \
+              --tag "$RELEASE_TAG"
+          else
+            echo "HOMEBREW_TAP_TOKEN not configured in Vault; running dry-run only."
+            bash ./scripts/ci/update_homebrew_cask.sh \
+              --dmg "$dmg_file" \
+              --version "$DISPLAY_VERSION" \
+              --tag "$RELEASE_TAG" \
+              --dry-run
+          fi
