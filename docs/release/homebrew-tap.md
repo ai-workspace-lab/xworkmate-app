@@ -14,14 +14,9 @@ XWorkmate distributes its macOS `.dmg` release via a Homebrew Cask in `ai-worksp
 ## User Installation
 
 ```bash
-brew install --cask ai-workspace-lab/tap/xworkmate
-```
-
-Or by tapping first:
-
-```bash
 brew tap ai-workspace-lab/tap
-brew install --cask xworkmate
+brew trust ai-workspace-lab/tap   # Required on Homebrew 7+ for third-party taps
+brew install --cask ai-workspace-lab/tap/xworkmate
 ```
 
 To upgrade:
