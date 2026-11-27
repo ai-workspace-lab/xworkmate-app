@@ -137,7 +137,17 @@ main() {
 
   case "$(uname -s)" in
     Darwin)
-      asset_name_pattern='^XWorkmate-[^/]+\.dmg$'
+      case "$(uname -m)" in
+        arm64)
+          asset_name_pattern='^XWorkmate-[^/]+-arm64\.dmg$'
+          ;;
+        x86_64)
+          asset_name_pattern='^XWorkmate-[^/]+-x86_64\.dmg$'
+          ;;
+        *)
+          asset_name_pattern='^XWorkmate-[^/]+\.dmg$'
+          ;;
+      esac
       ;;
     Linux)
       case "$(uname -m)" in
