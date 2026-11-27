@@ -121,15 +121,22 @@ APP_BUILD="$BUILD_NUMBER"
 APP_BUILD_DATE="${GIT_BUILD_DATE:-${BUILD_DATE_LINE:-unknown}}"
 APP_BUILD_COMMIT="${GIT_BUILD_COMMIT:-${BUILD_ID_LINE:-unknown}}"
 
+TARGET_ARCH=""
 if [[ -n "${ARCH:-}" ]]; then
   TARGET_ARCH="$ARCH"
   [[ "$TARGET_ARCH" == "x64" ]] && TARGET_ARCH="x86_64"
   export ARCHS="$TARGET_ARCH"
+  export FLUTTER_XCODE_ARCHS="$TARGET_ARCH"
+  export FLUTTER_XCODE_ONLY_ACTIVE_ARCH="NO"
 fi
 
 BUILD_APP_PATH="$APP_DIR/build/macos/Build/Products/$PRODUCTS_DIR_NAME/$APP_NAME.app"
 DIST_APP_PATH="$DIST_DIR/$APP_NAME.app"
-DIST_DMG_PATH="$DIST_DIR/$APP_NAME-$APP_VERSION.dmg"
+if [[ -n "$TARGET_ARCH" ]]; then
+  DIST_DMG_PATH="$DIST_DIR/$APP_NAME-$APP_VERSION-$TARGET_ARCH.dmg"
+else
+  DIST_DMG_PATH="$DIST_DIR/$APP_NAME-$APP_VERSION.dmg"
+fi
 mkdir -p "$DIST_DIR"
 
 echo "Building $APP_NAME $APP_VERSION ($APP_BUILD) for macOS..."
@@ -185,6 +192,11 @@ validate_bundle_dependencies() {
   bash "$ROOT_DIR/scripts/validate-macos-app-bundle.sh" "$app_path"
 }
 
+if [[ -n "$TARGET_ARCH" ]]; then
+  echo "Verifying target architecture ($TARGET_ARCH)..."
+  lipo "$BUILD_APP_PATH/Contents/MacOS/$APP_NAME" -verify_arch "$TARGET_ARCH"
+fi
+
 echo "Validating export compliance metadata..."
 bash "$ROOT_DIR/scripts/check-apple-export-compliance.sh" "$BUILD_APP_PATH"
 validate_bundle_dependencies "$BUILD_APP_PATH"
@@ -192,26 +204,33 @@ validate_bundle_dependencies "$BUILD_APP_PATH"
 rm -rf "$DIST_APP_PATH" "$DIST_DMG_PATH"
 ditto "$BUILD_APP_PATH" "$DIST_APP_PATH"
 
+CODESIGN_FLAGS=(--force --sign "${SIGN_IDENTITY:--}")
+if [[ -n "$SIGN_IDENTITY" && "$SIGN_IDENTITY" != "-" ]]; then
+  CODESIGN_FLAGS+=(--options runtime --timestamp)
+else
+  CODESIGN_FLAGS+=(--timestamp=none)
+fi
+
 echo "Re-signing app bundle to account for manual additions..."
 # Components must be signed from inside out.
 # 1. Sign all dylibs and frameworks
 find "$DIST_APP_PATH/Contents/Frameworks" -name "*.dylib" -type f | while read -r dylib; do
   echo "Signing nested dylib: $dylib"
-  codesign --force --sign "${SIGN_IDENTITY:--}" --timestamp=none "$dylib"
+  codesign "${CODESIGN_FLAGS[@]}" "$dylib"
 done
 
 find "$DIST_APP_PATH/Contents/Frameworks" -name "*.framework" -type d | while read -r framework; do
   echo "Signing nested framework: $framework"
-  codesign --force --sign "${SIGN_IDENTITY:--}" --timestamp=none "$framework"
+  codesign "${CODESIGN_FLAGS[@]}" "$framework"
 done
 
-# 2. Sign the main executable
+# 2. Sign the main executable, preserving embedded entitlements
 echo "Signing main executable..."
-codesign --force --sign "${SIGN_IDENTITY:--}" --timestamp=none "$DIST_APP_PATH/Contents/MacOS/$APP_NAME"
+codesign "${CODESIGN_FLAGS[@]}" --preserve-metadata=entitlements "$DIST_APP_PATH/Contents/MacOS/$APP_NAME"
 
-# 3. Finally sign the app bundle itself
+# 3. Finally sign the app bundle itself, preserving sandbox/network entitlements
 echo "Signing app bundle..."
-codesign --force --sign "${SIGN_IDENTITY:--}" --timestamp=none "$DIST_APP_PATH"
+codesign "${CODESIGN_FLAGS[@]}" --preserve-metadata=entitlements "$DIST_APP_PATH"
 
 verify_bundle_signature "$DIST_APP_PATH"
 validate_bundle_dependencies "$DIST_APP_PATH"

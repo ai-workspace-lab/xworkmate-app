@@ -1,3 +1,4 @@
+import CFNetwork
 import Cocoa
 import Darwin
 import FlutterMacOS
@@ -6,11 +7,14 @@ import FlutterMacOS
 class AppDelegate: FlutterAppDelegate, NSWindowDelegate {
   private let skillDirectoryChannelName = "plus.svc.xworkmate/skill_directory_access"
   private let appLifecycleChannelName = "plus.svc.xworkmate/app_lifecycle"
+  private let networkProxyChannelName = "plus.svc.xworkmate/network_proxy"
   private let dockDisplayMode: DockDisplayMode = .regular
   private let statusProvider = FlutterAppStatusProvider()
   private var directoryAccessSessions: [String: URL] = [:]
   private var appLifecycleChannel: FlutterMethodChannel?
   private var appLifecycleMessengerId: ObjectIdentifier?
+  private var networkProxyChannel: FlutterMethodChannel?
+  private var networkProxyMessengerId: ObjectIdentifier?
   private var skillDirectoryChannel: FlutterMethodChannel?
   private var skillDirectoryMessengerId: ObjectIdentifier?
   private lazy var statusViewModel = AppStatusViewModel(provider: statusProvider)
@@ -85,7 +89,52 @@ class AppDelegate: FlutterAppDelegate, NSWindowDelegate {
 
   func registerApplicationChannels(for controller: FlutterViewController) {
     registerAppLifecycleChannel(for: controller)
+    registerNetworkProxyChannel(for: controller)
     registerSkillDirectoryChannel(for: controller)
+  }
+
+  func registerNetworkProxyChannel(for controller: FlutterViewController) {
+    let messengerObject = controller.engine.binaryMessenger as AnyObject
+    let messengerId = ObjectIdentifier(messengerObject)
+    if networkProxyMessengerId == messengerId {
+      return
+    }
+    let channel = FlutterMethodChannel(
+      name: networkProxyChannelName,
+      binaryMessenger: controller.engine.binaryMessenger
+    )
+    channel.setMethodCallHandler { call, result in
+      switch call.method {
+      case "getSystemProxySettings":
+        result(Self.readSystemProxySettings())
+      default:
+        result(FlutterMethodNotImplemented)
+      }
+    }
+    networkProxyChannel = channel
+    networkProxyMessengerId = messengerId
+  }
+
+  private static func readSystemProxySettings() -> [String: Any] {
+    guard let raw = CFNetworkCopySystemProxySettings()?.takeRetainedValue() as? [String: Any] else {
+      return [:]
+    }
+    let httpEnable = (raw[kCFNetworkProxiesHTTPEnable as String] as? NSNumber)?.boolValue ?? false
+    let httpProxy = raw[kCFNetworkProxiesHTTPProxy as String] as? String ?? ""
+    let httpPort = (raw[kCFNetworkProxiesHTTPPort as String] as? NSNumber)?.intValue ?? 0
+    let httpsEnable = (raw[kCFNetworkProxiesHTTPSEnable as String] as? NSNumber)?.boolValue ?? false
+    let httpsProxy = raw[kCFNetworkProxiesHTTPSProxy as String] as? String ?? ""
+    let httpsPort = (raw[kCFNetworkProxiesHTTPSPort as String] as? NSNumber)?.intValue ?? 0
+    let exceptionsList = raw[kCFNetworkProxiesExceptionsList as String] as? [String] ?? []
+    return [
+      "httpEnable": httpEnable,
+      "httpProxy": httpProxy,
+      "httpPort": httpPort,
+      "httpsEnable": httpsEnable,
+      "httpsProxy": httpsProxy,
+      "httpsPort": httpsPort,
+      "exceptionsList": exceptionsList,
+    ]
   }
 
   func registerSkillDirectoryChannel(for controller: FlutterViewController) {

@@ -5,6 +5,8 @@ set -euo pipefail
 # commits and pushes it to the Homebrew tap repository.
 
 DMG_PATH=""
+ARM64_DMG_PATH=""
+X86_64_DMG_PATH=""
 VERSION=""
 RELEASE_TAG=""
 TAP_REPO="${HOMEBREW_TAP_REPO:-ai-workspace-lab/homebrew-tap}"
@@ -17,7 +19,9 @@ usage() {
 Usage: update_homebrew_cask.sh [options]
 
 Options:
-  --dmg <path>         Path to the macOS .dmg release artifact (required)
+  --dmg <path>         Path to a single macOS .dmg release artifact
+  --arm64-dmg <path>   Path to the macOS arm64 .dmg release artifact
+  --x86_64-dmg <path>  Path to the macOS x86_64 .dmg release artifact
   --version <ver>      Display version for the cask (required, e.g. 1.2.0)
   --tag <tag>          GitHub release tag (required, e.g. v1.2.0)
   --tap-repo <repo>    Target Homebrew tap repo (default: ai-workspace-lab/homebrew-tap)
@@ -32,6 +36,14 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
     --dmg)
       DMG_PATH="${2:-}"
+      shift 2
+      ;;
+    --arm64-dmg)
+      ARM64_DMG_PATH="${2:-}"
+      shift 2
+      ;;
+    --x86_64-dmg)
+      X86_64_DMG_PATH="${2:-}"
       shift 2
       ;;
     --version)
@@ -70,14 +82,27 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ -z "$DMG_PATH" || -z "$VERSION" || -z "$RELEASE_TAG" ]]; then
-  echo "Error: --dmg, --version, and --tag are required." >&2
+if [[ -z "$VERSION" || -z "$RELEASE_TAG" ]]; then
+  echo "Error: --version and --tag are required." >&2
   usage >&2
   exit 1
 fi
 
-if [[ ! -f "$DMG_PATH" ]]; then
-  echo "Error: DMG file not found: $DMG_PATH" >&2
+if [[ -n "$ARM64_DMG_PATH" && -n "$X86_64_DMG_PATH" ]]; then
+  for dmg_candidate in "$ARM64_DMG_PATH" "$X86_64_DMG_PATH"; do
+    if [[ ! -f "$dmg_candidate" ]]; then
+      echo "Error: DMG file not found: $dmg_candidate" >&2
+      exit 1
+    fi
+  done
+elif [[ -n "$DMG_PATH" ]]; then
+  if [[ ! -f "$DMG_PATH" ]]; then
+    echo "Error: DMG file not found: $DMG_PATH" >&2
+    exit 1
+  fi
+else
+  echo "Error: provide either --dmg or both --arm64-dmg and --x86_64-dmg." >&2
+  usage >&2
   exit 1
 fi
 
@@ -93,19 +118,18 @@ compute_sha256() {
   fi
 }
 
-SHA256="$(compute_sha256 "$DMG_PATH")"
-DMG_FILENAME="$(basename "$DMG_PATH")"
-
 # Strip leading 'v' if present for the Homebrew cask version field.
 CASK_VERSION="${VERSION#v}"
 
-# Build the URL template using #{version} when the filename embeds the version,
-# otherwise fall back to the exact filename.
-if [[ "$DMG_FILENAME" == *"$CASK_VERSION"* ]]; then
-  URL_FILENAME="${DMG_FILENAME//$CASK_VERSION/\#{version\}}"
-else
-  URL_FILENAME="$DMG_FILENAME"
-fi
+format_url_filename() {
+  local dmg_filename
+  dmg_filename="$(basename "$1")"
+  if [[ "$dmg_filename" == *"$CASK_VERSION"* ]]; then
+    printf '%s\n' "${dmg_filename//$CASK_VERSION/\#{version\}}"
+  else
+    printf '%s\n' "$dmg_filename"
+  fi
+}
 
 if [[ "$RELEASE_TAG" == "v$CASK_VERSION" ]]; then
   URL_TAG="v#{version}"
@@ -119,9 +143,39 @@ render_cask() {
   cat <<EOF
 cask "xworkmate" do
   version "${CASK_VERSION}"
-  sha256 "${SHA256}"
+EOF
 
-  url "https://github.com/${SOURCE_REPO}/releases/download/${URL_TAG}/${URL_FILENAME}"
+  if [[ -n "$ARM64_DMG_PATH" && -n "$X86_64_DMG_PATH" ]]; then
+    local arm64_sha x86_64_sha arm64_file x86_64_file
+    arm64_sha="$(compute_sha256 "$ARM64_DMG_PATH")"
+    x86_64_sha="$(compute_sha256 "$X86_64_DMG_PATH")"
+    arm64_file="$(format_url_filename "$ARM64_DMG_PATH")"
+    x86_64_file="$(format_url_filename "$X86_64_DMG_PATH")"
+    cat <<EOF
+  arch arm: "arm64", intel: "x86_64"
+
+  sha256 arm:   "${arm64_sha}",
+         intel: "${x86_64_sha}"
+
+  on_arm do
+    url "https://github.com/${SOURCE_REPO}/releases/download/${URL_TAG}/${arm64_file}"
+  end
+  on_intel do
+    url "https://github.com/${SOURCE_REPO}/releases/download/${URL_TAG}/${x86_64_file}"
+  end
+EOF
+  else
+    local single_sha single_file
+    single_sha="$(compute_sha256 "$DMG_PATH")"
+    single_file="$(format_url_filename "$DMG_PATH")"
+    cat <<EOF
+  sha256 "${single_sha}"
+
+  url "https://github.com/${SOURCE_REPO}/releases/download/${URL_TAG}/${single_file}"
+EOF
+  fi
+
+  cat <<EOF
   name "XWorkmate"
   desc "Desktop-first AI workspace shell"
   homepage "https://github.com/${SOURCE_REPO}"
@@ -131,7 +185,7 @@ cask "xworkmate" do
     strategy :github_latest
   end
 
-  depends_on :macos
+  depends_on macos: ">= :ventura"
 
   app "XWorkmate.app"
 

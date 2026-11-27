@@ -44,7 +44,7 @@ enum MenuBarConnectionState: String {
   }
 }
 
-struct AppStatusSnapshot {
+struct AppStatusSnapshot: Equatable {
   let connectionState: MenuBarConnectionState
   let connectionLabel: String
   let runningTasks: Int
@@ -225,7 +225,10 @@ final class AppStatusViewModel: ObservableObject {
   func refreshNow() {
     provider.fetchSnapshot { [weak self] snapshot in
       DispatchQueue.main.async {
-        self?.snapshot = snapshot
+        guard let self, self.snapshot != snapshot else {
+          return
+        }
+        self.snapshot = snapshot
       }
     }
   }
@@ -236,6 +239,9 @@ final class AppStatusViewModel: ObservableObject {
 
   func applyRemoteSnapshot(_ snapshot: AppStatusSnapshot) {
     DispatchQueue.main.async {
+      guard self.snapshot != snapshot else {
+        return
+      }
       self.snapshot = snapshot
     }
   }
